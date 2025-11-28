@@ -183,7 +183,16 @@ def _get_redis_client() -> Optional[Any]:
         client.ping()
         return client
     except Exception as e:
-        logger.error(f"No se pudo conectar a Redis con REDIS_URL={REDIS_URL!r}: {e}")
+        safe_url = REDIS_URL
+        if safe_url and "@" in safe_url:
+            try:
+                prefix, rest = safe_url.split("@", 1)
+                if ":" in prefix:
+                    scheme_user, _pass = prefix.rsplit(":", 1)
+                    safe_url = f"{scheme_user}:***@{rest}"
+            except Exception:
+                pass
+        logger.error(f"No se pudo conectar a Redis con REDIS_URL={safe_url!r}: {e}")
         return None
 
 

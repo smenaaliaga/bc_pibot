@@ -19,6 +19,17 @@ LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
 BCCH_USER: str = os.getenv("BCCH_USER", "")
 BCCH_PASS: str = os.getenv("BCCH_PASS", "")
 REDIS_URL: Optional[str] = os.getenv("REDIS_URL")
+
+# Inject Redis credentials if provided in env vars and not already in URL
+_redis_user = os.getenv("REDIS_USER", "")
+_redis_pass = os.getenv("REDIS_PASS", "")
+if REDIS_URL and _redis_pass and "@" not in REDIS_URL:
+    # Assumes REDIS_URL starts with redis:// or rediss://
+    if "://" in REDIS_URL:
+        _scheme, _rest = REDIS_URL.split("://", 1)
+        _auth = f"{_redis_user}:{_redis_pass}@" if _redis_user else f":{_redis_pass}@"
+        REDIS_URL = f"{_scheme}://{_auth}{_rest}"
+
 # Controla si se exponen enlaces de API con credenciales en texto plano en los logs.
 # Por defecto ACTIVADO en este entorno protegido; puedes desactivarlo con LOG_EXPOSE_API_LINKS=0
 LOG_EXPOSE_API_LINKS: bool = os.getenv("LOG_EXPOSE_API_LINKS", "1").lower() in ("1", "true", "yes")

@@ -11,6 +11,7 @@ Lógica de la aplicación Streamlit (frontend del chatbot).
 from typing import Callable, List, Dict, Optional, Iterable
 import datetime
 import time
+import uuid
 
 import streamlit as st
 
@@ -24,11 +25,14 @@ except Exception:
     _orch = None  # type: ignore
 
 # Tipos para las funciones de orquestación
-StreamFn = Callable[[str, Optional[List[Dict[str, str]]]], Iterable[str]]
-InvokeFn = Callable[[str, Optional[List[Dict[str, str]]]], str]
+StreamFn = Callable[[str, Optional[List[Dict[str, str]]], Optional[str]], Iterable[str]]
+InvokeFn = Callable[[str, Optional[List[Dict[str, str]]], Optional[str]], str]
 
 
 def _init_session_state(settings: Settings) -> None:
+    if "session_id" not in st.session_state:
+        st.session_state.session_id = str(uuid.uuid4())
+
     if "messages" not in st.session_state:
         st.session_state.messages = []  # type: ignore[assignment]
 
@@ -127,7 +131,7 @@ def run_app(
     # Llamar al orquestador en modo streaming
     with st.chat_message("assistant"):
         with st.spinner("Pensando..."):
-            raw_chunks = stream_fn(user_message, history=history)
+            raw_chunks = stream_fn(user_message, history=history, session_id=st.session_state.session_id)
 
             markers_csv: List[Dict[str, str]] = []
             markers_chart: List[Dict[str, str]] = []
@@ -343,7 +347,7 @@ def run_app(
                     hist2: List[Dict[str, str]] = list(st.session_state.messages)
                     with st.chat_message("assistant"):
                         with st.spinner("Procesando los datos solicitados..."):
-                            response_chunks = stream_fn(cmd, history=hist2)
+                            response_chunks = stream_fn(cmd, history=hist2, session_id=st.session_state.session_id)
                             response_text2 = st.write_stream(response_chunks)
                     st.session_state.messages.append({"role": "user", "content": cmd})
                     st.session_state.messages.append({"role": "assistant", "content": response_text2})

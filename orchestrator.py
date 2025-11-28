@@ -24,24 +24,28 @@ from dataclasses import asdict
 from typing import Dict, Iterable, List, Optional, Any, Tuple
 from functools import lru_cache
 
+# Core dependency - fail fast if missing
+from langchain_core.prompts import ChatPromptTemplate
+
+# Redis for state management
 try:
-    from langchain_core.prompts import ChatPromptTemplate  # original import
-except Exception:  # fallback stub if langchain not installed
-    class ChatPromptTemplate:  # type: ignore
-        def __init__(self, messages):
-            self.messages = messages
-        @classmethod
-        def from_messages(cls, messages):
-            return cls(messages)
-        def __or__(self, other):  # pipe operator fallback
-            class _Chain:
-                def __init__(self, prompt, llm):
-                    self.prompt = prompt
-                    self.llm = llm
-                def stream(self, vars_dict):  # mimic langchain stream interface
-                    # Produce a minimal placeholder chunk
-                    yield type("Chunk", (), {"content": "[Stub LLM: dependencia langchain no disponible]"})
-            return _Chain(self, other)
+    import redis
+except ImportError:
+    redis = None
+
+# Importar el nuevo StateManager
+from state_manager import StateManager
+
+logger = logging.getLogger(__name__)
+
+# Inicializar gestor global (usando URL de config si existe)
+try:
+    from config import REDIS_URL
+except ImportError:
+    REDIS_URL = None
+
+# Instancia global del StateManager
+_state_manager = StateManager(REDIS_URL)
 
 try:
     from langchain_openai import ChatOpenAI  # original import
@@ -185,9 +189,37 @@ from prompt import ClassificationResult, classify_query  # después de configura
 # API explícita: clasificación LLM + router modular de intents
 # ---------------------------------------------------------------------------
 
+def _check_followup_agreement(question: str, pending_action: str) -> bool:
+    """Verifica si la respuesta del usuario confirma la acción pendiente."""
+    try:
+        action_desc = {
+            "TOGGLE_MONTHLY": "cambiar a frecuencia mensual",
+            "TOGGLE_ANNUAL": "cambiar a frecuencia anual",
+            "SHOW_CHART": "mostrar un gráfico",
+        }.get(pending_action, "realizar la acción sugerida")
+        
+        prompt = (
+            f"El asistente ofreció: {action_desc}.\n"
+            f"El usuario respondió: \"{question}\".\n"
+            "¿La respuesta del usuario indica que SÍ quiere proceder con esa acción? "
+            "Responde solo 'SI' o 'NO'."
+        )
+        
+        if not hasattr(_llm_method, "invoke"):
+            # Fallback for stub or incompatible LLM
+            return False
+
+        resp = _llm_method.invoke(prompt)
+        content = getattr(resp, "content", "") or ""
+        return "SI" in content.upper()
+    except Exception as e:
+        logger.error(f"[FOLLOW_UP_CHECK] Error: {e}")
+        return False
+
 def response_api_openai_type(
     question: str,
     history: List[Dict[str, str]],
+    session_id: Optional[str] = None,
 ) -> Tuple[ClassificationResult, str]:
     """Encapsula la clasificación con LLM y la construcción de history_text.
 
@@ -198,8 +230,21 @@ def response_api_openai_type(
     logger.info(
         f"[FASE] start: Fase C1: Clasificación de consulta (OpenAI - function calling) | model='{_settings.openai_model}'"
     )
+    history_text = _build_history_text(history)
+
+    # 0. Pre-check: ¿Es un follow-up a una sugerencia pendiente?
+    # Usar session_id real si está disponible, sino default
+    sess_key = session_id or "default_session"
+    pending_action, _ = _state_manager.get_pending_suggestion(sess_key)
+    
+    if pending_action:
+        if _check_followup_agreement(question, pending_action):
+            logger.info(f"[FASE] C1: Bypass classification -> FOLLOW_UP detected for {pending_action}")
+            # Retornamos un resultado sintético para que el router lo maneje
+            return ClassificationResult(query_type="FOLLOW_UP"), history_text
+
     try:
-        classification = classify_query(question)
+        classification = classify_query(question, history_text)
     except Exception as e:
         t_class_end = time.perf_counter()
         logger.error(
@@ -216,14 +261,70 @@ def response_api_openai_type(
         f"default_key={classification.default_key} | "
         f"error={classification.error}"
     )
-    history_text = _build_history_text(history)
     return classification, history_text
 
+
+def _handle_intent_followup(
+    classification: ClassificationResult,
+    question: str,
+    history_text: str,
+    session_id: Optional[str] = None,
+) -> Iterable[str]:
+    """Maneja respuestas de seguimiento ('sí', 'hazlo') usando memoria explícita (Redis) o heurísticas."""
+    
+    # 1. Intentar recuperar la intención pendiente desde Redis (Session ID simulado por ahora)
+    # En producción, pasar session_id real desde app.py
+    sess_key = session_id or "default_session"
+    pending_action, meta = _state_manager.get_pending_suggestion(sess_key)
+
+    if pending_action:
+        logger.info(f"[FOLLOW_UP] Found explicit pending action: {pending_action}")
+        _state_manager.clear_pending_suggestion(sess_key) # Consumir la acción
+        
+        if pending_action == "TOGGLE_MONTHLY":
+            handler = globals().get("_handle_intent_toggle_monthly")
+            if handler: return handler(classification, question, history_text, None)
+            
+        elif pending_action == "TOGGLE_ANNUAL":
+            handler = globals().get("_handle_intent_toggle_annual")
+            if handler: return handler(classification, question, history_text, None)
+            
+        elif pending_action == "SHOW_CHART":
+            handler = globals().get("_handle_intent_chart_request")
+            if handler: return handler(classification, question, history_text, None)
+
+    # 2. Fallback a heurísticas de texto (Legacy)
+    last_assistant_msg = ""
+    parts = history_text.split("assistant:")
+    if len(parts) > 1:
+        last_assistant_msg = parts[-1].lower()
+    
+    if not last_assistant_msg:
+        return iter(["Entendido. ¿En qué más puedo ayudarte?"])
+
+    # Heurísticas
+    if "variación mensual" in last_assistant_msg or "mes a mes" in last_assistant_msg:
+        handler = globals().get("_handle_intent_toggle_monthly")
+        if handler and _last_data_context.get("data_full"):
+            return handler(classification, question, history_text, None)
+
+    if "gráfico" in last_assistant_msg or "grafico" in last_assistant_msg:
+        handler = globals().get("_handle_intent_chart_request")
+        if handler and _last_data_context.get("data_full"):
+            return handler(classification, question, history_text, None)
+
+    if "variación anual" in last_assistant_msg or "interanual" in last_assistant_msg:
+        handler = globals().get("_handle_intent_toggle_annual")
+        if handler and _last_data_context.get("data_full"):
+             return handler(classification, question, history_text, None)
+
+    return iter(["Entendido. Para continuar, por favor especifica qué acción deseas realizar."])
 
 def intent_response(
     classification: ClassificationResult,
     question: str,
     history_text: str,
+    session_id: Optional[str] = None,
 ) -> Optional[Iterable[str]]:
     """Router modular: intenta manejar la consulta con intents configurables
     y rutas deterministas tempranas. Si maneja, devuelve un iterable de chunks;
@@ -234,7 +335,13 @@ def intent_response(
     if dispatched is not None:
         logger.info("[ROUTE] CONFIG_INTENT_MATCHED")
         return dispatched
-    # 2) Ruta temprana: contribución sectores IMACEC (determinista)
+    
+    # 2) Manejo de afirmación (sí/yes) sobre contexto previo
+    if classification.query_type == "FOLLOW_UP":
+        logger.info("[ROUTE] FOLLOW_UP_DETECTED")
+        return _handle_intent_followup(classification, question, history_text, session_id=session_id)
+
+    # 3) Ruta temprana: contribución sectores IMACEC (determinista)
     if _detect_imacec_sector_contribution(question):
         logger.info("[ROUTE] IMACEC_SECTOR_CONTRIBUTION")
         return _stream_imacec_sector_contribution(question)
@@ -705,6 +812,7 @@ def _stream_data_phase_with_table(
     domain: str,
     year: int,
     data: Dict[str, Any],
+    session_id: Optional[str] = None,
 ) -> Iterable[str]:
     """Emite tabla de comparación y luego metadatos + resumen fase 2 en streaming.
 
@@ -755,6 +863,14 @@ def _stream_data_phase_with_table(
             yield "\n" + marker + "\n"
     except Exception as _e_footer:
         logger.error(f"[CSV_MARKER_ERROR] domain={domain} year={year} e={_e_footer}")
+
+    # Registrar sugerencia pendiente en Redis (Short Term Memory)
+    # Asumimos que si mostramos datos anuales, la siguiente acción lógica es ver mensual o gráfico
+    try:
+        sess_key = session_id or "default_session"
+        _state_manager.set_pending_suggestion(sess_key, "TOGGLE_MONTHLY")
+    except Exception:
+        pass
 
 # ---------------------------------------------------------------------------
 # Funciones auxiliares restauradas (streaming y normalización)
@@ -1618,6 +1734,7 @@ def _handle_intent_imacec_month_interval(
     lastdate = f"{year}-12-31"
     data = _call_with_trace(
         "IMACEC_MONTH_INTERVAL",
+       
         _get_series_with_retry,
         series_id=series_id,
         firstdate=firstdate,
@@ -2371,11 +2488,11 @@ def _stream_imacec_latest_flow(
         table_text = _build_year_table(data, latest_year)
         # Reemplazar encabezado 'Mes |' o 'Trimestre |' por 'Periodo |'
         _lines = table_text.split("\n")
-        for _i, _ln in enumerate(_lines):
-            if _ln.startswith("Mes | ") or _ln.startswith("Mes | Año"):
-                _lines[_i] = _ln.replace("Mes |", "Periodo |")
-            elif _ln.startswith("Trimestre |"):
-                _lines[_i] = _ln.replace("Trimestre |", "Periodo |")
+        for _i, _l in enumerate(_lines):
+            if _l.startswith("Mes | ") or _l.startswith("Mes | Año"):
+                _lines[_i] = _l.replace("Mes |", "Periodo |")
+            elif _l.startswith("Trimestre |"):
+                _lines[_i] = _l.replace("Trimestre |", "Periodo |")
         table_text = "\n".join(_lines)
         _imacec_full_lines = table_text.count("\n") + 1
         logger.info(f"[IMACEC_LATEST_TABLE_FULL_COMPARISON] year={latest_year} lines={_imacec_full_lines}")
@@ -2413,8 +2530,9 @@ def _stream_imacec_latest_flow(
         "La tabla de comparación ya fue mostrada al usuario. Ahora SOLO debes: primero mencionar explícitamente "
         "el último valor de variación anual del IMACEC que te doy, en una frase muy breve y neutra, y luego presentar "
         "tres preguntas de seguimiento, sin análisis ni interpretaciones adicionales. "
-        "NO repitas la tabla, NO inventes números nuevos, NO menciones años futuros al {year} ni proyectes resultados. "
-        "La salida debe ser SOLO texto plano: una breve frase con el último valor y luego exactamente tres preguntas en líneas separadas."
+        "NO repitas la tabla, NO muestres filas ni columnas, NO reescribas valores numéricos ni porcentajes. "
+        "NO menciones años futuros al {year} ni proyectes resultados. "
+        "La salida final debe ser SOLO texto plano: una breve frase introductoria neutral y luego exactamente tres preguntas en líneas separadas."
     ).format(year=latest_year)
 
     last_yoy_info = last_yoy_text or "No se dispone de una variación anual identificable para el último año."  # fallback seguro
@@ -2554,9 +2672,8 @@ def _stream_pib_latest_flow(
         yield "No fue posible conectar con la API tras reintentos. Por favor, intenta nuevamente."
         return
 
-    latest_year = _get_latest_year_from_data(data)
-    if want_full_comparison and latest_year:
-        table_text = _build_year_table(data, latest_year)
+    if want_full_comparison:
+        table_text = _build_year_table(data, today.year)
         # Reemplazar encabezado 'Mes |' o 'Trimestre |' por 'Periodo |'
         _p_lines = table_text.split("\n")
         for _pi, _pl in enumerate(_p_lines):
@@ -2566,17 +2683,18 @@ def _stream_pib_latest_flow(
                 _p_lines[_pi] = _pl.replace("Trimestre |", "Periodo |")
         table_text = "\n".join(_p_lines)
         _pib_full_lines = table_text.count("\n") + 1
-        logger.info(f"[PIB_LATEST_TABLE_FULL_COMPARISON] year={latest_year} lines={_pib_full_lines}")
+        logger.info(f"[PIB_LATEST_TABLE_FULL_COMPARISON] year={today.year} lines={_pib_full_lines}")
         yield "\n" + table_text + "\n\n"
     else:
         table_text = _build_latest_only_table(data)
         _pib_one_row_lines = table_text.count("\n") + 1
         logger.info(f"[PIB_LATEST_TABLE_ONE_ROW] lines={_pib_one_row_lines}")
         yield "\n" + table_text + "\n\n"
+    # Guardar contexto completo para soportar cambio de frecuencia posterior
     _last_data_context.update({
         "series_id": series_id,
         "domain": domain,
-        "year": latest_year,
+        "year": today.year,
         "freq": data.get("meta", {}).get("freq_effective"),
         "data_full": data,
     })
@@ -2660,30 +2778,26 @@ def _stream_pib_latest_flow(
     except Exception as _e_footer:
         logger.error(f"[CSV_MARKER_ERROR] pib_latest e={_e_footer}")
 
-# ---------------------------------------------------------------------------
-# API pública: stream / invoke
-# ---------------------------------------------------------------------------
-
-
 def stream(
     question: str,
     history: Optional[List[Dict[str, str]]] = None,
+    session_id: Optional[str] = None,
 ) -> Iterable[str]:
     """
     Versión con STREAMING real para integrar con `st.write_stream`.
     """
     t_orch_start = time.perf_counter()
     logger.info(
-        f"[FASE] start: Fase C0: Orquestador - Turno de chat | question='{question}'"
+        f"[FASE] start: Fase C0: Orquestador - Turno de chat | question='{question}' | session_id={session_id}"
     )
 
     # 1) Clasificación vía función explícita
-    classification, history_text = response_api_openai_type(question, history or [])
+    classification, history_text = response_api_openai_type(question, history or [], session_id=session_id)
     q_type = _normalize(getattr(classification, "query_type", None))
     domain = _normalize(getattr(classification, "data_domain", None))
 
     # 2) Ruteo determinista modular: intenta manejar por intents/handlers
-    intent_iter = intent_response(classification, question, history_text)
+    intent_iter = intent_response(classification, question, history_text, session_id=session_id)
     if intent_iter is not None:
         for chunk in intent_iter:
             yield chunk
@@ -2719,18 +2833,18 @@ def stream(
         if not data:
             yield "No fue posible conectar con la API tras reintentos. Por favor, intenta nuevamente."
             return
-        table_text = _build_month_interval_yoy_table(data, year_sel, m_start, m_end)
+        table_text = _call_with_trace("IMACEC_MONTH_INTERVAL", _build_month_interval_yoy_table, data, year, m1, m2)
         yield "\n" + table_text + "\n\n"
         _last_data_context.update({
             "series_id": series_id,
             "domain": "IMACEC",
-            "year": year_sel,
+            "year": year,
             "freq": data.get("meta", {}).get("freq_effective"),
             "data_full": data,
             "data_full_original_annual": data,
             "metric_type": "annual",
         })
-        md_block = _format_series_metadata_block(series_id)
+        md_block = _call_with_trace("IMACEC_MONTH_INTERVAL", _format_series_metadata_block, series_id)
         if md_block.strip():
             yield md_block + "\n"
         followups = [
@@ -2738,16 +2852,14 @@ def stream(
             "¿Quieres comparar con el mismo intervalo de otro año?",
             "¿Necesitas un gráfico de la variación anual de estos meses?",
         ]
-        for f in followups:
-            yield f + "\n"
-        # CSV marker para el intervalo
+        out.extend([f + "\n" for f in followups])
         try:
-            filename_base = f"imacec_{year_sel}_{m_start:02d}_{m_end:02d}"
-            marker = _emit_csv_download_marker(table_text, filename_base, preferred_filename=f"{filename_base}.csv")
+            filename_base = f"imacec_{year}_{m1:02d}_{m2:02d}"
+            marker = _call_with_trace("IMACEC_MONTH_INTERVAL", _emit_csv_download_marker, table_text, filename_base, preferred_filename=f"{filename_base}.csv")
             if marker:
-                yield "\n" + marker + "\n"
+                out.append("\n" + marker + "\n")
         except Exception as _e_csv_int:
-            logger.error(f"[CSV_MARKER_ERROR] month_interval year={year_sel} m1={m_start} m2={m_end} e={_e_csv_int}")
+            logger.error(f"[CSV_MARKER_ERROR] month_interval(INTENTS) year={year} m1={m1} m2={m2} e={_e_csv_int}")
         t_orch_end = time.perf_counter()
         logger.info(
             f"[FASE] end: Fase C0: Orquestador - Turno de chat ({t_orch_end - t_orch_start:.3f}s) | resumen='IMACEC/MONTH_INTERVAL'"
@@ -2780,35 +2892,33 @@ def stream(
         if not data:
             yield "No fue posible conectar con la API tras reintentos. Por favor, intenta nuevamente."
             return
-        table_text = _build_single_month_row(data, year_sel, month_sel)
+        table_text = _call_with_trace("IMACEC_MONTH_SPECIFIC", _build_single_month_row, data, year, month)
         yield "\n" + table_text + "\n\n"
         _last_data_context.update({
             "series_id": series_id,
             "domain": "IMACEC",
-            "year": year_sel,
+            "year": year,
             "freq": data.get("meta", {}).get("freq_effective"),
             "data_full": data,
             "data_full_original_annual": data,
             "metric_type": "annual",
         })
-        md_block = _format_series_metadata_block(series_id)
+        md_block = _call_with_trace("IMACEC_MONTH_SPECIFIC", _format_series_metadata_block, series_id)
         if md_block.strip():
-            yield md_block + "\n"
+            out.append(md_block + "\n")
         followups = [
             "¿Deseas ver la variación mensual (mes a mes)?",
             "¿Quieres comparar con otro año?",
             "¿Necesitas un gráfico de la variación anual?",
         ]
-        for f in followups:
-            yield f + "\n"
-        # CSV marker
+        out.extend([f + "\n" for f in followups])
         try:
-            filename_base = f"imacec_{year_sel}_{month_sel:02d}"
-            marker = _emit_csv_download_marker(table_text, filename_base, preferred_filename=f"{filename_base}.csv")
+            filename_base = f"imacec_{year}_{month:02d}"
+            marker = _call_with_trace("IMACEC_MONTH_SPECIFIC", _emit_csv_download_marker, table_text, filename_base, preferred_filename=f"{filename_base}.csv")
             if marker:
-                yield "\n" + marker + "\n"
+                out.append("\n" + marker + "\n")
         except Exception as _e_csv_m:
-            logger.error(f"[CSV_MARKER_ERROR] month_specific year={year_sel} month={month_sel} e={_e_csv_m}")
+            logger.error(f"[CSV_MARKER_ERROR] month_specific(INTENTS) year={year} month={month} e={_e_csv_m}")
         t_orch_end = time.perf_counter()
         logger.info(
             f"[FASE] end: Fase C0: Orquestador - Turno de chat ({t_orch_end - t_orch_start:.3f}s) | resumen='IMACEC/MONTH_SPEC'"
@@ -2832,7 +2942,7 @@ def stream(
                 if marker:
                     yield "\n" + marker + "\n"
             except Exception as _e_csv_mom:
-                logger.error(f"[CSV_MARKER_ERROR] toggle_monthly year={year_ctx} e={_e_csv_mom}")
+                logger.error(f"[CSV_MARKER_ERROR] toggle_monthly(INTENTS) year={year_ctx} e={_e_csv_mom}")
             followups = [
                 "¿Quieres volver a la variación anual (interanual)?",
                 "¿Deseas generar un gráfico de esta variación mensual?",
@@ -2852,7 +2962,7 @@ def stream(
         data_ctx = _last_data_context.get("data_full_original_annual") or _last_data_context.get("data_full")
         if year_ctx and data_ctx:
             logger.info(f"[ROUTE] TOGGLE_TO_ANNUAL year={year_ctx}")
-            _log_intent("TOGGLE_ANNUAL")
+            _log_intent("TOGGLE_ANUAL")
             table_text = _build_year_yoy_simple_table(data_ctx, int(year_ctx))
             yield "\n" + table_text + "\n\n"
             _last_data_context["metric_type"] = "annual"
@@ -2862,7 +2972,7 @@ def stream(
                 if marker:
                     yield "\n" + marker + "\n"
             except Exception as _e_csv_yoy:
-                logger.error(f"[CSV_MARKER_ERROR] toggle_annual year={year_ctx} e={_e_csv_yoy}")
+                logger.error(f"[CSV_MARKER_ERROR] toggle_annual(INTENTS) year={year_ctx} e={_e_csv_yoy}")
             followups = [
                 "¿Quieres ver nuevamente la variación mensual?",
                 "¿Deseas generar un gráfico de la variación anual?",
@@ -2921,180 +3031,6 @@ def stream(
             return
 
     # Cambio de frecuencia: interceptar ANTES de los flujos especiales
-    freq_req = _detect_frequency_change(question)
-    if freq_req and _last_data_context.get("series_id") and _last_data_context.get("data_full"):
-        target_freq = freq_req["target_freq"]
-        same_series = freq_req["same_series"]
-        # Si el usuario menciona el dominio y coincide con el contexto, también lo tratamos como misma serie
-        if same_series:
-            logger.info(
-                f"[ROUTE] FREQ_CHANGE intercept | target={target_freq} | last_series={_last_data_context.get('series_id')} | last_freq={_last_data_context.get('freq')}"
-            )
-            original_data = _last_data_context.get("data_full")
-            year_used = _last_data_context.get("year")
-            for chunk in _stream_frequency_change_table_only(
-                original_data=original_data,
-                target_freq=target_freq,
-                domain=_last_data_context.get("domain") or domain,
-                year=year_used,
-            ):
-                yield chunk
-            t_orch_end = time.perf_counter()
-            logger.info(
-                f"[FASE] end: Fase C0: Orquestador - Turno de chat ({t_orch_end - t_orch_start:.3f}s) | resumen='DATA/FREQ_CHANGE_TABLE_ONLY'"
-            )
-            return
-
-    # Caso especial: DATA sobre IMACEC sin año explícito (p.ej. "¿Cuál es el valor del IMACEC?")
-    if q_type == "DATA" and domain == "IMACEC" and _extract_year(question) is None:
-        logger.info("[ROUTE] IMACEC_LATEST_FLOW question_without_year (stream)")
-        _log_intent("IMACEC_LATEST")
-        for chunk in _stream_imacec_latest_flow(
-            classification=classification,
-            question=question,
-            history_text=history_text,
-        ):
-            yield chunk
-        t_orch_end = time.perf_counter()
-        logger.info(
-            f"[FASE] end: Fase C0: Orquestador - Turno de chat ({t_orch_end - t_orch_start:.3f}s) | resumen='DATA/IMACEC_LATEST'"
-        )
-        return
-
-    # Consulta de calendario (intercepta antes de flujos de datos/metodológicos)
-    cal_domain = _detect_calendar_request(question)
-    if cal_domain:
-        logger.info(f"[ROUTE] CALENDAR_REQUEST domain={cal_domain}")
-        _log_intent("CALENDAR_REQUEST")
-        entries = _load_calendar(cal_domain)
-        table = _build_calendar_table(cal_domain, entries)
-        yield f"Calendario de publicaciones {cal_domain} (2025)\n\n" + table + "\n\n" + _calendar_recommendations(cal_domain) + "\n"
-        t_orch_end = time.perf_counter()
-        logger.info(f"[FASE] end: Fase C0: Orquestador - Turno de chat ({t_orch_end - t_orch_start:.3f}s) | resumen='CALENDAR/{cal_domain}'")
-        return
-
-    # Caso especial: DATA sobre PIB sin año explícito (p.ej. "¿Cuál es el valor del PIB?")
-    if q_type == "DATA" and domain == "PIB" and _extract_year(question) is None:
-        logger.info("[ROUTE] PIB_LATEST_FLOW question_without_year (stream)")
-        _log_intent("PIB_LATEST")
-        for chunk in _stream_pib_latest_flow(
-            classification=classification,
-            question=question,
-            history_text=history_text,
-        ):
-            yield chunk
-        t_orch_end = time.perf_counter()
-        logger.info(
-            f"[FASE] end: Fase C0: Orquestador - Turno de chat ({t_orch_end - t_orch_start:.3f}s) | resumen='DATA/PIB_LATEST'"
-        )
-        return
-
-    # Caso especial: año específico IMACEC / PIB (tabla simple Mes | Variación anual)
-    year_specific = _extract_year(question)
-    if (
-        q_type == "DATA" and year_specific is not None and domain in ("IMACEC", "PIB")
-        and classification.is_generic
-    ):
-        # Excepción: si el usuario pide explícitamente índices y variación anual, usar flujo estándar
-        q_low = question.lower()
-        if not ("indices" in q_low or "índices" in q_low) or ("variacion anual" not in q_low and "variación anual" not in q_low):
-            logger.info(f"[ROUTE] YEAR_SIMPLE_FLOW domain={domain} year={year_specific}")
-            _log_intent("YEAR_SIMPLE_FLOW")
-            # Fase 1 metodológica breve (restaurada)
-            mode_instruction = get_data_first_phase_instruction()
-            wrapped_method = _wrap_phase_stream(
-                phase_name="Fase C2: Respuesta metodológica (stream)",
-                description="modo='primera_fase_datos/year_simple'",
-                inner_iter=_stream_methodological_phase(
-                    classification=classification,
-                    question=question,
-                    history_text=history_text,
-                    mode_instruction=mode_instruction,
-                ),
-            )
-            for chunk in wrapped_method:
-                yield str(chunk)
-            # Banner
-            yield get_processing_banner()
-            # Resolver serie específica por JSON (variant-aware) y luego fetch año-1/año
-            try:
-                series_id, freq, agg = resolve_series_for_key(question, domain)
-                if not series_id:
-                    # Fallback legacy por dominio
-                    defaults = _load_defaults_for_domain(domain) or {}
-                    series_id = defaults.get("cod_serie")
-                    freq = defaults.get("freq") or None
-                    agg = "avg"
-                if not series_id:
-                    raise RuntimeError("no series_id for YEAR_SIMPLE_FLOW")
-                data_year = _fetch_series_for_year_by_series_id(series_id, year_specific, freq)
-            except Exception as e:
-                logger.error(f"[YEAR_SIMPLE_FLOW_FETCH] error domain={domain} year={year_specific} e={e}")
-                yield f"No fue posible obtener datos para {domain} año {year_specific}."
-                t_orch_end = time.perf_counter()
-                logger.info(
-                    f"[FASE] end: Fase C0: Orquestador - Turno de chat ({t_orch_end - t_orch_start:.3f}s) | resumen='DATA/YEAR_SIMPLE_FAIL'"
-                )
-                return
-            if not data_year:
-                yield f"No se encontraron datos del {domain} para el año {year_specific}."
-                t_orch_end = time.perf_counter()
-                logger.info(
-                    f"[FASE] end: Fase C0: Orquestador - Turno de chat ({t_orch_end - t_orch_start:.3f}s) | resumen='DATA/YEAR_SIMPLE_EMPTY'"
-                )
-                return
-            table_text = _build_year_yoy_simple_table(data_year, year_specific)
-            yield "\n" + table_text + "\n\n"
-            # Metadatos según la serie efectiva usada
-            meta_sid = (data_year.get("meta") or {}).get("series_id")
-            if meta_sid:
-                md_block = _format_series_metadata_block(meta_sid)
-                if md_block.strip():
-                    yield md_block + "\n"
-            # Último yoy para frase
-            last_yoy_text = _format_last_yoy_from_table(data_year, year_specific) or "No se identificó una variación anual final."
-            instruction2 = get_data_second_phase_instruction()
-            system_msg = (
-                "Eres el asistente económico del Banco Central de Chile (PIBot). Responde SIEMPRE en español. "
-                "Estás en la FASE 2 para una consulta de datos anual simplificada. "
-                "Debes mencionar brevemente el último valor de variación anual del año consultado y luego ofrecer tres preguntas de seguimiento. "
-                "No repitas la tabla ni agregues análisis.")
-            human_msg = (
-                f"Dominio: {domain}\nAño consultado: {year_specific}\nÚltimo valor a mencionar tal cual: {last_yoy_text}\n\nInstrucción fase 2:\n{instruction2}" )
-            # Fase 2 usando invoke + sanitización para evitar artefactos
-            try:
-                try:
-                    from langchain_core.messages import SystemMessage, HumanMessage  # type: ignore
-                except ImportError:
-                    from langchain.schema import SystemMessage, HumanMessage  # type: ignore
-                msg_p2 = _llm_data.invoke([
-                    SystemMessage(content=system_msg),
-                    HumanMessage(content=human_msg),
-                ])
-                raw_p2 = getattr(msg_p2, "content", None) or getattr(msg_p2, "text", None) or ""
-                phase2 = _sanitize_llm_text(str(raw_p2))
-            except Exception as e:
-                logger.error(f"[YEAR_SIMPLE_PHASE2_ERROR] {e}")
-                phase2 = "No fue posible generar la segunda fase."
-            sentences = re.split(r"(?<=[.!?])\s+", phase2.strip())
-            for s in sentences:
-                if s:
-                    yield s + "\n"
-            # CSV marker para YEAR_SIMPLE_FLOW
-            try:
-                marker = _emit_csv_download_marker(table_text, f"{domain.lower()}_{year_specific}_yoy", preferred_filename=f"{domain.lower()}_{year_specific}_yoy.csv")
-                if marker:
-                    yield "\n" + marker + "\n"
-            except Exception as _e_footer:
-                logger.error(f"[CSV_MARKER_ERROR] year_simple domain={domain} year={year_specific} e={_e_footer}")
-            t_orch_end = time.perf_counter()
-            logger.info(
-                f"[FASE] end: Fase C0: Orquestador - Turno de chat ({t_orch_end - t_orch_start:.3f}s) | resumen='DATA/YEAR_SIMPLE'"
-            )
-            return
-
-    # Manejo especial: cambio de frecuencia solicitado
-    # Si no es misma serie continúa flujo normal
 
     # Manejo especial: selección directa de una serie después de vector search
     m_use = re.search(r"usar serie\s+([A-Z0-9_.]+)", question.upper())
@@ -3169,6 +3105,7 @@ def stream(
             domain=domain,
             year=year_sel,
             data=data_sel,
+            session_id=session_id,
         ):
             yield chunk
         t_orch_end = time.perf_counter()
@@ -3283,6 +3220,7 @@ def stream(
                     domain=domain,
                     year=year,
                     data=data,
+                    session_id=session_id,
                 ):
                     yield chunk
                 _last_data_context["data_full"] = data
@@ -3335,36 +3273,13 @@ def stream(
         f"({t_orch_end - t_orch_start:.3f}s) | resumen='OTRO/{domain}'"
     )
 
-
 def invoke(
     question: str,
     history: Optional[List[Dict[str, str]]] = None,
+    session_id: Optional[str] = None,
 ) -> str:
-    return "".join(chunk for chunk in stream(question, history=history))
-
-
-def stream_answer(question: str, history: Optional[List[Dict[str, str]]] = None) -> Iterable[str]:
-    """Orquestador principal expuesto a la app (wrapper simplificado).
-
-    Aquí se enruta la consulta según su clasificación y se aplica el flujo
-    especial para preguntas generales sobre IMACEC sin año explícito.
     """
-    history = history or []
-    history_text = "\n".join(f"{m['role']}: {m['content']}" for m in history)
-
-    # Clasificación de la consulta
-    # La firma actual de classify_query solo acepta `question`.
-    cls = classify_query(question)
-
-    # Caso especial: DATA sobre IMACEC sin año explícito (p.ej. "¿Cuál es el valor del IMACEC?")
-    if (
-        getattr(cls, "query_type", "") == "DATA"
-        and getattr(cls, "data_domain", "") == "IMACEC"
-        and _extract_year(question) is None
-    ):
-        logger.info("[ROUTE] IMACEC_LATEST_FLOW question_without_year")
-        for chunk in _stream_imacec_latest_flow(cls, question, history_text):
-            yield chunk
-        return
-
-    # ...existing routing logic for other cases (DATA con año, METHODOLOGICAL, etc.)...
+    Versión síncrona (no-streaming) que consume el generador stream().
+    """
+    chunks = stream(question, history=history, session_id=session_id)
+    return "".join(chunks)

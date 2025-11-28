@@ -23,11 +23,11 @@ def main() -> None:
     settings = get_settings()
 
     # Funciones que espera app.run_app (inyectadas desde el orquestador)
-    def invoke_fn(question: str, history: Optional[List[Dict[str, str]]] = None) -> str:
-        return orchestrator.invoke(question, history=history)
+    def invoke_fn(question: str, history: Optional[List[Dict[str, str]]] = None, session_id: Optional[str] = None) -> str:
+        return orchestrator.invoke(question, history=history, session_id=session_id)
 
-    def stream_fn(question: str, history: Optional[List[Dict[str, str]]] = None):
-        return orchestrator.stream(question, history=history)
+    def stream_fn(question: str, history: Optional[List[Dict[str, str]]] = None, session_id: Optional[str] = None):
+        return orchestrator.stream(question, history=history, session_id=session_id)
 
     # Delegar la construcción de la UI a app.py
     app.run_app(

@@ -171,7 +171,7 @@ respetando estos criterios.
 """.strip()
 
 
-def classify_query(question: str) -> ClassificationResult:
+def classify_query(question: str, history_text: str = "") -> ClassificationResult:
     """Llama a OpenAI con function calling para clasificar la consulta económica."""
     # Reglas deterministas previas: casos frecuentes IMACEC/PIB
     try:
@@ -238,11 +238,12 @@ def classify_query(question: str) -> ClassificationResult:
         # Default fallback
         return ClassificationResult(query_type=None, data_domain=None, is_generic=False, default_key=None, error="openai_client_unavailable")
     try:
+        content_msg = f"Historial:\n{history_text}\n\nConsulta: {question}" if history_text else question
         resp = _client.chat.completions.create(
             model=_settings.openai_model,
             messages=[
                 {"role": "system", "content": _SYSTEM_PROMPT},
-                {"role": "user", "content": question},
+                {"role": "user", "content": content_msg},
             ],
             tools=[
                 {
