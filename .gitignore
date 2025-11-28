@@ -1,0 +1,265 @@
+# ==============================================================================
+# PIBot - .gitignore
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Environment Variables & Secrets
+# ------------------------------------------------------------------------------
+# CRÍTICO: Archivos con API keys y credenciales
+.env
+.env.*
+.env.local
+.env.*.local
+env.txt
+
+# Archivos de configuración con posible información sensible
+config.txt
+
+# Azure credentials
+azure.credentials
+*.azureauth
+
+# ------------------------------------------------------------------------------
+# Python
+# ------------------------------------------------------------------------------
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# PEP 582
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.venv
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# ------------------------------------------------------------------------------
+# Streamlit
+# ------------------------------------------------------------------------------
+# Streamlit secrets
+.streamlit/secrets.toml
+
+# ------------------------------------------------------------------------------
+# Logs & Exports
+# ------------------------------------------------------------------------------
+# Application logs 
+logs/
+!logs/.gitkeep
+
+# Test logs y respuestas generadas 
+test/*.log
+test/log_*.text
+test/responses_*.json
+test/*.csv
+test/*.xlsx
+
+# ------------------------------------------------------------------------------
+# Temporary & Cache files
+# ------------------------------------------------------------------------------
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ------------------------------------------------------------------------------
+# UV Lock
+# ------------------------------------------------------------------------------
+# uv.lock puede incluirse para reproducibilidad exacta o ignorarse
+# Descomenta la siguiente línea si prefieres no versionarlo:
+# uv.lock
+
+# ------------------------------------------------------------------------------
+# IDE & Editor
+# ------------------------------------------------------------------------------
+# VSCode
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+*.iml
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*.swn
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# ------------------------------------------------------------------------------
+# Catálogos y Configuración del Proyecto
+# ------------------------------------------------------------------------------
+
+# ------------------------------------------------------------------------------
+# Database & Data files
+# ------------------------------------------------------------------------------
+*.db
+*.sqlite
+*.sqlite3
+
+# PostgreSQL dumps
+*.dump
+*.sql.gz
+
+# NOTA: db/pgvector.sql y db/azure_ai_search_setup.py SÍ deben versionarse
+
+# ------------------------------------------------------------------------------
+# Archive & Legacy
+# ------------------------------------------------------------------------------
+# Código y archivos legacy archivados (generalmente no necesitan versionarse)
+archive_legacy/
+
+# ------------------------------------------------------------------------------
+# Source documents
+# ------------------------------------------------------------------------------
+# Documentos fuente que pueden contener información sensible
+source/
+
+# Pero permitir archivos de documentación del proyecto
+!source/README.md
+!source/DOCS.md
+
+# ------------------------------------------------------------------------------
+# Documentación temporal
+# ------------------------------------------------------------------------------
+# Archivos .txt de documentación temporal
+documentacion.txt
+
+# ------------------------------------------------------------------------------
+# Miscellaneous
+# ------------------------------------------------------------------------------
+# Backup files
+*.bak
+*.backup
+
+# Compressed files
+*.zip
+*.tar.gz
+*.rar
+
+# Local configuration overrides 
+local.config.py
+config.local.py

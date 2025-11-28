@@ -1,0 +1,43 @@
+{
+  "defaults": {
+    "IMACEC": {
+      "cod_serie": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "nkname_esp": "Imacec empalmado, serie original (índice 2018=100)",
+      "tipo_medida_por_defecto": "indice",
+      "transformacion_por_defecto": "yoy_same_period_pct",
+      "freq_por_defecto": "M",
+      "intents": [
+        "imacec",
+        "crecimiento del imacec",
+        "evolución del imacec",
+        "actividad económica mensual"
+      ]
+    },
+    "PIB_TOTAL": {
+      "cod_serie": "F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
+      "nkname_esp": "PIB total a precios corrientes en flujo (encadenado EP18), trimestral",
+      "tipo_medida_por_defecto": "volumen_real",
+      "transformacion_por_defecto": "yoy_same_period_pct",
+      "freq_por_defecto": "T",
+      "intents": [
+        "pib",
+        "pib de chile",
+        "crecimiento del pib",
+        "producto interno bruto"
+      ]
+    },
+    "PIB_REGIONAL": {
+      "cod_serie": "F035.PIB.V12.R.CLP.2018.CONT.Z.Z.TOTAL.0.T",
+      "nkname_esp": "PIB total regionalizado, volumen a precios del año anterior encadenado, referencia 2018",
+      "tipo_medida_por_defecto": "volumen_real_regional",
+      "transformacion_por_defecto": "yoy_same_period_pct",
+      "freq_por_defecto": "T",
+      "intents": [
+        "pib regional",
+        "pib",
+        "pib por región",
+        "producto interno bruto regional"
+      ]
+    }
+  }
+}

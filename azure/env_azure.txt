@@ -1,0 +1,10 @@
+# ===========================
+AZURE_ENV_NAME="chat-playground-2891"
+AZURE_LOCATION="eastus2"
+AZURE_SUBSCRIPTION_ID="f46df88d-5e5e-4164-8a80-182995d2a7d7"
+AZURE_EXISTING_AIPROJECT_ENDPOINT="https://aif-dckjldgkw5zcs.cognitiveservices.azure.com/"
+AZURE_EXISTING_AIPROJECT_RESOURCE_ID="/subscriptions/f46df88d-5e5e-4164-8a80-182995d2a7d7/resourceGroups/RG-GPT-RAG-ZSP/providers/Microsoft.CognitiveServices/accounts/aif-dckjldgkw5zcs/projects/aifp-pibot"
+AZD_ALLOW_NON_EMPTY_FOLDER=true
+ENDPOINT_URL = "https://aif-dckjldgkw5zcs.cognitiveservices.azure.com/"
+DEPLOYMENT_NAME = "chat"
+AZURE_OPENAI_API_KEY = "4Ixr1sIhASJHlS0p1qGNZuhY3YtyE242DPkh8vtJb4LtBgGZYcFLJQQJ99BIACHYHv6XJ3w3AAAAACOG3WRL"

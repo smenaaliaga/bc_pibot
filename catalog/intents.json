@@ -1,0 +1,75 @@
+[
+  {
+    "name": "IMACEC_MONTH_INTERVAL",
+    "priority": 10,
+    "requiresDomain": "IMACEC",
+    "patterns": [
+      "desde\\s+({MONTHS})\\s+(?:a|hasta)\\s+({MONTHS})\\s+(?:de\\s+)?((?:19|20)\\d{2})",
+      "entre\\s+({MONTHS})\\s+y\\s+({MONTHS})\\s+(?:de\\s+)?((?:19|20)\\d{2})"
+    ],
+    "handler": "_handle_intent_imacec_month_interval"
+  },
+  {
+    "name": "IMACEC_INDEX_YOY",
+    "priority": 55,
+    "requiresDomain": "IMACEC",
+    "regexPatterns": [
+      "(?:indices|índices).*variaci[óo]n anual",
+      "variaci[óo]n anual.*(?:indices|índices)",
+      "datos.*imacec.*índices.*variaci[óo]n anual"
+    ],
+    "tokenPatterns": [
+      [
+        {"LEMMA": {"IN": ["dar", "entregar"]}, "OP": "?"},
+        {"LOWER": {"IN": ["datos", "información"]}},
+        {"LOWER": "del", "OP": "?"},
+        {"LOWER": {"IN": ["imacec"]}},
+        {"LOWER": {"IN": ["en", "con"]}, "OP": "?"},
+        {"LOWER": {"IN": ["índices", "indices"]}},
+        {"LOWER": {"IN": ["y", "más", "mas"]}, "OP": "?"},
+        {"LOWER": {"IN": ["variación", "variacion"]}},
+        {"LOWER": "anual"}
+      ],
+      [
+        {"LOWER": {"IN": ["índices", "indices"]}},
+        {"LOWER": {"IN": ["y"]}, "OP": "?"},
+        {"LOWER": {"IN": ["variación", "variacion"]}},
+        {"LOWER": "anual"}
+      ]
+    ],
+    "handler": "_handle_intent_imacec_index_yoy"
+  },
+  {
+    "name": "IMACEC_MONTH_SPECIFIC",
+    "priority": 20,
+    "requiresDomain": "IMACEC",
+    "patterns": [
+      "({MONTHS})\\s+(?:de\\s+)?((?:19|20)\\d{2})"
+    ],
+    "handler": "_handle_intent_imacec_month_specific"
+  },
+  {
+    "name": "TOGGLE_MONTHLY",
+    "priority": 30,
+    "patterns": [
+      "variaci[óo]n (mensual|mes a mes)|mes a mes"
+    ],
+    "handler": "_handle_intent_toggle_monthly"
+  },
+  {
+    "name": "TOGGLE_ANNUAL",
+    "priority": 40,
+    "patterns": [
+      "variaci[óo]n anual|interanual"
+    ],
+    "handler": "_handle_intent_toggle_annual"
+  },
+  {
+    "name": "CHART_REQUEST",
+    "priority": 50,
+    "patterns": [
+      "grafico|gráfico|realiza un gráfico|realiza un grafico|mostrar gráfico"
+    ],
+    "handler": "_handle_intent_chart_request"
+  }
+]

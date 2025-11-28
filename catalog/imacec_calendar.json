@@ -1,0 +1,14 @@
+[
+  {"month":"Enero","release_date":"2025-01-02","publication":"IMACEC noviembre 2024"},
+  {"month":"Febrero","release_date":"2025-02-03","publication":"IMACEC diciembre 2024"},
+  {"month":"Marzo","release_date":"2025-03-03","publication":"IMACEC enero 2025"},
+  {"month":"Abril","release_date":"2025-04-01","publication":"IMACEC febrero 2025"},
+  {"month":"Mayo","release_date":"2025-05-02","publication":"IMACEC marzo 2025"},
+  {"month":"Junio","release_date":"2025-06-02","publication":"IMACEC abril 2025"},
+  {"month":"Julio","release_date":"2025-07-01","publication":"IMACEC mayo 2025"},
+  {"month":"Agosto","release_date":"2025-08-01","publication":"IMACEC junio 2025"},
+  {"month":"Septiembre","release_date":"2025-09-01","publication":"IMACEC julio 2025"},
+  {"month":"Octubre","release_date":"2025-10-01","publication":"IMACEC agosto 2025"},
+  {"month":"Noviembre","release_date":"2025-11-03","publication":"IMACEC septiembre 2025"},
+  {"month":"Diciembre","release_date":"2025-12-01","publication":"IMACEC octubre 2025"}
+]
