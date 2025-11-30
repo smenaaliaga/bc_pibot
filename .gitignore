@@ -165,6 +165,10 @@ test/responses_*.json
 test/*.csv
 test/*.xlsx
 
+# Tests module output
+tests/output/*
+!tests/output/.gitkeep
+
 # ------------------------------------------------------------------------------
 # Temporary & Cache files
 # ------------------------------------------------------------------------------
