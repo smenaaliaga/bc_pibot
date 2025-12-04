@@ -18,9 +18,9 @@ Ensure your virtual environment is active and dependencies are installed. You wi
 
 ## Input Data
 
-The batch test looks for a file named `tests/input/test_preguntas.xlsx`.
-*   **Format**: Excel (.xlsx)
-*   **Columns**: It expects a column named `Question`. If that column is missing, it will default to using the first column of the sheet.
+The batch test looks for a file named `tests/input/test_preguntas.xlsx` (or `.csv`).
+*   **Format**: Excel (.xlsx) or CSV (.csv)
+*   **Columns**: It expects a column named `Question`. If that column is missing, it will default to using the first column.
 
 ## Running the Tests
 

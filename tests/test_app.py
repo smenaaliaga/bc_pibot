@@ -25,7 +25,7 @@ def test_single_interaction():
     at = AppTest.from_file("main.py").run()
     
     # Simulate user input
-    at.chat_input[0].set_value("Hola, Â¿cÃ³mo estÃ¡s?").run()
+    at.chat_input[0].set_value("Hola, -+c+¦mo est+ís?").run()
     
     # Check for response
     # Assuming app.py uses st.session_state.messages to store history
