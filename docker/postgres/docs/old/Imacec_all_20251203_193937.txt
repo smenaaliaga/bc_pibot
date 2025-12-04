@@ -1,0 +1,336 @@
+=== Página 1 ===
+Confianza media: 89.5%
+
+INDICADOR MENSUAL DE
+
+lae ACTIVIDAD ECONOÓMICA central . (IMACEC)
+
+DEFINICIÓN Y COBERTURA
+
+Definición
+
+El Índice Mensual de Actividad Económica (Imacec) es una estimación que resume la actividad de los distintos sectores económicos en un determinado mes, a precios del año anterior encadenados. Su variación interanual constituye una aproximación de la evolución mensual del producto interno bruto (PIB).
+
+Subproductos Además de la elaboración del índice original, se obtienen y publican tres series
+
+derivadas de éste: Imacec a costo de factores, Imacec desestacionalizado e Imacec Tendencia-ciclo. Se publican también, las tasas de variación de cada serie.
+
+DATOS FUENTE
+
+Registros Administrativos
+
+* Nombre de la Fuente: Registros de IVA Institución informante: Servicio de Impuestos Internos (SII)
+
+=== Página 2 ===
+Confianza media: 91.5%
+
+N
+
+banco — BANCO CENTRAL DE CHILE central
+
+Información utilizada: Ventas por actividad económica Periodicidad: Mensual
+
+* Nombre de la Fuente: Registros de Aduana Institución informante: Servicio Nacional de Aduana (SNA) Información utilizada: Exportaciones e importaciones Periodicidad: Mensual
+
+Encuestas Económicas
+
+* Nombre de la Fuente: Encuestas de mataderos de ganado bovino, aves y cerdos.
+
+Institución informante: Instituto Nacional de Estadísticas (INE) Información utilizada: Producción de carne Periodicidad: Mensual
+
+Informes y Formularios Estadísticos
+
+* Nombre de la Fuente: Informe de producción y compras de materiales nstitución informante: Empresa Nacional de Minería (ENAMI) nformación utilizada: Ventas de cobre a ENAMI
+
+Periodicidad: Mensual
+
+* Nombre de la Fuente: Estadísticas económicas nstitución informante: Instituto Nacional de Estadísticas (INE)
+
+nformación utilizada: Producción de oro, carbón, zinc y manganeso; Índice de Producción Industrial (IPI) manufacturero; IPI electricidad, gas y agua, ventas ísicas de empresas distribuidoras de electricidad; estadísticas de regasificación de gas natural licuado (GNL) y ventas físicas de empresas distribuidoras de gas; ventas físicas de agua potable, estadísticas de empleo; pasadas por peajes por tipo de vehículos; tráfico telefónico mensual de compañías locales, móviles y de larga distancia; correspondencia distribuida por empresas de Correos de Chile y correos privados y courier; índice nominal de ventas de servicios, e Índice de costo de mano de obra.
+
+Periodicidad: Mensual
+
+D
+
+* Nombre de la Fuente: Informe Mensual de Recepción y Producción de ndustria Lechera
+
+nstitución informante: Oficina de Políticas Agrarias (Odepa) nformación utilizada: Recepción de leche en plantas industriales Periodicidad: Mensual
+
+* Nombre de la Fuente: Pronóstico de producción de huevos nstitución informante: Asociación de productores de huevos
+
+=== Página 3 ===
+Confianza media: 91.8%
+
+N
+
+INDICADOR MENSUAL DE ACTIVIDAD ECONÓMICA (IMACEC) E.¿a| central
+
+nformación utilizada: Pronóstico de producción de huevos Periodicidad: Mensual
+
+* Nombre de la Fuente: Estadísticas de pesca extractiva nstitución informante: Subsecretaría de Pesca (Subpesca) nformación utilizada: Desembarques de especies Periodicidad: Mensual
+
+* Nombre de la Fuente: Generación bruta de electricidad en el Sistema nterconectado Central (SIC)
+
+nstitución informante: Centro de Despacho Económico de Carga-SIC nformación utilizada: Generación bruta (GWh) Periodicidad: Mensual
+
+* Nombre de la Fuente: Generación bruta de electricidad en el Sistema nterconectado del Norte Grande (SING)
+
+nstitución informante: Centro de Despacho Económico de Carga-SING nformación utilizada: Generación bruta (GWh) Periodicidad: Mensual
+
+* Nombre de la Fuente: Tráfico Aéreo por Operador Origen y Destino nstitución informante: Junta de Aeronáutica Civil (JAC)
+
+nformación utilizada: Pasajeros y toneladas kilómetro nacionales e internacionales transportados por líneas aéreas nacionales
+
+Periodicidad: Mensual
+
+* Nombre de la Fuente: Toneladas movilizadas por puertos nstitución informante: Empresa Portuaria de Chile (Emporchi) nformación utilizada: Toneladas movilizadas por puertos Periodicidad: Mensual
+
+* Nombre de la Fuente: Movimiento de aeronaves y pasajeros en aeropuertos nstitución informante: Dirección General de Aeronáutica Civil (DGAC) nformación utilizada: Movimiento de aeronaves y pasajeros.
+
+Periodicidad: Mensual
+
+* Nombre de la Fuente: Metros cúbicos movilizados por oleoductos
+
+nstitución informante: Sociedad Nacional de Oleoductos (Sonacol)
+
+nformación utilizada: Metros cúbicos movilizados por oleoductos Periodicidad: Mensual
+
+* Nombre de la Fuente: Estadísticas de Comunicaciones
+
+nstitución informante: Subsecretaría de Telecomunicaciones (Subtel)
+
+=== Página 4 ===
+Confianza media: 91.5%
+
+N
+
+banco — BANCO CENTRAL DE CHILE central
+
+nformación utilizada: Número de abonados a televisión de pago, satelital y servicios de Internet
+
+Periodicidad: Mensual
+
+* Nombre de la Fuente: Estadísticas financieras nstitución informante: Comisión para el Mercado Financiero (CMF)
+
+nformación utilizada: Activos y pasivos de bancos comerciales, e ingresos corrientes por comisiones
+
+Periodicidad: Mensual
+
+Estadísticas Varias
+
+* Nombre de la Fuente: Información producción minera nstitución informante: Empresas
+
+nformación utilizada: Producción por tipo de cobre y subproductos; Producción de mineral y pellets de hierro; Producción de crudo y gas natural.
+
+Periodicidad: Mensual
+
+* Nombre de la Fuente: Información de transporte nstitución informante: Empresas
+
+nformación utilizada: Pasajeros kilómetro y toneladas kilómetro transporte erroviario; pasajeros transportados en el Metro; pasajes aéreos vendidos por agencias de viajes.
+
+Periodicidad: Mensual
+
+METODOLOGÍA
+
+Tratamiento de la información básica
+
+Recopilación de Fuentes de información
+
+En cada proceso de construcción del Imacec se actualiza la información con los indicadores mencionados en los datos fuente. Se mensualizan los registros que son trimestrales, tales como en agricultura, construcción y algunos servicios.
+
+Validaciones e imputaciones
+
+Para la verificación de la calidad de la información se realiza un análisis de consistencia con información anterior. Y se efectúan imputaciones de datos faltantes en casos calificados.
+
+=== Página 5 ===
+Confianza media: 90.6%
+
+u
+
+INDICADOR MENSUAL DE ACTIVIDAD ECONÓMICA (IMACEC) anc central
+
+Compilación
+
+Procedimientos de cálculo
+
+Las fuentes básicas de información son indicadores, principalmente de productos, los que son transformados en indicadores de producción bruta. Finalmente, para determinar el valor agregado se utiliza el método de extrapolación por indicador único, lo que implica en este caso que el valor agregado evoluciona según los indicadores de la producción bruta.
+
+Conciliación Al concluir el trimestre, el Imacec se alinea con el PIB trimestral, en volumen a precios del año anterior encadenado, por medio de técnicas de benchmarking.
+
+Consistencia
+
+Se examina la consistencia del indicador con sus determinantes cíclicos (industria y comercio exterior), tendenciales (servicios) y los factores irregulares representados por los shocks de oferta (agricultura, minería, electricidad).
+
+ACCESO A DATOS
+
+Base de Datos Estadísticos
+
+* Capítulo: Cuentas Nacionales Nombre serie: Serie original, Desestacionalizado, Tendencia-ciclo, Costo de factores Período: desde 2008 en adelante, mensual, trimestral y anual Vínculo: : seleccionando “Referencia 2008” en https://si3.bcentral.cl/Siete
+
+* Capítulo: Cuentas Nacionales Nombre serie: Serie original, Desestacionalizado, Tendencia-ciclo Período: desde 2003 en adelante, empalmadas a la referencia 2008, mensual, trimestral y anual Vínculo: seleccionando “Empalmes con series referencia 2008” en
+
+https://si3.bcentral.cl/Siete
+
+* Capítulo: Cuentas Nacionales Nombre serie: Serie original, Desestacionalizado, Tendencia-ciclo, Costo de factores Período: 2003-2012 (enero), mensual, trimestral y anual Vínculo: seleccionando “Base 2003” en https://si3.bcentral.cl/Siete
+
+=== Página 6 ===
+Confianza media: 88.8%
+
+t
+
+banco central
+
+BANCO CENTRAL DE CHILE
+
+* Capítulo: Cuentas Nacionales
+
+Bolet
+
+()
+
+3
+
+ombre serie: Serie original, Desestacionalizado, Tendencia-ciclo Período: 1986-2012 (enero), empalmadas, mensual, trimestral y anual Vínculo:
+
+seleccionando “Empalmes con series base 2003” en tps://si3.bcentral.cl/Siete
+
+Capítulo: Cuentas Nacionales
+
+ombre serie: Serie original, Desestacionalizado, Tendencia-ciclo, Costo de actores Período: 1996-2003, mensual, trimestral y anual
+
+Vínculo: seleccionando “Base 1996” en tps://si3.bcentral.cl/Siete
+
+apítulo: Cuentas Nacionales ombre serie: Serie original, Desestacionalizado Período: 1986-1996, ensual, trimestral y anual Vínculo: seleccionando “Base 1986” en
+
+tps://si3.bcentral.cl/Siete
+
+ín Estadístico
+
+lombre serie: Serie original, Desestacionalizado, Tendencia-ciclo, Costo de actores
+
+Período: desde 2016 en adelante, mensual y anual Vínculo: seleccionando archivo PDF en https://www.bcentral.clweb/banco-central/boletin-detalle
+
+Período: desde 2013 en adelante, mensual Vínculo: seleccionando archivo Excel, CSV y Base de Datos en
+
+https://www.bcentral.cl/web/banco-central/boletin-detalle
+
+Series de Indicadores (Excel)
+
+* Nombre serie: Serie original, Desestacionalizado, Tendencia-ciclo, Costo de
+
+=
+
+actores
+
+Período: desde 2013 en adelante, mensual y anual
+
+Vínculo: Indicador Mensual de Actividad Económica (Imacec) en ttps://mww.bcentral.cl/web/banco-central/cuentas-nacionales-imacec-excel
+
+Nombre serie: Series de actividad económica mensual sectorial Período: desde 2013 en adelante, mensual y anual Vínculo: seleccionando Series de actividad económica mensual sectorial, en
+
+tps://www.bcentral.cl/web/banco-central/cuentas-nacionales-imacec-excel
+
+=== Página 7 ===
+Confianza media: 90.0%
+
+u
+
+INDICADOR MENSUAL DE ACTIVIDAD ECONÓMICA (IMACEC) I;nnt central
+
+DOCUMENTACIÓN RELACIONADA
+
+* Nombre de la Fuente: Empalme estadístico del PIB y de los componentes
+
+del gasto Vínculo:h
+
+: series anuales y trimestrales 1986-2003, referencia 2008 ttps://www.bcentral.cl/contenido/-/detalle/empalme-estadistico-
+
+del-pib-y-de-los-componentes-del-gasto-series-anuales-y-
+
+trimestral
+
+es-1986-2003-referencia-2008-4
+
+Fecha pul
+
+blicación: abril 2012
+
+* Nombre de la Fuente: Nuevas series de cuentas nacionales encadenadas:
+
+métodos Vínculo: |
+
+y fuentes de estimación tps://www.bcentral.cl/contenido/-/detalle/nuevas-series-de-
+
+cuentas-nacionales-encadenadas-metodos-y-fuentes-de-estimacion-4
+
+Fecha pul
+
+blicación: marzo 2012
+
+* Nombre de la Fuente: Metodología y resultados de la mensualización del PIB sectorial trimestral en el período 1996-2008
+
+Vínculo:h
+
+ttps://www.bcentral.cl/contenido/-/detalle/metodologia-y-
+
+resultado:
+
+s-de-la-mensualizacion-del-pib-sectorial-trimestral-en-el-
+
+periodo-1996-2008-4
+
+Fecha pul
+
+blicación: septiembre 2009
+
+* Nombre de la Fuente: Empalme del PIB y de los Componentes del Gasto: Series Anuales y Trimestrales 1986-2002, Base 2003
+
+Vínculo: |
+
+tps://ww.bcentral.cl/contenido/-/detalle/empalme-del-pib-y-
+
+de-los-co
+
+mponentes-del-gasto-series-anuales-y-trimestrales-1986-2002-
+
+base-200
+
+Fecha pul
+
+3-4 blicación: marzo 2007
+
+* Nombre de la Fuente: “Actualización de la Metodología Imacec base 2003
+
+Vínculo:h
+
+ttps://publicadorweb.bcentral.cl/web/banco-central/imacec-doc-
+
+de-interes
+
+Fecha pul
+
+blicación: 2006
+
+* Nombre de la Fuente: Indicador Mensual de Actividad Económica Imacec
+
+base 199
+
+6
+
+Vínculo:https://www.bcentral.cl/contenido/-/detalle/indicador-mensual-de-
+
+actividad-economica-imacec-base-1996-nota-metodologica-4
+
+Fecha publicación: octubre 2005
+
+* Nombre de la Fuente: Indicador Mensual de Actividad Económica Imacec
+
+base 198
+
+6
+
+Vínculo:https://www.bcentral.cl/contenido/-/detalle/indicador-mensual-de-
+
+actividad-economica-imacec-base-1986.-nota-metodologica-4
+
+Fecha publicación: junio 2000
