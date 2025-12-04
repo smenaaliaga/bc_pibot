@@ -69,6 +69,8 @@ except Exception:
     relativedelta = None  # type: ignore[assignment]
 
 from config import BCCH_USER, BCCH_PASS, LOG_LEVEL, get_settings
+# Flag opcional para habilitar/deshabilitar cacheo
+USE_REDIS_CACHE = os.getenv("USE_REDIS_CACHE", "1").lower() in {"1", "true", "yes", "y", "on"}
 # from logger import get_logger, Phase  -> fallback si no existe logger.py
 try:
     from logger import get_logger, Phase  # type: ignore
@@ -163,31 +165,53 @@ def _get_redis_client() -> Optional[Any]:
 
     Si no está configurado, devuelve None y el código funciona sin cacheo.
     """
-   
+
+    if not USE_REDIS_CACHE:
+        logger.info("Cache Redis deshabilitado por USE_REDIS_CACHE=0/false.")
+        return None
+
     if redis is None:
         logger.warning("Paquete 'redis' no instalado; cacheo deshabilitado.")
         return None
 
-    try:
-        from config import REDIS_URL  
-    except ImportError:
-        REDIS_URL = None 
+    redis_url = os.getenv("REDIS_URL")
+    if not redis_url:
+        try:
+            from config import REDIS_URL as _cfg_url  # lazy import para compatibilidad
+            redis_url = _cfg_url
+        except Exception:
+            redis_url = None
 
-    if not REDIS_URL:
+    if not redis_url:
         logger.warning("REDIS_URL no configurado en config.py; cacheo deshabilitado.")
         return None
 
     try:
-        client = redis.Redis.from_url(REDIS_URL, decode_responses=True)  
+        client = redis.Redis.from_url(
+            redis_url,
+            decode_responses=True,
+            socket_connect_timeout=1,
+            socket_timeout=2,
+        )
         # Pequeña prueba de conexión
         client.ping()
         return client
     except Exception as e:
-        logger.error(f"No se pudo conectar a Redis con REDIS_URL={REDIS_URL!r}: {e}")
+        logger.error(f"No se pudo conectar a Redis con REDIS_URL={redis_url!r}: {e}")
         return None
 
 
 _redis_client: Optional[Any] = _get_redis_client()
+
+
+def _ensure_redis_client() -> Optional[Any]:
+    """Inicializa el cliente Redis bajo demanda si no existe o falló antes."""
+    global _redis_client
+    if _redis_client is None:
+        _redis_client = _get_redis_client()
+        if _redis_client is not None:
+            logger.info("[redis] Cliente inicializado para cacheo de series.")
+    return _redis_client
 
 
 def _make_cache_key(
@@ -442,6 +466,7 @@ def get_series_api_rest_bcch(
         - "observations": lista de dicts con date, value, status, pct, yoy_pct
         - "observations_raw": observaciones tal como vinieron del BCCh
     """
+    global _redis_client
     if not BCCH_USER or not BCCH_PASS:
         raise RuntimeError("BCCH_USER/BCCH_PASS no configurados (.env)")
 
@@ -623,10 +648,11 @@ def get_series_api_rest_bcch(
         logger.error(f"Fallo escribiendo log de test para API: {_e}")
 
     # --- Almacenar en Redis ---
-    if _redis_client is not None:
+    client = _ensure_redis_client()
+    if client is not None:
         try:
             payload = json.dumps(result, ensure_ascii=False)
-            _redis_client.set(cache_key, payload)
+            client.set(cache_key, payload)
             logger.info(
                 f"[get_series_api_rest_bcch] Serie almacenada en Redis | key='{cache_key}'"
             )
@@ -634,6 +660,7 @@ def get_series_api_rest_bcch(
             logger.error(
                 f"[get_series_api_rest_bcch] Error almacenando en Redis key='{cache_key}': {e}"
             )
+            _redis_client = None  # permitir reintentos en llamadas futuras
     else:
         logger.info(
             "[get_series_api_rest_bcch] Redis no disponible; no se cachea la serie."
@@ -682,6 +709,7 @@ def get_series_from_redis(
         Mismo formato que get_series_api_rest_bcch, pero con "observations"
         filtradas al período solicitado.
     """
+    global _redis_client
     fd = None if firstdate in (None, "", "auto") else firstdate
     ld = None if lastdate in (None, "", "auto") else lastdate
 
@@ -691,7 +719,8 @@ def get_series_from_redis(
         f"series_id='{series_id}' | cache_key='{cache_key}'"
     )
 
-    if _redis_client is None:
+    client = _ensure_redis_client()
+    if client is None:
         logger.warning(
             "[get_series_from_redis] Redis no disponible; "
             "usando fallback a get_series_api_rest_bcch."
@@ -708,7 +737,22 @@ def get_series_from_redis(
             else None
         )
 
-    raw = _redis_client.get(cache_key)
+    try:
+        raw = client.get(cache_key)
+    except Exception as e:
+        logger.error(
+            f"[get_series_from_redis] Error obteniendo clave '{cache_key}' desde Redis: {e}"
+        )
+        _redis_client = None  # forzar reintento en próximas peticiones
+        if not use_fallback:
+            return None
+        return get_series_api_rest_bcch(
+            series_id=series_id,
+            firstdate=fd,
+            lastdate=ld,
+            target_frequency=target_frequency,
+            agg=agg,
+        )
     if raw is None:
         logger.info(
             f"[get_series_from_redis] Clave no encontrada en Redis | key='{cache_key}'"
@@ -809,32 +853,14 @@ def get_series_from_redis(
 # Wrapper de conveniencia: salida por frecuencia y tipo de cálculo
 # y logging a test/log.txt con timestamp
 # ---------------------------------------------------------------------------
-_RUN_LOG_TS = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-_TEST_LOG_FILE: Optional[str] = None
-
-def _ensure_test_log_path() -> str:
-    """Crea (una sola vez) la carpeta test y devuelve la ruta del log único por ejecución."""
-    global _TEST_LOG_FILE
-    if _TEST_LOG_FILE:
-        return _TEST_LOG_FILE
-    base_dir = os.path.abspath(os.path.dirname(__file__))
-    log_dir = os.path.join(base_dir, "test")
-    os.makedirs(log_dir, exist_ok=True)
-    _TEST_LOG_FILE = os.path.join(log_dir, f"log_{_RUN_LOG_TS}.text")  # extensión .text como solicitado
-    return _TEST_LOG_FILE
-
 def get_current_test_log_file() -> str:
-    """Permite a otros módulos conocer el archivo de log de esta ejecución."""
-    return _ensure_test_log_path()
+    """Compat: antes escribía a un archivo separado; ahora reusa el logger principal."""
+    return ""
 
 def _append_test_log(message: str) -> None:
-    path = _ensure_test_log_path()
+    """En lugar de crear archivos adicionales, registramos en el logger principal."""
     ts = datetime.datetime.now().isoformat(timespec="seconds")
-    try:
-        with open(path, "a", encoding="utf-8") as f:
-            f.write(f"[{ts}] {message}\n")
-    except Exception as e:
-        logger.error(f"No se pudo escribir en {path}: {e}")
+    logger.info(f"[TEST_LOG] {ts} {message}")
 
 
 @calc_trace

@@ -178,12 +178,13 @@ def classify_query(question: str) -> ClassificationResult:
         q_lower = (question or "").lower()
         has_year = bool(re.search(r"\b(19|20)\d{2}\b", q_lower))
         ultimo_patterns = ["ultimo valor", "último valor", "valor", "el valor"]
+        ultimo_words = ["ultimo", "último"]
         action_patterns = ["dame", "muéstrame", "muestrame", "entrega", "entregame", "entregáme", "datos"]
         def _matches_any(patterns):
             return any(pat in q_lower for pat in patterns)
         if not has_year:
             # IMACEC genérico: último/valor/acciones
-            if "imacec" in q_lower and (_matches_any(ultimo_patterns) or _matches_any(action_patterns)):
+            if "imacec" in q_lower and (_matches_any(ultimo_patterns) or _matches_any(action_patterns) or _matches_any(ultimo_words)):
                 return ClassificationResult(
                     query_type="DATA",
                     data_domain="IMACEC",
@@ -192,7 +193,7 @@ def classify_query(question: str) -> ClassificationResult:
                     imacec=ImacecTree(),
                 )
             # PIB nacional genérico (sin región): último/valor/acciones
-            if "pib" in q_lower and "regional" not in q_lower and "región" not in q_lower and (_matches_any(ultimo_patterns) or _matches_any(action_patterns)):
+            if "pib" in q_lower and "regional" not in q_lower and "región" not in q_lower and (_matches_any(ultimo_patterns) or _matches_any(action_patterns) or _matches_any(ultimo_words)):
                 return ClassificationResult(
                     query_type="DATA",
                     data_domain="PIB",

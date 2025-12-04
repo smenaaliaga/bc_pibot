@@ -16,15 +16,27 @@ services:
       - ./data/postgres:/var/lib/postgresql/data
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
     restart: unless-stopped
-  redis-test:
+  redis:
     image: redis:8.0-rc1
-    container_name: redis-test
+    container_name: redis-pibot
+    env_file:
+      - ../.env
+    command:
+      - redis-server
+      - "--appendonly"
+      - "yes"
+      - "--save"
+      - "60"
+      - "1"
+      - "--requirepass"
+      - "${REDIS_PASS}"
     ports:
       - "6379:6379"
     volumes:
-      - ./data/redis:/data
+      # Persistencia en host; ruta relativa a este archivo (../data/redis en repo raíz)
+      - ../data/redis:/data
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASS} ping | grep PONG"]
       interval: 10s
       timeout: 5s
       retries: 5

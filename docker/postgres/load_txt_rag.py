@@ -40,7 +40,7 @@ except Exception as exc:  # pragma: no cover
 
 # Files to load and a short topic tag for metadata
 DOCS: Dict[str, str] = {
-    r"E:\bc_pibot\docker\postgres\docs\ccnn_limpio.txt": "pib",
+    r"E:\bc_pibot\docker\postgres\docs\Cuentas_Nacionales_metodos_fuentes_ref18_all_20251203_200609_limpio.txt": "pib",
     r"E:\bc_pibot\docker\postgres\docs\Imacec_all_20251203_193937_limpio.txt": "imacec",
     r"E:\bc_pibot\docker\postgres\docs\see100_all_20251203_194549_limpio.txt": "seasonality",
 }

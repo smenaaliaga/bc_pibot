@@ -156,6 +156,7 @@ dmypy.json
 # ------------------------------------------------------------------------------
 # Application logs 
 logs/
+docker/data/
 !logs/.gitkeep
 
 # Test logs y respuestas generadas 

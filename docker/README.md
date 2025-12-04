@@ -1,17 +1,25 @@
 # Docker stack (Postgres + optional RAG)
 
-## Run the database
+## Run Postgres
 From `docker/`:
 ```bash
+# build solo si cambiaste la imagen
 docker compose build postgres
-docker compose up -d postgres
+docker compose --env-file ../.env up -d postgres
 ```
-
-## Create extension vector
+### Create vector extension
 
 ```bash
 docker compose exec postgres psql -U postgres -d pibot -c "CREATE EXTENSION IF NOT EXISTS vector;"
 ```
+## Run Redis (persistence + auth)
+From `docker/`:
+```bash
+docker compose --env-file ../.env up -d redis
+```
+Requiere que `REDIS_PASS` esté disponible (el `docker-compose.yml` ya toma `env_file: ../.env`), y persiste datos en `../data/redis`.
+
+
 
 ## RAG loading (manual)
 - The image already contains `load_txt_rag.py` and the cleaned docs at `/rag/docs`.
@@ -25,9 +33,10 @@ Example to load vectors after the container is up:
 ## Recreate the database
 From `docker/`:
 ```bash
+cd docker
 docker compose down
-docker compose build postgres   # si cambiaste la imagen
-docker compose up -d postgres
+docker compose build postgres   # opcional: si cambiaste la imagen
+docker compose --env-file ../.env up -d postgres redis
 ```
 
 You can also point to a different doc path using `RAG_DOCS_DIR`.

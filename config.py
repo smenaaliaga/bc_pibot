@@ -34,6 +34,7 @@ class Settings:
     bot_name: str = "PIBot"
     debug: bool = False
     pg_dsn: Optional[str] = None  # se rellena desde PG_DSN / DATABASE_URL si existen
+    welcome_message: str = ""
 
     # Parámetros de comportamiento del frontend
     show_suggestions: bool = False
@@ -68,6 +69,10 @@ def get_settings() -> Settings:
     bot_name = os.getenv("BOT_NAME", "PIBot")
     debug = os.getenv("DEBUG", "false").lower() == "true"
     pg_dsn = os.getenv("PG_DSN") or os.getenv("DATABASE_URL")
+    welcome_message = (
+        os.getenv("WELCOME_MESSAGE")
+        or f"Hola, soy {bot_name}, asistente económico del Banco Central de Chile. ¿En qué puedo ayudarte hoy?"
+    )
 
     return Settings(
         openai_api_key=api_key,
@@ -76,4 +81,5 @@ def get_settings() -> Settings:
         bot_name=bot_name,
         debug=debug,
         pg_dsn=pg_dsn,
+        welcome_message=welcome_message,
     )
