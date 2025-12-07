@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Set
 
 try:
     from dotenv import load_dotenv  # type: ignore
@@ -44,9 +44,29 @@ DOCS: Dict[str, str] = {
     r"E:\bc_pibot\docker\postgres\docs\Imacec_all_20251203_193937_limpio.txt": "imacec",
     r"E:\bc_pibot\docker\postgres\docs\see100_all_20251203_194549_limpio.txt": "seasonality",
 }
+ALLOWED_TOPICS: Set[str] = {
+    "pib",
+    "imacec",
+    "seasonality",
+    "metodologia",
+    "deflactores",
+    "encadenamiento",
+    "fuentes",
+}
 
 
-def chunk_text(text: str, max_chars: int = 400) -> List[str]:
+def guess_topic_from_name(name: str) -> str:
+    n = name.lower()
+    if "imacec" in n or "actividad" in n:
+        return "imacec"
+    if "see100" in n or "season" in n:
+        return "seasonality"
+    if "pib" in n or "cuentas" in n:
+        return "pib"
+    return "metodologia"
+
+
+def chunk_text(text: str, max_chars: int = 600) -> List[str]:
     chunks: List[str] = []
     for i in range(0, len(text), max_chars):
         chunk = text[i : i + max_chars].strip()
@@ -117,11 +137,33 @@ def main() -> None:
             print(f"SKIP: {path} not found")
             continue
         text = path.read_text(encoding="utf-8", errors="ignore")
+        topic_guess = guess_topic_from_name(path.name) if not topic else topic
         chunks = chunk_text(text)
-        metadatas = [
-            {"source": str(path), "topic": topic, "section": f"{topic}-{idx}"}
-            for idx, _ in enumerate(chunks)
-        ]
+        metadatas = []
+        for idx, ch in enumerate(chunks):
+            # topics por chunk: usar heurística por nombre y tags permitidos
+            chunk_topics: Set[str] = set()
+            chunk_topics.add(topic_guess)
+            # detectar palabras clave básicas
+            lower = ch.lower()
+            if "deflactor" in lower or "precio constante" in lower:
+                chunk_topics.add("deflactores")
+            if "encadenad" in lower:
+                chunk_topics.add("encadenamiento")
+            if "metodolog" in lower:
+                chunk_topics.add("metodologia")
+            if "fuente" in lower or "data source" in lower:
+                chunk_topics.add("fuentes")
+            # filtrar a permitidos
+            chunk_topics = {t for t in chunk_topics if t in ALLOWED_TOPICS}
+            metadatas.append(
+                {
+                    "source": str(path),
+                    "topic": topic_guess,
+                    "chunk_topics": list(chunk_topics),
+                    "section": f"{topic_guess}-{idx:04d}",
+                }
+            )
         vs.add_texts(chunks, metadatas=metadatas)
         total += len(chunks)
         print(f"Loaded {len(chunks)} chunks from {path.name} (topic={topic})")

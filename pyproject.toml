@@ -1,0 +1,33 @@
+[project]
+name = "bc-pibot"
+version = "0.3.0"
+description = "PIBot, asistente económico del Banco Central de Chile. ¿En qué puedo ayudarte hoy?"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "azure-identity>=1.25.1",
+    "azure-search-documents>=11.6.0",
+    "langchain>=1.1.2",
+    "langchain-openai>=1.1.0",
+    "langgraph[postgres]>=1.0.4",
+    "langchain-postgres==0.0.16",
+    "numpy>=1.23,<2",
+    "openai>=1.0.0",
+    "openpyxl>=3.1",
+    "pandas>=2.0,<2.3",
+    "pgvector>=0.2.5,<0.4",
+    "pillow>=12.0.0",
+    "psycopg>=3",
+    "psycopg-pool>=3",
+    "psycopg2-binary==2.9.11",
+    "pydantic>=2.6,<3",
+    "pydantic-settings>=2.3,<3",
+    "pytest>=9.0.1",
+    "python-dateutil>=2.8.2",
+    "python-docx>=1.2.0",
+    "python-dotenv>=1.2.1",
+    "redis>=5",
+    "requests>=2.31",
+    "streamlit>=1.52.1",
+    "typing-extensions>=4.7",
+]

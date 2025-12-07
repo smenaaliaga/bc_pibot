@@ -1,20 +1,26 @@
 # PIBot BCCh – Chat IMACEC/PIB
-**Build:** 2025-10-27 18:32:31
 
-## Instalación
+## Requisitos
+- Python 3.12 (gestionado con `uv`)
+- Variables de entorno necesarias (`OPENAI_API_KEY`, `BCCH_USER`, `BCCH_PASS`, etc.).
+
+## Instalación con uv
 ```bash
-python -m venv .venv
-# Windows: 
-.venv\Scripts\activate
-# macOS/Linux:
-source .venv/bin/activate
+# Instala Python 3.12 si no lo tienes
+uv python install 3.12
 
-pip install -r requirements.txt
-cp .env.example .env
-# Completa OPENAI_API_KEY, BCCH_USER y BCCH_PASS
+# Sincroniza dependencias y crea el entorno .venv
+uv sync
+
+# (Opcional) activa el entorno
+.\.venv\Scripts\activate   # Windows
+# source .venv/bin/activate # macOS/Linux
 ```
+
+Configura el archivo `.env` (puedes copiar desde `.env.example` si existe) y completa las claves requeridas.
 
 ## Ejecución
 ```bash
-streamlit run main.py
+# Desde la raíz del repo
+uv run streamlit run main.py
 ```

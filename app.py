@@ -7,6 +7,7 @@ Lógica de la aplicación Streamlit (frontend del chatbot).
 - Recibe funciones de orquestación (stream_fn / invoke_fn) desde main.py.
 - Maneja la historia de conversación en st.session_state.
 """
+import logging
 import uuid
 from typing import Callable, List, Dict, Optional, Iterable
 import datetime
@@ -23,6 +24,25 @@ try:
     import orchestrator as _orch
 except Exception:
     _orch = None  # type: ignore
+
+# Resolver logger para la UI: preferir el logger del orquestador; si no tiene
+# handlers, caer al root y, en última instancia, configurar uno básico.
+def _resolve_ui_logger() -> logging.Logger:
+    candidates = []
+    if _orch and hasattr(_orch, "logger"):
+        try:
+            candidates.append(_orch.logger)  # type: ignore[attr-defined]
+        except Exception:
+            pass
+    candidates.append(logging.getLogger())  # root
+    candidates.append(logging.getLogger(__name__))
+    for lg in candidates:
+        if lg and lg.handlers:
+            return lg
+    logging.basicConfig(level=logging.INFO)
+    return logging.getLogger()
+
+_ui_logger = _resolve_ui_logger()
 
 # Tipos para las funciones de orquestación
 StreamFn = Callable[[str, Optional[List[Dict[str, str]]], Optional[str]], Iterable[str]]
@@ -50,7 +70,7 @@ def _init_session_state(settings: Settings) -> None:
         st.session_state.session_id = f"st-{uuid.uuid4().hex}"
 
     if not st.session_state.welcome_emitted:
-        welcome_text = (settings.welcome_message or "").strip()
+        welcome_text = (getattr(settings, "welcome_message", "") or "").strip()
         if not welcome_text:
             welcome_text = (
                 f"Hola, soy {settings.bot_name}, asistente económico del Banco Central de Chile. "
@@ -177,77 +197,96 @@ def run_app(
     # Historial previo (antes de agregar el mensaje actual)
     history: List[Dict[str, str]] = list(st.session_state.messages)
 
-    # Llamar al orquestador en modo streaming y renderizar chunk a chunk
-    with st.chat_message("assistant"):
-        with st.spinner("Pensando..."):
-            markers_csv: List[Dict[str, str]] = []
-            markers_chart: List[Dict[str, str]] = []
-            collecting_csv = False
-            collecting_chart = False
-            buffer_csv: List[str] = []
-            buffer_chart: List[str] = []
-            text_accum = ""
-            placeholder = st.empty()
-            # parámetros para animar el render incremental aunque el chunk sea grande
-            _chunk_sleep = 0.03
-            _chunk_size = 120
+    assistant_box = st.chat_message("assistant")
+    status_placeholder = assistant_box.empty()
+    status_placeholder.caption("Pensando...")
+    markers_csv: List[Dict[str, str]] = []
+    markers_chart: List[Dict[str, str]] = []
+    collecting_csv = False
+    collecting_chart = False
+    buffer_csv: List[str] = []
+    buffer_chart: List[str] = []
+    text_accum = ""
+    placeholder = assistant_box.empty()
+    _debug_chunk_idx = 0
 
-            def handle_chunk(chunk: str) -> None:
-                nonlocal collecting_csv, collecting_chart, buffer_csv, buffer_chart, text_accum
-                text = str(chunk)
-                out_lines: List[str] = []
-                for line in text.splitlines(keepends=True):
-                    ls = line.strip()
-                    if ls == "##CSV_DOWNLOAD_START":
-                        collecting_csv = True
-                        buffer_csv = []
-                        continue
-                    if ls == "##CSV_DOWNLOAD_END":
-                        collecting_csv = False
-                        d: Dict[str, str] = {}
-                        for ln in buffer_csv:
-                            if "=" in ln:
-                                k, v = ln.split("=", 1)
-                                d[k.strip()] = v.strip()
-                        if d:
-                            markers_csv.append(d)
-                        buffer_csv = []
-                        continue
-                    if ls == "##CHART_START":
-                        collecting_chart = True
-                        buffer_chart = []
-                        continue
-                    if ls == "##CHART_END":
-                        collecting_chart = False
-                        d2: Dict[str, str] = {}
-                        for ln in buffer_chart:
-                            if "=" in ln:
-                                k, v = ln.split("=", 1)
-                                d2[k.strip()] = v.strip()
-                        if d2:
-                            markers_chart.append(d2)
-                        buffer_chart = []
-                        continue
-                    if collecting_csv:
-                        buffer_csv.append(ls)
-                        continue
-                    if collecting_chart:
-                        buffer_chart.append(ls)
-                        continue
-                    out_lines.append(line)
-                filtered = "".join(out_lines)
-                if filtered:
-                    # dividir en fragmentos para mostrar progresivo
-                    for i in range(0, len(filtered), _chunk_size):
-                        text_accum += filtered[i : i + _chunk_size]
-                        placeholder.markdown(text_accum)
-                        if len(filtered) > _chunk_size:
-                            time.sleep(_chunk_sleep)
+    def handle_chunk(chunk: str) -> None:
+        nonlocal collecting_csv, collecting_chart, buffer_csv, buffer_chart, text_accum, _debug_chunk_idx
+        text = str(chunk)
+        _debug_chunk_idx += 1
+        try:
+            preview = text[:200].replace("\n", "\\n")
+            _ui_logger.info(
+                "[UI_STREAM_CHUNK] idx=%s len=%s preview=%s",
+                _debug_chunk_idx,
+                len(text),
+                text[:120].replace("\n", " "),
+            )
+            _ui_logger.info(
+                "[UI_STREAM_CHUNK_RAW] idx=%s repr=%s",
+                _debug_chunk_idx,
+                preview,
+            )
+        except Exception:
+            pass
+        out_lines: List[str] = []
+        for line in text.splitlines(keepends=True):
+            ls = line.strip()
+            if ls == "##CSV_DOWNLOAD_START":
+                collecting_csv = True
+                buffer_csv = []
+                continue
+            if ls == "##CSV_DOWNLOAD_END":
+                collecting_csv = False
+                d: Dict[str, str] = {}
+                for ln in buffer_csv:
+                    if "=" in ln:
+                        k, v = ln.split("=", 1)
+                        d[k.strip()] = v.strip()
+                if d:
+                    markers_csv.append(d)
+                buffer_csv = []
+                continue
+            if ls == "##CHART_START":
+                collecting_chart = True
+                buffer_chart = []
+                continue
+            if ls == "##CHART_END":
+                collecting_chart = False
+                d2: Dict[str, str] = {}
+                for ln in buffer_chart:
+                    if "=" in ln:
+                        k, v = ln.split("=", 1)
+                        d2[k.strip()] = v.strip()
+                if d2:
+                    markers_chart.append(d2)
+                buffer_chart = []
+                continue
+            if collecting_csv:
+                buffer_csv.append(ls)
+                continue
+            if collecting_chart:
+                buffer_chart.append(ls)
+                continue
+            out_lines.append(line)
+        filtered = "".join(out_lines)
+        if filtered or not text_accum:
+            text_accum += filtered
+            placeholder.markdown(text_accum or "\u200B")
 
-            raw_chunks = stream_fn(user_message, history=history, session_id=st.session_state.session_id)
-            for _chunk in raw_chunks:
-                handle_chunk(_chunk)
-            response_text = text_accum
+    raw_chunks = stream_fn(user_message, history=history, session_id=st.session_state.session_id)
+    for _chunk in raw_chunks:
+        handle_chunk(_chunk)
+    response_text = text_accum
+    try:
+        _ui_logger.info(
+            "[UI_STREAM_END] total_len=%s preview=%s",
+            len(response_text),
+            response_text[:200].replace("\n", " "),
+        )
+    except Exception:
+        pass
+    status_placeholder.empty()
 
     # Almacenar markers en session_state (sin limpiar)
     st.session_state.csv_markers = markers_csv

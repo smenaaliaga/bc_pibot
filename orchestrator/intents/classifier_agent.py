@@ -1,0 +1,119 @@
+"""Clasificador modular basado en el flujo legacy de original orchestrator"""
+from __future__ import annotations
+
+import logging
+import os
+import time
+from typing import Any, Dict, List, Optional, Tuple
+
+from prompt import ClassificationResult, classify_query
+
+logger = logging.getLogger(__name__)
+
+
+def _build_history_text(history: Optional[List[Dict[str, str]]]) -> str:
+    """Concatena el historial en formato 'role: content' por línea."""
+    if not history:
+        return ""
+    try:
+        return "\n".join(f"{m.get('role', '')}: {m.get('content', '')}" for m in history)
+    except Exception:
+        logger.exception("Failed to build history_text")
+        return ""
+
+
+def classify_question_with_history(
+    question: str, history: Optional[List[Dict[str, str]]]
+) -> Tuple[ClassificationResult, str]:
+    """Replica la fase C1 del original orchestrator: clasifica y construye history_text."""
+    t_start = time.perf_counter()
+    model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    logger.info("[FASE] start: Fase C1: Clasificación de consulta | model='%s'", model)
+    try:
+        classification = classify_query(question)
+    except Exception as exc:  # pragma: no cover - logging path
+        t_end = time.perf_counter()
+        logger.error(
+            "[FASE] error: Fase C1: Clasificación de consulta (%.3fs) | question='%s' | error=%s",
+            t_end - t_start,
+            question,
+            exc,
+        )
+        raise
+    t_end = time.perf_counter()
+    summary = (
+        classification.query_type,
+        classification.data_domain,
+        classification.is_generic,
+        classification.default_key,
+        getattr(classification, "error", None),
+    )
+    logger.info(
+        "[FASE] end: Fase C1: Clasificación de consulta (%.3fs) | query_type=%s | data_domain=%s | "
+        "is_generic=%s | default_key=%s | error=%s",
+        t_end - t_start,
+        *summary,
+    )
+    # Forzar log también en root para trazabilidad en el archivo único de sesión
+    try:
+        import logging as _logging
+
+        _logging.getLogger().info(
+            "[CLASSIFIER] query_type=%s data_domain=%s is_generic=%s default_key=%s error=%s",
+            *summary,
+        )
+    except Exception:
+        pass
+    # Emisión a stdout para depuración rápida en entorno interactivo/Streamlit logs
+    try:
+        print(
+            "[CLASSIFIER_RETURN] query_type=%s data_domain=%s is_generic=%s default_key=%s error=%s"
+            % summary
+        )
+    except Exception:
+        pass
+    # Fallback: asegurarse de que quede registrado en el archivo de log configurado por RUN_MAIN_LOG,
+    # pero sin truncar ni reescribir; solo append.
+    try:
+        logs_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), "..", "logs")
+        os.makedirs(logs_dir, exist_ok=True)
+        fixed = os.getenv("RUN_MAIN_LOG", "").strip() or "run_main.log"
+        path = os.path.join(logs_dir, fixed)
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(
+                "[CLASSIFIER_FILE] query_type=%s data_domain=%s is_generic=%s default_key=%s error=%s\n"
+                % summary
+            )
+    except Exception:
+        pass
+    history_text = _build_history_text(history)
+    return classification, history_text
+
+
+def classify_question(question: str) -> ClassificationResult:
+    """Convenience wrapper cuando no se necesita history_text."""
+    cls, _ = classify_question_with_history(question, history=None)
+    return cls
+
+
+def build_intent_info(cls: Optional[ClassificationResult]) -> Optional[Dict[str, Any]]:
+    """Normaliza el resultado del clasificador al intent_info que consume el LLM."""
+    if cls is None:
+        return None
+    try:
+        return {
+            "intent": cls.query_type or "unknown",
+            "score": 1.0 if cls.query_type else 0.0,
+            "entities": {
+                "data_domain": cls.data_domain,
+                "is_generic": cls.is_generic,
+                "default_key": cls.default_key,
+                "imacec": cls.imacec.__dict__ if getattr(cls, "imacec", None) else None,
+                "pibe": cls.pibe.__dict__ if getattr(cls, "pibe", None) else None,
+                "intent_frequency_change": getattr(cls, "intent_frequency_change", None),
+            },
+            "spans": [],  # placeholder para el modelo BIO
+        }
+    except Exception:
+        logger.exception("build_intent_info failed")
+        return None

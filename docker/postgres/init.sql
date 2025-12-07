@@ -48,13 +48,11 @@ CREATE TABLE IF NOT EXISTS short_term_turns (
 CREATE INDEX IF NOT EXISTS idx_short_term_turns_session_ts ON short_term_turns(session_id, ts DESC);
 
 CREATE TABLE IF NOT EXISTS session_facts (
-    session_id TEXT NOT NULL,
-    fact_key TEXT NOT NULL,
-    fact_value TEXT,
-    ts TIMESTAMPTZ DEFAULT NOW(),
-    PRIMARY KEY (session_id, fact_key)
+    session_id TEXT PRIMARY KEY,
+    facts JSONB,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-CREATE INDEX IF NOT EXISTS idx_session_facts_session ON session_facts(session_id);
+CREATE INDEX IF NOT EXISTS idx_session_facts_updated ON session_facts(updated_at DESC);
 
 -- Intent store
 CREATE TABLE IF NOT EXISTS intents (

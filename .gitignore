@@ -12,6 +12,9 @@
 .env.*.local
 env.txt
 
+#Planes de mejora de agentes
+plan_agents/
+
 # Archivos de configuración con posible información sensible
 config.txt
 
@@ -268,3 +271,4 @@ documentacion.txt
 # Local configuration overrides 
 local.config.py
 config.local.py
+
