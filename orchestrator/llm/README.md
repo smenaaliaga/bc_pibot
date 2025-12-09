@@ -1,41 +1,39 @@
 # Capa LLM
 
-Abstracción única para todo lo que interactúa con modelos de lenguaje (fallback, respuestas
-metodológicas y modo RAG). El objetivo es mantener la interacción con LangChain/OpenAI confinada
-en este módulo para facilitar los cambios de backend.
+Abstracción única para todo lo que interactúa con modelos de lenguaje (respuestas metodológicas,
+RAG, fallback). Mantiene la dependencia con LangChain/OpenAI confinada en un solo lugar para facilitar
+cambios de backend.
 
 ## Archivos
-- `llm_adapter.py`: clase `LLMAdapter` con soporte de streaming, inyección de contexto RAG,
-	historial y facts persistidos. Encapsula la construcción de mensajes (`_build_messages`), la
-	selección del backend (`ChatOpenAI` o `init_chat_model`) y la lógica de `stream()/generate()`.
-- `system_prompt.py`: builder del mensaje de sistema. Incluye guardrails, formato de cita,
-	instrucciones de transparencia y toggles para prompts extendidos.
+- `llm_adapter.py`: implementación de `LLMAdapter` con soporte de streaming, inyección de contexto RAG,
+  historial y facts. Se encarga de `_build_messages`, del `ChatOpenAI`/`init_chat_model` y de la lógica
+  de `stream()`/`generate()`.
+- `system_prompt.py`: construye el mensaje de sistema común. Define guardrails (tono, transparencia,
+  citas), instrucciones adicionales para PIB/IMACEC y toggles para prompts extendidos.
 
 ## Responsabilidades
-- Normalizar contexto: combina `intent_info`, facts de memoria y contexto RAG antes de llegar al
-	modelo.
-- RAG opt-in: cuando se provee un retriever, el adapter decide el filtro (`topic`, `sector`,
-	`seasonality`) y limita el tamaño del contexto (`RAG_CONTEXT_MAX_CHARS`).
-- Streaming real: `LLMAdapter.stream` produce chunks de texto respetando el modo SSE y delega el
-	logging (`[LLM_STREAM_CHUNK]`).
-- Compatibilidad: cuando LangChain no está disponible, emite respuestas stub para pruebas locales.
+- Normalizar contexto: combina `intent_info`, facts (`memory`), clasificación, follow-ups pendientes y
+  contexto RAG antes de llamar al modelo.
+- RAG opt-in: cuando se le entrega un retriever, el adapter decide los filtros (`topic`, `sector` o
+  `seasonality`) y limita el tamaño del contexto (`RAG_CONTEXT_MAX_CHARS`).
+- Streaming: `LLMAdapter.stream` produce chunks respetando SSE y marca cada pedazo con
+  `[LLM_STREAM_CHUNK]` para logging.
+- Fallback seguro: si LangChain o las credenciales no están presentes, devuelve una respuesta stub para
+  que la UI siga operativa durante pruebas locales.
 
 ## Extender
-- Nuevos backends se incorporan modificando `_build_messages` y el bloque que inicializa `self._chat`.
-	Evita importar SDKs directamente fuera de esta clase.
-- Si necesitas adjuntar más contexto (p. ej. resúmenes), agrega la lógica en `_build_messages` para
-	mantener toda la ingeniería de prompts en un solo lugar.
-- Para prompts específicos crea helpers en `system_prompt.py` y consúmelos desde el adapter.
+- **Nuevos modelos/backends**: modifica `_build_messages` y el bloque donde se inicializa `self._chat`. No
+  importes SDKs fuera de esta clase para mantener el aislamiento.
+- **Más contexto**: añade funciones helper en `system_prompt.py` y llámalas desde `_build_messages`.
+- **Nuevos modos** (ej. evaluación): crea métodos específicos (`stream_eval`) que reutilicen la lógica
+  de construcción de mensajes para garantizar consistencia.
 
-## Recomendaciones
-- Usa `build_llm(streaming=True, retriever=...)` desde el grafo para mantener las opciones
-	alineadas con LangGraph.
-- Revisa `tests/test_orchestrator2.py::test_rag_branch` cuando toques la construcción de mensajes;
-	garantiza que los filtros esperados lleguen al retriever.
+## Validación
+- `pytest tests/test_llm_adapter_modes.py`
+- `tests/test_agent_graph_streaming.py` para asegurarse de que los chunks lleguen correctamente.
+- `tools/debug_llm_stream.py` permite inspeccionar en consola cómo se emiten los eventos `custom`.
 
 ## Documentación relacionada
 - [README del orquestador](../README.md)
 - [README raíz del proyecto](../../README.md)
 - [README de pruebas](../../tests/README.md)
-- [README de Docker](../../docker/README.md)
-- [README de scripts](../../readme/README.md)

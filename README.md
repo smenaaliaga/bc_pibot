@@ -1,26 +1,119 @@
 # PIBot BCCh – Chat IMACEC/PIB
 
-## Requisitos
-- Python 3.12 (gestionado con `uv`)
-- Variables de entorno necesarias (`OPENAI_API_KEY`, `BCCH_USER`, `BCCH_PASS`, etc.).
+Asistente Streamlit respaldado por LangGraph que responde dudas metodológicas y de series del BCCh
+combinando datos oficiales, RAG con documentos internos y memoria conversacional.
 
-## Instalación con uv
+## Inicio rápido
+### Requisitos
+- Python 3.12 administrado con [`uv`](https://astral.sh/uv)
+- Cuenta BCCh (`BCCH_USER`, `BCCH_PASS`) con acceso a las APIs oficiales
+- Credenciales de OpenAI (`OPENAI_API_KEY`) y servicios opcionales (Postgres, Redis, Azure AI Search)
+
+### Instala dependencias
 ```bash
-# Instala Python 3.12 si no lo tienes
 uv python install 3.12
-
-# Sincroniza dependencias y crea el entorno .venv
 uv sync
-
-# (Opcional) activa el entorno
+# (Opcional) activar entorno
 .\.venv\Scripts\activate   # Windows
-# source .venv/bin/activate # macOS/Linux
+# source .venv/bin/activate  # macOS/Linux
 ```
 
-Configura el archivo `.env` (puedes copiar desde `.env.example` si existe) y completa las claves requeridas.
+### Variables de entorno mínimas
+| Variable | Descripción |
+| --- | --- |
+| `OPENAI_API_KEY`, `OPENAI_MODEL` | Modelo y clave usados por `LLMAdapter` |
+| `BCCH_USER`, `BCCH_PASS` | Credenciales para `get_series.py` |
+| `USE_AGENT_GRAPH=1` | Habilita el grafo LangGraph en `main.py` |
+| `PG_DSN`, `REQUIRE_PG_MEMORY` | Configuran memoria conversacional y checkpoints (ver `docs/README_memory.md`) |
+| `REDIS_URL`, `USE_REDIS_CACHE` | Cache para consultas BCCh |
+| `RAG_ENABLED`, `RAG_BACKEND`, `RAG_PGVECTOR_URL` | Activa el retriever metodológico |
 
-## Ejecución
+Duplica `.env.example` si está disponible y mantén los secretos fuera del control de versiones.
+
+### Ejecuta la aplicación
 ```bash
-# Desde la raíz del repo
 uv run streamlit run main.py
 ```
+El entrypoint `main.py` prepara logging + configuración, invoca el grafo desde `orchestrator/` y la UI
+se renderiza desde `app.py`.
+
+## Arquitectura
+- `main.py` crea `AppConfig`, inicializa memoria/checkpoints y transmite el grafo LangGraph con
+	`stream_mode=["updates","custom"]`.
+- `app.py` consume los eventos del grafo y muestra chunks, tablas CSV/CHART y follow-ups.
+- `orchestrator/` contiene el grafo (`graph/agent_graph.py`), clasificadores/intents, ruteo, flujo de
+	datos BCCh, RAG factory, prompts compartidos y memoria.
+- `get_series.py` abstrae las llamadas a la API de series del BCCh con cache Redis y helpers de reprocesamiento.
+
+```mermaid
+flowchart LR
+    subgraph Frontend
+        UI[Streamlit app.py]
+    end
+    subgraph LangGraph: Orquestador de grafo
+        IN[ingest]
+        CL[classify]
+        IS[intent_shortcuts]
+        RT{route}
+        DT[data]
+        RG[rag]
+        FB[fallback]
+        DR[direct]
+        MM[memory]
+    end
+    subgraph Backends
+        S[(BCCh API)]
+        R[(Retriever/PGVector)]
+        M[(MemoryAdapter + PostgresSaver)]
+    end
+
+    UI --> IN --> CL --> IS --> RT
+    RT -->|DATA| DT --> MM
+    RT -->|RAG| RG --> MM
+    RT -->|DIRECT| DR --> MM
+    RT -->|FALLBACK| FB --> MM
+    MM --> UI
+    DT -.-> S
+    RG -.-> R
+    IN -.-> M
+    MM -.-> M
+```
+
+Detalles extendidos y diagramas adicionales viven en `orchestrator/README.md`.
+
+## Servicios locales (opcional)
+Para memoria persistente, cache y RAG se recomienda levantar Postgres + Redis mediante Docker.
+
+```bash
+cd docker
+docker compose build postgres      # sólo si cambiaste la imagen
+docker compose --env-file ../.env up -d postgres redis
+docker compose exec postgres psql -U postgres -d pibot -c "CREATE EXTENSION IF NOT EXISTS vector;"
+```
+
+Consulta `docker/README.md` para conocer volúmenes, migraciones y reinicios.
+
+## Flujo de datos + RAG
+1. **Series BCCh**: `get_series.py` usa las credenciales BCCh y opcionalmente Redis; la metadata de
+	 apoyo se carga con `tools/load_series_metadata.py`, que pobla la tabla `series_metadata` usada por
+	 `series/series_index.py`.
+2. **RAG metodológico**: `rag.py` provee ABIs para PGVector, FAISS o Azure AI Search. Ejecuta
+	 `docker/postgres/load_txt_rag.py` para indexar documentos usando embebidos OpenAI. El script acepta
+	 banderas como `--manifest manifest.json`, `--purge-mode staged`, `--eval-report report.json` para
+	 controlar ingestas incrementales.
+3. **Memoria**: `memory/MemoryAdapter` lee/escribe `session_facts` y checkpoints en Postgres; ver
+	 `docs/README_memory.md` para migraciones recientes.
+
+## Flujo de trabajo para desarrolladores
+- **Debug de streaming**: `tools/debug_graph_stream.py`, `tools/debug_llm_stream.py`.
+- **CLI headless**: `tools/tmp_langgraph_test.py`, `tools/test_orch2_chunk.py`.
+- **Pruebas**: `uv run pytest tests/` (ver `tests/README.md` para atajos como `tools/run_small_tests.py`).
+- **Registro de prompts/planes**: `plan_agents/*.prompt.md` describe mejoras pendientes (phase2 prompt,
+	dedupe de chunks, etc.).
+
+## Documentación relacionada
+- `orchestrator/README.md`: detalle del grafo, intents y configuración.
+- `docs/README_memory.md`: esquema y migraciones de memoria.
+- `docker/README.md`: stack local (Postgres, Redis) y loaders.
+- `tests/README.md`: convención de pruebas.
+- `plan_agents/`: hojas de ruta activas.

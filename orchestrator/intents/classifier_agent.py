@@ -6,7 +6,7 @@ import os
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
-from prompt import ClassificationResult, classify_query
+from orchestrator.prompts.query_classifier import ClassificationResult, classify_query
 
 logger = logging.getLogger(__name__)
 

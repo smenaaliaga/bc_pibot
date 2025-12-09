@@ -14,7 +14,8 @@ env.txt
 
 #Planes de mejora de agentes
 plan_agents/
-
+#Folder with legacy codes.
+to_delete/
 # Archivos de configuración con posible información sensible
 config.txt
 

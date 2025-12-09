@@ -1,93 +1,108 @@
 # Orchestrator PIBot
 
-Grafo LangGraph que coordina clasificación, intents deterministas, flujo de datos BCCh, RAG
-metodológico y memoria conversacional. `USE_AGENT_GRAPH=1` viene habilitado en `main.py` y la UI de
-Streamlit consume los eventos `updates` + `custom` que emite este grafo.
+Motor LangGraph que encapsula todo el flujo del asistente económico: clasificación híbrida, intents
+deterministas, llamadas a la API de series del BCCh, respuestas con RAG metodológico y memoria
+conversacional. `main.py` activa el grafo estableciendo `USE_AGENT_GRAPH=1` y la UI de Streamlit
+renderiza lo que llega por los canales `updates` (estado) y `custom` (chunks de texto).
 
-## Mapa de carpetas
-- `graph/`: definición del grafo (`agent_graph.py`) y del `AgentState` compartido.
-- `intents/`: clasificadores LLM + heurísticas (`classifier_agent.py`, `joint_intent_classifier.py`, etc.).
-- `catalog/`: intents declarativos en JSON + helpers para expandir patrones.
-- `routes/`: ruteo determinista (`intent_router.py`, `data_router.py`).
-- `data/`: flujo completo de series (prompts, fetch, tablas, markers).
-- `llm/`: `LLMAdapter` + `system_prompt` con soporte de streaming y RAG.
-- `rag/`: fábrica de retrievers (PGVector/FAISS/Chroma).
-- `memory/`: `MemoryAdapter` para facts + LangGraph checkpoints.
-- `utils/`: helpers comunes (`pg_logging`, `followups`).
-
-## Flujo extremo a extremo
+## Arquitectura general
 ```mermaid
 flowchart LR
-    UI[Streamlit / main.py]
-    subgraph LangGraph
-        A[ingest]
-        B[classify]
-        C[intent_shortcuts]
-      D{route?}
-        E[data]
-        F[rag]
-        G[fallback]
-        H[direct]
-        I[memory]
+    subgraph Frontend
+        UI[Streamlit app.py]
     end
-    UI --> A --> B --> C --> D
-    D -->|DATA| E --> I
-    D -->|RAG| F --> I
-    D -->|FALLBACK| G --> I
-    D -->|DIRECT| H --> I
-    I --> UI
+    subgraph LangGraph: Orquestador de grafo
+        IN[ingest]
+        CL[classify]
+        IS[intent_shortcuts]
+        RT{route}
+        DT[data]
+        RG[rag]
+        FB[fallback]
+        DR[direct]
+        MM[memory]
+    end
+    subgraph Backends
+        S[(BCCh API)]
+        R[(Retriever/PGVector)]
+        M[(MemoryAdapter + PostgresSaver)]
+    end
 
-    subgraph Servicios
-        R[(Retriever)]
-        M[(MemoryAdapter)]
-        S((Series API BCCh))
-    end
-    F -.-> R
-   A -.-> M
-   I -.-> M
-    E -.-> S
+    UI --> IN --> CL --> IS --> RT
+    RT -->|DATA| DT --> MM
+    RT -->|RAG| RG --> MM
+    RT -->|DIRECT| DR --> MM
+    RT -->|FALLBACK| FB --> MM
+    MM --> UI
+    DT -.-> S
+    RG -.-> R
+    IN -.-> M
+    MM -.-> M
 ```
 
-### Pasos detallados
-1. **Ingest**: limpia la pregunta, asegura `session_id`, consulta facts en memoria y arma `context`.
-2. **Classify**: `classifier_agent` produce `ClassificationResult` + `history_text`, luego
-   `build_intent_info` agrega entidades y facts.
-3. **Intent shortcuts**: ejecuta intents deterministas (catálogo JSON + heurísticas); si devuelve
-   chunks, el grafo responde por la rama `direct`.
-4. **Route**: decide entre `data`, `rag`, `fallback` o `direct` usando `classification.query_type`,
-   intents y disponibilidad de datos.
-5. **Data**: `data_router.stream_data_flow` delega a `data_flow.stream_data_flow_full`, que emite
-   metodología, tablas, markers CSV/CHART y follow-ups.
-6. **RAG**: `LLMAdapter` recibe el retriever de `rag_factory` y responde citando documentos.
-7. **Fallback**: LLM genérico con el mismo adapter pero sin retriever.
-8. **Memory**: persiste la respuesta y actualiza facts vía `MemoryAdapter` (PostgresSaver cuando está
-   disponible, fallback local en ambientes sin DB).
+### Flujo detallado
+1. **ingest** normaliza la pregunta, garantiza `session_id`, carga facts desde `MemoryAdapter` y arma
+   el `context` base.
+2. **classify** usa `orchestrator/prompts/query_classifier.py` y `classifier_agent.py` para obtener un
+   `ClassificationResult` + `history_text` y genera `intent_info` estructurado.
+3. **intent_shortcuts** ejecuta intents declarativos (`catalog/intents.json` + `routes/intent_router.py`)
+   para resolver consultas frecuentes sin tocar RAG/datos.
+4. **route** decide la rama final combinando clasificación, intents, disponibilidad de datos y flags
+   (`force_data`, `force_rag`).
+5. **data** dispara `data_router.stream_data_flow` → `data/data_flow.py`, que produce la fase
+   metodológica, tablas, markers de CSV/gráfico y follow-ups.
+6. **rag** alimenta `LLMAdapter` con el retriever creado por `rag/rag_factory.py` (PGVector/FAISS/Chroma).
+7. **fallback** usa el mismo adapter pero sin retriever, ideal para consultas out-of-domain.
+8. **direct** solo transmite los chunks devueltos por intents deterministas.
+9. **memory** sincroniza la salida completa con LangGraph checkpoints + Postgres (o `MemorySaver` en
+   local) y actualiza facts reutilizables.
 
-## Streaming
-- `_emit_stream_chunk` envía cada fragmento por dos vías: writer explícito y `get_runtime().stream_writer`.
-- `app.py` escucha `stream_mode=["updates","custom"]`; `custom` trae `{"stream_chunks": "texto"}` y se
-  muestra token a token en la UI.
-- `Topic(stream_chunks, accumulate=True)` guarda los chunks para pruebas (`tools/debug_graph_stream.py`).
+## Mapa de carpetas
+| Ruta | Rol principal |
+| --- | --- |
+| `graph/` | Define `AgentState`, nodos LangGraph y utilidades de streaming. |
+| `intents/` | Clasificadores LLM + heurísticas (`classifier_agent.py`, `joint_intent_classifier.py`). |
+| `catalog/` | Declaración de intents y helpers para expandir patrones JSON. |
+| `routes/` | Rutas deterministas (`intent_router.py`, `data_router.py`). |
+| `data/` | Flujo de series BCCh: prompts, fetch, tablas, markers, follow-ups. |
+| `prompts/` | Registro de prompts y el `query_classifier.py` (function calling). |
+| `llm/` | `LLMAdapter` y construcción del mensaje de sistema con guardrails. |
+| `rag/` | Fábrica de retrievers para PGVector/FAISS/Chroma. |
+| `memory/` | Adaptadores de facts + LangGraph checkpoints (Postgres + fallback). |
+| `utils/` | utilidades compartidas (`pg_logging`, `followups`). |
 
-## Configuración clave
+## Contrato de streaming
+- `_emit_stream_chunk` envía cada fragmento a `StreamWriter` y al runtime (`custom` event). La UI
+  muestra los chunks token a token y detecta markers (`##CSV_DOWNLOAD_START`, `##CHART_START`).
+- `Topic(str, accumulate=True)` en `AgentState.stream_chunks` conserva el historial para pruebas con
+  `tools/debug_graph_stream.py` o `tools/debug_llm_stream.py`.
+- Los nodos pueden adjuntar metadata usando `updates` (estado) para que Streamlit muestre barras de
+  progreso o banners reutilizables.
+
+## Variables y toggles clave
 - **Grafo**: `USE_AGENT_GRAPH`, `AGENT_DATA_MAX_ATTEMPTS`, `LANGGRAPH_CHECKPOINT_NS`.
-- **LLM / RAG**: `OPENAI_MODEL`, `OPENAI_API_KEY`, `RAG_ENABLED`, `RAG_BACKEND`, `RAG_PGVECTOR_URL`,
-  `RAG_TOP_K`.
-- **Datos**: `USE_REDIS_CACHE`, `REDIS_URL`, `REDIS_SERIES_TTL`, defaults de series en
+- **LLM/RAG**: `OPENAI_MODEL`, `OPENAI_API_KEY`, `RAG_ENABLED`, `RAG_BACKEND`, `RAG_PGVECTOR_URL`,
+  `RAG_TOP_K`, `OPENAI_EMBEDDINGS_MODEL`.
+- **Datos BCCh**: `BCCH_USER`, `BCCH_PASS`, `USE_REDIS_CACHE`, `REDIS_URL`, `REDIS_SERIES_TTL`,
   `series/config_default.json`.
-- **Memoria**: `PG_DSN`, `REQUIRE_PG_MEMORY`, `MEMORY_MAX_TURNS_PROMPT`, `MEMORY_FACTS_LAYOUT`.
-- **Logging**: `LOG_LEVEL`, `RUN_MAIN_LOG`, `LOG_EXPOSE_API_LINKS`.
+- **Memoria**: `PG_DSN`, `REQUIRE_PG_MEMORY`, `MEMORY_FACTS_LAYOUT`, `MEMORY_MAX_TURNS_PROMPT`.
+- **Logging**: `RUN_MAIN_LOG`, `LOG_LEVEL`, `LOG_EXPOSE_API_LINKS`, `THROTTLED_PG_LOG_PERIOD`.
 
-## Desarrollo / pruebas
-- `tools/debug_graph_stream.py`: compara `updates`, `values` y `custom` para validar streaming.
-- `tools/test_orch2_chunk.py`: smoke test que ejecuta el grafo completo y verifica markers.
-- `pytest tests/test_orchestrator2.py tests/test_orch2_chunk.py`: cobertura principal del orquestador.
+## Desarrollo y pruebas
+- `tools/debug_graph_stream.py` y `tools/debug_graph_invoke.py`: validan streaming LangGraph (updates vs
+  custom) y muestran markers en consola.
+- `tools/test_orch2_chunk.py`: smoke test completo del grafo, útil en CI o tras cambios grandes.
+- `pytest tests/test_orchestrator2.py tests/test_agent_graph_streaming.py`: validan clasificación,
+  ruteo y emisión de markers.
+- `plan_agents/*.prompt.md`: hojas de ruta activas (mejoras en prompts, deduplicación de chunks,
+  prompt audit, etc.).
 
 ## Documentación relacionada
 - [README raíz del proyecto](../README.md)
-- [README de catalogo](catalog/README.md)
-- [README de data](data/README.md)
-- [README de grafo](graph/README.md)
+- [README del grafo](graph/README.md)
+- [README de datos](data/README.md)
+- [README de intents](intents/README.md)
+- [README de RAG](rag/README.md)
+- [README de memoria](memory/README.md)
 - [README de Docker](../docker/README.md)
 - [README de pruebas](../tests/README.md)
-- [README de scripts auxiliares](../readme/README.md)

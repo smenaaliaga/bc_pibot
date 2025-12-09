@@ -1,0 +1,59 @@
+{
+  "defaults": {
+    "topic": "metodologia",
+    "version": "2025.12",
+    "tags": ["rag", "bcch"],
+    "language": "es",
+    "chunk_size": 900,
+    "chunk_overlap": 120
+  },
+  "documents": [
+    {
+      "id": "cder2018",
+      "path": "cder2018_all_20251207_153105.txt",
+      "topic": "pib",
+      "version": "2025.12.07",
+      "tags": ["pib", "metodologia"],
+      "preferred_filename": "cder2018_chunks.json"
+    },
+    {
+      "id": "cuentas_ref18",
+      "path": "Cuentas_Nacionales_metodos_fuentes_ref18_all_20251203_200609_limpio.txt",
+      "topic": "pib",
+      "version": "2025.12.03",
+      "tags": ["pib", "fuentes"],
+      "preferred_filename": "cuentas_ref18_chunks.json"
+    },
+    {
+      "id": "contrib_sectorial_trimestral",
+      "path": "Contribución Sectorial al Crecimiento Trimestral_20251207_152722.txt",
+      "topic": "pib",
+      "version": "2025.12.07",
+      "tags": ["pib", "crecimiento"],
+      "preferred_filename": "contrib_sectorial_chunks.json"
+    },
+    {
+      "id": "glosario_bcch",
+      "path": "glosario.txt",
+      "topic": "metodologia",
+      "version": "2025.12.07",
+      "tags": ["glosario", "metodologia"],
+      "preferred_filename": "glosario_chunks.json"
+    },
+    {
+      "id": "pib_regional",
+      "path": "pib_reg_all_20251207_152722.txt",
+      "topic": "pib",
+      "version": "2025.12.07",
+      "tags": ["pib", "regional"],
+      "preferred_filename": "pib_regional_chunks.json"
+    },
+    {
+      "id": "imacec_metodologia",
+      "path": "Imacec_all_20251203_193937_limpio.txt",
+      "topic": "imacec",
+      "version": "2025.12.03",
+      "tags": ["imacec", "metodologia"],
+      "preferred_filename": "imacec_chunks.json"
+    }  ]
+}

@@ -13,17 +13,22 @@ import logging
 import os
 import re
 import time
+from datetime import datetime
 from dataclasses import asdict
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 
 from config import get_settings
+from orchestrator.prompts.registry import (
+    build_data_method_prompt,
+    build_data_summary_prompt,
+)
 
 # Opcional: metadatos de series
 try:
-    from get_series import get_series_metadata  # type: ignore
+    from orchestrator.data.get_series import get_series_metadata  # type: ignore
 except Exception:
     get_series_metadata = None  # type: ignore
 
@@ -38,6 +43,38 @@ _settings = get_settings()
 
 # Contexto simple para compartir meta entre fases
 _last_data_context: Dict[str, Any] = {}
+
+
+class _ChunkDeduper:
+    """Best-effort guard to skip duplicated streamed chunks (LLM double-send)."""
+
+    def __init__(self, tail_limit: int = 4000) -> None:
+        self._last_norm: Optional[str] = None
+        self._tail_norm = ""
+        self._tail_limit = tail_limit
+
+    def _normalize(self, chunk: str) -> str:
+        return re.sub(r"\s+", " ", chunk).strip()
+
+    def _update_tail(self, normalized: str) -> None:
+        if not normalized:
+            return
+        self._tail_norm = (self._tail_norm + normalized)[-self._tail_limit :]
+
+    def should_emit(self, chunk: str) -> bool:
+        if not chunk:
+            return False
+        normalized = self._normalize(chunk)
+        if not normalized:
+            return False
+        if normalized == self._last_norm:
+            return False
+        if normalized and self._tail_norm.endswith(normalized):
+            return False
+        self._last_norm = normalized
+        self._update_tail(normalized)
+        return True
+
 
 
 def _record_fetch_error(info: Optional[Dict[str, Any]]) -> None:
@@ -76,37 +113,12 @@ except Exception:
 # ---------------------------------------------------------------------------
 # Prompts de fase DATA (copiados/ajustados del legacy)
 # ---------------------------------------------------------------------------
-_DATA_SYSTEM = (
-    "Eres el asistente económico del Banco Central de Chile (PIBot). "
-    "Respondes SIEMPRE en español.\n\n"
-    "Estás en el modo de respuesta orientada a DATOS. "
-    "El usuario podría pedir valores numéricos, tablas o variaciones. "
-    "Esta versión puede tener acceso limitado a datos; si no puedes entregar "
-    "valores reales, dilo explícitamente y describe los pasos para obtenerlos "
-    "desde la serie adecuada. No inventes cifras."
-)
-
-_DATA_HUMAN = (
-    "Historial de la conversación (puede estar vacío):\n"
-    "{history}\n\n"
-    "Consulta actual del usuario:\n"
-    "{question}\n\n"
-    "Clasificación técnica de la consulta (NO la muestres tal cual al usuario):\n"
-    "query_type={query_type}, data_domain={data_domain}, is_generic={is_generic}, "
-    "default_key={default_key}\n"
-    "Árbol IMACEC={imacec_tree}\n"
-    "Árbol PIB={pibe_tree}\n\n"
-    "Instrucción de modo (no la muestres, solo síguela):\n"
-    "{mode_instruction}\n\n"
-    "Responde con un texto breve, sin números si no los tienes, "
-    "explicando metodología y cómo obtendrías y presentarías los datos "
-    "para el periodo que menciona (por ejemplo, 2025), sin inventar cifras."
-)
+_DATA_PHASE1_SYSTEM, _DATA_PHASE1_HUMAN = build_data_method_prompt()
 
 _data_prompt = ChatPromptTemplate.from_messages(
     [
-        ("system", _DATA_SYSTEM),
-        ("human", _DATA_HUMAN),
+        ("system", _DATA_PHASE1_SYSTEM),
+        ("human", _DATA_PHASE1_HUMAN),
     ]
 )
 
@@ -116,10 +128,27 @@ _llm_data = ChatOpenAI(
     streaming=True,
 )
 
+_DATA_SUMMARY_SYSTEM, _DATA_SUMMARY_HUMAN = build_data_summary_prompt()
+
 # ---------------------------------------------------------------------------
 # Helpers de año/frecuencia y tablas/CSV
 # ---------------------------------------------------------------------------
 _YEAR_PATTERN = re.compile(r"(?:19|20)\d{2}")
+_MONTH_ABBRS = [
+    "Ene",
+    "Feb",
+    "Mar",
+    "Abr",
+    "May",
+    "Jun",
+    "Jul",
+    "Ago",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dic",
+]
+
 
 
 def _infer_domain_from_history(history_text: str) -> Optional[str]:
@@ -183,7 +212,7 @@ def _format_series_metadata_block(series_id: str) -> str:
 
 def _build_year_table(data: Dict[str, Any], year: int) -> str:
     try:
-        from get_series import build_year_comparison_table_text  # type: ignore
+        from orchestrator.data.get_series import build_year_comparison_table_text  # type: ignore
     except Exception as e:
         logger.error(f"[DATA_TABLE] No se pudo importar función canónica: {e}")
         return ""
@@ -257,11 +286,15 @@ def _emit_csv_download_marker(table_text: str, filename_base: str, preferred_fil
 
 def _emit_chart_marker(domain: str, data: Dict[str, Any]) -> Optional[str]:
     if not data:
+        logger.debug("[CHART_EXPORT_SKIP] domain=%s reason=no_data", domain)
         return None
     obs = data.get("observations") or []
     if not obs:
+        logger.debug("[CHART_EXPORT_SKIP] domain=%s reason=no_observations", domain)
         return None
-    metric_type = _last_data_context.get("metric_type", "annual")
+    metric_type = (_last_data_context.get("metric_type") or "annual").lower()
+    if metric_type not in {"monthly", "annual"}:
+        metric_type = "annual"
     try:
         import csv
         import time as _t
@@ -288,6 +321,11 @@ def _emit_chart_marker(domain: str, data: Dict[str, Any]) -> Optional[str]:
             if val is None:
                 continue
             rows_out.append((d, val))
+        if not rows_out:
+            logger.warning(
+                "[CHART_EXPORT_EMPTY] domain=%s year=%s metric=%s", domain, year_ctx, metric_type
+            )
+            return None
         with open(path, "w", newline="", encoding="utf-8") as f:
             w = csv.writer(f)
             if metric_type == "monthly":
@@ -367,7 +405,7 @@ def _get_series_with_retry(
     backoff: float = 1.0,
 ) -> Optional[Dict[str, Any]]:
     try:
-        from get_series import get_series_api_rest_bcch
+        from orchestrator.data.get_series import get_series_api_rest_bcch
     except Exception as e:
         logger.error(f"[DATA_FETCH] import get_series_api_rest_bcch falló: {e}")
         return None
@@ -456,7 +494,7 @@ def _fetch_series_for_year_by_series_id(series_id: str, year: int, target_freq: 
 
 def _format_last_yoy_from_table(data: Dict[str, Any], year: int) -> Optional[str]:
     obs = (data or {}).get("observations") or []
-    rows = []
+    rows: List[Tuple[str, float]] = []
     for o in obs:
         d = o.get("date")
         if not d:
@@ -475,12 +513,32 @@ def _format_last_yoy_from_table(data: Dict[str, Any], year: int) -> Optional[str
         return None
     rows.sort(key=lambda r: r[0])
     last_date, last_yoy = rows[-1]
+    freq = ((data.get("meta") or {}).get("freq_effective") or "M").upper()
+    period_label = _format_period_label(last_date, freq)
+    if not period_label:
+        period_label = str(last_date)
+    return f"La última variación anual disponible es {last_yoy:.1f}% en {period_label}."
+
+
+def _format_period_label(date_str: str, freq: str) -> Optional[str]:
     try:
-        month = last_date[5:7]
-        txt_date = f"{month}/{year}"
+        dt = datetime.fromisoformat(str(date_str)[:10])
     except Exception:
-        txt_date = str(last_date)
-    return f"La última variación anual disponible es {last_yoy:.1f}% (periodo {txt_date})."
+        return None
+    year = dt.year
+    month = dt.month
+    if freq in {"Q", "T"}:
+        quarter = ((month - 1) // 3) + 1
+        return f"T{quarter} {year}"
+    if freq == "M":
+        try:
+            name = _MONTH_ABBRS[month - 1]
+        except Exception:
+            name = f"{month:02d}"
+        return f"{name} {year}"
+    if freq == "A":
+        return str(year)
+    return f"{year}-{month:02d}"
 
 
 def _sanitize_llm_text(text: str) -> str:
@@ -491,6 +549,18 @@ def _sanitize_llm_text(text: str) -> str:
     text = re.sub(r"([a-záéíóúñ])([A-ZÁÉÍÓÚÑ])", r"\1 \2", text)
     text = re.sub(r"\s+", " ", text).strip()
     return text
+
+
+def _build_table_excerpt(table_text: str, max_lines: int = 24, max_chars: int = 1200) -> str:
+    """Return a trimmed excerpt of the rendered table to keep prompts compact."""
+    if not table_text:
+        return "(sin tabla)"
+    lines = [ln.rstrip() for ln in table_text.strip().splitlines() if ln.strip()]
+    excerpt = "\n".join(lines[:max_lines])
+    if len(excerpt) > max_chars:
+        excerpt = excerpt[: max_chars - 3].rstrip()
+        excerpt += "..."
+    return excerpt
 
 
 def _build_year_change_only_table(data: Dict[str, Any], year: int) -> str:
@@ -604,6 +674,7 @@ def _handle_vector_search_other_series(question: str) -> Optional[List[Dict[str,
 # Fase 1: metodológica (sin tablas)
 # ---------------------------------------------------------------------------
 def stream_phase(classification: Any, question: str, history_text: str) -> Iterable[str]:
+    deduper = _ChunkDeduper()
     try:
         vars_in = {
             "history": history_text,
@@ -617,6 +688,7 @@ def stream_phase(classification: Any, question: str, history_text: str) -> Itera
             "mode_instruction": "Genera una respuesta metodológica clara. No inventes cifras.",
         }
         chain = _data_prompt | _llm_data
+
         def _chunk_to_text(chunk: Any) -> str:
             for attr in ("content", "text"):
                 val = getattr(chunk, attr, None)
@@ -636,7 +708,7 @@ def stream_phase(classification: Any, question: str, history_text: str) -> Itera
             if content.startswith("<bound method"):
                 parts = content.split(">", 1)
                 content = parts[1].strip() if len(parts) == 2 else ""
-            if content:
+            if content and deduper.should_emit(content):
                 yield content
         return
     except Exception as e:
@@ -647,25 +719,31 @@ def stream_phase(classification: Any, question: str, history_text: str) -> Itera
 # ---------------------------------------------------------------------------
 # Fase 2: con tabla 
 # ---------------------------------------------------------------------------
-def _summarize_with_llm(domain: str, year: int, table_text: str) -> str:
-    system_msg = (
-        "Eres el asistente económico del Banco Central de Chile (PIBot). Responde SIEMPRE en español. "
-        "Estás en la FASE 2 de una respuesta orientada a DATOS. "
-        "SOLO debes generar una frase introductoria neutral y TRES preguntas de seguimiento, "
-        "sin conclusiones ni interpretaciones, sin repetir la tabla ni valores numéricos."
-    )
+def _summarize_with_llm(
+    domain: str,
+    year: int,
+    table_text: str,
+    latest_yoy_summary: Optional[str] = None,
+) -> str:
     table_description = (
         f"Tabla de comparación año anterior vs año actual para el dominio '{domain}' y el año {year}. "
         "La tabla ya fue mostrada al usuario y contiene columnas de periodo, año anterior, año actual y variación anual."
     )
-    human_msg = (
-        f"Dominio: {domain}\nAño consultado: {year}\n"
-        f"Resumen de tabla ya mostrada al usuario: {table_description}\n"
-        "Genera una frase introductoria neutral y luego exactamente tres preguntas de seguimiento."
+    table_excerpt = _build_table_excerpt(table_text)
+    yoy_summary_text = (
+        latest_yoy_summary
+        or "No se pudo identificar automáticamente la última variación anual en la tabla."
+    )
+    human_msg = _DATA_SUMMARY_HUMAN.format(
+        domain=domain,
+        year=year,
+        table_description=table_description,
+        table_excerpt=table_excerpt,
+        latest_yoy_summary=yoy_summary_text,
     )
     chain = ChatPromptTemplate.from_messages(
         [
-            ("system", system_msg),
+            ("system", _DATA_SUMMARY_SYSTEM),
             ("human", human_msg),
         ]
     ) | _llm_data
@@ -722,8 +800,11 @@ def _stream_data_phase_with_table(
             "year": year,
             "freq": meta.get("freq_effective"),
             "data_full": data,
+            "csv_marker_emitted": False,
+            "metric_type": "annual",
         }
     )
+    csv_marker_emitted = False
 
     table_text = _build_year_table(data, year)
     lines_count = table_text.count("\n") + 1
@@ -737,7 +818,8 @@ def _stream_data_phase_with_table(
             logger.info(f"[SERIES_META] series_id={series_id}")
             yield md_block + "\n"
 
-    summary_full = _summarize_with_llm(domain, year, table_text)
+    latest_yoy_summary = _format_last_yoy_from_table(data, year)
+    summary_full = _summarize_with_llm(domain, year, table_text, latest_yoy_summary)
     for pat in [r"no puedo proporcionar cifras", r"no puedo entregar cifras", r"no puedo proporcionar valores"]:
         summary_full = re.sub(pat, "", summary_full, flags=re.IGNORECASE)
     for s in re.split(r"(?<=[.!?])\s+", summary_full.strip()):
@@ -745,22 +827,16 @@ def _stream_data_phase_with_table(
             yield s + "\n"
 
     try:
-        marker = _emit_csv_download_marker(
-            table_text, f"{domain.lower()}_{year}", preferred_filename=f"{domain.lower()}_{year}.csv"
-        )
-        if marker:
-            yield "\n" + marker + "\n"
+        if not csv_marker_emitted:
+            marker = _emit_csv_download_marker(
+                table_text, f"{domain.lower()}_{year}", preferred_filename=f"{domain.lower()}_{year}.csv"
+            )
+            if marker:
+                csv_marker_emitted = True
+                _last_data_context["csv_marker_emitted"] = True
+                yield "\n" + marker + "\n"
     except Exception as _e_footer:
         logger.error(f"[CSV_MARKER_ERROR] domain={domain} year={year} e={_e_footer}")
-
-
-def _detect_chart_request(question: str) -> bool:
-    q = (question or "").lower()
-    if re.search(r"grafico|gráfico", q) and ("imacec" in q or "pib" in q or "serie" in q):
-        return True
-    if re.search(r"realiza un gráfico|realiza un grafico|mostrar gráfico", q):
-        return True
-    return False
 
 
 def stream_data_flow_full(
@@ -770,6 +846,10 @@ def stream_data_flow_full(
 ) -> Iterable[str]:
     """Fetch de datos y tabla; si falla, cae a fase metodológica."""
     domain = getattr(classification, "data_domain", "") or "IMACEC"
+    deduper = _ChunkDeduper()
+
+    def _should_emit(chunk: str) -> bool:
+        return deduper.should_emit(chunk)
     if not domain or domain == "OTHER":
         inferred = _infer_domain_from_history(history_text) or _last_data_context.get("domain")
         if inferred:
@@ -793,7 +873,7 @@ def stream_data_flow_full(
     if not data:
         # Fallback metodológico si no hay datos
         for chunk in stream_phase(classification, question, history_text):
-            if chunk:
+            if chunk and _should_emit(chunk):
                 yield chunk
         fetch_reason = _build_fetch_failure_message()
         logger.error(
@@ -805,14 +885,11 @@ def stream_data_flow_full(
             "para validar la conexión con el BCCh."
         )
         reason_block = f" ({fetch_reason})" if fetch_reason else ""
-        yield f"\nNo pude obtener la serie de datos para construir la tabla{reason_block}.{hint}\n"
+        fallback_chunk = f"\nNo pude obtener la serie de datos para construir la tabla{reason_block}.{hint}\n"
+        if _should_emit(fallback_chunk):
+            yield fallback_chunk
         return
 
-    if _detect_chart_request(question):
-        marker = _emit_chart_marker(domain, data)
-        if marker:
-            yield "\n" + marker + "\n"
-
     for chunk in _stream_data_phase_with_table(classification, question, history_text, domain, year or 0, data):
-        if chunk:
+        if chunk and _should_emit(chunk):
             yield chunk

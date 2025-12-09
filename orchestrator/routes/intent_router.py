@@ -9,7 +9,7 @@ from functools import lru_cache
 logger = logging.getLogger(__name__)
 
 # ------------------------------------------------------------
-# IMACEC deterministic intents (sin depender de orchestrator_old)
+# IMACEC deterministic intents (sin depender de original orchestrator)
 # ------------------------------------------------------------
 
 
@@ -43,7 +43,7 @@ def _fetch_imacec_series(year: int) -> Optional[Dict[str, Any]]:
     firstdate = f"{year-1}-01-01"
     lastdate = f"{year}-12-31"
     try:
-        from get_series import get_series_api_rest_bcch  # type: ignore
+        from orchestrator.data.get_series import get_series_api_rest_bcch  # type: ignore
 
         return get_series_api_rest_bcch(
             series_id=sid,
@@ -95,7 +95,7 @@ def _fetch_pib_series(year: int) -> Optional[Dict[str, Any]]:
     firstdate = f"{year-1}-01-01"
     lastdate = f"{year}-12-31"
     try:
-        from get_series import get_series_api_rest_bcch  # type: ignore
+        from orchestrator.data.get_series import get_series_api_rest_bcch  # type: ignore
 
         return get_series_api_rest_bcch(
             series_id=sid,
@@ -230,6 +230,10 @@ def _toggle_imacec_metric(question: str) -> Optional[str]:
         val_txt = f"{float(val):.1f}%"
     except Exception:
         val_txt = str(val)
+    try:
+        _df._last_data_context.update({"metric_type": "monthly" if want_monthly else "annual"})
+    except Exception:
+        logger.debug("Could not update metric_type in context", exc_info=True)
     return f"IMACEC {metric_label} ({date}): {val_txt}"
 
 
@@ -249,7 +253,7 @@ def _change_frequency_from_context(question: str) -> Optional[str]:
     if freq_eff == target_freq:
         return f"La serie ya está en frecuencia {target_freq}."
     try:
-        from get_series import get_series_api_rest_bcch  # type: ignore
+        from orchestrator.data.get_series import get_series_api_rest_bcch  # type: ignore
         sid = ctx.get("series_id") or data.get("meta", {}).get("series_id")
         if not sid:
             return None
@@ -316,11 +320,43 @@ def _methodology_response(question: str, domain: str) -> Optional[str]:
 # ----------------------------
 # IMACEC: solicitud de gráfico (usa último contexto de data_flow)
 # ----------------------------
-_CHART_PAT = re.compile(r"gr[aá]fic[oa]|plot|visual", re.IGNORECASE)
+_CHART_PAT = re.compile(r"gr[aá]fic[a-z]*|plot|visual|chart|diagram|visualiz[a-z]*", re.IGNORECASE)
+_CHART_COMMAND_PAT = re.compile(
+    r"(muestr[aá]|mostrar|muestre|haz|hazme|hacer|genera|generar|grafica|grafícal[oa]?|grafique|plot(?:ea|ear)?|"
+    r"visualiza|visualizar|dibuja|dibujar)",
+    re.IGNORECASE,
+)
 
 
 def _detect_chart_request(question: str) -> bool:
     return bool(_CHART_PAT.search(question or ""))
+
+
+def _looks_like_chart_command(question: str) -> bool:
+    q = (question or "").strip().lower()
+    if not q:
+        return False
+    if _CHART_COMMAND_PAT.search(q):
+        return True
+    if re.search(r"\botro\s+gr[aá]fico", q):
+        return True
+    if q.startswith(("grafico", "gráfico", "grafica", "gráfica", "chart", "plot")):
+        return True
+    return False
+
+
+def _tail_user_chunk(text: str) -> str:
+    if not text:
+        return ""
+    lowered = text.lower()
+    if "user:" not in lowered:
+        return text.strip()
+    try:
+        # Split keeping original casing; pick last chunk after "user:" marker.
+        tail = re.split(r"(?i)user:", text)[-1]
+        return tail.strip()
+    except Exception:
+        return text.strip()
 
 
 def _chart_marker_from_context(domain: str) -> Optional[str]:
@@ -329,6 +365,7 @@ def _chart_marker_from_context(domain: str) -> Optional[str]:
     ctx = getattr(_df, "_last_data_context", {}) or {}
     data = ctx.get("data_full")
     if not data:
+        logger.debug("[CHART_CONTEXT_MISSING] domain=%s reason=no_data", domain)
         return None
     try:
         marker = _df._emit_chart_marker(domain, data)  # type: ignore[attr-defined]
@@ -336,6 +373,123 @@ def _chart_marker_from_context(domain: str) -> Optional[str]:
     except Exception:
         logger.debug("Could not build chart marker from context", exc_info=True)
         return None
+
+
+class _DirectResponse:
+    """Small iterable wrapper that carries metadata for downstream nodes."""
+
+    def __init__(self, iterable: Iterable[str], metadata: Optional[Dict[str, Any]] = None):
+        self._iterable = iterable
+        self.metadata = metadata or {}
+
+    def __iter__(self):
+        yield from self._iterable
+
+
+def _extract_chart_domain_hint(question: str) -> Optional[str]:
+    q = (question or "").lower()
+    if "imacec" in q:
+        return "IMACEC"
+    if re.search(r"\bpib\b", q):
+        return "PIB"
+    return None
+
+
+def _last_chart_turn_metadata(memory: Optional[Any], session_id: Optional[str]) -> Optional[Dict[str, Any]]:
+    if not memory or not session_id or not hasattr(memory, "get_recent_turns"):
+        return None
+    try:
+        turns = memory.get_recent_turns(session_id, limit=6)
+    except Exception:
+        return None
+    for turn in reversed(turns or []):
+        role = str(turn.get("role", "")).lower()
+        if role != "assistant":
+            continue
+        metadata = (turn.get("metadata") or {}).copy()
+        return metadata if metadata.get("chart_domain") else None
+    return None
+
+
+def _handle_chart_followup(
+    question: str,
+    domain_hint: str,
+    memory: Optional[Any],
+    session_id: Optional[str],
+    facts: Optional[Dict[str, str]] = None,
+) -> Optional[Iterable[str]]:
+    latest_question = _tail_user_chunk(question)
+    if not _detect_chart_request(latest_question):
+        return None
+    if not _looks_like_chart_command(latest_question):
+        return None
+    if _df is None:
+        logger.debug("[CHART_FOLLOWUP_SKIP] data_flow module unavailable")
+        return None
+    recent_chart_meta = _last_chart_turn_metadata(memory, session_id)
+    ctx = getattr(_df, "_last_data_context", {}) or {}
+    ctx_domain = (ctx.get("domain") or "").upper()
+    question_domain = _extract_chart_domain_hint(latest_question)
+    target_domain = (question_domain or ctx_domain or (domain_hint or "")).upper()
+    if not target_domain:
+        return iter(["No tengo suficientes datos en memoria para generar el gráfico solicitado."])
+    facts_domain = ((facts or {}).get("chart_last_domain") or "").upper()
+    has_recent_chart = bool(recent_chart_meta and recent_chart_meta.get("chart_domain"))
+    ctx_ready = bool(ctx.get("data_full"))
+    if not has_recent_chart:
+        if facts_domain:
+            logger.debug(
+                "[CHART_FOLLOWUP_SKIP] facts present but no recent chart metadata facts=%s",
+                facts_domain,
+            )
+            return None
+        if not ctx_ready:
+            logger.debug("[CHART_FOLLOWUP_SKIP] no chart metadata and no context data")
+            return None
+        if ctx_domain and target_domain and ctx_domain != target_domain:
+            logger.debug(
+                "[CHART_FOLLOWUP_SKIP] ctx mismatch ctx=%s target=%s",
+                ctx_domain,
+                target_domain,
+            )
+            return None
+    else:
+        if facts_domain and target_domain and facts_domain != target_domain:
+            logger.debug(
+                "[CHART_FOLLOWUP_SKIP] domain mismatch facts=%s target=%s",
+                facts_domain,
+                target_domain,
+            )
+            return None
+        last_chart_domain = (recent_chart_meta.get("chart_domain") or "").upper()
+        if last_chart_domain and target_domain and last_chart_domain != target_domain:
+            logger.debug(
+                "[CHART_FOLLOWUP_SKIP] metadata mismatch meta=%s target=%s",
+                last_chart_domain,
+                target_domain,
+            )
+            return None
+    marker = _chart_marker_from_context(target_domain)
+    if marker:
+        try:
+            if memory and session_id and hasattr(memory, "set_facts"):
+                now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                memory.set_facts(
+                    session_id,
+                    {
+                        "chart_last_domain": target_domain,
+                        "chart_last_ts": now,
+                    },
+                )  # type: ignore
+        except Exception:
+            logger.debug("Could not store chart fact", exc_info=True)
+        metadata = {
+            "chart_domain": target_domain,
+            "chart_ts": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        }
+        return _DirectResponse(iter([marker]), metadata=metadata)
+    label = (target_domain or "indicador").upper()
+    return iter([f"No tengo suficientes datos en memoria para generar el gráfico del {label}."])
 
 
 def _handle_pib_quarter_year(match: Any) -> Iterable[str]:
@@ -377,7 +531,14 @@ def _handle_pib_quarter_year(match: Any) -> Iterable[str]:
     try:
         if _df is not None:
             _df._last_data_context.update(
-                {"series_id": data.get("meta", {}).get("series_id"), "domain": "PIB", "year": year, "freq": data.get("meta", {}).get("freq_effective"), "data_full": data}
+                {
+                    "series_id": data.get("meta", {}).get("series_id"),
+                    "domain": "PIB",
+                    "year": year,
+                    "freq": data.get("meta", {}).get("freq_effective"),
+                    "data_full": data,
+                    "metric_type": "annual",
+                }
             )
     except Exception:
         pass
@@ -449,7 +610,14 @@ def _handle_intent_imacec_month_interval(match: Any) -> Iterable[str]:
     try:
         if _df is not None:
             _df._last_data_context.update(
-                {"series_id": data.get("meta", {}).get("series_id"), "domain": "IMACEC", "year": year, "freq": data.get("meta", {}).get("freq_effective"), "data_full": data}
+                {
+                    "series_id": data.get("meta", {}).get("series_id"),
+                    "domain": "IMACEC",
+                    "year": year,
+                    "freq": data.get("meta", {}).get("freq_effective"),
+                    "data_full": data,
+                    "metric_type": "annual",
+                }
             )
     except Exception:
         pass
@@ -477,7 +645,14 @@ def _handle_intent_imacec_month_specific(match: Any) -> Iterable[str]:
     try:
         if _df is not None:
             _df._last_data_context.update(
-                {"series_id": data.get("meta", {}).get("series_id"), "domain": "IMACEC", "year": year, "freq": data.get("meta", {}).get("freq_effective"), "data_full": data}
+                {
+                    "series_id": data.get("meta", {}).get("series_id"),
+                    "domain": "IMACEC",
+                    "year": year,
+                    "freq": data.get("meta", {}).get("freq_effective"),
+                    "data_full": data,
+                    "metric_type": "annual",
+                }
             )
     except Exception:
         pass
@@ -583,6 +758,7 @@ def route_intents(
     intent_classifier: Optional[Any] = None,  # kept for future extensibility
     memory: Optional[Any] = None,
     session_id: Optional[str] = None,
+    facts: Optional[Dict[str, str]] = None,
 ) -> Optional[Iterable[str]]:
     """
     Decide whether to short-circuit con intents deterministas (IMACEC/PIB).
@@ -592,160 +768,141 @@ def route_intents(
         domain = getattr(classification, "data_domain", "") or ""
     except Exception:
         domain = ""
+    domain_upper = (domain or "").upper()
+    query_type = (getattr(classification, "query_type", "") or "").upper()
 
-    # Solo manejar IMACEC aquí; otros dominios siguen el flujo normal
-    if domain.upper() != "IMACEC":
+    chart_iter = _handle_chart_followup(question, domain_upper, memory, session_id, facts)
+    if chart_iter:
+        return chart_iter
+
+    if query_type == "METHODOLOGICAL":
+        # Delega íntegramente en la ruta RAG para definiciones/metodología.
         return None
 
-    # Último valor IMACEC
-    if _is_imacec_latest(question):
-        try:
-            year = datetime.date.today().year
-            data = _fetch_imacec_series(year)
-            if data is None:
+    if domain_upper == "IMACEC":
+        # Último valor IMACEC
+        if _is_imacec_latest(question):
+            try:
+                year = datetime.date.today().year
+                data = _fetch_imacec_series(year)
+                if data is None:
+                    return iter(["No pude obtener el IMACEC en este momento."])
+                msg = _format_latest_imacec(data)
+                if msg:
+                    try:
+                        if memory and session_id and hasattr(memory, "set_facts"):
+                            facts = {"imacec_last": msg}
+                            last_obs = (data.get("observations") or [])[-1]
+                            facts["imacec_last_date"] = last_obs.get("date", "")
+                            if last_obs.get("value") is not None:
+                                facts["imacec_last_value"] = str(last_obs.get("value"))
+                            if last_obs.get("yoy_pct") is not None:
+                                facts["imacec_last_yoy"] = str(last_obs.get("yoy_pct"))
+                            facts["imacec_freq"] = (data.get("meta", {}) or {}).get("freq_effective", "")
+                            facts["imacec_metric"] = "annual"
+                            memory.set_facts(session_id, facts)  # type: ignore
+                    except Exception:
+                        logger.debug("Could not store IMACEC last facts", exc_info=True)
+                    return iter([msg])
+            except Exception:
+                logger.exception("intent_router imacec_latest failed")
                 return iter(["No pude obtener el IMACEC en este momento."])
-            msg = _format_latest_imacec(data)
-            if msg:
-                try:
-                    if memory and session_id and hasattr(memory, "set_facts"):
-                        facts = {"imacec_last": msg}
-                        last_obs = (data.get("observations") or [])[-1]
-                        facts["imacec_last_date"] = last_obs.get("date", "")
-                        if last_obs.get("value") is not None:
-                            facts["imacec_last_value"] = str(last_obs.get("value"))
-                        if last_obs.get("yoy_pct") is not None:
-                            facts["imacec_last_yoy"] = str(last_obs.get("yoy_pct"))
-                        facts["imacec_freq"] = (data.get("meta", {}) or {}).get("freq_effective", "")
-                        facts["imacec_metric"] = "annual"
-                        memory.set_facts(session_id, facts)  # type: ignore
-                except Exception:
-                    logger.debug("Could not store IMACEC last facts", exc_info=True)
-                return iter([msg])
-        except Exception:
-            logger.exception("intent_router imacec_latest failed")
-            return iter(["No pude obtener el IMACEC en este momento."])
 
-    # Mes específico
-    month_year = _detect_specific_month_year(question)
-    if month_year:
-        m, y = month_year
-        data = _fetch_imacec_series(y)
-        if data:
-            target_date = f"{y}-{m:02d}-01"
-            obs = data.get("observations") or []
-            match = next((o for o in obs if o.get("date") == target_date), None)
-            if match:
-                msg = _format_imacec_obs_list([match])
-                try:
-                    if memory and session_id and hasattr(memory, "set_facts"):
-                        memory.set_facts(
-                            session_id,
-                            {
-                                "imacec_month": target_date,
-                                "imacec_month_value": str(match.get("value", "")),
-                                "imacec_freq": (data.get("meta", {}) or {}).get("freq_effective", ""),
-                                "imacec_metric": "annual",
-                            },
-                        )
-                except Exception:
-                    logger.debug("Could not store IMACEC month fact", exc_info=True)
-                return iter([msg])
-        return iter(["No encontré ese mes del IMACEC."])
+        # Mes específico
+        month_year = _detect_specific_month_year(question)
+        if month_year:
+            m, y = month_year
+            data = _fetch_imacec_series(y)
+            if data:
+                target_date = f"{y}-{m:02d}-01"
+                obs = data.get("observations") or []
+                match = next((o for o in obs if o.get("date") == target_date), None)
+                if match:
+                    msg = _format_imacec_obs_list([match])
+                    try:
+                        if memory and session_id and hasattr(memory, "set_facts"):
+                            memory.set_facts(
+                                session_id,
+                                {
+                                    "imacec_month": target_date,
+                                    "imacec_month_value": str(match.get("value", "")),
+                                    "imacec_freq": (data.get("meta", {}) or {}).get("freq_effective", ""),
+                                    "imacec_metric": "annual",
+                                },
+                            )
+                    except Exception:
+                        logger.debug("Could not store IMACEC month fact", exc_info=True)
+                    return iter([msg])
+            return iter(["No encontré ese mes del IMACEC."])
 
-    # Intervalo de meses en el mismo año
-    month_interval = _detect_month_interval(question)
-    if month_interval:
-        m_start, m_end, y = month_interval
-        data = _fetch_imacec_series(y)
-        if data:
-            obs = data.get("observations") or []
-            sel = []
-            for o in obs:
-                try:
-                    dt = datetime.date.fromisoformat(o.get("date", ""))
-                except Exception:
-                    continue
-                if dt.year == y and m_start <= dt.month <= m_end:
-                    sel.append(o)
-            if sel:
-                msg = _format_imacec_obs_list(sel)
-                try:
-                    if memory and session_id and hasattr(memory, "set_facts"):
-                        memory.set_facts(
-                            session_id,
-                            {
-                                "imacec_range": f"{y}-{m_start:02d}..{y}-{m_end:02d}",
-                                "imacec_freq": (data.get("meta", {}) or {}).get("freq_effective", ""),
-                                "imacec_metric": "annual",
-                            },
-                        )
-                except Exception:
-                    logger.debug("Could not store IMACEC range fact", exc_info=True)
-                return iter([msg])
-        return iter(["No encontré ese rango del IMACEC."])
+        # Intervalo de meses en el mismo año
+        month_interval = _detect_month_interval(question)
+        if month_interval:
+            m_start, m_end, y = month_interval
+            data = _fetch_imacec_series(y)
+            if data:
+                obs = data.get("observations") or []
+                sel = []
+                for o in obs:
+                    try:
+                        dt = datetime.date.fromisoformat(o.get("date", ""))
+                    except Exception:
+                        continue
+                    if dt.year == y and m_start <= dt.month <= m_end:
+                        sel.append(o)
+                if sel:
+                    msg = _format_imacec_obs_list(sel)
+                    try:
+                        if memory and session_id and hasattr(memory, "set_facts"):
+                            memory.set_facts(
+                                session_id,
+                                {
+                                    "imacec_range": f"{y}-{m_start:02d}..{y}-{m_end:02d}",
+                                    "imacec_freq": (data.get("meta", {}) or {}).get("freq_effective", ""),
+                                    "imacec_metric": "annual",
+                                },
+                            )
+                    except Exception:
+                        logger.debug("Could not store IMACEC range fact", exc_info=True)
+                    return iter([msg])
+            return iter(["No encontré ese rango del IMACEC."])
 
-    # Toggle métrica (variación mensual vs anual) usando último dato cacheado
-    toggle_msg = _toggle_imacec_metric(question)
-    if toggle_msg:
-        try:
-            if memory and session_id and hasattr(memory, "set_facts"):
-                memory.set_facts(
-                    session_id,
-                    {
-                        "imacec_metric": "monthly" if _TOGGLE_MONTHLY_PAT.search(question or "") else "annual",
-                        "imacec_freq": (getattr(_df, "_last_data_context", {}) or {}).get("freq", ""),
-                    },
-                )
-        except Exception:
-            logger.debug("Could not store IMACEC metric fact", exc_info=True)
-        return iter([toggle_msg])
-
-    # Solicitud de gráfico con contexto actual
-    if _detect_chart_request(question):
-        marker = _chart_marker_from_context("IMACEC")
-        if marker:
+        # Toggle métrica (variación mensual vs anual) usando último dato cacheado
+        toggle_msg = _toggle_imacec_metric(question)
+        if toggle_msg:
             try:
                 if memory and session_id and hasattr(memory, "set_facts"):
-                    memory.set_facts(session_id, {"chart_last": "IMACEC"})
+                    memory.set_facts(
+                        session_id,
+                        {
+                            "imacec_metric": "monthly" if _TOGGLE_MONTHLY_PAT.search(question or "") else "annual",
+                            "imacec_freq": (getattr(_df, "_last_data_context", {}) or {}).get("freq", ""),
+                        },
+                    )
             except Exception:
-                logger.debug("Could not store chart fact", exc_info=True)
-            return iter([marker])
-        return iter(["No tengo suficientes datos en memoria para generar el gráfico del IMACEC."])
+                logger.debug("Could not store IMACEC metric fact", exc_info=True)
+            return iter([toggle_msg])
 
-    # Metodológico IMACEC
-    m_resp = _methodology_response(question, domain)
-    if m_resp:
-        return iter([m_resp])
+        # Metodológico IMACEC
+        m_resp = _methodology_response(question, domain)
+        if m_resp:
+            return iter([m_resp])
 
-    # Intents configurables (IMACEC) desde catalog/intents.json
-    cfg_iter = _dispatch_config_intents(question)
-    if cfg_iter is not None:
-        return cfg_iter
+        # Intents configurables (IMACEC) desde catalog/intents.json
+        cfg_iter = _dispatch_config_intents(question)
+        if cfg_iter is not None:
+            return cfg_iter
 
-    # Cambio de frecuencia usando serie en contexto
-    freq_msg = _change_frequency_from_context(question)
-    if freq_msg:
-        return iter([freq_msg])
+        # Cambio de frecuencia usando serie en contexto
+        freq_msg = _change_frequency_from_context(question)
+        if freq_msg:
+            return iter([freq_msg])
 
-    # ----------------------------
-    # PIB determinista
-    # ----------------------------
-    if domain.upper() == "PIB":
+    elif domain_upper == "PIB":
         try:
             from . import data_flow as _df  # type: ignore
         except Exception:
             _df = None  # type: ignore
-
-    # Solicitud de gráfico con contexto actual PIB
-        if _detect_chart_request(question):
-            marker = _chart_marker_from_context("PIB")
-            if marker:
-                try:
-                    if memory and session_id and hasattr(memory, "set_facts"):
-                        memory.set_facts(session_id, {"chart_last": "PIB"})
-                except Exception:
-                    logger.debug("Could not store chart fact", exc_info=True)
-                return iter([marker])
 
         # Metodológico PIB
         m_resp_pib = _methodology_response(question, "PIB")
@@ -760,7 +917,6 @@ def route_intents(
                 obs = data.get("observations") or []
                 if obs:
                     q = (question or "").lower()
-                    # Rango específico: año o intervalo
                     year_req = None
                     m_year = re.search(r"(20\\d{2})", q)
                     if m_year:
@@ -768,21 +924,7 @@ def route_intents(
                             year_req = int(m_year.group(1))
                         except Exception:
                             year_req = None
-                    # Último valor (más variantes)
-                    want_latest = any(
-                        pat in q
-                        for pat in [
-                            "ultimo valor del pib",
-                            "último valor del pib",
-                            "pib más reciente",
-                            "pib mas reciente",
-                            "pib reciente",
-                            "pib ultimo",
-                            "pib último",
-                        ]
-                    )
 
-                    # Filtrar por año si se pidió
                     obs_filtered = obs
                     if year_req:
                         obs_filtered = [o for o in obs if str(o.get("date", ""))[:4] == str(year_req)]
@@ -804,7 +946,6 @@ def route_intents(
                             parts.append(f"variación anual={float(yoy):.1f}%")
                         except Exception:
                             parts.append(f"variación anual={yoy}%")
-                    # Trimestre específico si se pidió Tn
                     qtr = _extract_quarter_local(question)
                     if qtr:
                         month_map = {1: "01", 2: "04", 3: "07", 4: "10"}
@@ -827,7 +968,6 @@ def route_intents(
                                     except Exception:
                                         parts.append(f"variación anual={y2}%")
                                 return iter([" | ".join(parts)])
-                    # store facts
                     try:
                         if memory and session_id and hasattr(memory, "set_facts"):
                             memory.set_facts(session_id, {"pib_last": " | ".join(parts), "pib_last_date": date, "pib_freq": ctx.get("freq", "")})
@@ -839,7 +979,6 @@ def route_intents(
                     except Exception:
                         logger.debug("Could not store PIB facts", exc_info=True)
 
-                    # Si se pidió rango/año explícito, devolver los puntos del año
                     if year_req:
                         lines = []
                         for o in obs:
@@ -864,7 +1003,6 @@ def route_intents(
                             return iter([" | ".join(parts)] + ["\n".join(lines)])
                     return iter([" | ".join(parts)])
 
-        # Fallback: intentar fetch rápido del año actual
         try:
             year = datetime.date.today().year
             try:
@@ -878,7 +1016,7 @@ def route_intents(
                 sid_pib, freq_pib = None, None
             sid = sid_pib
             if sid:
-                from get_series import get_series_api_rest_bcch  # type: ignore
+                from orchestrator.data.get_series import get_series_api_rest_bcch  # type: ignore
 
                 data_pib = get_series_api_rest_bcch(
                     series_id=sid,
@@ -910,7 +1048,6 @@ def route_intents(
         except Exception:
             logger.debug("PIB intent fallback failed", exc_info=True)
 
-    # Vector fallback si no hubo match y se sugiere otra serie o domain=OTHER
     vec = _maybe_vector_fallback(question, domain or "")
     if vec is not None:
         return vec

@@ -1,0 +1,271 @@
+CUENTAS NACIONALES DE CHILE
+Producto Interno Bruto Regional: Métodos y Fuentes de Información
+Banco central Chile
+
+ÍNDICE
+Presentación . 
+Aspectos conceptuales 
+a. Producto interno bruto regional b. Variables del gasto: Consumo de los hogares regional C. Métodos generales de estimación de variables regionales |. Ciclos de compilación y perspectiva histórica a. Ciclos de compilación y publicación b. Perspectiva histórica I. Etapas del proceso de estimación a. Recopilación, validación y depuración de información básica
+b. Compilación de indicadores a precios corrientes
+C. Armonización a precios corrientes
+d. Deflación y resultados finales
+IV. Fuentes de información
+a. Producto interno bruto regional i. Descripción general i. Agropecuario-silvícola y pesca ¡il. Minería iv. Industria manufacturera v. Suministro de electricidad, gas, agua y gestión de desechos (EGA) vi. Construcción vii. Comercio, restaurantes y hoteles viii. Transporte, comunicaciones y servicios de información ix. Actividades de servicios empresariales y financieras X. Actividades inmobiliarias y servicios de vivienda xi. Servicios personales xii. Administración pública
+b. Consumo de hogares regional i. Descripción General ii. Bienes Durables ili. Bienes No Durables iv. Servicios
+V. Referencias
+Recuadros Recuadro 1. Componentes extrarregionales Recuadro 2. Armonización en las estimaciones regionales
+Presentación
+El capítulo I da cuenta de los aspectos conceptuales para la estimación del PIBR, señalando sus similitudes y particularidades respecto de las estimaciones nacionales. En este apartado se definen variables relevantes tales como producción, consumo intermedio, valor agregado y consumo de los hogares. En adición, se revisan los diferentes métodos de estimación, señalando el método adoptado para el caso chileno y las razones para su adopción.
+La primera sección del capítulo II presenta los ciclos de compilación del PIBR, los que se encuentran enmarcados en la actual política de compilación de las cuentas nacionales. En la segunda sección del capítulo, se entrega una perspectiva histórica de las estimaciones regionales, deteniéndose en las innovaciones incorporadas en cada ciclo de compilación. En esta sección se explica el cambio de frecuencia y los nuevos desgloses de publicación de la Compilación de Referencia 2018.
+El capítulo III presenta el proceso de estimación general del valor agregado y el consumo de los hogares en términos regionales, revisando tanto las distintas etapas del proceso, como los métodos de estimación utilizados.
+Finalmente, el capítulo IV revisa de forma detallada las fuentes de información utilizadas, para la regionalización de cada una de las actividades económicas y de los agregados del consumo de hogares. 
+l. ASPECTOS CONCEPTUALES
+a. Producto interno bruto regional
+El Producto Interno Bruto (PIB) es uno de los principales indicadores de las Cuentas Nacionales (CCNN). Desde la perspectiva de la producción, este indicador da cuenta del Valor Agregado (VA) de cada actividad económica, en un periodo de tiempo determinado y dentro del territorio nacional1/.
+Desde la perspectiva regional, el Producto Interno Bruto Regional (PIBR) constituye una desagregación geográfica del PIB, de acuerdo con la división político-administrativa del país. De esta forma, el PIBR registra el VA de las actividades económicas dentro de cada región, reflejando las diferentes estructuras productivas presentes en éstas. Dado que la distribución de la población y de las actividades económicas es heterogénea entre las regiones, los otales nacionales no permiten dar cuenta de las diferencias productivas y su evolución en as distintas zonas geográficas.
+b. Variables del gasto: Consumo de los hogares regional
+Desde la perspectiva del gasto del PIB, se consideran variables asociadas a la demanda interna y al comercio exterior. Dentro de la primera agrupación se distinguen las variables de consumo de los hogares, consumo de gobierno, la formación bruta de capital fijo y la variación de existencias. Por su parte, el comercio exterior contiene las exportaciones e importaciones de bienes y servicios.
+En términos regionales, las variables del gasto presentan distintos desafíos en su medición, asociados a la información disponible con los desgloses requeridos. En este contexto, el comercio exterior presenta los mayores desafíos, en ausencia de información de flujos interregionales de bienes y servicios?/. En tanto, el Consumo de Hogares (CHog) presenta mayor disponibilidad de información, que permite su estimación a nivel regional.
+1/ El VA corresponde al saldo de la cuenta de producción de las actividades económicas y se obtiene como la diferencia entre la producción de bienes y servicios (producción) y el consumo de bienes y servicios utilizados como insumos en los procesos productivos (consumo intermedio).
+2/ En el contexto regional, los conceptos de exportaciones e importaciones están asociados a flujos internacionales e interregionales.
+
+El CHog corresponde al consumo individual de bienes y servicios que los hogares residentes:/ de una economía realizan para la satisfacción de sus necesidades. Este concepto excluye la adquisición de bienes usados entre hogares, y el consumo de bienes y servicios realizado por los hogares, pero financiado por el gobierno.
+En términos regionales, la medición del Chog corresponde también a una desagregación geográfica de los totales nacionales registrados en las CCNN. Esta desagregación da cuenta de a heterogeneidad en las estructuras de consumo a nivel regional y en la evolución particular de los componentes del consumo en cada región.
+c. Métodos generales de estimación de variables regionales
+Para la estimación de las variables regionales, es necesario distinguir la naturaleza de las unidades institucionales asociadas. En el caso del PIBR, el proceso productivo es realizado principalmente por el sector empresas, mientras que, en el consumo de hogares, las unidades institucionales relevantes son los hogares.
+Adicionalmente, para las estimaciones del valor agregado regional, es necesario distinguir as unidades productivas (establecimientos)* que pertenecen a las empresas. Lo anterior es relevante dado que una empresa puede conformarse por más de un establecimiento, y éstos, a su vez, pueden estar distribuidos a lo largo del territorio nacional. El PIBR registra el VA en la región en la cual el establecimiento realiza su proceso productivo. Por lo tanto, el VA que aporta una empresa puede generarse en más de una región, de acuerdo con la ocalización de sus establecimientos.
+Las variables regionales pueden estimarse a través de tres métodos: ascendente, descendente y mixto. La elección del método a utilizar depende de las fuentes de información disponibles. El método ascendente consiste en la estimación de cuentas de producción o variables del gasto a nivel regional, las que al ser agregadas proveen la información del total nacional. Por su parte, el método descendente se utiliza cuando no es posible construir las variables por región, debido a la ausencia de información completa por establecimientos o regiones; bajo este enfoque, se estima el total nacional y luego se distribuye mediante el uso de indicadores regionales. Finalmente, el tercer método consiste en el uso de enfoques ascendentes y descendentes dependiendo de las actividades productivas.
+En el caso de Chile, el método adoptado para la estimación del PIBR corresponde a un método descendente, de tal forma que la estimación del agregado se distribuye por región en base a indicadores regionalizados para cada actividad económica o variable del gasto, y finalmente, las diferencias entre los indicadores y la estimación agregada son armonizadas mediante técnicas estadísticas.
+3/ Al considerar sólo los hogares residentes, la medición incluye el gasto realizado por los hogares residentes de la economía chilena en el exterior, y excluye los gastos de los hogares no residentes en el territorio nacional.
+4/ El Sistema Europeo de Cuentas Nacionales y Regionales, define un establecimiento como: “una empresa, o parte de una empresa situada en un único emplazamiento y en el que sólo se realiza una actividad productiva o en el que la actividad productiva principal representa la mayor parte del valor agregado”.
+
+RECUADRO 1. Componentes extrarregionales PIBR
+De acuerdo con el Sistema de Cuentas Nacionales (SCN), los territorios económicos que están ubicados en el resto del mundo y que son de dominio del país por acuerdos internacionales, conforman parte de la economía de dicho país. Dentro de tales territorios se consideran: a) el espacio aéreo, las aguas territoriales y la plataforma continental en aguas internacionales; b) enclaves territoriales en el resto del mundo; y c) depósitos de petróleo, gas natural, etc. en aguas internacionales, explotadas por unidades residentes. De la misma forma, los servicios prestados en el exterior por las actividades en tales territorios se consideran parte de la economía y deben contabilizarse para la estimación del PIB. Para efectos de la medición del PIB regional, sin embargo, los territorios antes mencionados se consideran extraterritoriales y conforman una región ficticia, adicional a las existentes en la división político-administrativa del país.
+Éste es el caso de los servicios prestados por la administración pública mediante sus embajadas y otros organismos en el exterior. Así, el valor agregado presente en el total nacional de esta actividad incluye estos servicios, los que por definición no pueden asignarse a ninguna región en particular. Para la estimación del PIBR, el componente extrarregional es descontado del valor agregado de la administración pública, para ser asignado a la región ficticia. Por consiguiente, el valor agregado regional de la administración pública no sumará el total nacional, a menos que el componente extrarregional sea incorporado.
+Por otra parte, los impuestos sobre los productos, requeridos para completar el PIB nacional a precios de mercado, tampoco se presentan regionalizados, debido a la falta de antecedentes regionales para distribuir el impuesto al valor agregado.
+Consumo de Hogares
+En cuanto al consumo de hogares, este se define en el SCN como el consumo de bienes y servicios por parte de los hogares residentes de una economía. La residencia económica se entiende como “el territorio económico con el cual tiene la relación más fuerte, en otras palabras, su centro predominante de interés económico”. Lo anterior, implica incorporar en la medición el consumo de bienes y servicios que los hogares residentes realizan en el exterior (en calidad de turistas)?/. Este gasto no puede ser regionalizado y por lo tanto se presenta como consumo realizado de forma extrarregional.
+5/ El gasto en turismo realizado por los hogares residentes de la economía chilena en el exterior se considera una importación y es realizado en el Resto del mundo.
+
+Producto Interno Bruto Regional: Métodos y Fuentes de Información
+II. CICLOS DE COMPILACIÓN Y PERSPECTIVA HISTÓRICA
+a. Ciclos de compilación y publicación
+La estimación de las CCNN se enmarca en ciclos de compilación. Estos ciclos comprenden las Compilaciones de Referencia (CdeR) y las compilaciones habituales. Las CdeR establecen la infraestructura estadística en la cual se enmarca la elaboración de las cuentas nacionales de la economía chilena para los años posteriores al de referencia (compilaciones habituales). De esta forma, los clasificadores de actividades y productos y los directorios de empresas son definidos y actualizados con motivo de un ejercicio de CdeR, manteniendo los criterios a lo largo de ese ciclo. Además, en cada nueva CdeR, se incorporan mejoras tanto en términos de fuentes de información como en métodos de estimación para cada una de las actividades y agregados”%/. En marzo de 2022, se publicó la nueva CdeR de las CCNN, para el año de referencia 2018 (CdeR2018).
+En el ámbito regional, la distribución del VA de las actividades económicas y de las variables del gasto en cada una de las regiones, es consistente con lo establecido en la CdeR. En particular, en el marco de la CdeR2018, para el PIBR se incorporaron innovaciones en cuanto a la frecuencia, rezago de publicación y el desglose de las cifras. En este contexto, las estadísticas regionales se elaboran y difunden en frecuencia trimestral; para el primer, segundo y tercer trimestre de un año, se publican el día 23 (o el día hábil siguiente) de los meses de junio, septiembre y diciembre del año de coyuntura, y para el cuarto trimestre, en abril del año siguiente. De esta forma, para los tres primeros trimestres del año, el rezago de publicación corresponde a 83 días, mientras que para el cuarto trimestre el rezago corresponde a 113 días.
+Por otra parte, con respecto los desgloses del PIBR, estos son los siguientes”/: :
+* Producto Interno Bruto Regional Producción de Bienes: - Minería - Industria
+6/ Para un mayor detalle de las innovaciones y resultados de la CdeR2018, revisar documento: “Cuentas Nacionales de Chile. Compilación de Referencia 2018”.
+7/Los desgloses son equivalentes al nivel de publicación del Indice Mensual de Actividad Económica (IMACEC).
+
+Producto Interno Bruto Regional: Métodos y Fuentes de Información
+- Resto de Bienes Comercio Servicios
+Desde la perspectiva del gasto, se presentan los siguientes desgloses:
+* Consumo de Hogares e IPSFL/ Bienes Durables Bienes No Durables Servicios
+Los desgloses anteriormente señalados son presentados para las series en volúmenes encadenados. Las series regionales son preliminares y actualizadas en línea con las revisiones de las Cuentas Nacionales Anuales (CNA) (en la publicación de abril) y las Cuentas Nacionales Trimestrales (CNT) (en cada publicación trimestral). Es relevante señalar que las cifras del PIB regional están sujetas a mayores revisiones que los totales nacionales.
+Cabe mencionar que, en la publicación de abril, se entregan cifras en frecuencia anual a precios corrientes y en volúmenes encadenados para las variables señaladas anteriormente y, de forma adicional, para la perspectiva del origen se incluye un desglose de trece actividades económicas.
+b. Perspectiva histórica
+El BCCh realizó la primera publicación del PIBR para el año 1985, en el marco de la base de precios 1986 de cuentas nacionales; con ello inició su función de elaborar y publicar la serie anual de PIBR en términos reales, la cual previamente había sido ejercida por la Oficina de Planificación Nacional. En esta primera publicación, se realizaron estimaciones del valor agregado regional para las trece regiones presentes en la división político-administrativa vigente a esa fecha. Desde entonces, las series del PIBR se han actualizado metodológicamente con la publicación de cada nueva CdeR, para los años 1996, 2003, 2008, 2013 y 2018. Cabe mencionar que, con ocasión de la CdeR2008, se reconoció un cambio en la división político: administrativa del país dictaminado en 2007, que determinaba la creación de las regiones XIV de los Ríos y XV de Arica-Parinacota, bajo las leyes 20.174 y 20.175, respectivamente. Por su parte, en la CdeR2018 se incorpora la región de Ñuble, creada en el año 2017, a través de la ley 21.033. De esta forma, las series regionales son presentadas para las siguientes regiones:
+8/ En las estimaciones regionales, el consumo de hogares se presenta agrupado con el consumo de las Instituciones Privadas Sin Fines de Lucro al servicio de los hogares (IPSFL).
+
+TABLA 1
+DIVISIÓN POLÍTICO-ADMINISTRATIVA DE CHILE UTILIZADA EN LA CDER2018
+Región Macrozona Abreviatura Región
+Región de Arica y Parinacota Norte AyP 
+Región de Tarapacá Norte TPCA 
+Región de Antofagasta Norte ANTOF 
+Región de Atacama Norte ATCMA 
+Región de Coquimbo Centro COQ 
+Región de Valparaíso Centro VALPO 
+Región Metropolitana de Santiago Metropolitana RM 
+Región de Libertador General Bernardo O'Higgins Centro Sur LGBO 
+Región de Maule Centro Sur MAULE 
+Región de Ñuble Centro Sur NUBLE 
+Región de Biobío Centro Sur BBIO 
+Región de La Araucanía Sur ARAUC 
+Región de Los Ríos Sur RIOS 
+Región de Los Lagos Sur LAGOS 
+Región de Aysén del General Carlos Ibáñez del Campo Austral AYSEN
+Región de Magallanes y de la Antártica Chilena Austral MAG
+En términos metodológicos, con un desglose de doce acti correspondientes. A partir de las series a precios de 1986, 1996 y 2003 fueron publicadas con un desglose de actividades económicas, a precios constantes de los años bases correspondientes. A partir de la CdeR2008 se introdujo la utilización de índices encadenados, obtenidos a partir de una base de precios móviles. Esta metodología utiliza los precios del año anterior para valorar las cantidades del año en curso, permitiendo utilizar estructuras de precios relativos actualizadas continuamente, a diferencia de la metodología previa, que utilizaba las estructuras de precios relativos de la referencia. Lo anterior es relevante dado que las estructuras de los años de referencia van perdiendo representatividad a través del tiempo, entregando mediciones en términos reales 9/ desactualizadas. Además, a partir del año 2012, se introdujo la publicación de niveles regionales a precios corrientes por actividad económica. 
+En las nuevas series en CdeR2018 se destacan dos grandes cambios: el primero, es el aumento en la frecuencia de publicación de las estadísticas regionales, de anuales a trimestrales. La mayor frecuencia en la publicación de las cifras regionales implicó una revisión exhaustiva de las fuentes de información y un uso intensivo de los registros administrativos para robustecer las estimaciones. Por otra parte, se incorpora el consumo de hogares, aumentando la cobertura de las variables incluidas dentro del sistema de CCNN con desglose geográfico.
+III. EFAPAS DEL PROCESO DE ESTIMACIÓN
+En línea con la metodología descendente utilizada para la compilación de las estadísticas regionales, los agregados nacionales compilados en las CNA y las CNT son regionalizados en base a indicadores. De esta forma, se reconocen cuatro etapas dentro del proceso:
+a. Recopilación, validación y depuración de información básica
+La elaboración del PIBR se inicia con la recopilación de la información básica disponible. Esta información, tanto con desglose de actividad como de producto, proviene de diversas fuentes, dentro de las cuales destacan registros administrativos, encuestas por actividad económica e indicadores sectoriales, entre otros.
+Una vez sistematizada la información básica, prosigue la etapa de validación. En esta parte del proceso se examina la consistencia territorial y temporal de la información proveniente de cada fuente. En esta etapa se consideran el uso de técnicas estadísticas para la depuración de datos básicos, el uso de indicadores de contraste y la imputación de la información básica para dotar de consistencia temporal y transversal a la información procesada.
+b. Compilación de indicadores a precios corrientes
+Una vez que la información básica ha sido depurada, se compilan indicadores a precios corrientes, es decir, que incluyen tanto la evolución del precio como de las cantidades. De acuerdo con las características de la información disponible, se distinguen los siguientes tipos de indicadores:
+* Indicadores de producción: aquellos que siguen la producción total o una muestra representativa de la canasta de producción de una actividad. Su uso como indicador descansa en la correlación entra la producción y el valor agregado, asumiendo relaciones constantes entre producción y consumo intermedio.
+* Indicadores de ventas o uso final: se utilizan para estimar las variables del gasto. Adicionalmente, se utilizan para estimar la producción cuando algún destino final de ésta (consumo, inversión o exportaciones) presenta una alta correlación, territorial y temporal, con el valor agregado de las actividades que ofrecen tales bienes y servicios.
+* Indicadores de pago de factores: buscan estimar el valor agregado mediante la evolución y distribución de sus componentes. Ejemplos de estos indicadores corresponden al uso de la dotación de empleados o las remuneraciones como aproximación del valor agregado.
+* Finalmente, algunas actividades se estiman mediante indicadores de demanda derivada. Estos indicadores estiman la producción en base a las demandas intermedias regionales de bienes y servicios. En este caso, se asume que la producción de una actividad se comporta de modo similar a la evolución ponderada de las actividades que la demandan dentro de la región. El uso de estos indicadores en la CdeR2018 es reducido y aconsejado sólo cuando no existan otras fuentes disponibles.
+Otra dimensión que se debe considerar en la compilación de los indicadores corresponde a la frecuencia de la información disponible. De esta forma, se encuentran dos tipos de indicadores:
+* Actividades con información trimestral: Existen indicadores en alta frecuencia que permiten realizar la estimación de estadísticas regionales.
+* Actividades con información anual: Corresponden a actividades sin información en alta frecuencia regional, pero con información robusta en frecuencia anual. En estos casos, se utilizan indicadores, generalmente del agregado nacional, para desagregar en trimestres la información regional anual.
+En el caso de la estimación del origen del PIBR, los indicadores antes mencionados se utilizan en una primera etapa para estimar la producción. Para obtener al valor agregado en la siguiente etapa del proceso, se aplican coeficientes técnicos sobre la de producción para obtener el consumo intermedio. Los coeficientes técnicos corresponden a la razón entre insumos y producción dentro de una actividad económica, obtenidos a partir de las CNA. El Uuso de estos coeficientes supone homogeneidad en las tecnologías de producción de cada establecimiento dentro de la actividad'?/.
+c. Armonización a precios corrientes
+Las publicaciones nacionales en frecuencia anual sirven de referencia para el PIBR, debido a la cobertura y robustez de la información a partir de la cual se compilan. Además, las estadísticas anuales son obtenidas mediante el uso de los Cuadros de Oferta y Utilización (COU)'7, los cuales constituyen la principal herramienta de consistencia e integración de las estadísticas de productos y actividades, tanto para bienes como servicios. Sin embargo, en la compilación del PIBR, no es posible utilizar los COU como herramienta analítica, debido a las limitaciones de información que existen para la elaboración de éstos. Dadas estas limitaciones, se asume que las estimaciones nacionales del PIB tienen mayor robustez que la suma del valor agregado regional estimado mediante indicadores. Lo anterior también es válido para los resultados nacionales en frecuencia trimestral, los cuáles son el resultado de un proceso de conciliación abreviado y que asegura la consistencia entre los enfoques de origen y gasto.
+10/ El supuesto de homogeneidad se levanta en ciertas actividades en las cuáles existen antecedentes de heterogeneidad. En estos casos se utilizan coeficientes técnicos por establecimiento o a nivel regional. Ejemplos de este tratamiento corresponden a la minería del cobre, la generación eléctrica y la fabricación y distribución de gas.
+11/ Organiza la información de oferta y uso de forma tal que se logren los equilibrios contables de cuentas nacionales. Una vez alcanzados los equilibrios, asegura la consistencia del PIB en sus tres enfoques.
+El proceso de armonización a restricciones es un ejercicio habitual en la compilación de las CCNN. En las estimaciones nacionales, este proceso es temporal y ajusta los indicadores en alta frecuencia a los resultados de menor frecuencia (resultados de la CNA). En el caso de las estadísticas regionales, este proceso adiciona una restricción de carácter transversal, ya que fuerza los indicadores regionales a sumar los resultados nacionales provenientes de las CNT en cada periodo en medición. El ejercicio privilegia el uso de series medidas a precios corrientes por sobre series en volúmenes encadenados, ya que éstas permiten dar cumplimiento a las restricciones aditivas.
+RECUADRO 2. Armonización en las estimaciones regionales
+Las series regionales obtenidas mediante el método descendente no siempre cumplen con las dimensiones de consistencia temporal y transversal deseadas. La consistencia temporal implica que la agregación de las series de mayor frecuencia (trimestrales) deben ser consistentes con las de menor frecuencia (anuales). Por otro lado, la consistencia transversal implica que la agregación de las regiones debe cuadrar con el total nacional en todos los períodos.
+Esta necesidad no es nueva en la compilación de las CCNN, existiendo diversas metodologías para subsanar la inconsistencia temporal que presentan los indicadores coyunturales utilizados en las CNT, con los resultados más
+robustos obtenidos de las CNA.2/.
+En las siguientes secciones se da a conocer el procedimiento de armonización temporal y transversal en las estadísticas regionales.
+Armonización temporal
+El proceso de armonización temporal consiste en imponer a los valores de baja frecuencia los valores de alta frecuencia, de modo que el resultado de la agregación de las series ajustadas (trimestrales) coincida con su respectiva referencia (anual)'/. El ajuste anterior debe preservar las dinámicas de alta frecuencia presente en los indicadores.
+12/ Para una presentación más detallada de las metodologías y su uso en las CCNN, revisar el capítulo “Benchmarking and Reconciliation” del Manual de Cuentas Nacionales del Fondo Monetario Internacional (2017)
+13/ Documento Cuentas Nacionales de Chile Métodos y Fuentes de Información CdeR2013
+Para resolver el problema antes señalado, Denton (1971)'/ plantea un programa de optimización similar al siguiente:
+mir . T1
+Dónde:
+t — corresponde al tiempo expresado en trimestres.
+Xt — corresponde a la estimación de la serie ajustada para el trimestre t.
+iy — corresponde al indicador trimestral para el trimestre t.
+Ay indica el nivel del dato anual que actúa como restricción al ejercicio de armonización para el año y.
+La función objetivo anterior busca minimizar las diferencias entre la evolución de la serie ajustada y el indicador original. La serie ajustada exhibirá una tendencia similar a la serie original si esta última es un buen indicador de los agregados.
+Incorporando la consistencia transversal para el ejercicio regional En el caso del ejercicio regional, a la dimensión temporal anterior se le añade la dimensión transversal (regiones). En este caso, los indicadores de alta frecuencia en términos de región-trimestre enfrentan restricciones provenientes de
+las CNT, de esta forma, el desafío del ejercicio es que los indicadores de alta frecuencia regionales obtenidos sumen trimestralmente las cifras correspondientes al total nacional.
+Considerando lo anterior, podemos replantear el programa de optimización anterior como:
+14/ Frank T. Denton (1971) Adjustment of Monthly or Quarterly Series to Annual Totals: An Approach Based on Quadratic Minimization, Journal of the American Statistical Association, 66:333, 99-102.
+Donde r corresponde al subíndice de región o componente Xt r — Corresponde a la estimación de la serie ajustada para la región r en el trimestre t.
+it r — corresponde al indicador para la región r en el trimestre t.
+Sujeto a que, para cada trimestre, la suma de las regiones debe ser el total del país:
+1T4.
+donde Ay , corresponde al total para el trimestre t en la región r.
+En esta nueva formulación, la lógica de mantener la evolución de la serie se establece de forma conjunta para todos los indicadores de cada región-trimestre en la función objetivo. Sin embargo, su aplicación puede resultar problemática de acuerdo con la distribución de las regiones a ajustar. Dado que se busca minimizar el impacto en la evolución de las regiones sin considerar el tamaño de estas, los mínimos que tienden a encontrarse asignan gran parte o el total del ajuste a las regiones de mayor tamaño, ya que proporcionalmente alteran menos la evolución de la región y de esta forma, minimizan las diferencias cuadráticas antes señaladas. Lo anterior no es deseable toda vez que el ajuste distorsiona tanto la evolución de las regiones más grandes, como la distribución regional del agregado.
+Considerando la distribución regional dentro de la formulación
+Para reducir el impacto del tamaño de las regiones en el ajuste anterior, es necesario ajustar de alguna forma la función objetivo del problema para tener en consideración la distribución regional, tal como se señala en la siguiente expresión:
+En esta expresión, se incorpora un segundo término que considera el ajuste proporcional recibido por la región j y lo compara con el ajuste recibido por todo el resto de las regiones. De esta forma, se penalizan desviaciones de una región con respecto al resto. Es importante mencionar que este término es contemporáneo a diferencia del primero, que compara el ajuste recibido por una región en dos periodos consecutivos. El parámetro e permite calibrar la importancia entregada al segundo término. Cuando q=0, la expresión se reduce a la formulación de Denton.
+Las restricciones del ejercicio en esta formulación se mantienen inalteradas. Así, los resultados corresponden a una ponderación entre preservar la evolución de los indicadores regionales y preservar la distribución contemporánea de las regiones.
+
+d. Deflación y resultados finales
+Una vez que se obtienen series a precios corrientes consistentes con los agregados del PIB y para el consumo de hogares nacional, estas series son deflactadas por indicadores de precios consistentes con los utilizados en la compilación de las CNT. En el caso del PIBR, las series de valor agregado son obtenidas como diferencia entre la producción y el consumo intermedio. En esta etapa es importante señalar que no existen indicadores de precios específicos por región, razón por la cual se utilizan precios nacionales. De esta forma, las diferencias interregionales visibles en los agregados publicados obedecen a las distintas ponderaciones por actividad y/o producto entre regiones y no a evoluciones específicas de precio en cada una de éstas.
+
+IV. FUENTES DE INFORMACIÓN 
+a. Producto interno bruto regional 
+i. Descripción general Dada la naturaleza trimestral de las nuevas series en referencia 2018, las fuentes utilizadas deben en una primera instancia proveer información en alta frecuencia (mensual o trimestral), o en su defecto, información anual por región, que puede ser desagregada en trimestres utilizando indicadores nacionales de alta frecuencia. 
+La principal fuente de información en el primer grupo la constituye el Formulario 29 Declaración Mensual y Pago Simultáneo de Impuestos del Servicio de Impuestos Internos (SII). Esta fuente permite la estimación de las ventas agregadas de los contribuyentes innominados. Sin perjuicio de lo anterior, el formulario 29 no permite la asignación por región directa de los niveles de venta, ya que se encuentra asociado únicamente a la comuna de domicilio del declarante (casa matriz). Para subsanar esta limitación, y poder asignar correctamente los niveles de venta regional, se recurre a la estimación de estructuras regionales a partir de diversos registros administrativos y fuentes de información provenientes de instituciones públicas y privadas. 
+Dentro de los registros administrativos y fuentes de información utilizadas se consideran:
+-	Documentos Tributarios Electrónicos (DTE): Corresponde a la emisión de facturas y boletas electrónicas sistematizada por el SII. Estas fuentes detallan la comuna de origen y destino de los documentos emitidos, permitiendo establecer estructuras tanto desde la perspectiva del emisor como del receptor.
+-	Pago de remuneraciones de la Administradora de Fondos de Cesantía Chile (AFC): Esta fuente permite obtener a nivel de comuna de residencia de los trabajadores, las rentas imponibles pagadas por los empleadores.
+-	Ventas con Medios Electrónicos (VME): Entrega información de ventas a través de terminales electrónicos y canales digitales levantados por una institución privada. 
+-	Índice de Producción Industrial (IPI): Información obtenida a nivel de establecimiento de las cantidades físicas de producción de empresas pertenecientes a la industria manufacturera.
+-	Nueva Encuesta Nacional de Empleo (NENE): número de ocupados por categorías y ramas de actividad
+ii. Agropecuario-silvícola y pesca 
+Esta agrupación corresponde a una industria heterogénea, cuya principal característica es que sus actividades y productos no se distribuyen de manera uniforme entre las regiones, y los precios entre sus productos —agrícolas, frutícolas, pecuarios, silvícolas y pesqueros— son particularmente disímiles. Para la estimación de las actividades agropecuario–silvícolas, se utilizan diversos indicadores regionales, levantados principalmente por el Instituto Nacional de Estadísticas (INE) y otros organismos especializados, como la Oficina de Estudios y Políticas Agrarias (ODEPA) y el Servicio Agrícola y Ganadero (SAG). Para la actividad pesca, se utiliza la información de desembarques y cosechas por región proporcionada por la Subsecretaría de Pesca y Acuicultura (SUBPESCA) y el Servicio Nacional de Pesca y Acuicultura (SERNAPESCA). 
+TABLA 2 DETALLE DE LAS FUENTES DE INFORMACIÓN: AGROPECUARIO-SILVÍCOLA Y PESCA
+Agricultura: Ventas físicas en mercados mayoristas de frutas y hortalizas (ODEPA); Encuesta de cultivos anuales (INE); IPI (INE); Exportación de productos agrícolas (Servicio Nacional de Aduanas) 
+Fruticultura: Ventas físicas en mercados mayoristas de frutas y hortalizas (ODEPA) ; Encuesta de cultivos anuales (INE); IPI (INE); Informe de producción de vinos (SAG) ; Exportación de productos frutícolas (Servicio Nacional de Aduanas)
+Ganadería: Encuesta de ferias y mataderos de ganado y aves (INE); Boletín de la leche (ODEPA); Asociación de productores de huevos (Chilehuevos)
+Silvicultura: IPI (INE); Anuario forestal (INFOR)
+Pesca: Desembarques y cosecha (SUBPESCA); Desembarques y cosecha (SERNAPESCA); Estadísticas de biomasa y cosecha de salmónidos (Institución privada)
+iii. Minería
+La minería comprende las actividades de extracción de cobre, carbón, petróleo y gas natural, y otros minerales. 
+Dada la concentración de estas actividades en pocas unidades productivas, priman en su estimación el uso de reportes directos de empresas, así como el del Indicador de Producción Minera (IPMIN) publicado por el INE. En el caso de la minería del cobre y algunas actividades del resto de la minería, se complementa la información anterior con los niveles de producción y consumo intermedio, a nivel de establecimiento, obtenidos de la Encuesta Nacional Anual de Minería (INE). 
+TABLA 3 DETALLE DE LAS FUENTES DE INFORMACIÓN: MINERÍA
+Minería del cobre: Información directa de empresas IPMIN (INE)
+Extracción de petróleo y gas natural: Información directa de empresas IPMIN (INE)
+Resto de minería: Información directa de empresas IPMIN (INE)
+iv. Industria manufacturera
+La industria manufacturera está compuesta por diversas actividades, cuyas unidades de producción (empresas y establecimientos) se dedican principalmente a la transformación de materias primas y materiales en productos nuevos. En este conjunto heterogéneo de actividades se observan diferencias en: los destinos de la producción, las formas de organización industrial, los niveles tecnológicos, el capital y la calificación y productividad de la mano de obra entre las empresas. 
+Para la estimación regional de las actividades manufactureras, se utiliza principalmente el Índice de Producción Industrial (IPI), proveniente del INE, y las ventas declaradas en el formulario 29. Esta información es complementada con el cálculo de coeficientes técnicos de la Encuesta Nacional Industrial Anual (ENIA) para algunas actividades específicas.
+TABLA 4 DETALLE DE LAS FUENTES DE INFORMACIÓN: INDUSTRIA MANUFACTURERA Industria alimenticia: IPI (INE); F29 y DTE (SII); Encuesta de mataderos y criaderos de aves y cerdos (INE); Boletín de la leche (ODEPA); Encuesta molienda (INE); Desembarques y cosecha (SUBPESCA); Desembarques y cosecha (SERNAPESCA)
+Elaboración de bebidas y tabaco: IPI (INE); F29 y DTE (SII); Vendimia anual (SAG)
+Fabricación de maderas y muebles: IPI (INE); F29 y DTE (SII)’
+Producción de celulosa, papel y productos de imprenta: IPI (INE); F29 y DTE (SII) 
+Química, petróleo, caucho y plástico Información directa de empresas: IPI (INE) F29 y DTE (SII)
+Fabricación de minerales no metálicos: IPI (INE) F29 y DTE (SII) Demanda derivada 
+Industria metálica básica: IPI (INE) F29 y DTE (SII)
+Fabricación de productos metálicos, maquinaria y equipos: IPI (INE) F29 y DTE (SII)
+v. Suministro de electricidad, gas, agua y gestión de desechos (EGA) 
+La actividad EGA se distingue por presentar una parte importante de la producción concentrada en pocas empresas, intensivas en capital y que poseen pocas unidades. Tienen redes de distribución de tuberías (gas, agua, vapor) y cables (electricidad), que cruzan las fronteras regionales. Así, el valor agregado debe ser asignado de acuerdo con la residencia de las unidades productoras y no a las regiones de los consumidores. Para este conjunto de actividades, se utiliza información de la generación bruta por sistema, publicada por la Comisión Nacional de Energía (CNE), la cual recoge información de producción y consumo de combustibles por central generadora; del índice de Producción del sector EGA (IPEGA) publicado por el INE, que provee información regionalizada de la distribución de electricidad, de agua y gas; y de información tributaria para la actividad gestión de desechos. La información anterior es complementada con la Encuesta Anual de EGA levantada por el INE, para la obtención de coeficientes técnicos a nivel de establecimiento en el sector gas.
+TABLA 5 DETALLE DE LAS FUENTES DE INFORMACIÓN: EGA 
+Generación de energía eléctrica: Generación bruta por combustible (CNE) 
+Transmisión de energía eléctrica: Generación bruta (CNE) 
+Distribución de energía eléctrica: IPEGA (INE)
+Suministro de gas, vapor y aire acondicionado: IPEGA (INE)
+Gestión de aguas: IPEGA (INE); Superintendencia de Servicios Sanitarios 
+Gestión de desechos: F29 y DTE (SII)
+vi. Construcción
+Los proyectos de construcción pueden estar localizados en la región donde la empresa tiene sus establecimientos permanentes o en otras regiones o países. Los grandes proyectos realizados por constructoras de otras regiones son registrados como una unidad residente en la región donde se construye, buscando mantener la consistencia entre la producción del contratista y la inversión en la misma región. Las principales fuentes de información para la estimación de esta actividad corresponden a los registros administrativos: F29 regionalizado con el pago de remuneraciones (AFC). En adición a lo anterior, se utiliza la Encuesta Anual de gasto en obras de Ingeniería para estimar los montos anuales asociados a la actividad de Obras de Ingeniería.
+TABLA 6 DETALLE DE LAS FUENTES DE INFORMACIÓN: CONSTRUCCIÓN 
+Edificación: F29 (SII) y pago de remuneraciones (AFC)
+Construcción de obras de ingeniería civil: F29 (SII) y pago de remuneraciones (AFC); Encuesta Anual de Obras de Ingeniería (BCCh)
+Servicios especializados de construcción F29 (SII) y pago de remuneraciones (AFC)
+vii. Comercio, restaurantes y hoteles
+La actividad comercio comprende la reventa (venta sin transformación) de productos nuevos o usados. Se puede clasificar en tres tipos: comercio al por mayor, comercio al por menor y comercio automotriz. La actividad de restaurantes, por su parte, incluye los servicios de expendio de bebidas y comida para consumo en el establecimiento, provisión de comida para empresas y particulares, y comida para llevar y servicios de entrega a domicilio. Finalmente, la actividad de hoteles comprende a los establecimientos que proporcionan al público hospedaje temporal, lugar y servicios para pernoctar, e incluye además los servicios de alimentación. Para las actividades asociadas al comercio, restaurantes y hoteles se utilizan como fuente de información las ventas provenientes de la declaración de IVA, complementadas con los DTE o con la información de venta por medios electrónicos, según corresponda. En el caso del componente de hogares productores en el comercio minorista, se utiliza la información regional de ocupados por cuenta propia, levantada en la Nueva Encuesta Nacional de Empleo del INE (NENE).
+TABLA 7 DETALLE DE LAS FUENTES DE INFORMACIÓN: COMERCIO, RESTAURANTES Y HOTELES
+Comercio automotriz: Primeras inscripciones de vehículos automotores del registro civil (SRC); F29 y DTE (SII)
+Comercio mayorista: F29 y DTE (SII) 
+Comercio minorista: F29 (SII) y VME (institución privada); NENE (INE)
+Restaurantes y hoteles: F29 y DTE (SII)
+viii. Transporte, comunicaciones y servicios de información
+La distribución territorial de las actividades de esta agrupación presenta importantes desafíos, debido a que la prestación del servicio se puede realizar en una región distinta a la de residencia del prestador. Por esta razón, para desagregar el total nacional en regiones, se utilizan indicadores que entregan información de la actividad de los demandantes de estos servicios (demanda derivada) o asociados al consumo de capital fijo de las actividades. Lo anterior, es realizado particularmente para las actividades de transporte de carga por carretera, actividades conexas al transporte y la telefonía móvil. Para el caso de los servicios de información, prima el uso de indicadores asociados a las remuneraciones.
+TABLA 8 DETALLE DE LAS FUENTES DE INFORMACIÓN: TRANSPORTE, COMUNICACIONES Y SERVICIOS DE INFORMACIÓN
+Transporte ferroviario: Información mensual de las estadísticas del sector Transporte y Comunicaciones (INE); Memorias empresas
+Transporte terrestre de pasajeros: Información mensual de las estadísticas del sector Transporte y Comunicaciones (INE) y de ocupados (INE); Pasajeros transportados por metro (Memoria empresa); Parque regional de vehículos (INE y Subsecretaria Transporte); Número regional de matrículas (Ministerio de Educación); NENE (INE) 
+Transporte terrestre de carga: Información directa de empresas; Demanda derivada 
+Transporte aéreo: Estadísticas de transporte aéreo (Junta de Aeronáutica Civil)
+Transporte marítimo: F29 (SII); Tonelajes movilizados por puerto (Dirección General del Territorio Marítimo y Marina Mercante); Encuesta de servicios portuarios (BCCh); 
+Actividades conexas de transporte: F29 (SII) y pago de remuneraciones (AFC); Encuesta de carreteras (BCCh) 
+Servicios de información: F29 (SII) y pago de remuneraciones (AFC)
+Comunicaciones: Información de antenas, líneas de telefonía fija y conexiones a servicios de telecomunicaciones (SUBTEL)
+ix. Actividades de servicios empresariales y financieras
+Para la estimación de las actividades de intermediación financiera, se utilizan estadísticas de colocaciones y captaciones por región (Superintendencia de Bancos e Instituciones Financieras), mientras que, para la estimación de las actividades seguros, reaseguros y fondos de pensiones, se usa información de primas de seguros de vida y generales (Superintendencia de Valores y Seguros). La actividad de los auxiliares financieros y las actividades de la agrupación de servicios empresariales se estiman mediante registros tributarios (F29) complementados con información de pago de remuneraciones.
+TABLA 9 DETALLE DE LAS FUENTES DE INFORMACIÓN: ACTIVIDADES DE SERVICIOS EMPRESARIALES Y FINANCIERAS
+Servicios Empresariales: F29 (SII) y pago de remuneraciones (AFC)
+Actividades Financieras: Primas de seguros de vida y generales (CMF) F29 (SII) y pago de remuneraciones (AFC)
+x. Actividades inmobiliarias y servicios de vivienda
+Las actividades inmobiliarias se miden con información tributaria, mientras que los servicios de vivienda se elaboran en base al catastro de bienes raíces, proveniente del SII.
+TABLA 10 DETALLE DE LAS FUENTES DE INFORMACIÓN: ACTIVIDADES INMOBILIARIAS Y SERVICIOS DE VIVIENDA. 
+Inmobiliarias: F29 y DTE (SII)
+Servicios de vivienda: Catastro de bienes raíces (SII)
+xi. Servicios personales 
+Para esta agrupación se utilizan diversas fuentes de información. En los casos de educación pública y privada, la estimación regional se basa en las estadísticas de matrículas (MINEDUC), mientras que para salud pública se utiliza la información de estados de situación presupuestaria del sector municipal (niveles, estructuras de ingresos y costos de consultorios y remuneraciones de los servicios de salud), proporcionada por la Contraloría General de la República. Finalmente, el Resto de servicios se mide principalmente con la información tributaria complementada con el pago de remuneraciones.
+TABLA 11 DETALLE DE LAS FUENTES DE INFORMACIÓN: SERVICIOS PERSONALES. 
+Educación: Estadísticas de matrículas (MINEDUC) 
+Salud pública: Estadísticas de ejecución presupuestaria del gobierno central y municipal (CGR)
+Salud privada: F29 (SII) y pago de remuneraciones (AFC) 
+Resto de servicios: F29 (SII) y pago de remuneraciones (AFC)
+Actividades Financieras: Ingresos de casinos (SCJ); Proyecciones de población (INE); F29 (SII) y pago de remuneraciones (AFC)
+xii. Administración pública 
+La distribución regional de la administración pública se realiza con información de dotación del personal civil y del gasto en personal total del gobierno central, del gasto en personal del Ejército, Policía de Investigaciones de Chile, Carabineros, Armada, Fuerza Aérea de Chile y del gasto en personal en municipalidades (Dirección de Presupuestos, Contraloría General de la Republica y Fuerzas Armadas y del Orden).
+TABLA 12 DETALLE DE LAS FUENTES DE INFORMACIÓN: ADMINISTRACIÓN PÚBLICA 
+Administración Pública: Dotación y gasto del personal
+b. Consumo de hogares regional 
+i. Descripción general 
+De la misma forma que en el origen del PIBR, en la estimación del consumo de hogares se privilegian fuentes que presentan información en alta frecuencia. Sin embargo, el consumo de hogares es una estadística enfocada en productos. Lo anterior, implica una jerarquización entre fuentes de información que, además de la desagregación regional y temporal, cuenten con desgloses por producto.
+De esta forma, se identifican las siguientes fuentes de información de instituciones privadas y públicas que cuentan con todos los desgloses requeridos:
+-	Ventas en Supermercados (VS): Información de ventas por categorías de producto, provistas por una empresa privada de inteligencia de mercado. 
+-	Ventas de bienes durables (VBD): Información de ventas del comercio minorista en las agrupaciones de aparatos electrónicos y equipamiento para el hogar. También es provista por una institución privada de inteligencia de mercado.
+-	Primeras inscripciones de vehículos automotores del Servicio de Registro Civil e Identificación (SRC): Corresponde al registro inicial por patente de vehículos automotores en las oficinas del registro civil. 
+-	Índice de Actividad del Comercio (IAC): Información de ventas del comercio por grandes categorías de producto, compilada por el INE. 
+-	Destinos residenciales del Índice de Producción del sector EGA (IPEGA): corresponde a información de unidades físicas de consumo en los destinos residenciales. 
+En un segundo grupo se encuentran fuentes de información que solo cubren de forma parcial los requisitos para la estimación del consumo de hogares regional trimestral. La principal fuente en este grupo corresponde a las ventas con boletas y medios electrónicos del Formulario 29 del SII. Estas ventas se utilizan como aproximación al gasto realizado por los hogares. Para estimar el consumo de los hogares regional a partir de estas fuentes se debe realizar, en una primera etapa, la asignación de las ventas por región, teniendo en cuenta que las declaraciones del IVA se concentran en la región metropolitana debido al registro de único del domicilio del declarante (casa matriz). Para desagregar territorialmente esta información se utilizan las siguientes fuentes de información: 
+-	DTE: En particular, para la medición del consumo se utilizan las comunas de origen de las facturas emitidas por aquellos contribuyentes no pertenecientes al comercio y las comunas de destino de las facturas de compra de los contribuyentes pertenecientes al comercio. De esta forma, la asignación regional de las ventas del comercio se realiza a partir de la compra de sus productos para reventa. 
+-	VME: Esta fuente es utilizada para distribuir regionalmente las ventas del comercio minorista. 
+En una segunda etapa, las ventas regionalizadas deben distribuirse por productos. Para realizar esto, se utilizan dos métodos: 
+-	Asignación de productos en base al detalle de compras de los DTE: En este caso, se utiliza el detalle de las glosas de compras de la DTE para el comercio minorista, siendo asignadas a productos mediante métodos de clasificación automática y validados para los grandes contribuyentes. De esta forma, se estiman estructuras de compras por producto.
+-	Asignación de producto en base matriz de oferta nacional y matriz de ventas del comercio: Para aquellos contribuyentes no capturados en el ejercicio anterior, se estima una estructura de productos proveniente de la oferta con destino hogares a nivel de actividad económica obtenida en los cuadros de oferta y uso estimados en la CdeR2018 -para los contribuyentes que no pertenecen al comercio-, o bien, a partir de las ventas del comercio obtenidas en el ejercicio de conciliación de los márgenes de la CdeR2018 -para los contribuyentes del comercio-.
+Con respecto a las fuentes del consumo es importante considerar que están asociadas a ventas y, por lo tanto, no permiten establecer la residencia de los consumidores. Lo anterior puede afectar las mediciones de regiones receptoras de turistas nacionales. Por otra parte, el uso de fuentes asociadas al pago con tarjetas, y el aumento del pago no presencial pueden generar sesgos en las distribuciones regionales. 
+ii. Bienes Durables
+Los bienes durables corresponden a bienes que se pueden utilizar más de una vez por un periodo igual o superior a un año, tales como enseres domésticos, productos electrónicos, automóviles, etc.). El consumo de estos bienes no se considera habitual. La tabla siguiente detalla las fuentes que se utilizan en los productos de esta agrupación:
+TABLA 13 DETALLE DE LAS FUENTES DE INFORMACIÓN: BIENES DURABLES
+Bienes Durables: Ventas de bienes durables (VBD); Primeras Inscripciones de vehículos automotores del Registro Civil (SRC); Ventas con boletas y medios electrónicos F29 (SII)
+iii. Bienes No Durables 
+Esta agrupación comprende el consumo de bienes que se pueden utilizar una sola vez, o de forma repetida, por un periodo menor a un año (productos alimenticios, artículos de aseo y limpieza, etc.). De forma excepcional, los productos textiles se consideran dentro del consumo no durable, a pesar de que su uso puede extenderse por más de un año. Por otra parte, esta agrupación contiene el consumo cuantificable de servicios básicos -Electricidad, Gas y Agua-. El consumo de estos bienes es de naturaleza habitual.
+TABLA 14 DETALLE DE LAS FUENTES DE INFORMACIÓN: BIENES NO DURABLES Bienes No Durables: Ventas de supermercados (VS); Índice de Actividad del Comercio (IAC); Destinos residenciales del Índice de Producción del sector EGA (IPEGA); Boletas y medios electrónicos F29 (SII)
+iv. Servicios 
+El consumo de servicios corresponde a los servicios prestados y consumidos de forma inmediata por los hogares, así como el consumo de las IPSFL hecho a nombre de los hogares. Esta categoría incluye, además, servicios de carácter no transaccional como son los servicios de intermediación financiera medidos indirectamente (SIFMI) -derivados de las transacciones de colocación y captación realizadas por instituciones financieras con los hogares- y el servicio de vivienda prestados a los hogares que son propietarios de sus viviendas.
+TABLA 15
+DETALLE DE LAS FUENTES DE INFORMACIÓN: SERVICIOS
+Servicios: Ventas con boletas y medios electrónicos F29 (SII); Información de antenas, líneas de telefonía fija y conexiones a servicios de telecomunicaciones (SUBTEL); Estadísticas de transporte aéreo (Junta de Aeronáutica Civil); Saldos totales en cuentas corrientes, cuentas de ahorro y cuentas vistas (CMF); Cotizaciones percibidas (Superintendencia de Salud); Estadísticas de matrículas (MINEDUC); Estadísticas de ejecución presupuestaria del gobierno central y municipal (CGR); F29 (SII) y pago de remuneraciones (AFC); Proyecciones de Población (INE)
+V. REFERENCIAS
+Banco Central de Chile. 2022. Cuentas Nacionales de Chile. Compilación de Referencia 2018.
+Banco Central de Chile. 2017. Cuentas Nacionales de Chile. Métodos y Fuentes de Información.
+Eurtostat. 2010. European System of Accounts. International Monetary Fund. 2017. Quarterly National Accounts Manual.
+Frank T. Denton. 1971. Adjustment of Monthly or Quarterly Series to Annual Totals: An Approach Based on Quadratic Minimization. Journal of the American Statistical Association. 66:333, 99-102.
+Simón Guerrero, René Luengo, Pilar Pozo y Sebastián Rébora, 2012. “Nuevas series de cuentas nacionales encadenadas: métodos y fuentes de estimación”. Serie de Estudios Económicos Estadísticos N90, Banco Central de Chile. Marzo.
+Ximena Aguilar, Antonio Escandón, José Venegas y Walter lllanes, 2006. “Producto Interno Bruto Regional de Chile, 1996- 2004: Metodología y Resultados. Serie de Estudios Económicos Estadísticos N52, Banco Central de Chile. Marzo.

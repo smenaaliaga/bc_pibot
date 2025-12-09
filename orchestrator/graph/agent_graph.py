@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import datetime
 import logging
 import os
+import re
 import uuid
 from typing import Annotated, Any, Dict, Iterable, List, Optional, TypedDict
 
@@ -18,9 +20,9 @@ from orchestrator.intents.classifier_agent import (
 )
 from orchestrator.llm.llm_adapter import LLMAdapter, build_llm
 from orchestrator.memory.memory_adapter import MemoryAdapter
+from orchestrator.prompts.query_classifier import ClassificationResult
 from orchestrator.rag.rag_factory import create_retriever
 from orchestrator.routes import data_router, intent_router
-from prompt import ClassificationResult
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +58,37 @@ def _emit_stream_chunk(chunk_text: str, writer: Optional[StreamWriter]) -> None:
             resolved_writer({"stream_chunks": chunk_text})
         except Exception:  # pragma: no cover - defensive logging only
             logger.debug("[GRAPH] stream writer emit failed", exc_info=True)
+
+
+class _StreamChunkFilter:
+    """Drop consecutive duplicate chunks from streaming routes."""
+
+    def __init__(self) -> None:
+        self._last_norm: Optional[str] = None
+        self._last_was_whitespace = False
+
+    def _normalize(self, chunk: str) -> str:
+        return re.sub(r"\s+", " ", chunk).strip()
+
+    def allow(self, chunk: Optional[str]) -> bool:
+        if not chunk:
+            return False
+        if chunk.strip():
+            normalized = self._normalize(chunk)
+            if not normalized:
+                return False
+            if normalized == self._last_norm:
+                return False
+            self._last_norm = normalized
+            self._last_was_whitespace = False
+            return True
+        # chunk contains only whitespace (newline/padding)
+        if self._last_norm is None:
+            return False
+        if self._last_was_whitespace:
+            return False
+        self._last_was_whitespace = True
+        return True
 
 
 def _safe_memory_adapter() -> Any:
@@ -101,17 +134,27 @@ class _InProcessMemoryAdapter:
             return {}
         return dict(self._facts.get(session_id, {}))
 
-    def on_user_turn(self, session_id: str, message: str) -> None:
-        self._append_history(session_id, "user", message)
+    def on_user_turn(self, session_id: str, message: str, *, metadata: Optional[Dict[str, Any]] = None) -> None:
+        self._append_history(session_id, "user", message, metadata=metadata)
 
-    def on_assistant_turn(self, session_id: str, message: str) -> None:
-        self._append_history(session_id, "assistant", message)
+    def on_assistant_turn(self, session_id: str, message: str, *, metadata: Optional[Dict[str, Any]] = None) -> None:
+        self._append_history(session_id, "assistant", message, metadata=metadata)
 
-    def _append_history(self, session_id: str, role: str, content: str) -> None:
+    def _append_history(
+        self,
+        session_id: str,
+        role: str,
+        content: str,
+        *,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
         if not session_id or not content:
             return
         history = self._history.setdefault(session_id, [])
-        history.append({"role": role, "content": str(content)})
+        entry = {"role": role, "content": str(content)}
+        if metadata:
+            entry["metadata"] = dict(metadata)
+        history.append(entry)
         if len(history) > 200:
             self._history[session_id] = history[-200:]
 
@@ -138,9 +181,9 @@ def _safe_retriever():
         return None
 
 
-def _safe_llm(*, retriever=None) -> Optional[LLMAdapter]:
+def _safe_llm(*, retriever=None, mode: str = "rag") -> Optional[LLMAdapter]:
     try:
-        return build_llm(streaming=True, retriever=retriever)
+        return build_llm(streaming=True, retriever=retriever, mode=mode)
     except Exception:  # pragma: no cover - avoid crashing import
         logger.exception("[GRAPH] LLMAdapter initialization failed")
         return None
@@ -151,6 +194,27 @@ _RETRIEVER = None
 _RAG_LLM = None
 _FALLBACK_LLM = None
 
+_CHART_BLOCK_PATTERN = re.compile(r"##CHART_START(?P<body>.*?)##CHART_END", re.DOTALL)
+
+
+def _extract_chart_metadata_from_output(output: str) -> Optional[Dict[str, str]]:
+    if not output:
+        return None
+    match = _CHART_BLOCK_PATTERN.search(output)
+    if not match:
+        return None
+    body = match.group("body") or ""
+    domain_match = re.search(r"domain\s*=\s*([A-Za-z0-9_\- ]+)", body, flags=re.IGNORECASE)
+    if not domain_match:
+        return None
+    domain = domain_match.group(1).strip().upper()
+    if not domain:
+        return None
+    return {
+        "chart_domain": domain,
+        "chart_ts": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    }
+
 
 def _ensure_backends() -> None:
     global _MEMORY, _RETRIEVER, _RAG_LLM, _FALLBACK_LLM
@@ -159,9 +223,9 @@ def _ensure_backends() -> None:
     if _RETRIEVER is None:
         _RETRIEVER = _safe_retriever()
     if _RAG_LLM is None:
-        _RAG_LLM = _safe_llm(retriever=_RETRIEVER)
+        _RAG_LLM = _safe_llm(retriever=_RETRIEVER, mode="rag")
     if _FALLBACK_LLM is None:
-        _FALLBACK_LLM = _safe_llm(retriever=None)
+        _FALLBACK_LLM = _safe_llm(retriever=None, mode="fallback")
 
 
 def _ensure_list(history: Optional[Iterable[Dict[str, str]]]) -> List[Dict[str, str]]:
@@ -244,13 +308,17 @@ def ingest_node(state: AgentState) -> AgentState:
     session_id = context.get("session_id") or f"graph-{uuid.uuid4().hex}"
     context["session_id"] = session_id
     facts: Dict[str, str] = {}
+    memory_history: List[Dict[str, str]] = []
     if _MEMORY and session_id:
         try:
             if question:
                 _MEMORY.on_user_turn(session_id, question)
             facts = _MEMORY.get_facts(session_id)
+            memory_history = _MEMORY.get_window_for_llm(session_id)
         except Exception:
             logger.debug("[GRAPH] Unable to read memory facts", exc_info=True)
+    if memory_history:
+        history = memory_history
     return {
         "question": question,
         "history": history,
@@ -296,23 +364,28 @@ def intent_shortcuts_node(state: AgentState, *, writer: Optional[StreamWriter] =
             history_text,
             memory=_MEMORY,
             session_id=session_id,
+            facts=state.get("facts"),
         )
     except Exception:
         logger.exception("[GRAPH] intent_router.route_intents failed")
     if direct_iter is None:
         return
     collected: List[str] = []
+    memory_metadata = getattr(direct_iter, "metadata", None)
+    chunk_filter = _StreamChunkFilter()
     for chunk in direct_iter:
         chunk_text = _ensure_text(chunk)
         if not chunk_text:
             continue
+        if not chunk_filter.allow(chunk_text):
+            continue
         collected.append(chunk_text)
         _emit_stream_chunk(chunk_text, writer)
-        yield {"stream_chunks": chunk_text}
     if collected:
         yield {
             "output": "".join(collected),
             "route_decision": "direct",
+            "memory_metadata": memory_metadata,
         }
 
 
@@ -323,25 +396,28 @@ def data_node(state: AgentState, *, writer: Optional[StreamWriter] = None):
     if not classification:
         text = "No pude clasificar la consulta para obtener datos."
         _emit_stream_chunk(text, writer)
-        yield {"stream_chunks": text}
         return {"output": text}
     collected: List[str] = []
+    chunk_filter = _StreamChunkFilter()
+
     try:
         stream = data_router.stream_data_flow(classification, question, history_text)
         for chunk in stream:
             chunk_text = _ensure_text(chunk)
             if not chunk_text:
                 continue
+            if not chunk_filter.allow(chunk_text):
+                continue
             collected.append(chunk_text)
             _emit_stream_chunk(chunk_text, writer)
-            yield {"stream_chunks": chunk_text}
     except Exception:
         logger.exception("[GRAPH] data route failed")
         if not collected:
             fallback = "Ocurrió un problema al obtener los datos solicitados."
             collected.append(fallback)
             _emit_stream_chunk(fallback, writer)
-            yield {"stream_chunks": fallback}
+        return {"output": "".join(collected)}
+
     return {"output": "".join(collected)}
 
 
@@ -357,14 +433,14 @@ def _run_llm(
     if not question:
         text = "No recibí una pregunta para responder."
         _emit_stream_chunk(text, writer)
-        yield {"stream_chunks": text}
         return {"output": text}
     if adapter is None:
         text = "No pude inicializar el modelo de lenguaje para esta ruta."
         _emit_stream_chunk(text, writer)
-        yield {"stream_chunks": text}
         return {"output": text}
     collected: List[str] = []
+    chunk_filter = _StreamChunkFilter()
+
     try:
         for chunk in adapter.stream(question, history=history, intent_info=intent_info):
             chunk_text = _ensure_text(chunk)
@@ -374,25 +450,26 @@ def _run_llm(
                 logger.debug("[GRAPH_LLM_CHUNK] %s", chunk_text[:200])
             except Exception:
                 pass
+            if not chunk_filter.allow(chunk_text):
+                continue
             collected.append(chunk_text)
             _emit_stream_chunk(chunk_text, writer)
-            yield {"stream_chunks": chunk_text}
     except Exception:
         logger.exception("[GRAPH] LLM streaming failed")
         if not collected:
             fallback = "Tuve un problema generando la respuesta."
             collected.append(fallback)
             _emit_stream_chunk(fallback, writer)
-            yield {"stream_chunks": fallback}
+        return {"output": "".join(collected)}
     return {"output": "".join(collected)}
 
 
 def rag_node(state: AgentState, *, writer: Optional[StreamWriter] = None):
-    yield from _run_llm(state, _RAG_LLM, writer=writer)
+    return _run_llm(state, _RAG_LLM, writer=writer)
 
 
 def fallback_node(state: AgentState, *, writer: Optional[StreamWriter] = None):
-    yield from _run_llm(state, _FALLBACK_LLM, writer=writer)
+    return _run_llm(state, _FALLBACK_LLM, writer=writer)
 
 
 def direct_node(state: AgentState) -> AgentState:
@@ -402,12 +479,73 @@ def direct_node(state: AgentState) -> AgentState:
 def memory_node(state: AgentState) -> AgentState:
     session_id = state.get("session_id")
     output = state.get("output", "")
-    if _MEMORY and session_id and output:
+    metadata = dict(state.get("memory_metadata") or {})
+    chart_meta = _extract_chart_metadata_from_output(output)
+    if chart_meta:
+        metadata.update(chart_meta)
+    has_chart_metadata = bool(metadata.get("chart_domain"))
+    if _MEMORY and session_id:
         try:
-            _MEMORY.on_assistant_turn(session_id, output)
+            if output:
+                if metadata:
+                    _MEMORY.on_assistant_turn(session_id, output, metadata=metadata)
+                else:
+                    _MEMORY.on_assistant_turn(session_id, output)
+            if has_chart_metadata:
+                _persist_chart_state(session_id, metadata)
+            else:
+                _maybe_clear_chart_state(session_id, state.get("facts"))
+            checkpoint_payload = {
+                "question": state.get("question"),
+                "output": output,
+                "route_decision": state.get("route_decision"),
+            }
+            classification = state.get("classification")
+            query_type = getattr(classification, "query_type", None) if classification else None
+            if query_type:
+                checkpoint_payload["query_type"] = query_type
+            facts = state.get("facts")
+            if facts:
+                checkpoint_payload["facts"] = facts
+            _MEMORY.save_checkpoint(
+                session_id,
+                checkpoint_payload,
+                metadata={"source": "memory_node"},
+            )
         except Exception:
             logger.debug("[GRAPH] Unable to persist assistant turn", exc_info=True)
     return {"output": output}
+
+
+def _persist_chart_state(session_id: str, metadata: Dict[str, Any]) -> None:
+    if not _MEMORY or not hasattr(_MEMORY, "set_facts"):
+        return
+    domain = str(metadata.get("chart_domain") or "").upper()
+    if not domain:
+        return
+    ts_value = metadata.get("chart_ts") or datetime.datetime.now(datetime.timezone.utc).isoformat()
+    try:
+        _MEMORY.set_facts(
+            session_id,
+            {
+                "chart_last_domain": domain,
+                "chart_last_ts": str(ts_value),
+            },
+        )  # type: ignore
+    except Exception:
+        logger.debug("[GRAPH] Unable to persist chart facts", exc_info=True)
+
+
+def _maybe_clear_chart_state(session_id: str, prior_facts: Optional[Dict[str, str]]) -> None:
+    if not _MEMORY or not hasattr(_MEMORY, "set_facts"):
+        return
+    facts = prior_facts or {}
+    if not facts.get("chart_last_domain"):
+        return
+    try:
+        _MEMORY.set_facts(session_id, {"chart_last_domain": "", "chart_last_ts": ""})  # type: ignore
+    except Exception:
+        logger.debug("[GRAPH] Unable to clear chart facts", exc_info=True)
 
 
 def route_decider(state: AgentState) -> str:

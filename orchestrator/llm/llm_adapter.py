@@ -27,7 +27,7 @@ except Exception:
     AIMessage = None
     LANGCHAIN_AVAILABLE = False
 
-from .system_prompt import build_system_message
+from orchestrator.prompts.registry import GuardrailMode, build_guardrail_prompt
 
 
 class LLMAdapter:
@@ -39,6 +39,7 @@ class LLMAdapter:
         temperature: float = 0.0,
         retriever: Optional[Any] = None,
         streaming: bool = True,
+        mode: GuardrailMode = "rag",
     ):
         env_model = os.getenv("OPENAI_MODEL")
         self.model = (env_model or model)
@@ -46,6 +47,7 @@ class LLMAdapter:
         self.streaming = streaming
         self._chat = None
         self._retriever = retriever
+        self.mode: GuardrailMode = mode
         if ChatOpenAI is not None:
             try:
                 self._chat = ChatOpenAI(model=self.model, temperature=self.temperature, streaming=self.streaming)
@@ -53,7 +55,7 @@ class LLMAdapter:
                 self._chat = None
 
     def _build_messages(self, question: str, history: List[Dict[str, str]], intent_info: Optional[Dict[str, Any]]):
-        system_content = build_system_message(include_guards=True)
+        system_content = build_guardrail_prompt(mode=self.mode, include_guards=True)
         if intent_info:
             try:
                 intent = intent_info.get("intent")
@@ -243,8 +245,13 @@ class LLMAdapter:
         return self.generate(question, history=history, intent_info=intent_info)
 
 
-def build_llm(streaming: bool = True, temperature: float = 0.0, retriever: Optional[Any] = None) -> LLMAdapter:
-    adapter = LLMAdapter(temperature=temperature, retriever=retriever, streaming=streaming)
+def build_llm(
+    streaming: bool = True,
+    temperature: float = 0.0,
+    retriever: Optional[Any] = None,
+    mode: GuardrailMode = "rag",
+) -> LLMAdapter:
+    adapter = LLMAdapter(temperature=temperature, retriever=retriever, streaming=streaming, mode=mode)
     # streaming flag kept for signature compatibility; adapter handles streaming internally
     return adapter
 

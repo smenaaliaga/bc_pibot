@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
+import atexit
 import os
 import uuid
 import datetime
 import logging
-import time
+import json
 from typing import Optional, List, Dict, Tuple, Any
-from contextlib import nullcontext
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
@@ -38,6 +38,10 @@ try:
 except Exception:
     ConnectionPool = None
 try:
+    from psycopg.types.json import Json  # type: ignore[attr-defined]
+except Exception:
+    Json = None  # type: ignore
+try:
     from memory_handler.response_diversity import ResponseDiversityManager  # type: ignore
 except Exception:
     ResponseDiversityManager = None  # type: ignore
@@ -52,13 +56,19 @@ class MemoryAdapter:
         self.pg_dsn = pg_dsn or os.getenv("PG_DSN", "postgresql://postgres:postgres@localhost:5432/pibot")
         self._require_pg = os.getenv("REQUIRE_PG_MEMORY", "0").lower() in ("1", "true", "yes", "on")
         self._cleanup = None
-        self._fallback: List[Dict[str, str]] = []
+        self._fallback_turns: Dict[str, List[Dict[str, Any]]] = {}
+        self._max_fallback_turns = int(os.getenv("MEMORY_MAX_TURNS_STORE", "200"))
+        self._fallback_checkpoints: Dict[str, List[Dict[str, Any]]] = {}
+        self._max_fallback_checkpoints = int(os.getenv("MEMORY_MAX_CHECKPOINTS", "10"))
         self._checkpoint_ns = os.getenv("LANGGRAPH_CHECKPOINT_NS", "memory")
         self._summary_every = int(os.getenv("MEMORY_SUMMARY_EVERY", "5"))
         self._max_turns_prompt = int(os.getenv("MEMORY_MAX_TURNS_PROMPT", "8"))
         self._local_facts: Dict[str, Dict[str, str]] = {}
         self._pool = None
         self._pool_dsn = None
+        self._pool_open = False
+        self._pool_cleanup_registered = False
+        self._turns_table_ready = False
         self._pg_log_state: Dict[str, Any] = {}
         self._pg_err_period = float(os.getenv("PG_ERROR_LOG_PERIOD", "60"))
         self._auto_setup = os.getenv("LANGGRAPH_AUTO_SETUP", "1").lower() not in ("0", "false", "no")
@@ -66,7 +76,11 @@ class MemoryAdapter:
         self._facts_layout_override = layout_override if layout_override in {"json", "kv"} else None
         self._facts_layout: Optional[str] = None
         # basic gauges/counters
-        self._metrics: Dict[str, float] = {"memory_fallback_used": 0, "diversity_hits": 0}
+        self._metrics: Dict[str, float] = {
+            "memory_fallback_used": 0,
+            "diversity_hits": 0,
+            "turns_fallback_used": 0,
+        }
         parsed = urlparse(self.pg_dsn)
         host = parsed.hostname or ""
         port = f":{parsed.port}" if parsed.port else ""
@@ -144,12 +158,46 @@ class MemoryAdapter:
                 pool_kwargs: Dict[str, Any] = {"autocommit": True, "prepare_threshold": 0}
                 if dict_row:
                     pool_kwargs["row_factory"] = dict_row
-                self._pool = ConnectionPool(self.pg_dsn, kwargs=pool_kwargs)
+                self._pool = ConnectionPool(self.pg_dsn, kwargs=pool_kwargs, open=False)
                 self._pool_dsn = self.pg_dsn
+                self._pool.open()
+                self._pool_open = True
+                if not self._pool_cleanup_registered:
+                    try:
+                        atexit.register(self._close_pool)
+                        self._pool_cleanup_registered = True
+                    except Exception:
+                        logger.debug("No se pudo registrar cleanup para ConnectionPool", exc_info=True)
             except Exception as e:
                 self._log_pg_error("Error creando pool: %s" % e, op="pool", table="psycopg_pool")
                 self._pool = None
+                self._pool_open = False
+        elif not self._pool_open:
+            try:
+                self._pool.open()
+                self._pool_open = True
+            except Exception as e:
+                self._log_pg_error("Error reabriendo pool: %s" % e, op="pool", table="psycopg_pool")
+                self._pool_open = False
         return self._pool
+
+    def _close_pool(self) -> None:
+        pool = self._pool
+        if not pool:
+            return
+        try:
+            pool.close()
+            wait_close = getattr(pool, "wait_close", None)
+            if callable(wait_close):
+                try:
+                    wait_close()
+                except Exception:
+                    logger.debug("wait_close falló para ConnectionPool", exc_info=True)
+        except Exception:
+            logger.debug("Error cerrando ConnectionPool", exc_info=True)
+        finally:
+            self._pool = None
+            self._pool_open = False
 
     def _log_pg_error(
         self,
@@ -314,11 +362,312 @@ class MemoryAdapter:
                     return {str(key): ("" if value is None else str(value)) for key, value in rows}
         return {}
 
+    def _normalize_metadata(self, metadata: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        if not metadata:
+            return {}
+        normalized: Dict[str, Any] = {}
+        for key, value in metadata.items():
+            key_str = str(key)
+            if isinstance(value, (str, int, float, bool)) or value is None:
+                normalized[key_str] = value
+            else:
+                normalized[key_str] = str(value)
+        return normalized
+
+    def _append_fallback_turn(self, session_id: str, payload: Dict[str, Any]) -> None:
+        bucket = self._fallback_turns.setdefault(session_id, [])
+        bucket.append(payload)
+        if len(bucket) > self._max_fallback_turns:
+            self._fallback_turns[session_id] = bucket[-self._max_fallback_turns :]
+
+    def _append_checkpoint_cache(self, session_id: str, payload: Dict[str, Any]) -> None:
+        bucket = self._fallback_checkpoints.setdefault(session_id, [])
+        bucket.append(payload)
+        if len(bucket) > self._max_fallback_checkpoints:
+            self._fallback_checkpoints[session_id] = bucket[-self._max_fallback_checkpoints :]
+
+    def _saver_config(self, session_id: str) -> Dict[str, Any]:
+        return {"configurable": {"thread_id": session_id, "checkpoint_ns": self._checkpoint_ns}}
+
+    def _json_param(self, value: Dict[str, Any]) -> Any:
+        value = value or {}
+        if Json is not None:
+            try:
+                return Json(value)
+            except Exception:
+                logger.debug("Json adapter failed; falling back to dumps", exc_info=True)
+        try:
+            return json.dumps(value)
+        except Exception:
+            return "{}"
+
+    def _ensure_session_turns_table(self) -> bool:
+        if self._turns_table_ready:
+            return True
+        pool = self._conn_pool()
+        if not pool:
+            return False
+        try:
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS session_turns (
+                            session_id TEXT NOT NULL,
+                            turn_id BIGSERIAL PRIMARY KEY,
+                            role TEXT NOT NULL,
+                            content TEXT,
+                            metadata JSONB,
+                            ts TIMESTAMPTZ DEFAULT NOW()
+                        )
+                        """
+                    )
+                    cur.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_session_turns_session_ts ON session_turns(session_id, ts DESC)"
+                    )
+                conn.commit()
+            self._turns_table_ready = True
+            return True
+        except Exception as e:
+            self._log_pg_error(
+                "No se pudo asegurar tabla session_turns: %s" % e,
+                op="ensure_table",
+                table="session_turns",
+            )
+        return False
+
+    def _persist_turn(
+        self,
+        session_id: str,
+        role: str,
+        content: str,
+        metadata: Dict[str, Any],
+        ts: datetime.datetime,
+    ) -> bool:
+        pool = self._conn_pool()
+        if not pool:
+            return False
+        if not self._ensure_session_turns_table():
+            return False
+        metadata_payload = metadata or {}
+        try:
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        INSERT INTO session_turns(session_id, role, content, metadata, ts)
+                        VALUES (%s, %s, %s, %s, %s)
+                        """,
+                        (session_id, role, content, self._json_param(metadata_payload), ts),
+                    )
+                conn.commit()
+            return True
+        except Exception as e:
+            self._log_pg_error(
+                "Error guardando turno: %s" % e,
+                session_id=session_id,
+                op="turn_write",
+                table="session_turns",
+            )
+        return False
+
+    def _parse_ts_filter(self, since_ts: Optional[Any]) -> Optional[datetime.datetime]:
+        if since_ts is None:
+            return None
+        if isinstance(since_ts, datetime.datetime):
+            return since_ts
+        if isinstance(since_ts, (int, float)):
+            return datetime.datetime.fromtimestamp(since_ts, datetime.timezone.utc)
+        if isinstance(since_ts, str):
+            try:
+                return datetime.datetime.fromisoformat(since_ts)
+            except ValueError:
+                return None
+        return None
+
+    def _read_turns_pg(
+        self,
+        session_id: str,
+        *,
+        limit: Optional[int] = None,
+        since_ts: Optional[Any] = None,
+    ) -> List[Dict[str, Any]]:
+        pool = self._conn_pool()
+        if not pool:
+            return []
+        if not self._ensure_session_turns_table():
+            return []
+        ts_filter = self._parse_ts_filter(since_ts)
+        query = [
+            "SELECT role, content, metadata, ts FROM session_turns WHERE session_id=%s",
+        ]
+        params: List[Any] = [session_id]
+        if ts_filter is not None:
+            query.append("AND ts >= %s")
+            params.append(ts_filter)
+        query.append("ORDER BY ts DESC")
+        if limit:
+            query.append("LIMIT %s")
+            params.append(limit)
+        sql = " ".join(query)
+        try:
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(sql, tuple(params))
+                    rows = cur.fetchall() or []
+        except Exception as e:
+            self._log_pg_error(
+                "Error leyendo turnos: %s" % e,
+                session_id=session_id,
+                op="turn_read",
+                table="session_turns",
+            )
+            return []
+        turns: List[Dict[str, Any]] = []
+        for row in rows:
+            if isinstance(row, dict):
+                role = row.get("role", "")
+                content = row.get("content", "")
+                metadata = row.get("metadata") or {}
+                ts_value = row.get("ts")
+            else:
+                try:
+                    role, content, metadata, ts_value = row
+                except Exception:
+                    continue
+            if isinstance(metadata, str):
+                try:
+                    metadata = json.loads(metadata)
+                except Exception:
+                    metadata = {}
+            turns.append(
+                {
+                    "role": str(role or ""),
+                    "content": "" if content is None else str(content),
+                    "metadata": metadata or {},
+                    "ts": ts_value.isoformat() if hasattr(ts_value, "isoformat") else ts_value,
+                }
+            )
+        return list(reversed(turns))
+
+    def _fallback_turn_rows(self, session_id: str, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        bucket = self._fallback_turns.get(session_id, [])
+        if not bucket:
+            return []
+        subset = bucket[-limit:] if limit else list(bucket)
+        return [dict(item) for item in subset]
+
+    def _record_turn(
+        self,
+        session_id: str,
+        role: str,
+        content: str,
+        *,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        if not session_id:
+            session_id = uuid.uuid4().hex
+        if not role or not content:
+            return
+        ts = datetime.datetime.now(datetime.timezone.utc)
+        normalized_metadata = self._normalize_metadata(metadata)
+        payload = {
+            "role": role,
+            "content": str(content),
+            "metadata": normalized_metadata,
+            "ts": ts.isoformat(),
+        }
+        self._append_fallback_turn(session_id, payload)
+        if not self._persist_turn(session_id, role, str(content), normalized_metadata, ts):
+            self._metrics["turns_fallback_used"] = self._metrics.get("turns_fallback_used", 0) + 1
+
+    def save_checkpoint(
+        self,
+        session_id: str,
+        checkpoint: Dict[str, Any],
+        *,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> bool:
+        if not session_id or not checkpoint:
+            return False
+        normalized_metadata = self._normalize_metadata(metadata)
+        entry = {
+            "checkpoint": checkpoint,
+            "metadata": {
+                **normalized_metadata,
+                "saved_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            },
+        }
+        self._append_checkpoint_cache(session_id, entry)
+        saver = getattr(self, "saver", None)
+        if saver and hasattr(saver, "put"):
+            config = self._saver_config(session_id)
+            payload = {
+                "id": '_'.join([session_id, uuid.uuid4().hex]),
+                "ts": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                "values": checkpoint,
+                "channel_values": {},
+            }
+            try:
+                channel_versions: Dict[str, Any] = {}
+                saver.put(config, payload, normalized_metadata, channel_versions)  # type: ignore[arg-type]
+            except Exception:
+                logger.debug("save_checkpoint fall back to cache", exc_info=True)
+        return True
+
+    def load_checkpoint(self, session_id: str) -> Optional[Dict[str, Any]]:
+        if not session_id:
+            return None
+        saver = getattr(self, "saver", None)
+        if saver and hasattr(saver, "get"):
+            config = self._saver_config(session_id)
+            try:
+                data = saver.get(config)  # type: ignore[call-arg]
+            except Exception:
+                logger.debug("load_checkpoint saver.get failed", exc_info=True)
+            else:
+                if isinstance(data, dict):
+                    checkpoint_payload = data.get("checkpoint") or data.get("values") or data
+                    metadata = data.get("metadata") or {}
+                    return {"checkpoint": checkpoint_payload, "metadata": metadata}
+        cache = self._fallback_checkpoints.get(session_id)
+        if cache:
+            return cache[-1]
+        return None
+
+    def get_recent_turns(
+        self,
+        session_id: str,
+        *,
+        limit: Optional[int] = None,
+        since_ts: Optional[Any] = None,
+    ) -> List[Dict[str, Any]]:
+        if not session_id:
+            return []
+        turns = self._read_turns_pg(session_id, limit=limit, since_ts=since_ts)
+        if turns:
+            return turns if not limit else turns[-limit:]
+        return self._fallback_turn_rows(session_id, limit=limit)
+
+    def get_window_for_llm(self, session_id: str, max_turns: Optional[int] = None) -> List[Dict[str, str]]:
+        limit = max_turns or self._max_turns_prompt
+        turns = self.get_recent_turns(session_id, limit=limit)
+        if not turns:
+            return []
+        window = []
+        for turn in turns[-limit:]:
+            role = str(turn.get("role", ""))
+            content = str(turn.get("content", ""))
+            if role and content:
+                window.append({"role": role, "content": content})
+        return window[-limit:]
+
     # --- Facts API ---------------------------------------------------------
     def set_facts(self, session_id: str, facts: Dict[str, str]) -> None:
         if not session_id or not facts:
             return
-        self._local_facts.setdefault(session_id, {}).update({k: str(v) for k, v in facts.items()})
+        normalized = {str(k): self._serialize_fact_value(v) for k, v in facts.items()}
+        self._local_facts.setdefault(session_id, {}).update(normalized)
         pool = self._conn_pool()
         if not pool:
             return
@@ -327,11 +676,24 @@ class MemoryAdapter:
             return
         try:
             if layout == "kv":
-                self._set_facts_kv(pool, session_id, facts)
+                self._set_facts_kv(pool, session_id, normalized)
             else:
-                self._set_facts_json(pool, session_id, facts)
+                self._set_facts_json(pool, session_id, normalized)
         except Exception as e:
             self._log_pg_error("Error guardando facts: %s" % e, session_id=session_id, op="facts_write", table="session_facts")
+
+    @staticmethod
+    def _serialize_fact_value(value: Any) -> str:
+        if value is None:
+            return ""
+        if isinstance(value, (str, int, float, bool)):
+            return str(value)
+        if isinstance(value, datetime.datetime):
+            return value.isoformat()
+        try:
+            return json.dumps(value, ensure_ascii=False)
+        except Exception:
+            return str(value)
 
     def get_facts(self, session_id: str) -> Dict[str, str]:
         if not session_id:
@@ -353,41 +715,40 @@ class MemoryAdapter:
         return {}
 
     # --- Turns API (minimal) ----------------------------------------------
-    def on_user_turn(self, session_id: str, message: str) -> None:
-        """Append user message to fallback memory if no saver is available."""
-        if not session_id:
-            session_id = uuid.uuid4().hex
-        self._fallback.append({"role": "user", "content": message, "ts": datetime.datetime.utcnow().isoformat()})
-        if len(self._fallback) > 200:
-            self._fallback = self._fallback[-200:]
+    def on_user_turn(self, session_id: str, message: str, *, metadata: Optional[Dict[str, Any]] = None) -> None:
+        """Record the latest user message across backends."""
+        if not message:
+            return
+        self._record_turn(session_id, "user", message, metadata=metadata)
 
-    def on_assistant_turn(self, session_id: str, message: str) -> None:
-        if not session_id:
-            session_id = uuid.uuid4().hex
-        self._fallback.append({"role": "assistant", "content": message, "ts": datetime.datetime.utcnow().isoformat()})
-        if len(self._fallback) > 200:
-            self._fallback = self._fallback[-200:]
+    def on_assistant_turn(
+        self,
+        session_id: str,
+        message: str,
+        *,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        if not message:
+            return
+        self._record_turn(session_id, "assistant", message, metadata=metadata)
 
     def get_history_for_llm(self, session_id: str) -> List[Dict[str, str]]:
-        if not LANGGRAPH_AVAILABLE or not self.saver:
-            return [{"role": m["role"], "content": m["content"]} for m in self._fallback[-self._max_turns_prompt :]]
         try:
-            with nullcontext():
-                if hasattr(self.saver, "list") and callable(getattr(self.saver, "list", None)):
-                    turns = list(self.saver.list(config={"configurable": {"thread_id": session_id}}))
-                    turns = turns[-self._max_turns_prompt :]
-                    return [{"role": t.get("role", ""), "content": t.get("content", "")} for t in turns]
+            window = self.get_window_for_llm(session_id, max_turns=self._max_turns_prompt)
+            if window:
+                return window
         except Exception as e:
             logger.debug("get_history_for_llm failed: %s", e)
             self._metrics["memory_fallback_used"] += 1
-        return [{"role": m["role"], "content": m["content"]} for m in self._fallback[-self._max_turns_prompt :]]
+        return []
 
     def get_backend_status(self) -> Dict[str, Any]:
         return {
             "using_pg": self._using_pg,
             "require_pg": self._require_pg,
             "saver": type(self.saver).__name__ if self.saver else None,
-            "fallback_len": len(self._fallback),
+            "fallback_sessions": len(self._fallback_turns),
+            "checkpoint_sessions": len(self._fallback_checkpoints),
             "metrics": self._metrics,
         }
 
