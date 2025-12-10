@@ -4,11 +4,12 @@
 From `docker/`:
 ```bash
 # build solo si cambiaste la imagen
+cd docker
 docker compose build postgres
 docker compose --env-file ../.env up -d postgres
 ```
 ### Create vector extension
-
+From `docker/`:
 ```bash
 docker compose exec postgres psql -U postgres -d pibot -c "CREATE EXTENSION IF NOT EXISTS vector;"
 ```
@@ -27,8 +28,7 @@ Requiere que `REDIS_PASS` esté disponible (el `docker-compose.yml` ya toma `env
 
 Example to load vectors after the container is up:
 ```bash
-  .venv/Scripts/activate
-  python docker/postgres/load_txt_rag.py
+  uv run python docker/postgres/load_txt_rag.py
 ```
 ## Recreate the database
 From `docker/`:

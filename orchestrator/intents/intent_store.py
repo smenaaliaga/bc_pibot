@@ -37,6 +37,7 @@ class IntentStoreBase:
         spans: Optional[List[Dict[str, Any]]] = None,
         entities: Optional[Dict[str, Any]] = None,
         turn_id: int = 0,
+        model_version: Optional[str] = None,
     ) -> IntentRecord:
         raise NotImplementedError
 
@@ -301,6 +302,7 @@ class RedisIntentStore(IntentStoreBase):
         spans: Optional[List[Dict[str, Any]]] = None,
         entities: Optional[Dict[str, Any]] = None,
         turn_id: int = 0,
+        model_version: Optional[str] = None,
     ) -> IntentRecord:
         rec = IntentRecord(
             intent=intent or "",

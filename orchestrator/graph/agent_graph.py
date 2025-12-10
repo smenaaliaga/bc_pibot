@@ -18,6 +18,7 @@ from orchestrator.intents.classifier_agent import (
     build_intent_info,
     classify_question_with_history,
 )
+from orchestrator.intents.intent_store import IntentStoreBase, create_intent_store
 from orchestrator.llm.llm_adapter import LLMAdapter, build_llm
 from orchestrator.memory.memory_adapter import MemoryAdapter
 from orchestrator.prompts.query_classifier import ClassificationResult
@@ -32,6 +33,7 @@ class AgentState(TypedDict, total=False):
     history: List[Dict[str, str]]
     context: Dict[str, Any]
     session_id: str
+    user_turn_id: int
     facts: Dict[str, str]
     classification: ClassificationResult
     history_text: str
@@ -181,6 +183,14 @@ def _safe_retriever():
         return None
 
 
+def _safe_intent_store() -> Optional[IntentStoreBase]:
+    try:
+        return create_intent_store()
+    except Exception:
+        logger.exception("[GRAPH] IntentStore initialization failed")
+        return None
+
+
 def _safe_llm(*, retriever=None, mode: str = "rag") -> Optional[LLMAdapter]:
     try:
         return build_llm(streaming=True, retriever=retriever, mode=mode)
@@ -193,6 +203,7 @@ _MEMORY: Optional[Any] = None
 _RETRIEVER = None
 _RAG_LLM = None
 _FALLBACK_LLM = None
+_INTENT_STORE: Optional[IntentStoreBase] = None
 
 _CHART_BLOCK_PATTERN = re.compile(r"##CHART_START(?P<body>.*?)##CHART_END", re.DOTALL)
 
@@ -217,7 +228,7 @@ def _extract_chart_metadata_from_output(output: str) -> Optional[Dict[str, str]]
 
 
 def _ensure_backends() -> None:
-    global _MEMORY, _RETRIEVER, _RAG_LLM, _FALLBACK_LLM
+    global _MEMORY, _RETRIEVER, _RAG_LLM, _FALLBACK_LLM, _INTENT_STORE
     if _MEMORY is None:
         _MEMORY = _safe_memory_adapter()
     if _RETRIEVER is None:
@@ -226,6 +237,8 @@ def _ensure_backends() -> None:
         _RAG_LLM = _safe_llm(retriever=_RETRIEVER, mode="rag")
     if _FALLBACK_LLM is None:
         _FALLBACK_LLM = _safe_llm(retriever=None, mode="fallback")
+    if _INTENT_STORE is None:
+        _INTENT_STORE = _safe_intent_store()
 
 
 def _ensure_list(history: Optional[Iterable[Dict[str, str]]]) -> List[Dict[str, str]]:
@@ -309,23 +322,27 @@ def ingest_node(state: AgentState) -> AgentState:
     context["session_id"] = session_id
     facts: Dict[str, str] = {}
     memory_history: List[Dict[str, str]] = []
+    user_turn_id: Optional[int] = None
     if _MEMORY and session_id:
         try:
             if question:
-                _MEMORY.on_user_turn(session_id, question)
+                user_turn_id = _MEMORY.on_user_turn(session_id, question)
             facts = _MEMORY.get_facts(session_id)
             memory_history = _MEMORY.get_window_for_llm(session_id)
         except Exception:
             logger.debug("[GRAPH] Unable to read memory facts", exc_info=True)
     if memory_history:
         history = memory_history
-    return {
+    next_state: AgentState = {
         "question": question,
         "history": history,
         "context": context,
         "session_id": session_id,
         "facts": facts,
     }
+    if user_turn_id is not None:
+        next_state["user_turn_id"] = user_turn_id
+    return next_state
 
 
 def classify_node(state: AgentState) -> AgentState:
@@ -342,11 +359,57 @@ def classify_node(state: AgentState) -> AgentState:
     if facts:
         intent_info = intent_info or {}
         intent_info.setdefault("facts", facts)
+    _persist_intent_event(state, classification, intent_info)
     return {
         "classification": classification,
         "history_text": history_text,
         "intent_info": intent_info,
     }
+
+
+def _persist_intent_event(
+    state: AgentState,
+    classification: Optional[ClassificationResult],
+    intent_info: Optional[Dict[str, Any]],
+) -> None:
+    if not _INTENT_STORE:
+        return
+    session_id = state.get("session_id")
+    turn_id = state.get("user_turn_id")
+    if not session_id or not turn_id:
+        return
+    payload = intent_info or {}
+    raw_intent = payload.get("intent")
+    if not raw_intent and classification:
+        raw_intent = getattr(classification, "query_type", None)
+    intent = _ensure_text(raw_intent)
+    if not intent:
+        return
+    score_raw = payload.get("score")
+    try:
+        score = float(score_raw) if score_raw is not None else 1.0
+    except (TypeError, ValueError):
+        score = 1.0
+    spans = payload.get("spans") or []
+    entities = payload.get("entities") or {}
+    try:
+        _INTENT_STORE.record(
+            session_id,
+            intent,
+            score,
+            spans=spans,
+            entities=entities,
+            turn_id=int(turn_id),
+        )
+        logger.info(
+            "[GRAPH] intent stored | session=%s turn=%s intent=%s score=%.3f",
+            session_id,
+            turn_id,
+            intent,
+            score,
+        )
+    except Exception:
+        logger.debug("[GRAPH] Unable to persist intent event", exc_info=True)
 
 
 def intent_shortcuts_node(state: AgentState, *, writer: Optional[StreamWriter] = None):

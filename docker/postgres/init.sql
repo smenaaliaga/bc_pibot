@@ -1,6 +1,7 @@
--- Inicialización de la base de datos y tablas de memoria/diversidad
-CREATE DATABASE pibot;
-\c pibot;
+\set ON_ERROR_STOP on
+SELECT 'CREATE DATABASE pibot'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'pibot')\gexec
+\connect pibot
 
 -- Extensión pgvector para RAG
 CREATE EXTENSION IF NOT EXISTS vector;
@@ -54,6 +55,17 @@ CREATE TABLE IF NOT EXISTS session_facts (
 );
 CREATE INDEX IF NOT EXISTS idx_session_facts_updated ON session_facts(updated_at DESC);
 
+-- Conversation turn history for MemoryAdapter windowing
+CREATE TABLE IF NOT EXISTS session_turns (
+    session_id TEXT NOT NULL,
+    turn_id BIGSERIAL PRIMARY KEY,
+    role TEXT NOT NULL,
+    content TEXT,
+    metadata JSONB,
+    ts TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_session_turns_session_ts ON session_turns(session_id, ts DESC);
+
 -- Intent store
 CREATE TABLE IF NOT EXISTS intents (
     id UUID PRIMARY KEY,
@@ -67,3 +79,26 @@ CREATE TABLE IF NOT EXISTS intents (
     ts TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_intents_session_ts ON intents(session_id, ts DESC);
+
+-- Series metadata catalog powering search helpers
+CREATE TABLE IF NOT EXISTS series_metadata (
+    cod_serie TEXT PRIMARY KEY,
+    freq TEXT,
+    desc_serie_esp TEXT,
+    nkname_esp TEXT,
+    cap_esp TEXT,
+    cod_capitulo TEXT,
+    cod_cuadro TEXT,
+    desc_cuad_esp TEXT,
+    url TEXT,
+    metadata_unidad TEXT,
+    metadata_fuente TEXT,
+    metadata_rezago TEXT,
+    metadata_base TEXT,
+    metadata_metodologia TEXT,
+    metadata_concep_est TEXT,
+    metadata_recom_uso TEXT,
+    extra JSONB
+);
+CREATE INDEX IF NOT EXISTS idx_series_freq ON series_metadata(freq);
+CREATE INDEX IF NOT EXISTS idx_series_capitulo ON series_metadata(cod_capitulo);

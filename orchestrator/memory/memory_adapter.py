@@ -57,6 +57,7 @@ class MemoryAdapter:
         self._require_pg = os.getenv("REQUIRE_PG_MEMORY", "0").lower() in ("1", "true", "yes", "on")
         self._cleanup = None
         self._fallback_turns: Dict[str, List[Dict[str, Any]]] = {}
+        self._fallback_turn_seq: Dict[str, int] = {}
         self._max_fallback_turns = int(os.getenv("MEMORY_MAX_TURNS_STORE", "200"))
         self._fallback_checkpoints: Dict[str, List[Dict[str, Any]]] = {}
         self._max_fallback_checkpoints = int(os.getenv("MEMORY_MAX_CHECKPOINTS", "10"))
@@ -374,6 +375,11 @@ class MemoryAdapter:
                 normalized[key_str] = str(value)
         return normalized
 
+    def _next_fallback_turn_id(self, session_id: str) -> int:
+        counter = self._fallback_turn_seq.get(session_id, 0) + 1
+        self._fallback_turn_seq[session_id] = counter
+        return counter
+
     def _append_fallback_turn(self, session_id: str, payload: Dict[str, Any]) -> None:
         bucket = self._fallback_turns.setdefault(session_id, [])
         bucket.append(payload)
@@ -443,12 +449,12 @@ class MemoryAdapter:
         content: str,
         metadata: Dict[str, Any],
         ts: datetime.datetime,
-    ) -> bool:
+    ) -> Optional[int]:
         pool = self._conn_pool()
         if not pool:
-            return False
+            return None
         if not self._ensure_session_turns_table():
-            return False
+            return None
         metadata_payload = metadata or {}
         try:
             with pool.connection() as conn:
@@ -457,11 +463,17 @@ class MemoryAdapter:
                         """
                         INSERT INTO session_turns(session_id, role, content, metadata, ts)
                         VALUES (%s, %s, %s, %s, %s)
+                        RETURNING turn_id
                         """,
                         (session_id, role, content, self._json_param(metadata_payload), ts),
                     )
+                    row = cur.fetchone()
                 conn.commit()
-            return True
+            if row:
+                try:
+                    return int(row[0])
+                except Exception:
+                    return None
         except Exception as e:
             self._log_pg_error(
                 "Error guardando turno: %s" % e,
@@ -469,7 +481,7 @@ class MemoryAdapter:
                 op="turn_write",
                 table="session_turns",
             )
-        return False
+        return None
 
     def _parse_ts_filter(self, since_ts: Optional[Any]) -> Optional[datetime.datetime]:
         if since_ts is None:
@@ -564,23 +576,28 @@ class MemoryAdapter:
         content: str,
         *,
         metadata: Optional[Dict[str, Any]] = None,
-    ) -> None:
+    ) -> Optional[int]:
         if not session_id:
             session_id = uuid.uuid4().hex
         if not role or not content:
-            return
+            return None
         ts = datetime.datetime.now(datetime.timezone.utc)
         normalized_metadata = self._normalize_metadata(metadata)
+        fallback_turn_id = self._next_fallback_turn_id(session_id)
         payload = {
             "role": role,
             "content": str(content),
             "metadata": normalized_metadata,
             "ts": ts.isoformat(),
+            "turn_id": fallback_turn_id,
         }
         self._append_fallback_turn(session_id, payload)
-        if not self._persist_turn(session_id, role, str(content), normalized_metadata, ts):
+        recorded_turn_id = self._persist_turn(session_id, role, str(content), normalized_metadata, ts)
+        if recorded_turn_id is None:
             self._metrics["turns_fallback_used"] = self._metrics.get("turns_fallback_used", 0) + 1
-
+            return fallback_turn_id
+        payload["turn_id"] = recorded_turn_id
+        return recorded_turn_id
     def save_checkpoint(
         self,
         session_id: str,
@@ -715,11 +732,17 @@ class MemoryAdapter:
         return {}
 
     # --- Turns API (minimal) ----------------------------------------------
-    def on_user_turn(self, session_id: str, message: str, *, metadata: Optional[Dict[str, Any]] = None) -> None:
+    def on_user_turn(
+        self,
+        session_id: str,
+        message: str,
+        *,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Optional[int]:
         """Record the latest user message across backends."""
         if not message:
-            return
-        self._record_turn(session_id, "user", message, metadata=metadata)
+            return None
+        return self._record_turn(session_id, "user", message, metadata=metadata)
 
     def on_assistant_turn(
         self,
@@ -727,10 +750,10 @@ class MemoryAdapter:
         message: str,
         *,
         metadata: Optional[Dict[str, Any]] = None,
-    ) -> None:
+    ) -> Optional[int]:
         if not message:
-            return
-        self._record_turn(session_id, "assistant", message, metadata=metadata)
+            return None
+        return self._record_turn(session_id, "assistant", message, metadata=metadata)
 
     def get_history_for_llm(self, session_id: str) -> List[Dict[str, str]]:
         try:
