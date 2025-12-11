@@ -1,0 +1,33 @@
+[
+  {
+    "name": "IMACEC_MONTH_INTERVAL",
+    "priority": 1,
+    "requiresDomain": "IMACEC",
+    "patterns": [
+      "(?:imacec|indice mensual).*\\b({MONTHS})\\b.*\\b({MONTHS})\\b.*\\b(20\\d{2})\\b",
+      "\\b({MONTHS})\\b\\s*a\\s*\\b({MONTHS})\\b\\s*(20\\d{2})",
+      "(?:imacec|indice mensual)\\s+(20\\d{2})\\s+de\\s+\\b({MONTHS})\\b\\s+a\\s+\\b({MONTHS})\\b"
+    ],
+    "handler": "handle_imacec_month_interval"
+  },
+  {
+    "name": "IMACEC_MONTH_SPECIFIC",
+    "priority": 2,
+    "requiresDomain": "IMACEC",
+    "patterns": [
+      "(?:imacec|indice mensual).*\\b({MONTHS})\\b.*\\b(20\\d{2})\\b",
+      "\\b({MONTHS})\\b\\s*(20\\d{2})"
+    ],
+    "handler": "handle_imacec_month_specific"
+  },
+  {
+    "name": "PIB_T_QUARTER_YEAR",
+    "priority": 3,
+    "requiresDomain": "PIB",
+    "patterns": [
+      "(?:pib|producto interno).*(?:t|trimestre)\\s*([1-4])\\s*(20\\d{2})",
+      "(?:pib|producto interno).*\\b(primer|segundo|tercer|cuarto)\\s+trimestre\\b.*(20\\d{2})"
+    ],
+    "handler": "handle_pib_quarter_year"
+  }
+]

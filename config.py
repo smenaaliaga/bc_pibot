@@ -32,6 +32,7 @@ class Settings:
     openai_model: str = "gpt-4o-mini"
     openai_embeddings_model: str = "text-embedding-3-large"  # puede sobreescribirse con OPENAI_EMBEDDINGS_MODEL
     bot_name: str = "PIBot"
+    welcome_message: Optional[str] = None
     debug: bool = False
     pg_dsn: Optional[str] = None  # se rellena desde PG_DSN / DATABASE_URL si existen
 
@@ -66,6 +67,7 @@ def get_settings() -> Settings:
         or "text-embedding-3-large"
     )
     bot_name = os.getenv("BOT_NAME", "PIBot")
+    welcome_message = os.getenv("WELCOME_MESSAGE")
     debug = os.getenv("DEBUG", "false").lower() == "true"
     pg_dsn = os.getenv("PG_DSN") or os.getenv("DATABASE_URL")
 
@@ -74,6 +76,7 @@ def get_settings() -> Settings:
         openai_model=model,
         openai_embeddings_model=embeddings_model,
         bot_name=bot_name,
+        welcome_message=welcome_message,
         debug=debug,
         pg_dsn=pg_dsn,
     )
