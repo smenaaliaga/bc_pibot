@@ -143,17 +143,25 @@ class PIBotPredictor:
         if not os.path.exists(args_path):
             raise FileNotFoundError(f"No se encuentra {args_path}")
         
+        logger.info(f"[DEBUG] Cargando args desde: {args_path}")
         self.args = torch.load(args_path, weights_only=False)
+        logger.info(f"[DEBUG] Args cargado, tipo: {type(self.args)}")
+        logger.info(f"[DEBUG] Args tiene atributos: {dir(self.args)}")
+        
         self.args.max_seq_len = self.max_seq_len  # Override si es necesario
         # Agregar model_dir a args para que get_intent_labels/get_slot_labels lo usen
         self.args.model_dir = self.model_dir
         
         # Cargar labels
+        logger.info(f"[DEBUG] Cargando labels desde args.model_dir={self.args.model_dir}")
         self.intent_label_lst = get_intent_labels(self.args)
         self.slot_label_lst = get_slot_labels(self.args)
+        logger.info(f"[DEBUG] Labels cargados: {len(self.intent_label_lst)} intents, {len(self.slot_label_lst)} slots")
         
         # Si model_name_or_path no existe o el path no es válido, usar BETO público
         model_name = getattr(self.args, "model_name_or_path", None)
+        logger.info(f"[DEBUG] model_name_or_path original: {model_name}")
+        
         if not model_name or not os.path.exists(str(model_name)):
             model_name = "dccuchile/bert-base-spanish-wwm-cased"
             logger.warning(
@@ -161,6 +169,7 @@ class PIBotPredictor:
                 model_name
             )
             self.args.model_name_or_path = model_name
+            logger.info(f"[DEBUG] model_name_or_path actualizado a: {self.args.model_name_or_path}")
         
         # Cargar tokenizer con el model_name corregido
         self.tokenizer = BertTokenizer.from_pretrained(self.args.model_name_or_path)
