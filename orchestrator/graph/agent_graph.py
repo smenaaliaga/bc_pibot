@@ -456,6 +456,35 @@ def data_node(state: AgentState, *, writer: Optional[StreamWriter] = None):
     classification = state.get("classification")
     question = state.get("question", "")
     history_text = state.get("history_text", "")
+    # Imprime classificación para depuración
+    try:
+        summary = (
+            _ensure_text(getattr(classification, "query_type", "")),
+            _ensure_text(getattr(classification, "data_domain", "")),
+            str(getattr(classification, "is_generic", "")),
+            _ensure_text(getattr(classification, "default_key", "")),
+            _ensure_text(getattr(classification, "error", "")),
+        )
+        logger.debug(
+            "[CLASSIFIER] query_type=%s data_domain=%s is_generic=%s default_key=%s error=%s",
+            *summary,
+        )
+        # Log adicional de campos JointBERT
+        intent = getattr(classification, "intent", None)
+        confidence = getattr(classification, "confidence", None)
+        entities = getattr(classification, "entities", None)
+        normalized = getattr(classification, "normalized", None)
+        if intent or confidence or entities or normalized:
+            logger.debug(
+                "[CLASSIFIER_JOINTBERT] intent=%s confidence=%.4f entities=%s normalized=%s",
+                intent,
+                confidence if confidence is not None else 0.0,
+                entities,
+                normalized,
+            )
+    except Exception:
+        logger.exception("[CLASSIFIER] Failed to log classification summary")
+        
     if not classification:
         text = "No pude clasificar la consulta para obtener datos."
         _emit_stream_chunk(text, writer)

@@ -131,6 +131,11 @@ def _classify_with_jointbert(question: str) -> ClassificationResult:
             default_key=default_key,
             imacec=imacec_tree,
             pibe=pibe_tree,
+            # Info adicional de JointBERT
+            intent=intent,
+            confidence=result.get('confidence', 0.0),
+            entities=entities,
+            normalized=normalized,
         )
         
     except Exception as e:

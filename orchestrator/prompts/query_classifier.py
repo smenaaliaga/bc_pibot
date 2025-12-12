@@ -52,6 +52,11 @@ class ClassificationResult:
     pibe: Optional[PibeTree] = None
     intent_frequency_change: Optional[str] = None
     error: Optional[str] = None
+    # Campos adicionales de JointBERT
+    intent: Optional[str] = None  # Intent raw de JointBERT ('value', 'methodology')
+    confidence: Optional[float] = None  # Confianza del modelo
+    entities: Optional[dict] = None  # Entidades raw extraídas
+    normalized: Optional[dict] = None  # Entidades normalizadas
 
 
 def classify_query(question: str) -> ClassificationResult:

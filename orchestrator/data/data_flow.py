@@ -850,12 +850,42 @@ def stream_data_flow_full(
 
     def _should_emit(chunk: str) -> bool:
         return deduper.should_emit(chunk)
+    
+    # Extraer info de JointBERT si está disponible
+    entities = getattr(classification, "entities", None)
+    normalized = getattr(classification, "normalized", None)
+    
+    logger.info(
+        "[DATA_FLOW] classification | domain=%s entities=%s normalized=%s",
+        domain,
+        entities,
+        normalized,
+    )
+    
     if not domain or domain == "OTHER":
         inferred = _infer_domain_from_history(history_text) or _last_data_context.get("domain")
         if inferred:
             logger.info(f"[DATA_DOMAIN_INFERRED] domain={inferred} (fallback from history/context)")
             domain = inferred
-    year = _extract_year(question)
+    
+    # Intentar extraer año desde normalized (JointBERT), sino desde question
+    year = None
+    if normalized and isinstance(normalized, dict):
+        period_norm = normalized.get('period')
+        if period_norm and isinstance(period_norm, dict):
+            start_date = period_norm.get('start_date')
+            if start_date:
+                try:
+                    # start_date puede ser datetime.date o string ISO
+                    if hasattr(start_date, 'year'):
+                        year = start_date.year
+                    else:
+                        year = int(str(start_date)[:4])
+                    logger.info("[DATA_FLOW] Year extraído de normalized: %s", year)
+                except Exception as e:
+                    logger.debug("[DATA_FLOW] Error extrayendo year de normalized: %s", e)
+    
+    # Fallback: extraer año de la pregunta
     if year is None:
         try:
             year = int(time.strftime("%Y"))
@@ -865,6 +895,7 @@ def stream_data_flow_full(
     data = None
     if year:
         data = _fetch_series_for_year(domain, year)
+        
     if data is None and getattr(classification, "default_key", None) and year:
         sid = getattr(classification, "default_key", None)
         if sid:

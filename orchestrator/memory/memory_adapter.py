@@ -230,12 +230,12 @@ class MemoryAdapter:
             return layout
         return None
 
-    def _detect_facts_layout(self) -> Optional[str]:
+    def _detect_kv_layout(self) -> Optional[str]:
         pool = self._conn_pool()
         if not pool:
             return None
         try:
-            with pool.connection() as conn:
+            with pool.connection(timeout=3) as conn:
                 with conn.cursor() as cur:
                     cur.execute(
                         """
@@ -310,7 +310,7 @@ class MemoryAdapter:
         return False
 
     def _set_facts_json(self, pool: Any, session_id: str, facts: Dict[str, str]) -> None:
-        with pool.connection() as conn:
+        with pool.connection(timeout=3) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -326,7 +326,7 @@ class MemoryAdapter:
 
     def _set_facts_kv(self, pool: Any, session_id: str, facts: Dict[str, str]) -> None:
         rows = [(session_id, key, str(value)) for key, value in facts.items()]
-        with pool.connection() as conn:
+        with pool.connection(timeout=3) as conn:
             with conn.cursor() as cur:
                 cur.execute("DELETE FROM session_facts WHERE session_id=%s", (session_id,))
                 if rows:
@@ -343,7 +343,7 @@ class MemoryAdapter:
             conn.commit()
 
     def _read_facts_json(self, pool: Any, session_id: str) -> Dict[str, str]:
-        with pool.connection() as conn:
+        with pool.connection(timeout=3) as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT facts FROM session_facts WHERE session_id=%s", (session_id,))
                 row = cur.fetchone()
@@ -352,7 +352,7 @@ class MemoryAdapter:
         return {}
 
     def _read_facts_kv(self, pool: Any, session_id: str) -> Dict[str, str]:
-        with pool.connection() as conn:
+        with pool.connection(timeout=3) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "SELECT fact_key, fact_value FROM session_facts WHERE session_id=%s",
@@ -414,7 +414,7 @@ class MemoryAdapter:
         if not pool:
             return False
         try:
-            with pool.connection() as conn:
+            with pool.connection(timeout=3) as conn:
                 with conn.cursor() as cur:
                     cur.execute(
                         """
@@ -457,7 +457,7 @@ class MemoryAdapter:
             return None
         metadata_payload = metadata or {}
         try:
-            with pool.connection() as conn:
+            with pool.connection(timeout=3) as conn:
                 with conn.cursor() as cur:
                     cur.execute(
                         """
@@ -523,7 +523,7 @@ class MemoryAdapter:
             params.append(limit)
         sql = " ".join(query)
         try:
-            with pool.connection() as conn:
+            with pool.connection(timeout=3) as conn:
                 with conn.cursor() as cur:
                     cur.execute(sql, tuple(params))
                     rows = cur.fetchall() or []
