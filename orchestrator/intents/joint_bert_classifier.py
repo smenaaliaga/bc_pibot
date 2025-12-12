@@ -29,12 +29,14 @@ from transformers import BertTokenizer
 try:
     from orchestrator.utils.period_normalizer import standardize_imacec_time_ref
     from orchestrator.utils.indicator_normalizer import standardize_indicator
-except ImportError:
+    logger = logging.getLogger(__name__)
+    logger.info("✓ Normalizadores cargados exitosamente")
+except ImportError as e:
     # Normalizadores opcionales
+    logger = logging.getLogger(__name__)
+    logger.warning(f"⚠ Normalizadores no disponibles: {e}")
     standardize_imacec_time_ref = None
     standardize_indicator = None
-
-logger = logging.getLogger(__name__)
 
 # Importar JointBERT model dinámicamente desde model/in
 try:
@@ -371,29 +373,39 @@ class PIBotPredictor:
         normalized = {}
         
         # Normalizar período (solo si la función existe)
-        if 'period' in entities and standardize_imacec_time_ref is not None:
-            try:
-                period_normalized = standardize_imacec_time_ref(
-                    entities['period'],
-                    date.today()
-                )
-                if period_normalized:
-                    normalized['period'] = period_normalized
-            except Exception:
-                logger.debug("Error normalizando período", exc_info=True)
+        if 'period' in entities:
+            if standardize_imacec_time_ref is None:
+                logger.warning("standardize_imacec_time_ref no está disponible")
+            else:
+                try:
+                    logger.info(f"Normalizando período: '{entities['period']}'")
+                    period_normalized = standardize_imacec_time_ref(
+                        entities['period'],
+                        date.today()
+                    )
+                    logger.info(f"Período normalizado: {period_normalized}")
+                    if period_normalized:
+                        normalized['period'] = period_normalized
+                except Exception as e:
+                    logger.warning(f"Error normalizando período '{entities['period']}': {e}", exc_info=True)
         
         # Normalizar indicador (solo si la función existe)
-        if 'indicator' in entities and standardize_indicator is not None:
-            try:
-                indicator_normalized = standardize_indicator(entities['indicator'])
-                if indicator_normalized and indicator_normalized.get('indicator'):
-                    normalized['indicator'] = {
-                        'standard_name': indicator_normalized['indicator'].upper(),
-                        'text_normalized': indicator_normalized['text_norm'],
-                        'detected_by': indicator_normalized.get('text_standardized_imacec')
-                    }
-            except Exception:
-                logger.debug("Error normalizando indicador", exc_info=True)
+        if 'indicator' in entities:
+            if standardize_indicator is None:
+                logger.warning("standardize_indicator no está disponible")
+            else:
+                try:
+                    logger.info(f"Normalizando indicador: '{entities['indicator']}'")
+                    indicator_normalized = standardize_indicator(entities['indicator'])
+                    logger.info(f"Indicador normalizado: {indicator_normalized}")
+                    if indicator_normalized and indicator_normalized.get('indicator'):
+                        normalized['indicator'] = {
+                            'standard_name': indicator_normalized['indicator'].upper(),
+                            'text_normalized': indicator_normalized['text_norm'],
+                            'detected_by': indicator_normalized.get('text_standardized_imacec')
+                        }
+                except Exception as e:
+                    logger.warning(f"Error normalizando indicador '{entities['indicator']}': {e}", exc_info=True)
         
         return normalized
     
@@ -448,6 +460,13 @@ def get_predictor(model_dir: Optional[str] = None, **kwargs) -> PIBotPredictor:
         Instancia de PIBotPredictor
     """
     global _global_predictor
+    
+    # TEMPORAL: Forzar recarga si los normalizadores no estaban disponibles antes
+    force_reload = os.getenv('FORCE_RELOAD_PREDICTOR', 'false').lower() == 'true'
+    if force_reload and _global_predictor is not None:
+        logger.info("Forzando recarga del predictor...")
+        _global_predictor = None
+    
     if _global_predictor is None:
         if model_dir is None:
             model_dir = os.getenv('JOINT_BERT_MODEL_DIR', 'model/out/pibot_model_beto')

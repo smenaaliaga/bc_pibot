@@ -39,6 +39,37 @@ def _classify_with_jointbert(question: str) -> ClassificationResult:
         
         intent = result.get('intent', 'unknown')
         entities = result.get('entities', {})
+        normalized = result.get('normalized', {})
+        
+        # Mostrar predicción completa
+        logger.info(f"[JOINTBERT PREDICTION] question='{question}'")
+        logger.info(f"[JOINTBERT PREDICTION] intent={intent}, confidence={result.get('confidence', 0.0):.3f}")
+        logger.info(f"[JOINTBERT PREDICTION] Raw entities: {entities}")
+        logger.info(f"[JOINTBERT PREDICTION] Normalized entities: {normalized}")
+        
+        print(f"\n{'='*80}")
+        print(f"[JOINTBERT PREDICTION]")
+        print(f"Question: {question}")
+        print(f"\nIntent: {intent} (confidence: {result.get('confidence', 0.0):.3f})")
+        print(f"\nRaw Entities: {entities}")
+        print(f"\nNormalized Entities: {normalized}")
+        print(f"{'='*80}\n")
+        
+        # Usar entidades normalizadas si están disponibles, sino usar raw
+        indicator_norm = normalized.get('indicator', {})
+        period_norm = normalized.get('period', {})
+        
+        # Extraer indicador (priorizar normalizado)
+        if indicator_norm and indicator_norm.get('standard_name'):
+            indicator = indicator_norm['standard_name'].lower()
+        else:
+            indicator = entities.get('indicator', '').lower()
+        
+        # Extraer período (priorizar normalizado)
+        if period_norm:
+            period = str(period_norm)  # La normalización retorna un dict estructurado
+        else:
+            period = entities.get('period', '')
         
         # Mapeo de intenciones JointBERT a query_type
         query_type_map = {
@@ -52,7 +83,6 @@ def _classify_with_jointbert(question: str) -> ClassificationResult:
         query_type = query_type_map.get(intent.lower(), None)
         
         # Determinar data_domain desde el indicador
-        indicator = entities.get('indicator', '').lower()
         data_domain = None
         default_key = None
         imacec_tree = None
@@ -83,16 +113,15 @@ def _classify_with_jointbert(question: str) -> ClassificationResult:
                 default_key = 'PIB_TOTAL'
                 pibe_tree = PibeTree()
         
-        # Detectar si es genérico (sin período específico o con palabras genéricas)
-        period = entities.get('period', '')
+        # Detectar si es genérico (basado en período)
         is_generic = not period or any(
-            word in period.lower() 
+            word in str(period).lower() 
             for word in ['ultimo', 'último', 'actual', 'reciente']
         )
         
         logger.info(
-            "[JOINTBERT] intent=%s entities=%s → query_type=%s data_domain=%s is_generic=%s",
-            intent, entities, query_type, data_domain, is_generic
+            "[JOINTBERT MAPPED] query_type=%s data_domain=%s is_generic=%s default_key=%s",
+            query_type, data_domain, is_generic, default_key
         )
         
         return ClassificationResult(

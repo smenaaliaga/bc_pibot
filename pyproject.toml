@@ -35,4 +35,5 @@ dependencies = [
     "ragas>=0.0.22",
     "transformers>=4.30.0",
     "pytorch-crf>=0.7.2",
+    "dateparser>=1.2.2",
 ]
