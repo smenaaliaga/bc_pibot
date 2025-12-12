@@ -18,22 +18,55 @@ uv sync
 # source .venv/bin/activate  # macOS/Linux
 ```
 
-### Variables de entorno mínimas
-| Variable | Descripción |
-| --- | --- |
-| `OPENAI_API_KEY`, `OPENAI_MODEL` | Modelo y clave usados por `LLMAdapter` |
-| `BCCH_USER`, `BCCH_PASS` | Credenciales para `get_series.py` |
-| `USE_AGENT_GRAPH=1` | Habilita el grafo LangGraph en `main.py` |
-| `PG_DSN`, `REQUIRE_PG_MEMORY` | Configuran memoria conversacional y checkpoints (ver `docs/README_memory.md`) |
-| `REDIS_URL`, `USE_REDIS_CACHE` | Cache para consultas BCCh |
-| `RAG_ENABLED`, `RAG_BACKEND`, `RAG_PGVECTOR_URL` | Activa el retriever metodológico |
+**Dependencias clave incluidas:**
+- `transformers`, `pytorch-crf` - Para clasificación JointBERT de intenciones y entidades
+- `langchain`, `langgraph` - Orquestación de agentes
+- `streamlit` - Interface de usuario
+- `torch` - Deep learning (CPU por defecto)
 
-Duplica `.env.example` si está disponible y mantén los secretos fuera del control de versiones.
+### Variables de entorno mínimas
+
+Copia `.env.example` a `.env` y configura:
+
+```bash
+cp .env.example .env
+```
+
+Edita `.env` y configura al menos `OPENAI_API_KEY`.
+
+**Verifica tu instalación:**
+```bash
+python verify_setup.py
+```
+
+Este script comprueba:
+- ✓ Versión de Python correcta
+- ✓ Dependencias instaladas
+- ✓ Variables de entorno configuradas
+- ✓ Archivos del modelo JointBERT
+- ✓ Carga correcta del modelo
+
+| Variable | Descripción | Requerido |
+| --- | --- | --- |
+| `OPENAI_API_KEY`, `OPENAI_MODEL` | Modelo y clave usados por `LLMAdapter` | ✓ Sí |
+| `BCCH_USER`, `BCCH_PASS` | Credenciales para `get_series.py` | ✓ Sí |
+| `JOINT_BERT_MODEL_DIR` | Ruta al modelo JointBERT entrenado | No (default: `model/out/pibot_model_beto`) |
+| `USE_AGENT_GRAPH=1` | Habilita el grafo LangGraph en `main.py` | No |
+| `PG_DSN`, `REQUIRE_PG_MEMORY` | Configuran memoria conversacional y checkpoints | No |
+| `REDIS_URL`, `USE_REDIS_CACHE` | Cache para consultas BCCh | No |
+| `RAG_ENABLED`, `RAG_BACKEND`, `RAG_PGVECTOR_URL` | Activa el retriever metodológico | No |
 
 ### Ejecuta la aplicación
 ```bash
 uv run streamlit run main.py
 ```
+
+Al iniciar, el sistema automáticamente:
+1. ✅ Carga el modelo JointBERT (clasificador de intenciones) - ~6 segundos
+2. ✅ Inicializa el grafo LangGraph
+3. ✅ Prepara la memoria conversacional
+4. ✅ Abre la interfaz web en `http://localhost:8501`
+
 El entrypoint `main.py` prepara logging + configuración, invoca el grafo desde `orchestrator/` y la UI
 se renderiza desde `app.py`.
 

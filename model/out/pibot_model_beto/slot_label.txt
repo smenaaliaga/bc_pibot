@@ -1,0 +1,10 @@
+B-component
+B-frequency
+B-indicator
+B-period
+B-seasonality
+I-component
+I-frequency
+I-indicator
+I-period
+O

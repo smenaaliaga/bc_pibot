@@ -65,6 +65,19 @@ def main() -> None:
 
     settings = get_settings()
 
+    # Pre-cargar modelo JointBERT al inicio (carga única, reutilización global)
+    try:
+        from orchestrator import get_predictor
+        predictor = get_predictor()
+        logger.info("✓ JointBERT predictor inicializado exitosamente")
+        logger.info(f"  - Modelo: {predictor.args.model_type}")
+        logger.info(f"  - Device: {predictor.device}")
+        logger.info(f"  - Intenciones: {len(predictor.intent_label_lst)}")
+        logger.info(f"  - Slots: {len(predictor.slot_label_lst)}")
+    except Exception as e:
+        logger.warning(f"⚠ JointBERT predictor no disponible: {e}")
+        logger.warning("  El sistema funcionará sin clasificación JointBERT")
+
     orch = None
     graph = None
     if build_graph:

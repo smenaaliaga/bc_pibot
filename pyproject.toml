@@ -33,4 +33,6 @@ dependencies = [
     "langchain-text-splitters>=1.0.0",
     "langdetect>=1.0.9",
     "ragas>=0.0.22",
+    "transformers>=4.30.0",
+    "pytorch-crf>=0.7.2",
 ]

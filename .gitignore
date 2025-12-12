@@ -273,3 +273,15 @@ documentacion.txt
 local.config.py
 config.local.py
 
+# ------------------------------------------------------------------------------
+# ML Models & Large Files
+# ------------------------------------------------------------------------------
+# Modelos entrenados (demasiado grandes para git)
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.ckpt
+*.h5
+*.pkl
+*.pickle
