@@ -155,6 +155,15 @@ class PIBotPredictor:
         # Cargar tokenizer
         self.tokenizer = BertTokenizer.from_pretrained(self.args.model_name_or_path)
         
+        # Si model_name_or_path no existe o el path no es válido, usar BETO público
+        model_name = getattr(args, "model_name_or_path", None)
+        if not model_name or not os.path.exists(model_name):
+            model_name = "dccuchile/bert-base-spanish-wwm-cased"
+            logger.warning(
+                "model_name_or_path inválido o inexistente, usando BETO público: %s",
+                model_name
+            )
+        
         # Cargar modelo
         model_class = MODEL_CLASSES[self.args.model_type][1]
         self.model = model_class.from_pretrained(
