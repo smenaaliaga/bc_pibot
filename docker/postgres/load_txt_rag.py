@@ -20,6 +20,7 @@ from langdetect import detect as _langdetect  # type: ignore
 from langchain_openai import OpenAIEmbeddings  # type: ignore
 from langchain_postgres import PGVector as PGVectorCls  # type: ignore
 import psycopg  # type: ignore
+from psycopg import errors as psycopg_errors  # type: ignore
 from psycopg import sql  # type: ignore
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -288,17 +289,25 @@ def log_rejection(
 
 def ensure_psycopg_available() -> None:
     if psycopg is None or sql is None:  # pragma: no cover - sanity
-        raise SystemExit(f"psycopg is required: {_PSYCOPG_IMPORT_ERROR}")
+        raise SystemExit("psycopg (with SQL helpers) is required; install psycopg[binary]")
 
 
 def purge_collection(dsn: str, collection: str) -> None:
     ensure_psycopg_available()
     with psycopg.connect(dsn) as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                "SELECT uuid FROM langchain_pg_collection WHERE name = %s",
-                (collection,),
-            )
+            try:
+                cur.execute(
+                    "SELECT uuid FROM langchain_pg_collection WHERE name = %s",
+                    (collection,),
+                )
+            except psycopg_errors.UndefinedTable:
+                logging.warning(
+                    "LangChain tables missing; skipping purge for %s (run 'python -m langchain_postgres create_tables' once)",
+                    collection,
+                )
+                return
+
             rows = cur.fetchall()
             if not rows:
                 return
@@ -322,7 +331,13 @@ def fetch_existing_doc_hashes(dsn: str, collection: str) -> Dict[str, str]:
     """
     with psycopg.connect(dsn) as conn:
         with conn.cursor() as cur:
-            cur.execute(sql_query, (collection,))
+            try:
+                cur.execute(sql_query, (collection,))
+            except psycopg_errors.UndefinedTable:
+                logging.warning(
+                    "LangChain tables missing; cannot diff against existing docs for %s", collection
+                )
+                return {}
             return {row[0]: row[1] for row in cur.fetchall() if row[0] and row[1]}
 
 
@@ -337,7 +352,12 @@ def delete_doc_chunks(dsn: str, collection: str, doc_id: str) -> None:
     """
     with psycopg.connect(dsn) as conn:
         with conn.cursor() as cur:
-            cur.execute(sql_delete, (collection, doc_id))
+            try:
+                cur.execute(sql_delete, (collection, doc_id))
+            except psycopg_errors.UndefinedTable:
+                logging.warning(
+                    "LangChain tables missing; cannot delete chunks for doc %s in %s", doc_id, collection
+                )
 
 
 def stage_chunks(dsn: str, table_name: str, doc_id: str, records: Sequence[Dict[str, Any]]) -> None:
@@ -408,9 +428,9 @@ def emit_eval_dataset(path: Path, records: Sequence[Dict[str, Any]], collection:
 
 def ensure_embeddings_available() -> None:
     if OpenAIEmbeddings is None:  # pragma: no cover - runtime guard
-        raise SystemExit(f"langchain_openai is required: {_EMBEDDINGS_IMPORT_ERROR}")
+        raise SystemExit("langchain_openai is required to build embeddings")
     if PGVectorCls is None:
-        raise SystemExit(f"langchain_postgres is required: {_PGVECTOR_IMPORT_ERROR}")
+        raise SystemExit("langchain_postgres is required for the PGVector store")
 
 
 def build_vector_store(dsn: str, collection: str, model: str):

@@ -3,7 +3,7 @@ services:
     build:
       context: ..
       dockerfile: ./docker/postgres/Dockerfile
-    container_name: pibot-postgres
+    container_name: pibot-postgres2
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -19,7 +19,7 @@ services:
     restart: unless-stopped
   redis:
     image: redis:8.0-rc1
-    container_name: redis-pibot
+    container_name: redis-pibot2
     env_file:
       - ../.env
     command:
