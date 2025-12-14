@@ -155,17 +155,18 @@ class PIBotPredictor:
         self.intent_label_lst = get_intent_labels(self.args)
         self.slot_label_lst = get_slot_labels(self.args)
         
-        # Si model_name_or_path no existe o el path no es válido, usar BETO público
+
+        # Si model_name_or_path no existe o el path no es válido, usar valor de entorno o BETO público
         model_name = getattr(self.args, "model_name_or_path", None)
-        
+        env_model_name = os.getenv("JOINT_BERT_MODEL_NAME")
         if not model_name or not os.path.exists(str(model_name)):
-            model_name = "dccuchile/bert-base-spanish-wwm-cased"
+            model_name = env_model_name or "dccuchile/bert-base-spanish-wwm-cased"
             logger.warning(
-                "model_name_or_path inválido o inexistente, usando BETO público: %s",
+                "model_name_or_path inválido o inexistente, usando: %s",
                 model_name
             )
             self.args.model_name_or_path = model_name
-        
+
         # Cargar tokenizer con el model_name corregido
         self.tokenizer = BertTokenizer.from_pretrained(self.args.model_name_or_path)
         

@@ -155,6 +155,18 @@ def run_app(
         st.write(f"Session ID: `{st.session_state.session_id}`")
         model_sel = st.text_input("Modelo", value=os.getenv("OPENAI_MODEL", "gpt-3.5-turbo"))
         temp_sel = st.slider("Temperatura", min_value=0.0, max_value=1.0, value=0.0, step=0.1)
+        bert_model_name = st.text_input("Modelo BERT", value=os.getenv("BERT_MODEL_NAME", ""))
+        # Mostrar solo el nombre de la carpeta final, pero mantener el path completo
+        joint_bert_model_dir_full = os.getenv("JOINT_BERT_MODEL_DIR", "")
+        joint_bert_model_dir_name = os.path.basename(joint_bert_model_dir_full.rstrip("/\\")) if joint_bert_model_dir_full else ""
+        joint_bert_model_dir_name_new = st.text_input("Modelo Joint BERT", value=joint_bert_model_dir_name)
+        # Reconstruir el path completo si el usuario lo cambia
+        if joint_bert_model_dir_name_new != joint_bert_model_dir_name and joint_bert_model_dir_name_new:
+            # Mantener el directorio padre original si existe, si no, usar el valor nuevo tal cual
+            parent_dir = os.path.dirname(joint_bert_model_dir_full) if joint_bert_model_dir_full else "model/out"
+            joint_bert_model_dir = os.path.join(parent_dir, joint_bert_model_dir_name_new)
+        else:
+            joint_bert_model_dir = joint_bert_model_dir_full
         if st.button("Nueva sesión", icon=":material/refresh:"):
             _clear_conversation()
             st.experimental_rerun()

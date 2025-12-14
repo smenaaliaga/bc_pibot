@@ -24,7 +24,7 @@ from orchestrator.memory.memory_adapter import MemoryAdapter
 from orchestrator.prompts.query_classifier import ClassificationResult
 from orchestrator.rag.rag_factory import create_retriever
 from orchestrator.routes import data_router
-from orchestrator.routes import intent_router_v2 as intent_router
+from orchestrator.routes import intent_router as intent_router
 
 logger = logging.getLogger(__name__)
 
