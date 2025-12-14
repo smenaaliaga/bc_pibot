@@ -121,7 +121,7 @@ def stream_data_flow(
 
     # Llamar a get_series_api_rest_bcch
     try:
-        from orchestrator.data.get_series import get_series_api_rest_bcch
+        from orchestrator.data.get_data_serie import get_series_api_rest_bcch
     except Exception as e:
         logger.error(f"No se pudo importar get_series_api_rest_bcch: {e}")
         return
