@@ -8,12 +8,28 @@ from difflib import SequenceMatcher
 
 
 class ComponentNormalizer:
-    """Normaliza componentes económicos a su forma estándar."""
+    """
+    Normaliza componentes económicos a su forma estándar del catálogo.
+    
+    Los valores de salida coinciden con catalog/series_catalog.json -> standard_names.component:
+    - "minero", "no minero", "produccion de bienes", "imacec", "industria",
+      "resto de bienes", "comercio", "servicios", "a costo de factores",
+      "impuestos sobre los productos"
+    """
     
     def __init__(self):
         # Diccionario de patrones de normalización
-        # Clave: forma normalizada, Valor: lista de patrones regex
+        # Clave: forma normalizada (coincide con standard_names.component), Valor: lista de patrones regex
+        # IMPORTANTE: "no minero" debe ir antes que "minero" para evitar falsos positivos
         self.component_patterns = {
+            "no minero": [
+                r"no\s+miner[ao]",
+                r"no\s+miner[ií]a",
+                r"sin\s+miner[ií]a",
+                r"excluye?\s+miner[ií]a",
+                r"excepto\s+miner[ií]a",
+                r"menos\s+miner[ií]a",
+            ],
             "produccion de bienes": [
                 r"producci[oó]n\s+de\s+bienes?",
                 r"producion\s+de\s+bienes?",
@@ -25,16 +41,17 @@ class ComponentNormalizer:
                 r"prod\.?\s+bienes?",
                 r"pib\s+bienes?",
             ],
-            "mineria": [
-                r"miner[ií]a",
-                r"minera",
-                r"mieneria",
-                r"mineri[ao]",
-                r"minr[ií]a",
-                r"minria",
-                r"mineri?a",
+            "minero": [
+                r"\bminer[ií]a\b",
+                r"\bminera\b",
+                r"\bmieneria\b",
+                r"\bmineri[ao]\b",
+                r"\bminr[ií]a\b",
+                r"\bminria\b",
+                r"\bmineri?a\b",
                 r"sector\s+miner[ií]a",
                 r"sector\s+minero",
+                r"\bminero\b",
             ],
             "industria": [
                 r"industri[ao]",
@@ -75,20 +92,20 @@ class ComponentNormalizer:
             ],
             "impuestos sobre los productos": [
                 r"impuestos?\s+sobre\s+(?:los\s+)?productos?",
+                r"impuestos?\s+(?:sobre\s+)?producci[oó]n",
                 r"impuestos?\s+productos?",
                 r"impuesto\s+sobre\s+producci[oó]n",
-                r"impuestos?\s+prod",
-                r"inpuestos?\s+productos?",
+                r"impuestos?\s+prod\b",
+                r"inpuestos?\s+(?:sobre\s+)?productos?",
                 r"inpuestos?\s+sobre",
                 r"tax\s+productos?",
+                r"(?:los\s+)?productos$",  # Solo "productos" al final
+                r"^productos$",            # Solo "productos"
             ],
-            "no minero": [
-                r"no\s+miner[ao]",
-                r"no\s+miner[ií]a",
-                r"sin\s+miner[ií]a",
-                r"excluye?\s+miner[ií]a",
-                r"excepto\s+miner[ií]a",
-                r"menos\s+miner[ií]a",
+            "imacec": [
+                r"^imacec$",
+                r"^total$",
+                r"^general$",
             ],
         }
     

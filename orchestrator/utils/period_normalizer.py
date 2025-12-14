@@ -84,6 +84,11 @@ def normalize_text(s: str) -> str:
     s = re.sub(r"\bult[io]?m?[oa]?\b", "ultimo", s)
     s = re.sub(r"\bultim\b", "ultimo", s)  # "ultim" sin vocal final
     s = re.sub(r"\bultmo\b", "ultimo", s)  # "ultmo" orden incorrecto
+    # Normalizar sinónimos de "último": reciente, más reciente -> ultimo
+    # Tolera errores: reciente, recente, resiente, reciente
+    s = re.sub(r"\b(mas|muy)?\s*r[eai]c[ie][ei]nte?\b", "ultimo", s)
+    # Tolera errores en "nuevo": nuevo, nuebo, nueo, nevo
+    s = re.sub(r"\b(el|la|lo)?\s*mas\s+n[ue][euo][bv]?[oa]\b", "ultimo", s)
     # Reescrituras útiles - tolerando typos en "año"
     s = re.sub(r"\bpresente\s+a[nñ][oiea]\b", "este ano", s)
     s = re.sub(r"\ba[nñ][oiea]\s+en\s+curso\b", "este ano", s)

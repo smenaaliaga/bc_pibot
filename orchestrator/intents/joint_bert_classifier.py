@@ -29,6 +29,7 @@ from transformers import BertTokenizer
 try:
     from orchestrator.utils.period_normalizer import standardize_imacec_time_ref
     from orchestrator.utils.indicator_normalizer import standardize_indicator
+    from orchestrator.utils.component_normalizer import normalize_component
     logger = logging.getLogger(__name__)
     logger.info("✓ Normalizadores cargados exitosamente")
 except ImportError as e:
@@ -37,6 +38,7 @@ except ImportError as e:
     logger.warning(f"⚠ Normalizadores no disponibles: {e}")
     standardize_imacec_time_ref = None
     standardize_indicator = None
+    normalize_component = None
 
 # Importar JointBERT model dinámicamente desde model/in
 try:
@@ -143,24 +145,18 @@ class PIBotPredictor:
         if not os.path.exists(args_path):
             raise FileNotFoundError(f"No se encuentra {args_path}")
         
-        logger.info(f"[DEBUG] Cargando args desde: {args_path}")
         self.args = torch.load(args_path, weights_only=False)
-        logger.info(f"[DEBUG] Args cargado, tipo: {type(self.args)}")
-        logger.info(f"[DEBUG] Args tiene atributos: {dir(self.args)}")
         
         self.args.max_seq_len = self.max_seq_len  # Override si es necesario
         # Agregar model_dir a args para que get_intent_labels/get_slot_labels lo usen
         self.args.model_dir = self.model_dir
         
         # Cargar labels
-        logger.info(f"[DEBUG] Cargando labels desde args.model_dir={self.args.model_dir}")
         self.intent_label_lst = get_intent_labels(self.args)
         self.slot_label_lst = get_slot_labels(self.args)
-        logger.info(f"[DEBUG] Labels cargados: {len(self.intent_label_lst)} intents, {len(self.slot_label_lst)} slots")
         
         # Si model_name_or_path no existe o el path no es válido, usar BETO público
         model_name = getattr(self.args, "model_name_or_path", None)
-        logger.info(f"[DEBUG] model_name_or_path original: {model_name}")
         
         if not model_name or not os.path.exists(str(model_name)):
             model_name = "dccuchile/bert-base-spanish-wwm-cased"
@@ -169,7 +165,6 @@ class PIBotPredictor:
                 model_name
             )
             self.args.model_name_or_path = model_name
-            logger.info(f"[DEBUG] model_name_or_path actualizado a: {self.args.model_name_or_path}")
         
         # Cargar tokenizer con el model_name corregido
         self.tokenizer = BertTokenizer.from_pretrained(self.args.model_name_or_path)
@@ -418,13 +413,37 @@ class PIBotPredictor:
                     indicator_normalized = standardize_indicator(entities['indicator'])
                     logger.info(f"Indicador normalizado: {indicator_normalized}")
                     if indicator_normalized and indicator_normalized.get('indicator'):
+                        # El indicador normalizado ya coincide con standard_names.indicator del catálogo (lowercase)
+                        indicator_value = indicator_normalized['indicator']
+                        
                         normalized['indicator'] = {
-                            'standard_name': indicator_normalized['indicator'].upper(),
+                            'standard_name': indicator_value,  # Formato del catálogo (lowercase: "imacec", "pib")
+                            'normalized': indicator_value,     # Mismo valor
                             'text_normalized': indicator_normalized['text_norm'],
                             'detected_by': indicator_normalized.get('text_standardized_imacec')
                         }
                 except Exception as e:
                     logger.warning(f"Error normalizando indicador '{entities['indicator']}': {e}", exc_info=True)
+        
+        # Normalizar sector/componente (si existe)
+        if 'sector' in entities or 'component' in entities:
+            sector_text = entities.get('sector') or entities.get('component')
+            if normalize_component:
+                try:
+                    logger.info(f"Normalizando sector/componente: '{sector_text}'")
+                    component_normalized = normalize_component(sector_text)
+                    logger.info(f"Componente normalizado: {component_normalized}")
+                    
+                    # El componente normalizado ya coincide con standard_names.component del catálogo
+                    normalized['component'] = {
+                        'standard_name': component_normalized,  # Formato del catálogo (coincide con standard_names)
+                        'normalized': component_normalized,     # Mismo valor
+                        'original': sector_text
+                    }
+                    # Mantener 'sector' por compatibilidad
+                    normalized['sector'] = normalized['component']
+                except Exception as e:
+                    logger.warning(f"Error normalizando sector/componente '{sector_text}': {e}", exc_info=True)
         
         return normalized
     

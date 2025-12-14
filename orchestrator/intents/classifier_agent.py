@@ -47,13 +47,10 @@ def _classify_with_jointbert(question: str) -> ClassificationResult:
         logger.info(f"[JOINTBERT PREDICTION] Raw entities: {entities}")
         logger.info(f"[JOINTBERT PREDICTION] Normalized entities: {normalized}")
         
-        print(f"\n{'='*80}")
-        print(f"[JOINTBERT PREDICTION]")
-        print(f"Question: {question}")
-        print(f"\nIntent: {intent} (confidence: {result.get('confidence', 0.0):.3f})")
-        print(f"\nRaw Entities: {entities}")
-        print(f"\nNormalized Entities: {normalized}")
-        print(f"{'='*80}\n")
+        # Si no hay entidades, tratar como consulta metodológica
+        if not entities or all(not v for v in entities.values()):
+            logger.info("[JOINTBERT] No entities detected, treating as METHODOLOGICAL query")
+            intent = 'methodology'
         
         # Usar entidades normalizadas si están disponibles, sino usar raw
         indicator_norm = normalized.get('indicator', {})
@@ -192,24 +189,6 @@ def classify_question_with_history(
         t_end - t_start,
         *summary,
     )
-    # Forzar log también en root para trazabilidad en el archivo único de sesión
-    try:
-        import logging as _logging
-
-        _logging.getLogger().info(
-            "[CLASSIFIER] query_type=%s data_domain=%s is_generic=%s default_key=%s error=%s",
-            *summary,
-        )
-    except Exception:
-        pass
-    # Emisión a stdout para depuración rápida en entorno interactivo/Streamlit logs
-    try:
-        print(
-            "[CLASSIFIER_RETURN] query_type=%s data_domain=%s is_generic=%s default_key=%s error=%s"
-            % summary
-        )
-    except Exception:
-        pass
     # Fallback: asegurarse de que quede registrado en el archivo de log configurado por RUN_MAIN_LOG,
     # pero sin truncar ni reescribir; solo append.
     try:

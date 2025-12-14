@@ -369,12 +369,14 @@ def standardize_indicator(
     policy: IndicatorPolicy = DEFAULT_POLICY,
 ) -> dict:
     """
-    Devuelve un dict útil para pipelines:
+    Devuelve un dict con el indicador detectado en formato standard_names del catálogo:
     {
-        "indicator": "imacec" | "pib" | None,
+        "indicator": "imacec" | "pib" | None  (lowercase para coincidir con catalog.standard_names),
         "text_standardized_imacec": <texto con menciones IMACEC normalizadas>,
         "text_norm": <texto normalizado>
     }
+    
+    IMPORTANTE: El valor de "indicator" coincide con catalog/series_catalog.json -> standard_names.indicator
     """
     t_norm = normalize_text(text)
     detector = detect_indicator_with_fuzzy if use_fuzzy else detect_indicator
@@ -387,10 +389,12 @@ def standardize_indicator(
         policy=policy
     )
 
-    # (Opcional) Si quisieras estandarizar PIB, podrías agregar reglas similares.
-    # Por ahora lo dejamos explícito:
+    # Normalizar a lowercase para coincidir con standard_names del catálogo
+    if ind:
+        ind = ind.lower()
+
     return {
-        "indicator": ind if ind in (canonical_imacec, canonical_pib, "imacec", "pib") else ind,
+        "indicator": ind if ind in ("imacec", "pib") else ind,
         "text_standardized_imacec": std_imacec,
         "text_norm": t_norm,
     }

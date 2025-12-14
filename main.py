@@ -159,10 +159,7 @@ def main() -> None:
                 stream_mode=["updates", "custom"],
             ):
                 mode, payload = _split_event(event)
-                try:
-                    logger.info("[STREAM_EVENT] mode=%s payload=%s", mode, payload)
-                except Exception:
-                    pass
+
                 for chunk_payload in _extract_field(payload, "stream_chunks"):
                     payload_items = chunk_payload
                     if isinstance(chunk_payload, (list, tuple)):
