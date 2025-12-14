@@ -23,7 +23,8 @@ from orchestrator.llm.llm_adapter import LLMAdapter, build_llm
 from orchestrator.memory.memory_adapter import MemoryAdapter
 from orchestrator.prompts.query_classifier import ClassificationResult
 from orchestrator.rag.rag_factory import create_retriever
-from orchestrator.routes import data_router, intent_router
+from orchestrator.routes import data_router
+from orchestrator.routes import intent_router_v2 as intent_router
 
 logger = logging.getLogger(__name__)
 
@@ -419,6 +420,7 @@ def intent_shortcuts_node(state: AgentState, *, writer: Optional[StreamWriter] =
     session_id = state.get("session_id")
     if not classification:
         return
+    
     direct_iter = None
     try:
         direct_iter = intent_router.route_intents(
@@ -430,7 +432,8 @@ def intent_shortcuts_node(state: AgentState, *, writer: Optional[StreamWriter] =
             facts=state.get("facts"),
         )
     except Exception:
-        logger.exception("[GRAPH] intent_router.route_intents failed")
+        logger.exception("[GRAPH] intent_router failed")
+    
     if direct_iter is None:
         return
     collected: List[str] = []

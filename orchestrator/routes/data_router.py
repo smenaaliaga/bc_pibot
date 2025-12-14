@@ -56,9 +56,9 @@ def stream_data_flow(classification: Any, question: str, history_text: str) -> I
     year = _extract_year(question)
 
     try:
-        from orchestrator.data import data_flow
+        from orchestrator.data import get_data
 
-        for chunk in data_flow.stream_data_flow_full(classification, question, history_text):
+        for chunk in get_data.stream_data_flow(classification, question, history_text):
             if chunk:
                 yield chunk
         return
