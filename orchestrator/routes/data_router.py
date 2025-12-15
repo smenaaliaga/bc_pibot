@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Iterable, Optional
+from typing import Any, Dict, Iterable, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,13 @@ def can_handle_data(classification: Any) -> bool:
         return False
 
 
-def stream_data_flow(classification: Any, question: str, history_text: str) -> Iterable[str]:
+def stream_data_flow(
+    classification: Any,
+    question: str,
+    history_text: str,
+    *,
+    indicator_context: Optional[Dict[str, str]] = None,
+) -> Iterable[str]:
     """
     Intenta usar el flujo DATA completo (fase 1 + fetch + tabla).
 
@@ -58,7 +64,12 @@ def stream_data_flow(classification: Any, question: str, history_text: str) -> I
     try:
         from orchestrator.data import flow_data
 
-        for chunk in flow_data.stream_data_flow(classification, question, history_text):
+        for chunk in flow_data.stream_data_flow(
+            classification,
+            question,
+            history_text,
+            indicator_context=indicator_context,
+        ):
             if chunk:
                 yield chunk
         return

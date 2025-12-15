@@ -13,6 +13,41 @@ logger = logging.getLogger(__name__)
 # Flag para usar JointBERT en lugar de LLM
 USE_JOINTBERT_CLASSIFIER = os.getenv("USE_JOINTBERT_CLASSIFIER", "false").lower() in ("true", "1", "yes")
 
+_SMALL_TALK_GREETINGS = (
+    "hola",
+    "holi",
+    "buenas",
+    "buenos dias",
+    "buenas tardes",
+    "buenas noches",
+    "saludos",
+    "que tal",
+)
+_SMALL_TALK_DATA_TOKENS = (
+    "imacec",
+    "pib",
+    "inflacion",
+    "dato",
+    "serie",
+    "valor",
+    "porcentaje",
+    "indicador",
+    "consulta",
+)
+
+
+def _looks_like_small_talk(question: str, indicator: str) -> bool:
+    text = question.lower().strip()
+    if not text:
+        return False
+    if not any(token in text for token in _SMALL_TALK_GREETINGS):
+        return False
+    if indicator and any(token in indicator for token in ("imacec", "pib", "ipc")):
+        return False
+    if any(token in text for token in _SMALL_TALK_DATA_TOKENS):
+        return False
+    return True
+
 
 def _build_history_text(history: Optional[List[Dict[str, str]]]) -> str:
     """Concatena el historial en formato 'role: content' por línea."""
@@ -116,6 +151,18 @@ def _classify_with_jointbert(question: str) -> ClassificationResult:
             for word in ['ultimo', 'último', 'actual', 'reciente']
         )
         
+        entities_out = entities
+        normalized_out = normalized
+
+        if _looks_like_small_talk(question, indicator):
+            logger.info("[JOINTBERT] Greeting-like query detected, forcing METHODOLOGICAL flow")
+            query_type = 'METHODOLOGICAL'
+            data_domain = None
+            default_key = None
+            is_generic = True
+            entities_out = {}
+            normalized_out = {}
+
         logger.info(
             "[JOINTBERT MAPPED] query_type=%s data_domain=%s is_generic=%s default_key=%s",
             query_type, data_domain, is_generic, default_key
@@ -131,8 +178,8 @@ def _classify_with_jointbert(question: str) -> ClassificationResult:
             # Info adicional de JointBERT
             intent=intent,
             confidence=result.get('confidence', 0.0),
-            entities=entities,
-            normalized=normalized,
+            entities=entities_out,
+            normalized=normalized_out,
         )
         
     except Exception as e:
