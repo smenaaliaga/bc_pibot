@@ -23,7 +23,8 @@ from orchestrator.llm.llm_adapter import LLMAdapter, build_llm
 from orchestrator.memory.memory_adapter import MemoryAdapter
 from orchestrator.prompts.query_classifier import ClassificationResult
 from orchestrator.rag.rag_factory import create_retriever
-from orchestrator.routes import data_router, intent_router
+from orchestrator.routes import data_router
+from orchestrator.routes import intent_router as intent_router
 
 logger = logging.getLogger(__name__)
 
@@ -391,7 +392,21 @@ def _persist_intent_event(
     except (TypeError, ValueError):
         score = 1.0
     spans = payload.get("spans") or []
-    entities = payload.get("entities") or {}
+    base_entities = payload.get("entities") or {}
+    entities = dict(base_entities) if isinstance(base_entities, dict) else {}
+    extra_jointbert: Dict[str, Any] = {}
+    if classification:
+        if getattr(classification, "intent", None):
+            extra_jointbert["raw_intent"] = classification.intent
+        if getattr(classification, "confidence", None) is not None:
+            extra_jointbert["confidence"] = classification.confidence
+        if getattr(classification, "entities", None):
+            extra_jointbert["entities"] = classification.entities
+        if getattr(classification, "normalized", None):
+            extra_jointbert["normalized"] = classification.normalized
+    if extra_jointbert:
+        entities = dict(entities)
+        entities["jointbert"] = extra_jointbert
     try:
         _INTENT_STORE.record(
             session_id,
@@ -412,6 +427,67 @@ def _persist_intent_event(
         logger.debug("[GRAPH] Unable to persist intent event", exc_info=True)
 
 
+def _coerce_indicator_value(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        text = value.strip()
+        return text or None
+    if isinstance(value, dict):
+        for key in ("standard_name", "normalized", "original", "text_normalized", "label"):
+            candidate = value.get(key)
+            if isinstance(candidate, str) and candidate.strip():
+                return candidate.strip()
+    return None
+
+
+def _extract_indicator_context_from_entities(entities: Optional[Dict[str, Any]]) -> Optional[Dict[str, str]]:
+    if not isinstance(entities, dict):
+        return None
+    jointbert = entities.get("jointbert")
+    if not isinstance(jointbert, dict):
+        return None
+    normalized = jointbert.get("normalized")
+    if not isinstance(normalized, dict):
+        return None
+    indicator = _coerce_indicator_value(normalized.get("indicator"))
+    sector = _coerce_indicator_value(normalized.get("sector"))
+    component = _coerce_indicator_value(normalized.get("component"))
+    if not sector:
+        sector = component
+    if indicator or sector:
+        context: Dict[str, str] = {}
+        if indicator:
+            context["indicator"] = indicator
+        if sector:
+            context["sector"] = sector
+            context.setdefault("component", sector)
+        elif component:
+            context["component"] = component
+        return context
+    raw_entities = jointbert.get("entities")
+    if isinstance(raw_entities, dict):
+        indicator = _coerce_indicator_value(raw_entities.get("indicator"))
+        if indicator:
+            return {"indicator": indicator}
+    return None
+
+
+def _get_last_indicator_context(session_id: Optional[str]) -> Optional[Dict[str, str]]:
+    if not session_id or not _INTENT_STORE or not hasattr(_INTENT_STORE, "history"):
+        return None
+    try:
+        records = _INTENT_STORE.history(session_id, k=25)
+    except Exception:
+        logger.debug("[GRAPH] Unable to read intent history for indicator context", exc_info=True)
+        return None
+    for record in reversed(records or []):
+        context = _extract_indicator_context_from_entities(getattr(record, "entities", None))
+        if context:
+            return context
+    return None
+
+
 def intent_shortcuts_node(state: AgentState, *, writer: Optional[StreamWriter] = None):
     classification = state.get("classification")
     question = state.get("question", "")
@@ -419,6 +495,7 @@ def intent_shortcuts_node(state: AgentState, *, writer: Optional[StreamWriter] =
     session_id = state.get("session_id")
     if not classification:
         return
+    
     direct_iter = None
     try:
         direct_iter = intent_router.route_intents(
@@ -430,7 +507,8 @@ def intent_shortcuts_node(state: AgentState, *, writer: Optional[StreamWriter] =
             facts=state.get("facts"),
         )
     except Exception:
-        logger.exception("[GRAPH] intent_router.route_intents failed")
+        logger.exception("[GRAPH] intent_router failed")
+    
     if direct_iter is None:
         return
     collected: List[str] = []
@@ -456,6 +534,36 @@ def data_node(state: AgentState, *, writer: Optional[StreamWriter] = None):
     classification = state.get("classification")
     question = state.get("question", "")
     history_text = state.get("history_text", "")
+    session_id = state.get("session_id")
+    # Imprime classificación para depuración
+    try:
+        summary = (
+            _ensure_text(getattr(classification, "query_type", "")),
+            _ensure_text(getattr(classification, "data_domain", "")),
+            str(getattr(classification, "is_generic", "")),
+            _ensure_text(getattr(classification, "default_key", "")),
+            _ensure_text(getattr(classification, "error", "")),
+        )
+        logger.debug(
+            "[CLASSIFIER] query_type=%s data_domain=%s is_generic=%s default_key=%s error=%s",
+            *summary,
+        )
+        # Log adicional de campos JointBERT
+        intent = getattr(classification, "intent", None)
+        confidence = getattr(classification, "confidence", None)
+        entities = getattr(classification, "entities", None)
+        normalized = getattr(classification, "normalized", None)
+        if intent or confidence or entities or normalized:
+            logger.debug(
+                "[CLASSIFIER_JOINTBERT] intent=%s confidence=%.4f entities=%s normalized=%s",
+                intent,
+                confidence if confidence is not None else 0.0,
+                entities,
+                normalized,
+            )
+    except Exception:
+        logger.exception("[CLASSIFIER] Failed to log classification summary")
+        
     if not classification:
         text = "No pude clasificar la consulta para obtener datos."
         _emit_stream_chunk(text, writer)
@@ -463,8 +571,15 @@ def data_node(state: AgentState, *, writer: Optional[StreamWriter] = None):
     collected: List[str] = []
     chunk_filter = _StreamChunkFilter()
 
+    indicator_context = _get_last_indicator_context(session_id)
+
     try:
-        stream = data_router.stream_data_flow(classification, question, history_text)
+        stream = data_router.stream_data_flow(
+            classification,
+            question,
+            history_text,
+            indicator_context=indicator_context,
+        )
         for chunk in stream:
             chunk_text = _ensure_text(chunk)
             if not chunk_text:

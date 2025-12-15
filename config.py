@@ -19,6 +19,10 @@ LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
 BCCH_USER: str = os.getenv("BCCH_USER", "")
 BCCH_PASS: str = os.getenv("BCCH_PASS", "")
 REDIS_URL: Optional[str] = os.getenv("REDIS_URL")
+
+# Modelo JointBERT para clasificación de intenciones
+JOINT_BERT_MODEL_DIR: str = os.getenv("JOINT_BERT_MODEL_DIR", "model/out/pibot_model_beto")
+
 # Controla si se exponen enlaces de API con credenciales en texto plano en los logs.
 # Por defecto ACTIVADO en este entorno protegido; puedes desactivarlo con LOG_EXPOSE_API_LINKS=0
 LOG_EXPOSE_API_LINKS: bool = os.getenv("LOG_EXPOSE_API_LINKS", "1").lower() in ("1", "true", "yes")

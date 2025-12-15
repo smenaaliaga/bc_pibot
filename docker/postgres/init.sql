@@ -9,34 +9,39 @@ CREATE EXTENSION IF NOT EXISTS vector;
 -- LangGraph checkpointer
 CREATE TABLE IF NOT EXISTS checkpoints (
     thread_id TEXT NOT NULL,
-    checkpoint_ns TEXT NOT NULL,
+    checkpoint_ns TEXT NOT NULL DEFAULT '',
     checkpoint_id TEXT NOT NULL,
     parent_checkpoint_id TEXT,
     type TEXT,
     checkpoint JSONB NOT NULL,
-    metadata JSONB,
+    metadata JSONB NOT NULL DEFAULT '{}',
     PRIMARY KEY (thread_id, checkpoint_ns, checkpoint_id)
 );
 CREATE TABLE IF NOT EXISTS checkpoint_blobs (
     thread_id TEXT NOT NULL,
-    checkpoint_ns TEXT NOT NULL,
-    checkpoint_id TEXT NOT NULL,
-    key TEXT NOT NULL,
-    value BYTEA,
-    PRIMARY KEY (thread_id, checkpoint_ns, checkpoint_id, key)
+    checkpoint_ns TEXT NOT NULL DEFAULT '',
+    channel TEXT NOT NULL,
+    version TEXT NOT NULL,
+    type TEXT NOT NULL,
+    blob BYTEA,
+    PRIMARY KEY (thread_id, checkpoint_ns, channel, version)
 );
 CREATE TABLE IF NOT EXISTS checkpoint_writes (
     thread_id TEXT NOT NULL,
-    checkpoint_ns TEXT NOT NULL,
+    checkpoint_ns TEXT NOT NULL DEFAULT '',
     checkpoint_id TEXT NOT NULL,
     task_id TEXT NOT NULL,
+    task_path TEXT NOT NULL DEFAULT '',
     idx INTEGER NOT NULL,
     channel TEXT NOT NULL,
-    value JSONB,
+    type TEXT,
+    blob BYTEA NOT NULL,
     PRIMARY KEY (thread_id, checkpoint_ns, checkpoint_id, task_id, idx)
 );
 CREATE TABLE IF NOT EXISTS checkpoint_migrations (v INTEGER PRIMARY KEY);
 CREATE INDEX IF NOT EXISTS idx_checkpoints_thread ON checkpoints(thread_id, checkpoint_ns, checkpoint_id);
+CREATE INDEX IF NOT EXISTS idx_checkpoint_blobs_thread ON checkpoint_blobs(thread_id);
+CREATE INDEX IF NOT EXISTS idx_checkpoint_writes_thread ON checkpoint_writes(thread_id);
 
 -- Short-term sidecar storage
 CREATE TABLE IF NOT EXISTS short_term_turns (

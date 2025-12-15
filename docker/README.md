@@ -5,6 +5,7 @@ From `docker/`:
 ```bash
 # build solo si cambiaste la imagen
 cd docker
+set REDIS_PASS=owMaOQsIAGK80NYwlsvv93a4ZOxX73Um
 docker compose build postgres
 docker compose --env-file ../.env up -d postgres
 ```

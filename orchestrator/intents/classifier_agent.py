@@ -10,6 +10,44 @@ from orchestrator.prompts.query_classifier import ClassificationResult, classify
 
 logger = logging.getLogger(__name__)
 
+# Flag para usar JointBERT en lugar de LLM
+USE_JOINTBERT_CLASSIFIER = os.getenv("USE_JOINTBERT_CLASSIFIER", "false").lower() in ("true", "1", "yes")
+
+_SMALL_TALK_GREETINGS = (
+    "hola",
+    "holi",
+    "buenas",
+    "buenos dias",
+    "buenas tardes",
+    "buenas noches",
+    "saludos",
+    "que tal",
+)
+_SMALL_TALK_DATA_TOKENS = (
+    "imacec",
+    "pib",
+    "inflacion",
+    "dato",
+    "serie",
+    "valor",
+    "porcentaje",
+    "indicador",
+    "consulta",
+)
+
+
+def _looks_like_small_talk(question: str, indicator: str) -> bool:
+    text = question.lower().strip()
+    if not text:
+        return False
+    if not any(token in text for token in _SMALL_TALK_GREETINGS):
+        return False
+    if indicator and any(token in indicator for token in ("imacec", "pib", "ipc")):
+        return False
+    if any(token in text for token in _SMALL_TALK_DATA_TOKENS):
+        return False
+    return True
+
 
 def _build_history_text(history: Optional[List[Dict[str, str]]]) -> str:
     """Concatena el historial en formato 'role: content' por línea."""
@@ -22,24 +60,168 @@ def _build_history_text(history: Optional[List[Dict[str, str]]]) -> str:
         return ""
 
 
+def _classify_with_jointbert(question: str) -> ClassificationResult:
+    """
+    Clasificación usando JointBERT en lugar de LLM.
+    Mapea los resultados de JointBERT al formato ClassificationResult.
+    """
+    try:
+        from orchestrator import get_predictor
+        from orchestrator.prompts.query_classifier import ImacecTree, PibeTree
+        
+        predictor = get_predictor()
+        result = predictor.predict(question)
+        
+        intent = result.get('intent', 'unknown')
+        entities = result.get('entities', {})
+        normalized = result.get('normalized', {})
+        
+        # Mostrar predicción completa
+        logger.info(f"[JOINTBERT PREDICTION] question='{question}'")
+        logger.info(f"[JOINTBERT PREDICTION] intent={intent}, confidence={result.get('confidence', 0.0):.3f}")
+        logger.info(f"[JOINTBERT PREDICTION] Raw entities: {entities}")
+        logger.info(f"[JOINTBERT PREDICTION] Normalized entities: {normalized}")
+        
+        # Si no hay entidades, tratar como consulta metodológica
+        if not entities or all(not v for v in entities.values()):
+            logger.info("[JOINTBERT] No entities detected, treating as METHODOLOGICAL query")
+            intent = 'methodology'
+        
+        # Usar entidades normalizadas si están disponibles, sino usar raw
+        indicator_norm = normalized.get('indicator', {})
+        period_norm = normalized.get('period', {})
+        
+        # Extraer indicador (priorizar normalizado)
+        if indicator_norm and indicator_norm.get('standard_name'):
+            indicator = indicator_norm['standard_name'].lower()
+        else:
+            indicator = entities.get('indicator', '').lower()
+        
+        # Extraer período (priorizar normalizado)
+        if period_norm:
+            period = str(period_norm)  # La normalización retorna un dict estructurado
+        else:
+            period = entities.get('period', '')
+        
+        # Mapeo de intenciones JointBERT a query_type
+        query_type_map = {
+            'value': 'DATA',
+            'data': 'DATA',
+            'last': 'DATA',
+            'table': 'DATA',
+            'methodology': 'METHODOLOGICAL',
+            'definition': 'METHODOLOGICAL',
+        }
+        query_type = query_type_map.get(intent.lower(), None)
+        
+        # Determinar data_domain desde el indicador
+        data_domain = None
+        default_key = None
+        imacec_tree = None
+        pibe_tree = None
+        
+        # Si no hay indicador en entidades, buscar en la pregunta original
+        if not indicator:
+            q_lower = question.lower()
+            if 'imacec' in q_lower:
+                indicator = 'imacec'
+            elif 'pib' in q_lower:
+                indicator = 'pib'
+        
+        if 'imacec' in indicator:
+            data_domain = 'IMACEC'
+            default_key = 'IMACEC'
+            imacec_tree = ImacecTree()
+        elif 'pib' in indicator:
+            # Detectar si es regional
+            region = entities.get('region', '')
+            q_lower = question.lower()
+            if region or 'regional' in q_lower or 'región' in q_lower:
+                data_domain = 'PIB_REGIONAL'
+                default_key = 'PIB_REGIONAL'
+                pibe_tree = PibeTree(region=region if region else None)
+            else:
+                data_domain = 'PIB'
+                default_key = 'PIB_TOTAL'
+                pibe_tree = PibeTree()
+        
+        # Detectar si es genérico (basado en período)
+        is_generic = not period or any(
+            word in str(period).lower() 
+            for word in ['ultimo', 'último', 'actual', 'reciente']
+        )
+        
+        entities_out = entities
+        normalized_out = normalized
+
+        if _looks_like_small_talk(question, indicator):
+            logger.info("[JOINTBERT] Greeting-like query detected, forcing METHODOLOGICAL flow")
+            query_type = 'METHODOLOGICAL'
+            data_domain = None
+            default_key = None
+            is_generic = True
+            entities_out = {}
+            normalized_out = {}
+
+        logger.info(
+            "[JOINTBERT MAPPED] query_type=%s data_domain=%s is_generic=%s default_key=%s",
+            query_type, data_domain, is_generic, default_key
+        )
+        
+        return ClassificationResult(
+            query_type=query_type,
+            data_domain=data_domain,
+            is_generic=is_generic,
+            default_key=default_key,
+            imacec=imacec_tree,
+            pibe=pibe_tree,
+            # Info adicional de JointBERT
+            intent=intent,
+            confidence=result.get('confidence', 0.0),
+            entities=entities_out,
+            normalized=normalized_out,
+        )
+        
+    except Exception as e:
+        logger.warning(f"JointBERT classification failed: {e}, falling back to LLM")
+        return classify_query(question)
+
+
 def classify_question_with_history(
     question: str, history: Optional[List[Dict[str, str]]]
 ) -> Tuple[ClassificationResult, str]:
     """Replica la fase C1 del original orchestrator: clasifica y construye history_text."""
     t_start = time.perf_counter()
     model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-    logger.info("[FASE] start: Fase C1: Clasificación de consulta | model='%s'", model)
-    try:
-        classification = classify_query(question)
-    except Exception as exc:  # pragma: no cover - logging path
-        t_end = time.perf_counter()
-        logger.error(
-            "[FASE] error: Fase C1: Clasificación de consulta (%.3fs) | question='%s' | error=%s",
-            t_end - t_start,
-            question,
-            exc,
-        )
-        raise
+    
+    # Decidir qué clasificador usar
+    if USE_JOINTBERT_CLASSIFIER:
+        logger.info("[FASE] start: Fase C1: Clasificación de consulta | classifier='JointBERT'")
+        try:
+            classification = _classify_with_jointbert(question)
+        except Exception as exc:
+            t_end = time.perf_counter()
+            logger.error(
+                "[FASE] error: Fase C1: Clasificación con JointBERT (%.3fs) | question='%s' | error=%s",
+                t_end - t_start,
+                question,
+                exc,
+            )
+            raise
+    else:
+        logger.info("[FASE] start: Fase C1: Clasificación de consulta | classifier='LLM' | model='%s'", model)
+        try:
+            classification = classify_query(question)
+        except Exception as exc:
+            t_end = time.perf_counter()
+            logger.error(
+                "[FASE] error: Fase C1: Clasificación de consulta (%.3fs) | question='%s' | error=%s",
+                t_end - t_start,
+                question,
+                exc,
+            )
+            raise
+    
     t_end = time.perf_counter()
     summary = (
         classification.query_type,
@@ -54,24 +236,6 @@ def classify_question_with_history(
         t_end - t_start,
         *summary,
     )
-    # Forzar log también en root para trazabilidad en el archivo único de sesión
-    try:
-        import logging as _logging
-
-        _logging.getLogger().info(
-            "[CLASSIFIER] query_type=%s data_domain=%s is_generic=%s default_key=%s error=%s",
-            *summary,
-        )
-    except Exception:
-        pass
-    # Emisión a stdout para depuración rápida en entorno interactivo/Streamlit logs
-    try:
-        print(
-            "[CLASSIFIER_RETURN] query_type=%s data_domain=%s is_generic=%s default_key=%s error=%s"
-            % summary
-        )
-    except Exception:
-        pass
     # Fallback: asegurarse de que quede registrado en el archivo de log configurado por RUN_MAIN_LOG,
     # pero sin truncar ni reescribir; solo append.
     try:
