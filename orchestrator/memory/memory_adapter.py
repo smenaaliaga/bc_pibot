@@ -230,6 +230,10 @@ class MemoryAdapter:
             return layout
         return None
 
+    def _detect_facts_layout(self) -> Optional[str]:
+        """Backward-compatible shim for legacy callers."""
+        return self._detect_kv_layout()
+
     def _detect_kv_layout(self) -> Optional[str]:
         pool = self._conn_pool()
         if not pool:

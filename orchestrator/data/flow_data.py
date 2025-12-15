@@ -1,8 +1,10 @@
 from __future__ import annotations
+import calendar
 import logging
 import re
 import time
-from typing import Any, Iterable, Optional
+from datetime import date, datetime
+from typing import Any, Dict, Iterable, Optional
 
 from config import get_settings
 
@@ -14,51 +16,220 @@ except Exception:
 logger = logging.getLogger(__name__)
 _settings = get_settings()
 
+
+def _coerce_date(value: Any) -> Optional[date]:
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    if value in (None, ""):
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y-%m", "%Y"):
+        try:
+            parsed = datetime.strptime(text[: len(fmt)], fmt)
+            if fmt == "%Y":
+                return date(parsed.year, 1, 1)
+            if fmt == "%Y-%m":
+                return date(parsed.year, parsed.month, 1)
+            return parsed.date()
+        except Exception:
+            continue
+    return None
+
+
+def _end_of_period(value: date, granularity: str) -> date:
+    gran = (granularity or "").lower()
+    if gran == "month":
+        last_day = calendar.monthrange(value.year, value.month)[1]
+        return value.replace(day=last_day)
+    if gran == "quarter":
+        quarter = ((value.month - 1) // 3) + 1
+        last_month = quarter * 3
+        last_day = calendar.monthrange(value.year, last_month)[1]
+        return value.replace(month=last_month, day=last_day)
+    if gran == "year":
+        return value.replace(month=12, day=31)
+    return value
+
+
+def _subtract_months(value: date, months: int) -> date:
+    total_months = value.year * 12 + (value.month - 1) - max(months, 0)
+    year = total_months // 12
+    month = total_months % 12 + 1
+    last_day = calendar.monthrange(year, month)[1]
+    day = min(value.day, last_day)
+    return value.replace(year=year, month=month, day=day)
+
+
+def _format_date(value: Optional[date]) -> Optional[str]:
+    return value.strftime("%Y-%m-%d") if value else None
+
+
+def _date_from_period_key(period_key: Any) -> Optional[str]:
+    if not period_key:
+        return None
+    key = str(period_key).strip()
+    if re.match(r"^\d{4}-\d{2}$", key):
+        try:
+            dt = datetime.strptime(key, "%Y-%m").date()
+            return _format_date(dt)
+        except Exception:
+            return None
+    if re.match(r"^\d{4}-Q[1-4]$", key.upper()):
+        year = int(key[:4])
+        quarter = int(key[-1])
+        month = quarter * 3
+        last_day = calendar.monthrange(year, month)[1]
+        return f"{year:04d}-{month:02d}-{last_day:02d}"
+    return None
+
+
+def _build_period_context(normalized: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    period_obj: Any = None
+    if isinstance(normalized, dict):
+        period_obj = normalized.get("period")
+    if not period_obj:
+        return None
+    period_dict = period_obj if isinstance(period_obj, dict) else getattr(period_obj, "__dict__", {})
+    raw_start = period_dict.get("start_date") or period_dict.get("startDate")
+    raw_end = period_dict.get("end_date") or period_dict.get("endDate")
+    gran = str(period_dict.get("granularity") or period_dict.get("period_type") or "").lower()
+    start = _coerce_date(raw_start)
+    end = _coerce_date(raw_end)
+    if not start and end:
+        start = end
+    if start and not end:
+        end = _end_of_period(start, gran)
+    if not start and not end:
+        return None
+    target = end or start
+    buffer_months = {"month": 15, "quarter": 24, "year": 60}.get(gran, 18)
+    first_candidate = _subtract_months(target, buffer_months)
+    firstdate = _format_date(first_candidate)
+    lastdate = _format_date(target)
+    candidates = []
+    for dt in (start, end):
+        formatted = _format_date(dt)
+        if formatted:
+            candidates.append(formatted)
+    key_date = _date_from_period_key(period_dict.get("period_key"))
+    if key_date:
+        candidates.append(key_date)
+    label = period_dict.get("period_key") or period_dict.get("label") or lastdate or firstdate
+    return {
+        "start": start,
+        "end": end,
+        "granularity": gran,
+        "firstdate": firstdate,
+        "lastdate": lastdate,
+        "match_candidates": [c for c in candidates if c],
+        "label": label,
+    }
+
+
+def _as_mapping(payload: Any) -> Dict[str, Any]:
+    if isinstance(payload, dict):
+        return payload
+    if hasattr(payload, "__dict__"):
+        try:
+            return dict(payload.__dict__)
+        except Exception:
+            return {}
+    return {}
+
+
+def _coerce_meta_value(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        text = value.strip()
+        return text or None
+    if isinstance(value, dict):
+        for key in ("standard_name", "normalized", "original", "text_normalized", "label"):
+            candidate = value.get(key)
+            if isinstance(candidate, str) and candidate.strip():
+                return candidate.strip()
+    return None
+
+
+def _has_indicator_info(normalized: Dict[str, Any], entities: Dict[str, Any]) -> bool:
+    indicator = _coerce_meta_value(normalized.get("indicator"))
+    if indicator:
+        return True
+    indicator = _coerce_meta_value(entities.get("indicator"))
+    return bool(indicator)
+
+
+def _has_sector_info(normalized: Dict[str, Any]) -> bool:
+    if _coerce_meta_value(normalized.get("sector")):
+        return True
+    if _coerce_meta_value(normalized.get("component")):
+        return True
+    return False
+
+
+def _match_observation(observations: list, candidates: list[str]) -> Optional[Dict[str, Any]]:
+    if not observations or not candidates:
+        return None
+    for candidate in candidates:
+        for obs in observations:
+            date_str = obs.get("date")
+            if not date_str:
+                continue
+            if date_str == candidate:
+                return obs
+            if date_str[:7] == candidate[:7]:
+                return obs
+    return None
+
 def stream_data_flow(
     classification: Any,
     question: str,
     history_text: str,
+    *,
+    indicator_context: Optional[Dict[str, str]] = None,
 ) -> Iterable[str]:
     """Fetch de datos y tabla."""
     
     # Extraer info de JointBERT si está disponible
-    entities = getattr(classification, "entities", None)
-    normalized = getattr(classification, "normalized", None)
-    intent_value = getattr(classification, "intent", None)
-    
-    # Extraer año desde normalized.period 
+    entities_raw = getattr(classification, "entities", None)
+    normalized_raw = getattr(classification, "normalized", None)
+    entities = entities_raw if isinstance(entities_raw, dict) else {}
+    normalized = normalized_raw if isinstance(normalized_raw, dict) else _as_mapping(normalized_raw)
+    period_context = _build_period_context(normalized)
+
     year = None
-    if normalized and isinstance(normalized, dict):
-        period_norm = normalized.get('period')
-        if period_norm and isinstance(period_norm, dict):
-            start_date = period_norm.get('start_date')
-            if start_date:
-                try:
-                    if hasattr(start_date, 'year'):
-                        year = start_date.year
-                    else:
-                        year = int(str(start_date)[:4])
-                    # yield f"**Año extraído de normalized:** {year}\n\n"
-                except Exception as e:
-                    logger.warning(f"Error extrayendo year: {e}")
-    
-    # Fallback: año actual
+    if period_context and period_context.get("start"):
+        year = period_context["start"].year  # type: ignore[index]
     if year is None:
         try:
             year = int(time.strftime("%Y"))
-            # yield f"**Año por defecto (actual):** {year}\n\n"
         except Exception:
             logger.error("No se pudo determinar el año")
             return
-    
+
     # 2. Detectar serie usando el módulo series_detector
     if detect_series_code is None:
         logger.error("No se pudo importar detect_series_code")
         return
     
+    indicator_override = None
+    sector_override = None
+    if indicator_context:
+        if not _has_indicator_info(normalized, entities):
+            indicator_override = indicator_context.get("indicator")
+        if not _has_sector_info(normalized):
+            sector_override = indicator_context.get("sector") or indicator_context.get("component")
+
     detection_result = detect_series_code(
         normalized=normalized,
-        entities=entities
+        entities=entities,
+        indicator=indicator_override,
+        sector=sector_override,
+        component=sector_override,
     )
     
     series_id = detection_result.get("series_code")
@@ -70,52 +241,11 @@ def stream_data_flow(
     
     # Determinar frecuencia (por ahora mensual por defecto)
     freq = "M"
-    
-    # 4. Calcular rango usando el período normalizado
-    # Extraer start_date del período normalizado
-    start_date_raw = None
-    if normalized and isinstance(normalized, dict):
-        period_norm = normalized.get('period')
-        if period_norm and isinstance(period_norm, dict):
-            start_date_raw = period_norm.get('start_date')
-    
-    # Calcular lastdate y firstdate
-    if start_date_raw:
-        # Usar start_date como lastdate
-        from datetime import datetime, timedelta
-        def subtract_years_months(dt, years=0, months=0):
-            # Resta años y meses a un datetime.date o datetime.datetime
-            year = dt.year - years
-            month = dt.month - months
-            while month <= 0:
-                month += 12
-                year -= 1
-            # Ajustar día si el mes resultante no tiene ese día
-            day = min(dt.day, [31,29 if year%4==0 and (year%100!=0 or year%400==0) else 28,31,30,31,30,31,31,30,31,30,31][month-1])
-            return dt.replace(year=year, month=month, day=day)
 
-        if hasattr(start_date_raw, 'strftime'):
-            lastdate = start_date_raw.strftime('%Y-%m-%d')
-            try:
-                firstdate_dt = subtract_years_months(start_date_raw, years=1, months=3)
-                firstdate = firstdate_dt.strftime('%Y-%m-%d')
-            except Exception:
-                # Fallback: solo restar año
-                year_minus_one = start_date_raw.year - 1
-                firstdate = start_date_raw.replace(year=year_minus_one).strftime('%Y-%m-%d')
-        else:
-            # Si es string, parsearlo
-            lastdate = str(start_date_raw)
-            try:
-                dt = datetime.strptime(str(start_date_raw)[:10], '%Y-%m-%d')
-                firstdate_dt = subtract_years_months(dt, years=1, months=3)
-                firstdate = firstdate_dt.strftime('%Y-%m-%d')
-            except Exception:
-                # Fallback: usar año extraído anteriormente
-                firstdate = f"{year-1}-01-01"
-                lastdate = f"{year}-12-31"
+    if period_context and period_context.get("firstdate") and period_context.get("lastdate"):
+        firstdate = period_context["firstdate"]
+        lastdate = period_context["lastdate"]
     else:
-        # Fallback: usar año extraído anteriormente
         firstdate = f"{year-1}-01-01"
         lastdate = f"{year}-12-31"
 
@@ -158,79 +288,37 @@ def stream_data_flow(
     obs = data.get("observations", [])
 
     if obs:
-        # Mostrar solo el periodo igual a start_date, o el máximo disponible si no existe
-        # Buscar start_date como string (puede ser datetime o string)
-        start_date_str = None
-        if 'start_date' in locals():
-            if hasattr(start_date, 'strftime'):
-                start_date_str = start_date.strftime('%Y-%m-%d')
-            else:
-                start_date_str = str(start_date)
-        else:
-            start_date_str = None
+        candidates = period_context["match_candidates"] if period_context else []
+        obs_match = _match_observation(obs, candidates)
+        obs_latest = max(obs, key=lambda o: o.get("date", "")) if obs else None
 
-        # Buscar observación con periodo igual a start_date
-        obs_match = None
-        if start_date_str:
-            for o in obs:
-                if o.get('date') == start_date_str:
-                    obs_match = o
-                    break
-        # Si no existe, usar el máximo periodo disponible
-        if not obs_match and obs:
-            obs_match = max(obs, key=lambda o: o.get('date', ''))
-
-        # Encontrar el máximo periodo disponible
-        obs_max = max(obs, key=lambda o: o.get('date', '')) if obs else None
-        max_date = obs_max.get('date') if obs_max else None
-
-        # Mensaje resumen según condición
-        resumen_emitido = False
-        if max_date and start_date_str:
-            if max_date < start_date_str:
-                # Usar el máximo periodo (no hay dato para start_date)
-                yoy_pct = obs_max.get('yoy_pct') if obs_max else None
-                date = obs_max.get('date') if obs_max else None
-                if yoy_pct is not None and date:
-                    yield f"La última variación anual disponible es {float(yoy_pct):.1f}% (período {date}).\n"
-                    resumen_emitido = True
-            elif obs_match and max_date == start_date_str:
-                # Si el máximo periodo es exactamente el start_date, mostrar el mensaje específico
-                yoy_pct = obs_match.get('yoy_pct')
-                date = obs_match.get('date')
-                if yoy_pct is not None and date:
-                    try:
-                        mes = int(date[5:7])
-                        anio = int(date[:4])
-                        meses_es = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
-                        mes_nombre = meses_es[mes-1].capitalize()
-                    except Exception:
-                        mes_nombre = date[5:7]
-                        anio = date[:4]
-                    yield f"La variacion anual para el mes de {mes_nombre} del {anio} fue {float(yoy_pct):.1f}%\n"
-                    resumen_emitido = True
-        elif obs_match:
-            yoy_pct = obs_match.get('yoy_pct')
-            date = obs_match.get('date')
-            if yoy_pct is not None and date:
+        mensaje_emitido = False
+        if period_context and obs_match:
+            date = obs_match.get("date")
+            yoy_pct = obs_match.get("yoy_pct")
+            if date and yoy_pct is not None:
                 try:
                     mes = int(date[5:7])
                     anio = int(date[:4])
-                    import calendar
                     mes_nombre = calendar.month_name[mes].capitalize()
                 except Exception:
                     mes_nombre = date[5:7]
                     anio = date[:4]
-                yield f"La variacion anual para el mes de {mes_nombre} del {anio} fue {float(yoy_pct):.1f}%\n"
-                resumen_emitido = True
+                yield f"La variación anual para {mes_nombre} de {anio} fue {float(yoy_pct):.1f}%\n"
+                mensaje_emitido = True
+        if not mensaje_emitido and obs_latest:
+            date = obs_latest.get("date")
+            yoy_pct = obs_latest.get("yoy_pct")
+            if date and yoy_pct is not None:
+                yield f"La última variación anual disponible es {float(yoy_pct):.1f}% (período {date}).\n"
 
-        # Mostrar la tabla de dato solicitado
         yield "Periodo | Valor | Variación anual\n"
         yield "--------|-------|-----------------\n"
-        if obs_match:
-            date = obs_match.get('date')
-            value = obs_match.get('value')
-            yoy_pct = obs_match.get('yoy_pct')
+        target_row = obs_match or obs_latest
+        if target_row:
+            date = target_row.get("date")
+            value = target_row.get("value")
+            yoy_pct = target_row.get("yoy_pct")
             val_fmt = f"{float(value):,.2f}".replace(",", "_").replace("_", ".") if value is not None else "--"
             yoy_fmt = f"{float(yoy_pct):.1f}%" if yoy_pct is not None else "--"
             yield f"{date} | {val_fmt} | {yoy_fmt}\n"

@@ -5,8 +5,9 @@ import os
 import json
 import uuid
 import time
-from typing import List, Dict, Any, Optional
 import logging
+from datetime import date, datetime
+from typing import List, Dict, Any, Optional
 
 from .intent_memory import IntentRecord, IntentMemory
 from orchestrator.utils.pg_logging import throttled_pg_log
@@ -26,6 +27,21 @@ try:
     import redis  # type: ignore
 except Exception:
     redis = None
+
+
+def _json_safe(value: Any) -> Any:
+    """Convert complex values (dates, dataclasses) into JSON-serializable types."""
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {str(k): _json_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_json_safe(v) for v in value]
+    if hasattr(value, "__dict__"):
+        return _json_safe(value.__dict__)
+    return str(value)
 
 
 class IntentStoreBase:
@@ -197,8 +213,8 @@ class PostgresIntentStore(IntentStoreBase):
                             turn_id,
                             rec.intent,
                             rec.score,
-                            json.dumps(rec.spans),
-                            json.dumps(rec.entities),
+                            json.dumps(_json_safe(rec.spans)),
+                            json.dumps(_json_safe(rec.entities)),
                             model_version or "",
                         ),
                     )
