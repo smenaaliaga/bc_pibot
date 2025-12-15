@@ -269,9 +269,9 @@ def detect_series_code(
 
         # Si aún no hay sector, usar default
         if not final_sector:
-            # Si el indicador es 'pib', usar 'a precios de mercado' como componente por defecto
+            # Si el indicador es 'pib', usar 'pib' como componente por defecto
             if final_indicator == "pib":
-                final_sector = _normalize_text("a precios de mercado")
+                final_sector = _normalize_text("pib")
             else:
                 final_sector = _normalize_text(DEFAULT_COMPONENT)
     
