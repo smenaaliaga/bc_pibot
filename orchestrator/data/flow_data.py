@@ -321,7 +321,6 @@ def stream_data_flow(
                     q = ((m - 1) // 3) + 1
                     return f"{q}T {y}"
                 else:
-                    # Mes en español
                     meses_es = [
                         "", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
                         "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
@@ -358,34 +357,64 @@ def stream_data_flow(
             yield "-- | -- | --\n"
         yield "\n"
 
-    # Mostrar metadatos de la serie
-    if metadata:
-        yield f"- Código: `{series_id}`\n"
-        yield f"- Título: {metadata.get('title', '')}\n"
-        # Frecuencia: buscar en varios campos posibles
-        freq = metadata.get('freq_effective') or metadata.get('default_frequency') or metadata.get('original_frequency') or metadata.get('frequency') or ''
-        yield f"- Frecuencia: {freq}\n"
-        yield f"- Unidad: {metadata.get('unit', '')}\n"
+        # --- NUEVO: Emitir marcador de descarga CSV ---
+        try:
+            import pandas as _pd
+            import tempfile
+            import os
+            # Solo exportar la fila del periodo solicitado (obs_match)
+            row = obs_match or obs_latest
+            if row:
+                # Mapeo de nombres para exportar con encabezados amigables
+                export_map = {
+                    "date": "Periodo",
+                    "value": "Valor",
+                    "yoy_pct": "Variación anual"
+                }
+                export_row = {export_map[c]: row.get(c) for c in export_map if c in row}
+                df_export = _pd.DataFrame([export_row])
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".csv", prefix="serie_", mode="w", encoding="utf-8") as tmp:
+                    df_export.to_csv(tmp, index=False)
+                    tmp_path = tmp.name
+                filename = f"serie_{series_id}.csv"
+                label = "Descargar CSV"
+                yield "##CSV_DOWNLOAD_START\n"
+                yield f"path={tmp_path}\n"
+                yield f"filename={filename}\n"
+                yield f"label={label}\n"
+                yield "mimetype=text/csv\n"
+                yield "##CSV_DOWNLOAD_END\n"
+        except Exception as e:
+            logger.warning(f"No se pudo generar CSV para descarga: {e}")
 
-        # Gráfico: mostrar siempre el campo, aunque esté vacío
-        grafico_url = metadata.get('source_url', '')
-        yield f"- Gráfico: {grafico_url}\n"
+    # # Mostrar metadatos de la serie
+    # if metadata:
+    #     yield f"- Código: `{series_id}`\n"
+    #     yield f"- Título: {metadata.get('title', '')}\n"
+    #     # Frecuencia: buscar en varios campos posibles
+    #     freq = metadata.get('freq_effective') or metadata.get('default_frequency') or metadata.get('original_frequency') or metadata.get('frequency') or ''
+    #     yield f"- Frecuencia: {freq}\n"
+    #     yield f"- Unidad: {metadata.get('unit', '')}\n"
 
-        # Metodología: mostrar siempre el campo, aunque esté vacío
-        metodologia = ''
-        notes = metadata.get('notes', {})
-        if isinstance(notes, dict):
-            metodologia = notes.get('metodologia', '')
+    #     # Gráfico: mostrar siempre el campo, aunque esté vacío
+    #     grafico_url = metadata.get('source_url', '')
+    #     yield f"- Gráfico: {grafico_url}\n"
+
+    #     # Metodología: mostrar siempre el campo, aunque esté vacío
+    #     metodologia = ''
+    #     notes = metadata.get('notes', {})
+    #     if isinstance(notes, dict):
+    #         metodologia = notes.get('metodologia', '')
             
-        if metodologia:
-            if isinstance(metodologia, str) and metodologia.startswith('http'):
-                metodologia_str = f"[Ver documento]({metodologia})"
-            else:
-                metodologia_str = metodologia
-        else:
-            metodologia_str = ''
-        yield f"- Metodología: {metodologia_str}\n"
-        yield "\n"
+    #     if metodologia:
+    #         if isinstance(metodologia, str) and metodologia.startswith('http'):
+    #             metodologia_str = f"[Ver documento]({metodologia})"
+    #         else:
+    #             metodologia_str = metodologia
+    #     else:
+    #         metodologia_str = ''
+    #     yield f"- Metodología: {metodologia_str}\n"
+    #     yield "\n"
 
     
     return
