@@ -246,7 +246,7 @@ def detect_series_code(
     # Extraer sector (normalizar a lowercase)
     # Prioridad: sector > component > normalized.sector > normalized.component > default
     final_sector = None
-    
+
     if sector:
         final_sector = _normalize_text(sector)
     elif component:
@@ -258,7 +258,7 @@ def detect_series_code(
             final_sector = _normalize_text(sector_value.get("standard_name") or sector_value.get("original") or "")
         elif isinstance(sector_value, str):
             final_sector = _normalize_text(sector_value)
-        
+
         # Fallback a 'component' si no hay 'sector'
         if not final_sector:
             component_value = normalized.get("component")
@@ -266,33 +266,32 @@ def detect_series_code(
                 final_sector = _normalize_text(component_value.get("standard_name") or component_value.get("original") or "")
             elif isinstance(component_value, str):
                 final_sector = _normalize_text(component_value)
-        
+
         # Si aún no hay sector, usar default
         if not final_sector:
-            final_sector = _normalize_text(DEFAULT_COMPONENT)
+            # Si el indicador es 'pib', usar 'a precios de mercado' como componente por defecto
+            if final_indicator == "pib":
+                final_sector = _normalize_text("a precios de mercado")
+            else:
+                final_sector = _normalize_text(DEFAULT_COMPONENT)
     
 
-    # Buscar serie desestacionalizada si corresponde
+
+    # Buscar serie desestacionalizada solo si se pide explícitamente
     seasonality = None
-    # Buscar en normalized dict
     if 'seasonality' in normalized:
         s = normalized['seasonality']
         if isinstance(s, dict):
-            seasonality = s.get('standard_name') or s.get('normalized') or s.get('original') or s
+            seasonality = s.get('standard_name') or s.get('normalized') or s.get('original') or s.get('text_normalized') or s.get('label')
         else:
             seasonality = s
-    # Normalizar texto
-    if seasonality:
-        seasonality_norm = _normalize_text(str(seasonality))
-    else:
-        seasonality_norm = None
+    seasonality_norm = _normalize_text(str(seasonality)) if seasonality else None
 
     catalog = _load_series_catalog()
     series_code = None
     metadata = {}
     matched_by = "catalog_standard_names"
 
-    # Si se pide desestacionalizado, buscar serie con ese atributo
     if seasonality_norm == "desestacionalizado":
         # Buscar en el catálogo una serie que coincida con indicator, component y seasonality=desestacionalizado
         for code, meta in catalog.items():
@@ -306,17 +305,39 @@ def detect_series_code(
                 metadata = meta
                 matched_by = "catalog_standard_names+seasonality"
                 break
+    else:
+        # Buscar la serie original (no desestacionalizada)
+        for code, meta in catalog.items():
+            std = meta.get("standard_names", {})
+            if (
+                _normalize_text(std.get("indicator", "")) == final_indicator and
+                _normalize_text(std.get("component", "")) == final_sector and
+                (not std.get("seasonality") or _normalize_text(std.get("seasonality", "")) != "desestacionalizado")
+            ):
+                series_code = code
+                metadata = meta
+                matched_by = "catalog_standard_names_original"
+                break
 
-    # Si no se encontró por seasonality, usar búsqueda normal
+    # Si no se encuentra, intentar con valores por indicador solo (sin componente)
     if not series_code:
-        series_code = _find_best_match(final_indicator, final_sector)
-        metadata = catalog.get(series_code, {}) if series_code else {}
+        # Buscar por indicador solo (sin componente)
+        for code, meta in catalog.items():
+            std = meta.get("standard_names", {})
+            if _normalize_text(std.get("indicator", "")) == final_indicator:
+                # Si tiene campo seasonality, debe ser distinto de 'desestacionalizado'
+                if std.get("seasonality") and _normalize_text(std.get("seasonality", "")) == "desestacionalizado":
+                    continue
+                series_code = code
+                metadata = meta
+                matched_by = "catalog_fallback_indicator_only"
+                break
 
-    # Si no se encuentra, intentar con valores por defecto
+    # Si aún no se encuentra, solo entonces usar el fallback global (imacec)
     if not series_code:
         logger.warning(
             f"No se encontró serie para indicator='{final_indicator}', component='{final_sector}'. "
-            f"Usando valores por defecto."
+            f"Usando valores por defecto globales."
         )
         series_code = _find_best_match(_normalize_text(DEFAULT_INDICATOR), _normalize_text(DEFAULT_COMPONENT))
         metadata = catalog.get(series_code, {}) if series_code else {}

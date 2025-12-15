@@ -185,6 +185,8 @@ def _match_observation(observations: list, candidates: list[str]) -> Optional[Di
                 return obs
     return None
 
+_last_period_context = None  # Memoria de periodo consultado
+
 def stream_data_flow(
     classification: Any,
     question: str,
@@ -199,7 +201,11 @@ def stream_data_flow(
     normalized_raw = getattr(classification, "normalized", None)
     entities = entities_raw if isinstance(entities_raw, dict) else {}
     normalized = normalized_raw if isinstance(normalized_raw, dict) else _as_mapping(normalized_raw)
+    global _last_period_context
     period_context = _build_period_context(normalized)
+    # Si no hay periodo en la consulta pero hay memoria previa, usarla
+    if (not period_context or not period_context.get("start")) and _last_period_context and _last_period_context.get("start"):
+        period_context = _last_period_context
 
     year = None
     if period_context and period_context.get("start"):
@@ -239,8 +245,14 @@ def stream_data_flow(
         logger.error("No se pudo determinar el código de serie")
         return
     
-    # Determinar frecuencia (por ahora mensual por defecto)
+    # Determinar frecuencia objetivo: trimestral para PIB, mensual por defecto
     freq = "M"
+    if metadata:
+        # Detectar si es PIB trimestral por el código o descripción
+        desc = (metadata.get('title') or metadata.get('descripEsp') or '').lower()
+        code = (series_id or '').upper()
+        if ("pib" in desc or "producto interno bruto" in desc or "PIB" in code) and ("trimes" in desc or code.endswith(".T")):
+            freq = "Q"
 
     if period_context and period_context.get("firstdate") and period_context.get("lastdate"):
         firstdate = period_context["firstdate"]
@@ -255,7 +267,7 @@ def stream_data_flow(
     except Exception as e:
         logger.error(f"No se pudo importar get_series_api_rest_bcch: {e}")
         return
-    
+
     data = None
     max_retries = 2
     for attempt in range(max_retries + 1):
@@ -288,29 +300,49 @@ def stream_data_flow(
     obs = data.get("observations", [])
 
     if obs:
+        # Guardar el periodo consultado en memoria para la próxima consulta
+        if period_context:
+            _last_period_context = period_context
         candidates = period_context["match_candidates"] if period_context else []
         obs_match = _match_observation(obs, candidates)
         obs_latest = max(obs, key=lambda o: o.get("date", "")) if obs else None
+
+        # Detectar frecuencia efectiva
+        freq = metadata.get('freq_effective') or metadata.get('default_frequency') or metadata.get('original_frequency') or metadata.get('frequency') or ''
+        freq = str(freq).upper()
+
+        def period_label(date_str):
+            if not date_str:
+                return "--"
+            try:
+                y = int(date_str[:4])
+                m = int(date_str[5:7])
+                if freq in {"Q", "T"}:
+                    q = ((m - 1) // 3) + 1
+                    return f"{q}T {y}"
+                else:
+                    # Mes en español
+                    meses_es = [
+                        "", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+                        "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+                    ]
+                    mes_nombre = meses_es[m] if 1 <= m <= 12 else str(m)
+                    return f"{mes_nombre} {y}"
+            except Exception:
+                return date_str
 
         mensaje_emitido = False
         if period_context and obs_match:
             date = obs_match.get("date")
             yoy_pct = obs_match.get("yoy_pct")
             if date and yoy_pct is not None:
-                try:
-                    mes = int(date[5:7])
-                    anio = int(date[:4])
-                    mes_nombre = calendar.month_name[mes].capitalize()
-                except Exception:
-                    mes_nombre = date[5:7]
-                    anio = date[:4]
-                yield f"La variación anual para {mes_nombre} de {anio} fue {float(yoy_pct):.1f}%\n"
+                yield f"La variación anual para {period_label(date)} fue {float(yoy_pct):.1f}%\n"
                 mensaje_emitido = True
         if not mensaje_emitido and obs_latest:
             date = obs_latest.get("date")
             yoy_pct = obs_latest.get("yoy_pct")
             if date and yoy_pct is not None:
-                yield f"La última variación anual disponible es {float(yoy_pct):.1f}% (período {date}).\n"
+                yield f"La última variación anual disponible es {float(yoy_pct):.1f}% (período {period_label(date)}).\n"
 
         yield "Periodo | Valor | Variación anual\n"
         yield "--------|-------|-----------------\n"
@@ -321,7 +353,7 @@ def stream_data_flow(
             yoy_pct = target_row.get("yoy_pct")
             val_fmt = f"{float(value):,.2f}".replace(",", "_").replace("_", ".") if value is not None else "--"
             yoy_fmt = f"{float(yoy_pct):.1f}%" if yoy_pct is not None else "--"
-            yield f"{date} | {val_fmt} | {yoy_fmt}\n"
+            yield f"{period_label(date)} | {val_fmt} | {yoy_fmt}\n"
         else:
             yield "-- | -- | --\n"
         yield "\n"

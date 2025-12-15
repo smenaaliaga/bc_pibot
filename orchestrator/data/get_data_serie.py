@@ -354,7 +354,8 @@ def _resample(
     if target not in {"D", "M", "Q", "A"}:
         return df
 
-    rule_map = {"D": "D", "M": "M", "Q": "Q-DEC", "A": "A-DEC"}
+    # Use 'ME' for month-end to avoid pandas deprecation warning
+    rule_map = {"D": "D", "M": "ME", "Q": "Q-DEC", "A": "A-DEC"}
     rule = rule_map[target]
 
     if not isinstance(df.index, pd.DatetimeIndex):
@@ -377,9 +378,17 @@ def _resample(
 
 
 def _normalize_observations(obs: List[Dict[str, Any]]) -> pd.DataFrame:
+    import pandas as pd
     rows = []
     for o in obs:
-        d = _parse_index_date(o.get("indexDateString", ""))
+        # Normalizar fecha: usar indexDateString si existe, sino date
+        date_raw = o.get("indexDateString") or o.get("date")
+        d = None
+        if date_raw:
+            try:
+                d = _parse_index_date(date_raw)
+            except Exception:
+                d = None
         v_raw = o.get("value", None)
         try:
             v = float(str(v_raw).replace(",", ".")) if v_raw is not None else None
@@ -387,12 +396,14 @@ def _normalize_observations(obs: List[Dict[str, Any]]) -> pd.DataFrame:
             v = None
         rows.append(
             {
-                "date": pd.to_datetime(d),
+                "date": d,
                 "value": v,
                 "status": o.get("statusCode", ""),
             }
         )
-    df = pd.DataFrame(rows).dropna(subset=["value"]).sort_values("date")
+    df = pd.DataFrame(rows).dropna(subset=["value", "date"]).sort_values("date")
+    # Asegurar que la columna 'date' sea datetime para permitir resampleo
+    df["date"] = pd.to_datetime(df["date"])
     return df
 
 
@@ -431,7 +442,25 @@ def _compute_variations(df: pd.DataFrame, freq: str) -> pd.DataFrame:
     else:
         lag = None
 
-    if lag is not None and lag > 0:
+    # Cálculo robusto de variación anual: emparejar por trimestre y año
+    import numpy as np
+    if freq in {"Q", "T"}:
+        # Extraer año y trimestre
+        df["_year"] = df["date"].apply(lambda x: int(str(x)[:4]))
+        df["_month"] = df["date"].apply(lambda x: int(str(x)[5:7]))
+        df["_quarter"] = df["_month"].apply(lambda m: ((m - 1) // 3) + 1)
+        yoy_list = []
+        for idx, row in df.iterrows():
+            y, q = row["_year"], row["_quarter"]
+            prev = df[(df["_year"] == y - 1) & (df["_quarter"] == q)]
+            if not prev.empty and prev.iloc[0]["value"] != 0:
+                yoy = (row["value"] / prev.iloc[0]["value"] - 1.0) * 100.0
+            else:
+                yoy = np.nan
+            yoy_list.append(yoy)
+        df["yoy_pct"] = yoy_list
+        df.drop(["_year", "_month", "_quarter"], axis=1, inplace=True)
+    elif lag is not None and lag > 0:
         prev = df["value"].shift(lag)
         df["yoy_pct"] = (df["value"] / prev - 1.0) * 100.0
     else:
@@ -1042,11 +1071,17 @@ def get_series(
     target_frequency admite: D/M/Q/A.
     """
     # Reusar la implementación existente aceptando alias en español/inglés
+    # Detect if PIB and force quarterly frequency for correct YoY/periods
+    force_quarterly = False
+    sid_up = (series_id or "").upper()
+    if "PIB" in sid_up and (target_frequency or "M").upper() == "M":
+        force_quarterly = True
+    freq_to_use = "Q" if force_quarterly else (target_frequency or None)
     return fetch_series_with_calc(
         series_id=series_id,
         firstdate=firstdate,
         lastdate=lastdate,
-        frequency=(target_frequency or None),
+        frequency=freq_to_use,
         calc_type=(calc_type or "ORIGINAL"),
         agg=agg,
     )
@@ -1213,12 +1248,27 @@ def build_year_comparison_table(data: Dict[str, Any], year: int) -> Dict[str, An
     prev_year = year - 1
     freq = (data.get('meta', {}) or {}).get('freq_effective', 'M').upper()
 
-    def _label_for_date(dt: datetime.date) -> str:
+    from typing import Tuple
+    def _quarter_and_label(dt: datetime.date) -> Tuple[str, str]:
+        # Robustly assign quarter and label for quarterly data
         if freq in {"Q", "T"}:
-            q = (dt.month - 1) // 3 + 1
-            return f"T{q}"
+            # If date is first of quarter, assign quarter accordingly
+            month = dt.month
+            if month in (1, 2, 3):
+                q = 1
+            elif month in (4, 5, 6):
+                q = 2
+            elif month in (7, 8, 9):
+                q = 3
+            else:
+                q = 4
+            label = f"{q}T {dt.year}"
+            key = f"{dt.year}-Q{q}"
+            return key, label
         meses = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"]
-        return meses[dt.month - 1]
+        label = meses[dt.month - 1]
+        key = f"{dt.year}-{dt.month:02d}"
+        return key, label
 
     prev_map: Dict[str, Dict[str, Any]] = {}
     curr_map: Dict[str, Dict[str, Any]] = {}
@@ -1227,19 +1277,25 @@ def build_year_comparison_table(data: Dict[str, Any], year: int) -> Dict[str, An
             d = datetime.date.fromisoformat(r.get('date', '0000-01-01'))
         except Exception:
             continue
-        lbl = _label_for_date(d)
+        key, label = _quarter_and_label(d)
+        r['_period_label'] = label
         if d.year == prev_year:
-            prev_map[lbl] = r
+            prev_map[key] = r
         elif d.year == year:
-            curr_map[lbl] = r
+            curr_map[key] = r
 
     # Solo periodos presentes en el año actual
-    periods_curr = sorted(curr_map.keys(), key=lambda x: (
-        (int(x[1]) if (freq in {"Q","T"} and len(x) >= 2 and x[0] == 'T' and x[1].isdigit()) else {
-            "Ene":1,"Feb":2,"Mar":3,"Abr":4,"May":5,"Jun":6,
-            "Jul":7,"Ago":8,"Sep":9,"Oct":10,"Nov":11,"Dic":12
-        }.get(x, 99))
-    ))
+    def quarter_sort_key(k):
+        # k is like '2025-Q3'
+        if freq in {"Q", "T"} and '-Q' in k:
+            y, q = k.split('-Q')
+            return (int(y), int(q))
+        # fallback for months
+        if '-' in k:
+            y, m = k.split('-')
+            return (int(y), int(m))
+        return (9999, 99)
+    periods_curr = sorted(curr_map.keys(), key=quarter_sort_key)
 
     rows: List[Dict[str, Any]] = []
     for p in periods_curr:
@@ -1247,6 +1303,9 @@ def build_year_comparison_table(data: Dict[str, Any], year: int) -> Dict[str, An
         cy = curr_map.get(p, {})
         pv = py.get('value')
         cv = cy.get('value')
+        # Use label from current year if available, else from previous
+        period_label = cy.get('_period_label') or py.get('_period_label') or p
+        # Calculate YoY only if both values exist and are not None
         yoy = cy.get('yoy_pct')
         if yoy is None and (pv is not None and cv is not None and pv != 0):
             try:
@@ -1260,7 +1319,7 @@ def build_year_comparison_table(data: Dict[str, Any], year: int) -> Dict[str, An
             except Exception:
                 pass
         rows.append({
-            'period': p,
+            'period': period_label,
             'value_prev': pv,
             'value_curr': cv,
             'yoy_pct': yoy,
