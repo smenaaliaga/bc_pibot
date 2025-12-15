@@ -271,13 +271,47 @@ def detect_series_code(
         if not final_sector:
             final_sector = _normalize_text(DEFAULT_COMPONENT)
     
-    # Buscar serie en el catálogo usando component (no sector)
-    series_code = _find_best_match(final_indicator, final_sector)
-    
-    # Obtener metadata de la serie
+
+    # Buscar serie desestacionalizada si corresponde
+    seasonality = None
+    # Buscar en normalized dict
+    if 'seasonality' in normalized:
+        s = normalized['seasonality']
+        if isinstance(s, dict):
+            seasonality = s.get('standard_name') or s.get('normalized') or s.get('original') or s
+        else:
+            seasonality = s
+    # Normalizar texto
+    if seasonality:
+        seasonality_norm = _normalize_text(str(seasonality))
+    else:
+        seasonality_norm = None
+
     catalog = _load_series_catalog()
-    metadata = catalog.get(series_code, {}) if series_code else {}
-    
+    series_code = None
+    metadata = {}
+    matched_by = "catalog_standard_names"
+
+    # Si se pide desestacionalizado, buscar serie con ese atributo
+    if seasonality_norm == "desestacionalizado":
+        # Buscar en el catálogo una serie que coincida con indicator, component y seasonality=desestacionalizado
+        for code, meta in catalog.items():
+            std = meta.get("standard_names", {})
+            if (
+                _normalize_text(std.get("indicator", "")) == final_indicator and
+                _normalize_text(std.get("component", "")) == final_sector and
+                _normalize_text(std.get("seasonality", "")) == "desestacionalizado"
+            ):
+                series_code = code
+                metadata = meta
+                matched_by = "catalog_standard_names+seasonality"
+                break
+
+    # Si no se encontró por seasonality, usar búsqueda normal
+    if not series_code:
+        series_code = _find_best_match(final_indicator, final_sector)
+        metadata = catalog.get(series_code, {}) if series_code else {}
+
     # Si no se encuentra, intentar con valores por defecto
     if not series_code:
         logger.warning(
@@ -286,21 +320,21 @@ def detect_series_code(
         )
         series_code = _find_best_match(_normalize_text(DEFAULT_INDICATOR), _normalize_text(DEFAULT_COMPONENT))
         metadata = catalog.get(series_code, {}) if series_code else {}
-    
+
     result = {
         "series_code": series_code,
         "indicator": final_indicator,
         "component": final_sector,  # Usar component como campo principal
         "sector": final_sector,      # Mantener por compatibilidad
         "metadata": metadata if metadata else {},
-        "matched_by": "catalog_standard_names",
+        "matched_by": matched_by,
     }
-    
+
     logger.info(
         f"Serie detectada: {series_code} | "
-        f"indicator={final_indicator}, component={final_sector}"
+        f"indicator={final_indicator}, component={final_sector}, seasonality={seasonality_norm}"
     )
-    
+
     return result
 
 

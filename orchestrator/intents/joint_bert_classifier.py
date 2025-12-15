@@ -30,6 +30,7 @@ try:
     from orchestrator.utils.period_normalizer import standardize_imacec_time_ref
     from orchestrator.utils.indicator_normalizer import standardize_indicator
     from orchestrator.utils.component_normalizer import normalize_component
+    from orchestrator.utils.seasonality_normalizer import normalize_seasonality
     logger = logging.getLogger(__name__)
     logger.info("✓ Normalizadores cargados exitosamente")
 except ImportError as e:
@@ -39,6 +40,7 @@ except ImportError as e:
     standardize_imacec_time_ref = None
     standardize_indicator = None
     normalize_component = None
+    normalize_seasonality = None
 
 # Importar JointBERT model dinámicamente desde model/in
 try:
@@ -158,7 +160,7 @@ class PIBotPredictor:
 
         # Si model_name_or_path no existe o el path no es válido, usar valor de entorno o BETO público
         model_name = getattr(self.args, "model_name_or_path", None)
-        env_model_name = os.getenv("JOINT_BERT_MODEL_NAME")
+        env_model_name = os.getenv("BERT_MODEL_NAME")
         if not model_name or not os.path.exists(str(model_name)):
             model_name = env_model_name or "dccuchile/bert-base-spanish-wwm-cased"
             logger.warning(
@@ -428,13 +430,39 @@ class PIBotPredictor:
         
         # Normalizar sector/componente (si existe)
         if 'sector' in entities or 'component' in entities:
+            # --- Separar seasonality de component si aparecen juntos ---
+            # Palabras clave de estacionalidad
+            seasonality_keywords = [
+                "desestacionalizado", "desestacionalizada", "desestacionalizados", "desestacionalizadas",
+                "ajustado por estacionalidad", "ajustada por estacionalidad", "ajustados por estacionalidad", "ajustadas por estacionalidad",
+                "no desestacionalizado", "no desestacionalizada", "original", "sin ajuste estacional", "sin ajustar"
+            ]
+            import re
+            def split_component_seasonality(text):
+                for kw in seasonality_keywords:
+                    # Buscar palabra clave como palabra completa (ignorando mayúsculas/minúsculas y signos de puntuación al final)
+                    pattern = r"\b" + re.escape(kw) + r"[\b\?!.,;:]*$"
+                    match = re.search(pattern, text, re.IGNORECASE)
+                    if match:
+                        idx = match.start()
+                        comp = text[:idx].strip(" ,;:¿?¡!.")
+                        seas = text[idx:].strip(" ,;:¿?¡!.")
+                        return comp, seas
+                return text, None
+
+            # Si component contiene una palabra de seasonality, separarla
+            if "component" in entities:
+                comp = entities["component"]
+                comp_clean, seas = split_component_seasonality(comp)
+                if seas:
+                    entities["component"] = comp_clean
+                    entities["seasonality"] = seas
+
             sector_text = entities.get('sector') or entities.get('component')
             if normalize_component:
                 try:
-                    logger.info(f"Normalizando sector/componente: '{sector_text}'")
                     component_normalized = normalize_component(sector_text)
                     logger.info(f"Componente normalizado: {component_normalized}")
-                    
                     # El componente normalizado ya coincide con standard_names.component del catálogo
                     normalized['component'] = {
                         'standard_name': component_normalized,  # Formato del catálogo (coincide con standard_names)
@@ -446,6 +474,15 @@ class PIBotPredictor:
                 except Exception as e:
                     logger.warning(f"Error normalizando sector/componente '{sector_text}': {e}", exc_info=True)
         
+        # Normalizar estacionalidad (seasonality) si existe
+        if 'seasonality' in entities and normalize_seasonality:
+            try:
+                logger.info(f"Normalizando estacionalidad: '{entities['seasonality']}'")
+                seasonality_normalized = normalize_seasonality(entities['seasonality'])
+                logger.info(f"Estacionalidad normalizada: {seasonality_normalized}")
+                normalized['seasonality'] = seasonality_normalized
+            except Exception as e:
+                logger.warning(f"Error normalizando estacionalidad '{entities['seasonality']}': {e}", exc_info=True)
         return normalized
     
     def predict_batch(self, texts: list) -> list:
