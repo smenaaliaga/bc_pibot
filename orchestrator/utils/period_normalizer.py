@@ -74,18 +74,11 @@ def strip_accents(s: str) -> str:
 def normalize_text(s: str) -> str:
     s = s.lower().strip()
     s = strip_accents(s)
-    # Unificar ordinales comunes
-    s = re.sub(r"\b1er\b|\b1ero\b|\bprimer\b", "primer", s)
-    s = re.sub(r"\b2do\b|\bsegundo\b", "segundo", s)
-    s = re.sub(r"\b3er\b|\btercer\b", "tercer", s)
-    s = re.sub(r"\b4to\b|\bcuarto\b", "cuarto", s)
     # Normalizar typos en "último" - ultima, ultimo, ultmo, ultim, ulto, ulta -> ultimo
-    # ultim?[oa]? = ult + (i)? + (m)? + (o|a)?
     s = re.sub(r"\bult[io]?m?[oa]?\b", "ultimo", s)
     s = re.sub(r"\bultim\b", "ultimo", s)  # "ultim" sin vocal final
     s = re.sub(r"\bultmo\b", "ultimo", s)  # "ultmo" orden incorrecto
     # Normalizar sinónimos de "último": reciente, más reciente -> ultimo
-    # Tolera errores: reciente, recente, resiente, reciente
     s = re.sub(r"\b(mas|muy)?\s*r[eai]c[ie][ei]nte?\b", "ultimo", s)
     # Tolera errores en "nuevo": nuevo, nuebo, nueo, nevo
     s = re.sub(r"\b(el|la|lo)?\s*mas\s+n[ue][euo][bv]?[oa]\b", "ultimo", s)
@@ -193,53 +186,77 @@ def parse_explicit_month(text: str) -> Optional[StandardPeriod]:
 
 
 def parse_explicit_quarter(text: str, base_date: Optional[date] = None) -> Optional[StandardPeriod]:
+    """
+    Detecta periodos trimestrales explícitos en español, incluyendo variantes y errores comunes:
+    - 1T 2025, 1Q 2025, 1er trimestre 2025, I trimestre 2025, primer trimestre 2025, etc.
+    - Soporta variantes y typos: 'trimstre', 'trimestr', etc.
+    """
+    ord_map = {"primer": 1, "segundo": 2, "tercer": 3, "cuarto": 4, "1er": 1, "2do": 2, "3er": 3, "4to": 4, "1ro": 1, "2do": 2, "3ro": 3, "4to": 4}
+    roman_map = {"i": 1, "ii": 2, "iii": 3, "iv": 4}
     base = base_date or date.today()
-    
-    # 1) Notación corta: 1T 2025, 2t2025
-    m = re.search(r"\b([1-4])\s*t\s*(20\d{2})\b", text)
-    if m:
-        q = int(m.group(1))
-        year = int(m.group(2))
-        start, end = quarter_range(year, q)
-        return StandardPeriod("quarter", start, end, f"{year:04d}-Q{q}")
-    
-    # 1b) Notación corta sin año: 1T, 2t (asume año actual)
-    m = re.search(r"\b([1-4])\s*t\b", text)
-    if m:
-        q = int(m.group(1))
-        year = base.year
-        start, end = quarter_range(year, q)
-        return StandardPeriod("quarter", start, end, f"{year:04d}-Q{q}", confidence="medium")
 
-    # 2) T1 2025, T 1 2025
-    m = re.search(r"\bt\s*([1-4])\s*(20\d{2})\b", text)
-    if m:
-        q = int(m.group(1))
-        year = int(m.group(2))
-        start, end = quarter_range(year, q)
-        return StandardPeriod("quarter", start, end, f"{year:04d}-Q{q}")
+    # Fuzzy matching para variantes de 'trimestre' (typos comunes)
+    fuzzy_trimestre = ["trimestre", "trimstre", "trimetre", "trimestr", "trimesttre", "trimestte"]
+    fuzzy_ordinals = ["primer", "segundo", "tercer", "cuarto", "1er", "2do", "3er", "4to", "1ro", "2do", "3ro", "4to"]
+    for ord in fuzzy_ordinals:
+        for tri in fuzzy_trimestre:
+            pat = fr"\b({ord})\s+{tri}(?:\s+(?:de|del))?\s*(20\d{{2}})\b"
+            m = re.search(pat, text, re.IGNORECASE)
+            if m:
+                q = ord_map.get(m.group(1).lower(), None)
+                year = int(m.group(2))
+                if q and year:
+                    start, end = quarter_range(year, q)
+                    return StandardPeriod("quarter", start, end, f"{year:04d}-Q{q}", confidence="medium")
 
-    # 3) "trimestre 3 del 2023", "trimestre 3 2023", "3 trimestre 2023"
-    # Orden: número + trimestre + año o trimestre + número + año
-    m = re.search(r"\b([1-4])\s*trimestre(?:\s+(?:de|del))?\s*(20\d{2})\b", text)
-    if m:
-        q = int(m.group(1))
-        year = int(m.group(2))
-        start, end = quarter_range(year, q)
-        return StandardPeriod("quarter", start, end, f"{year:04d}-Q{q}")
-    
-    m = re.search(r"\btrimestre\s*([1-4])(?:\s+(?:de|del))?\s*(20\d{2})\b", text)
-    if m:
-        q = int(m.group(1))
-        year = int(m.group(2))
-        start, end = quarter_range(year, q)
-        return StandardPeriod("quarter", start, end, f"{year:04d}-Q{q}")
+    def roman_extractor(m):
+        roman = m.group(1)
+        roman_clean = strip_accents(roman).lower()
+        q = roman_map.get(roman_clean)
+        return (q, int(m.group(2)))
 
-    # 4) "primer/segundo/tercer/cuarto trimestre de/del 2025"
-    m = re.search(
-        r"\b(primer|segundo|tercer|cuarto)\s+trimestre(?:\s+(?:de|del))?\s*(20\d{2})\b",
-        text
-    )
+    def roman_extractor_no_year(m):
+        roman = m.group(1)
+        roman_clean = strip_accents(roman).lower()
+        q = roman_map.get(roman_clean)
+        return (q, None)
+
+    patterns = [
+        (r"\b([ivx]{1,3})\s*trimestre(?:\s+(?:de|del))?\s*(20\d{2})\b", roman_extractor),
+        (r"\b([ivx]{1,3})\s*trimestre\b", roman_extractor_no_year),
+        (r"\b([1-4])\s*[TtQq]\s*[- ]?(20\d{2})\b", lambda m: (int(m.group(1)), int(m.group(2)))),
+        (r"\b([1-4])[TtQq](20\d{2})\b", lambda m: (int(m.group(1)), int(m.group(2)))),
+        (r"\b([1-4])\s*[TtQq]\b", lambda m: (int(m.group(1)), None)),
+        (r"\b([1-4])[TtQq]\b", lambda m: (int(m.group(1)), None)),
+        (r"\b[TtQq]\s*([1-4])\s*[- ]?(20\d{2})\b", lambda m: (int(m.group(1)), int(m.group(2)))),
+        (r"\b[TtQq]([1-4])(20\d{2})\b", lambda m: (int(m.group(1)), int(m.group(2)))),
+        (r"\b[TtQq]\s*([1-4])\b", lambda m: (int(m.group(1)), None)),
+        (r"\b[TtQq]([1-4])\b", lambda m: (int(m.group(1)), None)),
+        (r"\b([1-4])(er|ro|do|to)?\s*trimestre(?:\s+(?:de|del))?\s*(20\d{2})\b", lambda m: (int(m.group(1)), int(m.group(3)))),
+        (r"\b([1-4])(er|ro|do|to)?\s*trimestre\b", lambda m: (int(m.group(1)), None)),
+        (r"\b(primer|segundo|tercer|cuarto|1er|2do|3er|4to|1ro|2do|3ro|4to)\s+trimestre(?:\s+(?:de|del))?\s*(20\d{2})\b", lambda m: (ord_map.get(m.group(1).lower()), int(m.group(2)))),
+        (r"\b(primer|segundo|tercer|cuarto|1er|2do|3er|4to|1ro|2do|3ro|4to)\s+trimestre\b", lambda m: (ord_map.get(m.group(1).lower()), None)),
+        (r"\btrimestre\s*([1-4])(?:\s+(?:de|del))?\s*(20\d{2})\b", lambda m: (int(m.group(1)), int(m.group(2)))),
+        (r"\b([1-4])\s*trimestre(?:\s+(?:de|del))?\s*(20\d{2})\b", lambda m: (int(m.group(1)), int(m.group(2)))),
+    ]
+
+    for pat, extractor in patterns:
+        m = re.search(pat, text, re.IGNORECASE)
+        if m:
+            q, year = extractor(m)
+            if q is None:
+                continue
+            if year or year is None:
+                if year is None:
+                    year = base.year
+                    confidence = "medium"
+                else:
+                    confidence = "high"
+                start, end = quarter_range(year, q)
+                return StandardPeriod("quarter", start, end, f"{year:04d}-Q{q}", confidence=confidence)
+
+    # 4) "primer/segundo/tercer/cuarto trimestre de/del 2025" (palabra, sin variantes)
+    m = re.search(r"\b(primer|segundo|tercer|cuarto)\s+trimestre(?:\s+(?:de|del))?\s*(20\d{2})\b", text)
     if m:
         ord_map = {"primer": 1, "segundo": 2, "tercer": 3, "cuarto": 4}
         q = ord_map[m.group(1)]
@@ -295,93 +312,74 @@ def parse_relative_periods(text: str, base: date) -> Optional[StandardPeriod]:
     m = re.search(r"\b(primer|segundo|tercer|cuarto)\s+mes\s+del\s+ano\b", text)
     if m:
         ord_to_month = {"primer": 1, "segundo": 2, "tercer": 3, "cuarto": 4}
-        month = ord_to_month[m.group(1)]
-        year = base.year
-        start, end = month_range(year, month)
-        return StandardPeriod("month", start, end, f"{year:04d}-{month:02d}", source="rules")
+        # Mapas para ordinales y romanos
+        ord_map = {"primer": 1, "segundo": 2, "tercer": 3, "cuarto": 4, "1er": 1, "2do": 2, "3er": 3, "4to": 4, "1ro": 1, "2do": 2, "3ro": 3, "4to": 4}
+        roman_map = {"I": 1, "II": 2, "III": 3, "IV": 4}
 
-    # Trimestres relativos simples
-    if re.search(r"\b(este trimestre|trimestre actual)\b", text):
-        p = pd.Period(base.strftime("%Y-%m"), freq="M").asfreq("Q")
-        start, end = p.start_time.date(), p.end_time.date()
-        q = p.quarter
-        return StandardPeriod("quarter", start, end, f"{p.year:04d}-Q{q}", source="rules")
+        # 1) Notaciones cortas y variantes: 1T, 1Q, 1er trimestre, I trimestre, etc.
+        # Orden de patrones: primero los más específicos y con año explícito
+        patterns = [
+            (r"\b([1-4])\s*[TQ]\s*[- ]?(20\d{2})\b", lambda m: (int(m.group(1)), int(m.group(2)))),
+            (r"\b([1-4])\s*[TQ]\b", lambda m: (int(m.group(1)), None)),
+            (r"\b[TQ]\s*([1-4])\s*[- ]?(20\d{2})\b", lambda m: (int(m.group(1)), int(m.group(2)))),
+            (r"\b[TQ]\s*([1-4])\b", lambda m: (int(m.group(1)), None)),
+            (r"\b([1-4])(er|ro|do|to)?\s*trimestre(?:\s+(?:de|del))?\s*(20\d{2})\b", lambda m: (int(m.group(1)), int(m.group(3)))),
+            (r"\b([1-4])(er|ro|do|to)?\s*trimestre\b", lambda m: (int(m.group(1)), None)),
+            (r"\b(primer|segundo|tercer|cuarto|1er|2do|3er|4to|1ro|2do|3ro|4to)\s+trimestre(?:\s+(?:de|del))?\s*(20\d{2})\b", lambda m: (ord_map.get(m.group(1).lower()), int(m.group(2)))),
+            (r"\b(primer|segundo|tercer|cuarto|1er|2do|3er|4to|1ro|2do|3ro|4to)\s+trimestre\b", lambda m: (ord_map.get(m.group(1).lower()), None)),
+            (r"\b([IVX]{1,3})\s*trimestre(?:\s+(?:de|del))?\s*(20\d{2})\b", lambda m: (roman_map.get(m.group(1).upper()), int(m.group(2)))),
+            (r"\b([IVX]{1,3})\s*trimestre\b", lambda m: (roman_map.get(m.group(1).upper()), None)),
+            (r"\btrimestre\s*([1-4])(?:\s+(?:de|del))?\s*(20\d{2})\b", lambda m: (int(m.group(1)), int(m.group(2)))),
+            (r"\b([1-4])\s*trimestre(?:\s+(?:de|del))?\s*(20\d{2})\b", lambda m: (int(m.group(1)), int(m.group(2)))),
+        ]
 
-    if re.search(r"\b(trimestre pasado|trimestre anterior)\b", text):
-        p = pd.Period(base.strftime("%Y-%m"), freq="M").asfreq("Q") - 1
-        start, end = p.start_time.date(), p.end_time.date()
-        q = p.quarter
-        return StandardPeriod("quarter", start, end, f"{p.year:04d}-Q{q}", source="rules")
-    
-    # "último trimestre" - asume el trimestre más reciente reportado (trimestre anterior)
-    # Después de normalize_text(): "ultimo trimestre" (ya normalizado)
-    # trim[ei]?s?tre tolera: trimestre, trimstre, trimetre
-    if re.search(r"\bultimo\s+trim[ei]?s?tre\b", text):
-        p = pd.Period(base.strftime("%Y-%m"), freq="M").asfreq("Q") - 1
-        start, end = p.start_time.date(), p.end_time.date()
-        q = p.quarter
-        return StandardPeriod("quarter", start, end, f"{p.year:04d}-Q{q}", confidence="medium", source="rules")
+        for pat, extractor in patterns:
+            m = re.search(pat, text, re.IGNORECASE)
+            if m:
+                q, year = extractor(m)
+                if q and (year or year is None):
+                    if year is None:
+                        year = base.year
+                        confidence = "medium"
+                    else:
+                        confidence = "high"
+                    start, end = quarter_range(year, q)
+                    return StandardPeriod("quarter", start, end, f"{year:04d}-Q{q}", confidence=confidence)
 
-    # Mes relativos
-    if re.search(r"\b(este mes|mes actual|mes en curso)\b", text):
-        start, end = month_range(base.year, base.month)
-        return StandardPeriod("month", start, end, f"{base.year:04d}-{base.month:02d}", source="rules")
-    if re.search(r"\b(mes pasado|mes anterior|mes previo)\b", text):
-        p = pd.Period(base.strftime("%Y-%m"), freq="M") - 1
-        start, end = p.start_time.date(), p.end_time.date()
-        return StandardPeriod("month", start, end, f"{p.year:04d}-{p.month:02d}", source="rules")
-    if re.search(r"\b(mes antepasado)\b", text):
-        p = pd.Period(base.strftime("%Y-%m"), freq="M") - 2
-        start, end = p.start_time.date(), p.end_time.date()
-        return StandardPeriod("month", start, end, f"{p.year:04d}-{p.month:02d}", source="rules")
-    
-    # "último mes del año" (más específico, antes de capturar solo "ultimo")
-    # Nota: después de normalize_text(), "último/última/ultmo/ultim" -> "ultimo"
-    if re.search(r"\bultimo\s+mes\s+del\s+ano\b", text):
-        year = base.year
-        start, end = month_range(year, 12)
-        return StandardPeriod("month", start, end, f"{year:04d}-12", confidence="medium", source="rules")
-    
-    # "último mes" - ya normalizado a "ultimo mes"
-    if re.search(r"\bultimo\s+mes\b", text):
-        p = pd.Period(base.strftime("%Y-%m"), freq="M") - 1
-        start, end = p.start_time.date(), p.end_time.date()
-        return StandardPeriod("month", start, end, f"{p.year:04d}-{p.month:02d}", confidence="medium", source="rules")
-    
-    # Patrones genéricos con "último/última" sin especificar periodo
-    # Ejemplos: "el último", "la última", "último dato", "última cifra", "último valor", "última medición"
-    # Por defecto asumimos que se refiere al último mes reportado
-    if re.search(r"\b(el|la|del|de la)?\s*ultimo\s+(dato|cifra|valor|medicion|reporte|comunicado|registro|informe)?\b", text):
-        # Si también menciona "trimestre" o "ano", no usar esta regla (ya se captura arriba)
-        if not re.search(r"\b(trimestre|trim[ei]?s?tre|ano)\b", text):
-            p = pd.Period(base.strftime("%Y-%m"), freq="M") - 1
-            start, end = p.start_time.date(), p.end_time.date()
-            return StandardPeriod("month", start, end, f"{p.year:04d}-{p.month:02d}", confidence="medium", source="rules")
-    
-    # Año relativos (antes de capturar "ultimo" genérico)
-    if re.search(r"\b(este ano|ano actual|ano en curso|presente ano)\b", text):
-        start, end = year_range(base.year)
-        return StandardPeriod("year", start, end, f"{base.year:04d}", source="rules")
-    if re.search(r"\b(ano pasado|ano anterior)\b", text):
-        start, end = year_range(base.year - 1)
-        return StandardPeriod("year", start, end, f"{base.year - 1:04d}", source="rules")
-    
-    # "último año" - año anterior
-    if re.search(r"\bultimo\s+ano\b", text):
-        start, end = year_range(base.year - 1)
-        return StandardPeriod("year", start, end, f"{base.year - 1:04d}", source="rules")
-    
-    # "último" o "última" solo, sin contexto adicional
-    # Solo aplica si no hay mención de trimestre/año
-    if re.search(r"\bultimo\b", text):
-        if not re.search(r"\b(trimestre|trim[ei]?s?tre|ano|t[1-4]|[1-4]t)\b", text):
-            p = pd.Period(base.strftime("%Y-%m"), freq="M") - 1
-            start, end = p.start_time.date(), p.end_time.date()
-            return StandardPeriod("month", start, end, f"{p.year:04d}-{p.month:02d}", confidence="low", source="rules")
+        # Fuzzy matching para "trimestre" y ordinales (tolerancia a errores ortográficos)
+        fuzzy_ordinals = ["primer", "segundo", "tercer", "cuarto", "1er", "2do", "3er", "4to", "1ro", "2do", "3ro", "4to"]
+        fuzzy_trimestre = ["trimestre", "trimstre", "trimetre", "trimestr", "trimesttre", "trimestte"]
+        for ord in fuzzy_ordinals:
+            for tri in fuzzy_trimestre:
+                pat = fr"\b({ord})\s+{tri}(?:\s+(?:de|del))?\s*(20\d{{2}})\b"
+                m = re.search(pat, text, re.IGNORECASE)
+                if m:
+                    q = ord_map.get(m.group(1).lower(), None)
+                    year = int(m.group(2))
+                    if q and year:
+                        start, end = quarter_range(year, q)
+                        return StandardPeriod("quarter", start, end, f"{year:04d}-Q{q}", confidence="medium")
 
-    # "último reporte del año" / "comunicado del año pasado"
-    # Esto no es una fecha directa, sino una referencia documental.
-    # Puedes mapearlo a rango anual con baja confianza.
+        # 4) Rangos por meses: "enero-marzo 2025", "abril a junio 2025"
+        m = re.search(
+            r"\b(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)"
+            r"\s*(?:-|a)\s*"
+            r"(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)"
+            r"\s*(20\d{2})\b",
+            text
+        )
+        if m:
+            m1 = MONTHS[m.group(1)]
+            m2 = MONTHS[m.group(2)]
+            year = int(m.group(3))
+            # Si coincide exactamente con un trimestre canónico, lo expresamos como quarter
+            for q, (qs, qe) in RANGE_QUARTER_MONTHS.items():
+                if (m1, m2) == (qs, qe):
+                    start, end = quarter_range(year, q)
+                    return StandardPeriod("quarter", start, end, f"{year:04d}-Q{q}")
+            # Si no coincide, podrías optar por devolver un rango mensual genérico
+            # pero aquí dejamos que otro nivel lo resuelva.
+        return None
     if re.search(r"\b(ultimo reporte del ano|comunicado del ano pasado)\b", text):
         year = base.year - 1 if "pasado" in text else base.year
         start, end = year_range(year)
@@ -434,29 +432,31 @@ def standardize_imacec_time_ref(text: str, base_date: Optional[date] = None) -> 
       granularity, start_date, end_date, period_key, confidence, source
     """
     base = base_date or date.today()
-    t = normalize_text(text)
+    t_norm = normalize_text(text)
+    t_noacc = strip_accents(t_norm)
 
     # 1) Relativos primero (más específicos: "primer trimestre del presente año")
-    p = parse_relative_periods(t, base)
+    p = parse_relative_periods(t_noacc, base)
     if p:
         return p.__dict__
 
-    # 2) Reglas explícitas
-    p = parse_explicit_quarter(t, base)
+    # 2) Reglas explícitas: quarter
+    p = parse_explicit_quarter(t_noacc, base)
     if p:
         return p.__dict__
 
-    p = parse_explicit_month(t)
+    # 3) Reglas explícitas: mes
+    p = parse_explicit_month(t_noacc)
     if p:
         return p.__dict__
 
-    # 3) Año explícito (solo si no se detectó algo más fino)
-    p = parse_explicit_year(t)
+    # 4) Año explícito (solo si no se detectó algo más fino)
+    p = parse_explicit_year(t_noacc)
     if p:
         return p.__dict__
 
-    # 4) NLP fallback
-    p = parse_with_dateparser(t, base)
+    # 5) NLP fallback
+    p = parse_with_dateparser(t_noacc, base)
     if p:
         return p.__dict__
 

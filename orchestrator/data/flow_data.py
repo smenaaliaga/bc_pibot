@@ -311,6 +311,17 @@ def stream_data_flow(
         freq = metadata.get('freq_effective') or metadata.get('default_frequency') or metadata.get('original_frequency') or metadata.get('frequency') or ''
         freq = str(freq).upper()
 
+        # Detectar si es PIB o desestacionalizado
+        indicator_is_pib = (series_id or '').lower().startswith('pib') or metadata.get('indicator', '') == 'pib' or (metadata.get('title','').lower().startswith('pib'))
+        seasonality_norm = None
+        if 'seasonality' in normalized:
+            s = normalized['seasonality']
+            if isinstance(s, dict):
+                seasonality_norm = s.get('standard_name') or s.get('normalized') or s.get('original') or s.get('text_normalized') or s.get('label')
+            else:
+                seasonality_norm = s
+            seasonality_norm = str(seasonality_norm).lower()
+
         def period_label(date_str):
             if not date_str:
                 return "--"
@@ -321,7 +332,6 @@ def stream_data_flow(
                     q = ((m - 1) // 3) + 1
                     return f"{q}T {y}"
                 else:
-                    # Mes en español
                     meses_es = [
                         "", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
                         "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
@@ -331,61 +341,113 @@ def stream_data_flow(
             except Exception:
                 return date_str
 
-        mensaje_emitido = False
-        if period_context and obs_match:
-            date = obs_match.get("date")
-            yoy_pct = obs_match.get("yoy_pct")
-            if date and yoy_pct is not None:
-                yield f"La variación anual para {period_label(date)} fue {float(yoy_pct):.1f}%\n"
-                mensaje_emitido = True
-        if not mensaje_emitido and obs_latest:
-            date = obs_latest.get("date")
-            yoy_pct = obs_latest.get("yoy_pct")
-            if date and yoy_pct is not None:
-                yield f"La última variación anual disponible es {float(yoy_pct):.1f}% (período {period_label(date)}).\n"
 
-        yield "Periodo | Valor | Variación anual\n"
-        yield "--------|-------|-----------------\n"
-        target_row = obs_match or obs_latest
-        if target_row:
-            date = target_row.get("date")
-            value = target_row.get("value")
-            yoy_pct = target_row.get("yoy_pct")
+        # Calcular variación t-1 si corresponde
+        show_qoq = seasonality_norm and 'desestacionalizado' in seasonality_norm
+        freq_label = 'anual'
+        if freq in {'Q', 'T'}:
+            freq_label = 'trimestral'
+        elif freq == 'M':
+            freq_label = 'mensual'
+
+        var_label = f"Variación {freq_label if show_qoq else 'anual'}"
+        var_key = "yoy_pct"
+        var_value = None
+        row = obs_match or obs_latest
+        if show_qoq and row:
+            # Buscar el periodo anterior
+            obs_sorted = sorted(obs, key=lambda o: o.get("date", ""))
+            idx = next((i for i, o in enumerate(obs_sorted) if o.get("date") == row.get("date")), None)
+            if idx is not None and idx > 0:
+                prev = obs_sorted[idx-1]
+                try:
+                    v_now = float(row.get("value"))
+                    v_prev = float(prev.get("value"))
+                    if v_prev != 0:
+                        var_value = 100.0 * (v_now - v_prev) / abs(v_prev)
+                        var_label = f"Variación {freq_label}"
+                        var_key = "qoq_pct"
+                except Exception:
+                    pass
+        if not var_value and row:
+            var_value = row.get("yoy_pct")
+
+        mensaje_emitido = False
+        if period_context and obs_match and var_value is not None:
+            date = obs_match.get("date")
+            yield f"La variación {freq_label if show_qoq else 'anual'} para {period_label(date)} fue {float(var_value):.1f}%\n"
+            mensaje_emitido = True
+        if not mensaje_emitido and obs_latest and var_value is not None:
+            date = obs_latest.get("date")
+            yield f"La última variación {freq_label if show_qoq else 'anual'} disponible es {float(var_value):.1f}% (período {period_label(date)}).\n"
+
+        yield f"Periodo | Valor | {var_label}\n"
+        yield f"--------|-------|{'-'*len(var_label)}\n"
+        if row:
+            date = row.get("date")
+            value = row.get("value")
             val_fmt = f"{float(value):,.2f}".replace(",", "_").replace("_", ".") if value is not None else "--"
-            yoy_fmt = f"{float(yoy_pct):.1f}%" if yoy_pct is not None else "--"
-            yield f"{period_label(date)} | {val_fmt} | {yoy_fmt}\n"
+            var_fmt = f"{float(var_value):.1f}%" if var_value is not None else "--"
+            yield f"{period_label(date)} | {val_fmt} | {var_fmt}\n"
         else:
             yield "-- | -- | --\n"
         yield "\n"
 
-    # Mostrar metadatos de la serie
-    if metadata:
-        yield f"- Código: `{series_id}`\n"
-        yield f"- Título: {metadata.get('title', '')}\n"
-        # Frecuencia: buscar en varios campos posibles
-        freq = metadata.get('freq_effective') or metadata.get('default_frequency') or metadata.get('original_frequency') or metadata.get('frequency') or ''
-        yield f"- Frecuencia: {freq}\n"
-        yield f"- Unidad: {metadata.get('unit', '')}\n"
+        # --- NUEVO: Emitir marcador de descarga CSV ---
+        try:
+            import pandas as _pd
+            import tempfile
+            import os
+            if row:
+                export_map = {
+                    "date": "Periodo",
+                    "value": "Valor",
+                    var_key: var_label
+                }
+                export_row = {export_map[c]: row.get(c) if c != var_key else var_value for c in export_map if c in row or c == var_key}
+                df_export = _pd.DataFrame([export_row])
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".csv", prefix="serie_", mode="w", encoding="utf-8") as tmp:
+                    df_export.to_csv(tmp, index=False)
+                    tmp_path = tmp.name
+                filename = f"serie_{series_id}.csv"
+                label = "Descargar CSV"
+                yield "##CSV_DOWNLOAD_START\n"
+                yield f"path={tmp_path}\n"
+                yield f"filename={filename}\n"
+                yield f"label={label}\n"
+                yield "mimetype=text/csv\n"
+                yield "##CSV_DOWNLOAD_END\n"
+        except Exception as e:
+            logger.warning(f"No se pudo generar CSV para descarga: {e}")
 
-        # Gráfico: mostrar siempre el campo, aunque esté vacío
-        grafico_url = metadata.get('source_url', '')
-        yield f"- Gráfico: {grafico_url}\n"
+    # # Mostrar metadatos de la serie
+    # if metadata:
+    #     yield f"- Código: `{series_id}`\n"
+    #     yield f"- Título: {metadata.get('title', '')}\n"
+    #     # Frecuencia: buscar en varios campos posibles
+    #     freq = metadata.get('freq_effective') or metadata.get('default_frequency') or metadata.get('original_frequency') or metadata.get('frequency') or ''
+    #     yield f"- Frecuencia: {freq}\n"
+    #     yield f"- Unidad: {metadata.get('unit', '')}\n"
 
-        # Metodología: mostrar siempre el campo, aunque esté vacío
-        metodologia = ''
-        notes = metadata.get('notes', {})
-        if isinstance(notes, dict):
-            metodologia = notes.get('metodologia', '')
+    #     # Gráfico: mostrar siempre el campo, aunque esté vacío
+    #     grafico_url = metadata.get('source_url', '')
+    #     yield f"- Gráfico: {grafico_url}\n"
+
+    #     # Metodología: mostrar siempre el campo, aunque esté vacío
+    #     metodologia = ''
+    #     notes = metadata.get('notes', {})
+    #     if isinstance(notes, dict):
+    #         metodologia = notes.get('metodologia', '')
             
-        if metodologia:
-            if isinstance(metodologia, str) and metodologia.startswith('http'):
-                metodologia_str = f"[Ver documento]({metodologia})"
-            else:
-                metodologia_str = metodologia
-        else:
-            metodologia_str = ''
-        yield f"- Metodología: {metodologia_str}\n"
-        yield "\n"
+    #     if metodologia:
+    #         if isinstance(metodologia, str) and metodologia.startswith('http'):
+    #             metodologia_str = f"[Ver documento]({metodologia})"
+    #         else:
+    #             metodologia_str = metodologia
+    #     else:
+    #         metodologia_str = ''
+    #     yield f"- Metodología: {metodologia_str}\n"
+    #     yield "\n"
 
     
     return
