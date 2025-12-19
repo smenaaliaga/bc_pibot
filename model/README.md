@@ -1,3 +1,24 @@
+# Clonado de modelos Hugging Face
+
+Para descargar cualquier modelo público de Hugging Face directamente a la carpeta `model/out/{modelo}`, usa el script incluido:
+
+```bash
+pip install huggingface_hub
+python model/clone_hf_model.py <nombre-del-modelo> [ruta_destino]
+```
+
+Ejemplo para pibot-jointbert:
+
+```bash
+python model/clone_hf_model.py smenaaliaga/pibot-jointbert model/out/beto
+```
+
+Esto descargará todos los archivos del modelo a la carpeta indicada.
+
+> Si necesitas autenticación (por ejemplo, para modelos privados), configura tu token de Hugging Face con:
+> ```bash
+> huggingface-cli login
+> ```
 # Modelo JointBERT
 
 Estructura de directorios para el clasificador de intenciones y entidades usando Joint BERT.
