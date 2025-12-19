@@ -10,7 +10,11 @@ combinando datos oficiales, RAG con documentos internos y memoria conversacional
 - Credenciales de OpenAI (`OPENAI_API_KEY`) y servicios opcionales (Postgres, Redis, Azure AI Search)
 
 ### Instala dependencias
+
 ```bash
+# Instala uv si no lo tienes
+pip install uv
+
 uv python install 3.12
 uv sync
 # (Opcional) activar entorno

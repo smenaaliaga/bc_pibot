@@ -53,6 +53,42 @@ uv run python docker/postgres/load_txt_rag.py --eval-report logs/exports/rag_eva
 ```
 Produces a JSON artifact listing every chunk inserted during the run. This is intended for downstream Ragas quality evaluations.
 
+### Excel loader (question/fact/topic)
+Ingest an Excel file with columns for question, fact (answer), and topic using `load_excel_facts.py`.
+
+Append to an existing collection (no drop):
+```powershell
+uv run python docker/postgres/load_excel_facts.py `
+  --excel docker/postgres/docs/doc_base.xlsx `
+  --collection methodology `
+  --doc-id faq_excel `
+  --version v1 `
+  --tags "faq,excel" `
+  --language es `
+  --question-col 0 `
+  --fact-col 1 `
+  --topic-col 2
+```
+
+Drop and reload that collection:
+```powershell
+uv run python docker/postgres/load_excel_facts.py `
+  --excel docker/postgres/docs/doc_base.xlsx `
+  --collection methodology `
+  --doc-id faq_excel `
+  --version v1 `
+  --tags "faq,excel" `
+  --language es `
+  --question-col 0 `
+  --fact-col 1 `
+  --topic-col 2 `
+  --purge
+```
+Notes:
+- `--question-col/--fact-col/--topic-col` accept column names or 0-based indexes.
+- `doc_id`, `version`, `tags`, `language`, and any `--extra key=value` are stored in metadata.
+- `--dry-run` parses the file without writing to PG.
+
 ## Useful Flags
 - `--chunk-size / --chunk-overlap`: Override manifest defaults for experimentation.
 - `--staging-table staging.rag_chunks`: Copy chunks into a Postgres table before vector insertion.
