@@ -31,6 +31,15 @@ Example to load vectors after the container is up:
 ```bash
   uv run python docker/postgres/load_txt_rag.py
 ```
+
+
+### Excel loader (question/fact/topic)
+Ingest an Excel file with columns for question, fact (answer), and topic using `load_excel_facts.py`.
+
+```
+uv run python docker/postgres/load_excel_facts.py --excel docker/postgres/docs/doc_base.xlsx --collection methodology --doc-id faq_excel --version v1 --tags "faq,excel" --language es --question-col 0 --fact-col 1 --topic-col 2
+```
+
 ## Recreate the database
 From `docker/`:
 ```bash

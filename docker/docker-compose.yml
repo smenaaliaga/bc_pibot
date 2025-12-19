@@ -13,7 +13,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - ./data/postgres:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
       - ./postgres/migrations:/docker-entrypoint-initdb.d/migrations:ro
     restart: unless-stopped
@@ -34,8 +34,7 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      # Persistencia en host; ruta relativa a este archivo (../data/redis en repo raíz)
-      - ./data/redis:/data
+      - redisdata:/data
     healthcheck:
       test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASS:?set REDIS_PASS in .env} ping | grep PONG"]
       interval: 10s
