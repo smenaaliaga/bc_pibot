@@ -22,25 +22,10 @@ Uso:
 import os
 import logging
 import torch
-from datetime import date
 from typing import Dict, Optional, Any
 from transformers import BertTokenizer
 
-try:
-    from orchestrator.utils.period_normalizer import standardize_imacec_time_ref
-    from orchestrator.utils.indicator_normalizer import standardize_indicator
-    from orchestrator.utils.component_normalizer import normalize_component
-    from orchestrator.utils.seasonality_normalizer import normalize_seasonality
-    logger = logging.getLogger(__name__)
-    logger.info("✓ Normalizadores cargados exitosamente")
-except ImportError as e:
-    # Normalizadores opcionales
-    logger = logging.getLogger(__name__)
-    logger.warning(f"⚠ Normalizadores no disponibles: {e}")
-    standardize_imacec_time_ref = None
-    standardize_indicator = None
-    normalize_component = None
-    normalize_seasonality = None
+logger = logging.getLogger(__name__)
 
 # Importar JointBERT model dinámicamente desde model/in
 try:
@@ -70,36 +55,8 @@ MODEL_CLASSES = {
     'beto': (None, JointBERT) if JointBERT else (None, None),
 }
 
-def get_intent_labels(args):
-    """Lee labels de intención desde model_dir o usa fallback"""
-    model_dir = getattr(args, 'model_dir', None)
-    if model_dir:
-        label_file = os.path.join(model_dir, 'intent_label.txt')
-        if os.path.exists(label_file):
-            return [label.strip() for label in open(label_file, 'r', encoding='utf-8')]
-    # Fallback
-    return ['value', 'methodology']
 
-
-def get_slot_labels(args):
-    """Lee labels de slots desde model_dir o usa fallback"""
-    model_dir = getattr(args, 'model_dir', None)
-    if model_dir:
-        label_file = os.path.join(model_dir, 'slot_label.txt')
-        if os.path.exists(label_file):
-            return [label.strip() for label in open(label_file, 'r', encoding='utf-8')]
-    # Fallback
-    return [
-        'O',
-        'B-indicator', 'I-indicator',
-        'B-frequency', 'I-frequency',
-        'B-period', 'I-period',
-        'B-component', 'I-component',
-        'B-seasonality', 'I-seasonality',
-    ]
-
-
-class PIBotPredictor:
+class JointBERTPredictor:
     """
     El predictor:
     1. Carga el modelo entrenado
@@ -113,7 +70,6 @@ class PIBotPredictor:
         self,
         model_dir: str,
         device: Optional[str] = None,
-        normalize_entities: bool = True,
         max_seq_len: int = 50
     ):
         """
@@ -122,11 +78,9 @@ class PIBotPredictor:
         Args:
             model_dir: Directorio con el modelo entrenado
             device: 'cuda', 'cpu', o None (auto-detectar)
-            normalize_entities: Si True, normaliza fechas e indicadores
             max_seq_len: Longitud máxima de secuencia
         """
         self.model_dir = model_dir
-        self.normalize_entities = normalize_entities
         self.max_seq_len = max_seq_len
         
         # Detectar dispositivo
@@ -188,7 +142,7 @@ class PIBotPredictor:
     
     def predict(self, text: str) -> Dict[str, Any]:
         """
-        Realiza predicción completa sobre el texto.
+        Realiza predicción de intención y extracción de entidades.
         
         Args:
             text: Texto de entrada (consulta del usuario)
@@ -198,15 +152,10 @@ class PIBotPredictor:
             {
                 'intent': str,              # Intención detectada
                 'confidence': float,        # Confianza 0-1
-                'entities': {               # Entidades extraídas
+                'entities': {               # Entidades extraídas (sin normalizar)
                     'indicator': str,       # Opcional
                     'period': str,          # Opcional
-                    'measure_type': str,    # Opcional
                     ...
-                },
-                'normalized': {             # Opcional: entidades normalizadas
-                    'indicator': {...},
-                    'period': {...}
                 }
             }
         """
@@ -226,22 +175,12 @@ class PIBotPredictor:
             raw_prediction['slots']
         )
         
-        # 3. Normalizar entidades si está habilitado
-        normalized = {}
-        if self.normalize_entities:
-            normalized = self._normalize_entities(entities)
-        
-        # 4. Construir respuesta
-        result = {
+        # 3. Construir respuesta
+        return {
             'intent': raw_prediction['intent'],
             'confidence': raw_prediction['intent_confidence'],
             'entities': entities
         }
-        
-        if normalized:
-            result['normalized'] = normalized
-        
-        return result
     
     def _predict_raw(self, text: str) -> Dict[str, Any]:
         """
@@ -377,113 +316,7 @@ class PIBotPredictor:
         
         return entities
     
-    def _normalize_entities(self, entities: Dict[str, str]) -> Dict[str, Any]:
-        """
-        Normaliza las entidades extraídas.
-        
-        Args:
-            entities: Dict con entidades sin normalizar
-        
-        Returns:
-            Dict con entidades normalizadas
-        """
-        normalized = {}
-        
-        # Normalizar período (solo si la función existe)
-        if 'period' in entities:
-            if standardize_imacec_time_ref is None:
-                logger.warning("standardize_imacec_time_ref no está disponible")
-            else:
-                try:
-                    logger.info(f"Normalizando período: '{entities['period']}'")
-                    period_normalized = standardize_imacec_time_ref(
-                        entities['period'],
-                        date.today()
-                    )
-                    logger.info(f"Período normalizado: {period_normalized}")
-                    if period_normalized:
-                        normalized['period'] = period_normalized
-                except Exception as e:
-                    logger.warning(f"Error normalizando período '{entities['period']}': {e}", exc_info=True)
-        
-        # Normalizar indicador (solo si la función existe)
-        if 'indicator' in entities:
-            if standardize_indicator is None:
-                logger.warning("standardize_indicator no está disponible")
-            else:
-                try:
-                    logger.info(f"Normalizando indicador: '{entities['indicator']}'")
-                    indicator_normalized = standardize_indicator(entities['indicator'])
-                    logger.info(f"Indicador normalizado: {indicator_normalized}")
-                    if indicator_normalized and indicator_normalized.get('indicator'):
-                        # El indicador normalizado ya coincide con standard_names.indicator del catálogo (lowercase)
-                        indicator_value = indicator_normalized['indicator']
-                        
-                        normalized['indicator'] = {
-                            'standard_name': indicator_value,  # Formato del catálogo (lowercase: "imacec", "pib")
-                            'normalized': indicator_value,     # Mismo valor
-                            'text_normalized': indicator_normalized['text_norm'],
-                            'detected_by': indicator_normalized.get('text_standardized_imacec')
-                        }
-                except Exception as e:
-                    logger.warning(f"Error normalizando indicador '{entities['indicator']}': {e}", exc_info=True)
-        
-        # Normalizar sector/componente (si existe)
-        if 'sector' in entities or 'component' in entities:
-            # --- Separar seasonality de component si aparecen juntos ---
-            # Palabras clave de estacionalidad
-            seasonality_keywords = [
-                "desestacionalizado", "desestacionalizada", "desestacionalizados", "desestacionalizadas",
-                "ajustado por estacionalidad", "ajustada por estacionalidad", "ajustados por estacionalidad", "ajustadas por estacionalidad",
-                "no desestacionalizado", "no desestacionalizada", "original", "sin ajuste estacional", "sin ajustar"
-            ]
-            import re
-            def split_component_seasonality(text):
-                for kw in seasonality_keywords:
-                    # Buscar palabra clave como palabra completa (ignorando mayúsculas/minúsculas y signos de puntuación al final)
-                    pattern = r"\b" + re.escape(kw) + r"[\b\?!.,;:]*$"
-                    match = re.search(pattern, text, re.IGNORECASE)
-                    if match:
-                        idx = match.start()
-                        comp = text[:idx].strip(" ,;:¿?¡!.")
-                        seas = text[idx:].strip(" ,;:¿?¡!.")
-                        return comp, seas
-                return text, None
 
-            # Si component contiene una palabra de seasonality, separarla
-            if "component" in entities:
-                comp = entities["component"]
-                comp_clean, seas = split_component_seasonality(comp)
-                if seas:
-                    entities["component"] = comp_clean
-                    entities["seasonality"] = seas
-
-            sector_text = entities.get('sector') or entities.get('component')
-            if normalize_component:
-                try:
-                    component_normalized = normalize_component(sector_text)
-                    logger.info(f"Componente normalizado: {component_normalized}")
-                    # El componente normalizado ya coincide con standard_names.component del catálogo
-                    normalized['component'] = {
-                        'standard_name': component_normalized,  # Formato del catálogo (coincide con standard_names)
-                        'normalized': component_normalized,     # Mismo valor
-                        'original': sector_text
-                    }
-                    # Mantener 'sector' por compatibilidad
-                    normalized['sector'] = normalized['component']
-                except Exception as e:
-                    logger.warning(f"Error normalizando sector/componente '{sector_text}': {e}", exc_info=True)
-        
-        # Normalizar estacionalidad (seasonality) si existe
-        if 'seasonality' in entities and normalize_seasonality:
-            try:
-                logger.info(f"Normalizando estacionalidad: '{entities['seasonality']}'")
-                seasonality_normalized = normalize_seasonality(entities['seasonality'])
-                logger.info(f"Estacionalidad normalizada: {seasonality_normalized}")
-                normalized['seasonality'] = seasonality_normalized
-            except Exception as e:
-                logger.warning(f"Error normalizando estacionalidad '{entities['seasonality']}': {e}", exc_info=True)
-        return normalized
     
     def predict_batch(self, texts: list) -> list:
         """
@@ -513,42 +346,64 @@ class PIBotPredictor:
             'num_slots': len(self.slot_label_lst),
             'slot_labels': self.slot_label_lst,
             'max_seq_len': self.args.max_seq_len,
-            'use_crf': self.args.use_crf,
-            'normalize_entities': self.normalize_entities
+            'use_crf': self.args.use_crf
         }
 
 
-# Función de conveniencia para uso rápido
-_global_predictor = None
+# ============================================================
+# GESTOR SINGLETON DEL PREDICTOR
+# ============================================================
+# Variable global que almacena la única instancia del predictor
+_global_predictor: Optional[JointBERTPredictor] = None
 
-def get_predictor(model_dir: Optional[str] = None, **kwargs) -> PIBotPredictor:
+
+def get_predictor(model_dir: Optional[str] = None, **kwargs) -> JointBERTPredictor:
     """
-    Obtiene una instancia global del predictor (patrón singleton con lazy loading).
+    Obtiene la instancia global del predictor (patrón Singleton).
     
-    La primera llamada carga el modelo. Llamadas subsecuentes retornan la instancia cacheada.
-    
-    Args:
-        model_dir: Directorio del modelo. Si None, usa JOINT_BERT_MODEL_DIR env var 
-                   o 'model/out/pibot_model_beto' por defecto
-        **kwargs: Argumentos adicionales para PIBotPredictor
-    
+    Se carga una sola vez en la primera llamada. Las llamadas posteriores
+    retornan la misma instancia en memoria, evitando recargas innecesarias.
+
     Returns:
-        Instancia de PIBotPredictor
+        Instancia de JointBERTPredictor (singleton)
     """
     global _global_predictor
-    
-    # TEMPORAL: Forzar recarga si los normalizadores no estaban disponibles antes
-    force_reload = os.getenv('FORCE_RELOAD_PREDICTOR', 'false').lower() == 'true'
-    if force_reload and _global_predictor is not None:
-        logger.info("Forzando recarga del predictor...")
-        _global_predictor = None
-    
+
     if _global_predictor is None:
-        if model_dir is None:
-            model_dir = os.getenv('JOINT_BERT_MODEL_DIR', 'model/out/pibot_model_beto')
-        logger.info(f"Inicializando JointBERT predictor desde {model_dir}")
-        _global_predictor = PIBotPredictor(model_dir, **kwargs)
+        model_dir_env = os.getenv('JOINT_BERT_MODEL_DIR', 'model/out/pibot_model_beto')
+        # logger.info(f"[SINGLETON] Cargando JointBERT predictor desde {model_dir_env}")
+        _global_predictor = JointBERTPredictor(model_dir_env, **kwargs)
+
     return _global_predictor
+
+
+def get_intent_labels(args):
+    """Lee labels de intención desde model_dir o usa fallback"""
+    model_dir = getattr(args, 'model_dir', None)
+    if model_dir:
+        label_file = os.path.join(model_dir, 'intent_label.txt')
+        if os.path.exists(label_file):
+            return [label.strip() for label in open(label_file, 'r', encoding='utf-8')]
+    # Fallback
+    return ['value', 'methodology']
+
+
+def get_slot_labels(args):
+    """Lee labels de slots desde model_dir o usa fallback"""
+    model_dir = getattr(args, 'model_dir', None)
+    if model_dir:
+        label_file = os.path.join(model_dir, 'slot_label.txt')
+        if os.path.exists(label_file):
+            return [label.strip() for label in open(label_file, 'r', encoding='utf-8')]
+    # Fallback
+    return [
+        'O',
+        'B-indicator', 'I-indicator',
+        'B-frequency', 'I-frequency',
+        'B-period', 'I-period',
+        'B-component', 'I-component',
+        'B-seasonality', 'I-seasonality',
+    ]
 
 
 def predict(text: str, model_dir: Optional[str] = None) -> Dict[str, Any]:
@@ -557,10 +412,15 @@ def predict(text: str, model_dir: Optional[str] = None) -> Dict[str, Any]:
     
     Args:
         text: Texto a predecir
-        model_dir: Directorio del modelo (solo se usa en la primera llamada)
+        model_dir: Ignorado; el directorio se toma siempre de JOINT_BERT_MODEL_DIR env var
     
     Returns:
         Dict con predicción
+    
+    Ejemplo:
+        result = predict("cual fue el imacec de agosto 2024")
+        print(result['intent'])  # 'value'
+        print(result['entities'])  # {'indicator': 'imacec', 'period': 'agosto 2024'}
     """
     predictor = get_predictor(model_dir)
     return predictor.predict(text)

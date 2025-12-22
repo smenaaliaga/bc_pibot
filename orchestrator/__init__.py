@@ -8,14 +8,14 @@ logger = logging.getLogger(__name__)
 from .memory.memory_adapter import MemoryAdapter
 from .llm.llm_adapter import LLMAdapter
 from .rag.rag_factory import create_retriever
-from .intents.intent_memory import IntentMemory
-from .intents.intent_classifier import IntentClassifierProtocol, SimpleIntentClassifier
-from .intents.intent_store import IntentStoreBase, InMemoryIntentStore, PostgresIntentStore, RedisIntentStore, create_intent_store
-from .intents.classifier_agent import classify_question, build_intent_info
+from .classifier.intent_memory import IntentMemory
+from .classifier.intent_classifier import IntentClassifierProtocol, SimpleIntentClassifier
+from .classifier.intent_store import IntentStoreBase, InMemoryIntentStore, PostgresIntentStore, RedisIntentStore, create_intent_store
+from .classifier.classifier_agent import classify_question, build_intent_info
 
 # Exponer JointBERT predictor globalmente
 try:
-    from .intents.joint_bert_classifier import get_predictor, predict, PIBotPredictor
+    from .classifier.joint_bert_classifier import get_predictor, predict, PIBotPredictor
     _JOINT_BERT_AVAILABLE = True
 except ImportError as e:
     logger.warning(f"No se pudo importar JointBERT predictor: {e}")

@@ -7,6 +7,7 @@ from datetime import date, datetime
 from typing import Any, Dict, Iterable, Optional
 
 from config import get_settings
+from orchestrator.memory.memory_adapter import MemoryAdapter
 
 try:
     from orchestrator.data.get_series import detect_series_code 
@@ -15,6 +16,50 @@ except Exception:
     
 logger = logging.getLogger(__name__)
 _settings = get_settings()
+
+
+# Contexto unificado: reúne todo lo necesario (memoria Redis, historial, entidades, periodo, etc.)
+def get_full_context(
+    *,
+    session_id: Optional[str] = None,
+    classification: Any = None,
+    history: Optional[Iterable[Dict[str, str]]] = None,
+) -> Dict[str, Any]:
+    ctx: Dict[str, Any] = {
+        "session_id": session_id,
+        "facts": None,
+        "history": list(history) if history else [],
+        "entities": {},
+        "normalized": {},
+        "period_context": None,
+        "has_indicator": False,
+        "has_sector": False,
+    }
+
+    # Obtener memoria/historial desde Redis (MemoryAdapter) si hay session_id
+    if session_id:
+        try:
+            mem = MemoryAdapter()
+            ctx["facts"] = mem.get_facts(session_id)
+            ctx["history"] = mem.get_history_for_llm(session_id) or ctx["history"]
+        except Exception:
+            ctx["facts_error"] = "memory_unavailable"
+
+    # Extraer entidades/normalizados desde la clasificación
+    if classification is not None:
+        entities_raw = getattr(classification, "entities", None)
+        normalized_raw = getattr(classification, "normalized", None)
+        ctx["entities"] = entities_raw if isinstance(entities_raw, dict) else {}
+        ctx["normalized"] = _as_mapping(normalized_raw)
+
+    # Construir contexto de periodo
+    ctx["period_context"] = _build_period_context(ctx["normalized"])
+
+    # Banderas de indicador/sector
+    ctx["has_indicator"] = _has_indicator_info(ctx["normalized"], ctx["entities"])
+    ctx["has_sector"] = _has_sector_info(ctx["normalized"])
+
+    return ctx
 
 
 def _coerce_date(value: Any) -> Optional[date]:
@@ -196,17 +241,17 @@ def stream_data_flow(
 ) -> Iterable[str]:
     """Fetch de datos y tabla."""
     
-    # Extraer info de JointBERT si está disponible
-    entities_raw = getattr(classification, "entities", None)
-    normalized_raw = getattr(classification, "normalized", None)
-    entities = entities_raw if isinstance(entities_raw, dict) else {}
-    normalized = normalized_raw if isinstance(normalized_raw, dict) else _as_mapping(normalized_raw)
+    # Contexto unificado (incluye facts/historial desde Redis si hay session_id en indicator_context)
+    session_id = indicator_context.get("session_id") if indicator_context else None
+    ctx = get_full_context(session_id=session_id, classification=classification, history=None)
+    entities = ctx.get("entities", {})
+    normalized = ctx.get("normalized", {})
     global _last_period_context
-    period_context = _build_period_context(normalized)
+    period_context = ctx.get("period_context")
     # Si no hay periodo en la consulta pero hay memoria previa, usarla
     if (not period_context or not period_context.get("start")) and _last_period_context and _last_period_context.get("start"):
         period_context = _last_period_context
-
+    # Obtiene el periodo de 
     year = None
     if period_context and period_context.get("start"):
         year = period_context["start"].year  # type: ignore[index]
@@ -225,9 +270,9 @@ def stream_data_flow(
     indicator_override = None
     sector_override = None
     if indicator_context:
-        if not _has_indicator_info(normalized, entities):
+        if not ctx.get("has_indicator"):
             indicator_override = indicator_context.get("indicator")
-        if not _has_sector_info(normalized):
+        if not ctx.get("has_sector"):
             sector_override = indicator_context.get("sector") or indicator_context.get("component")
 
     detection_result = detect_series_code(
@@ -375,12 +420,11 @@ def stream_data_flow(
         mensaje_emitido = False
         if period_context and obs_match and var_value is not None:
             date = obs_match.get("date")
-            yield f"La variación {freq_label if show_qoq else 'anual'} para {period_label(date)} fue {float(var_value):.1f}%\n"
+            yield f"Acorde al {str(indicator_context['indicator']).upper()} disponible en la BDE, la variación {freq_label if show_qoq else 'anual'} para {period_label(date)} fue de {float(var_value):.1f}%\n"
             mensaje_emitido = True
         if not mensaje_emitido and obs_latest and var_value is not None:
             date = obs_latest.get("date")
-            yield f"La última variación {freq_label if show_qoq else 'anual'} disponible es {float(var_value):.1f}% (período {period_label(date)}).\n"
-
+            yield f"Acorde al {str(indicator_context['indicator']).upper()} disponible en la BDE, la última variación {freq_label if show_qoq else 'anual'} fue de {float(var_value):.1f}% (período {period_label(date)}).\n"
         yield f"Periodo | Valor | {var_label}\n"
         yield f"--------|-------|{'-'*len(var_label)}\n"
         if row:

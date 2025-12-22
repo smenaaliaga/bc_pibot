@@ -14,14 +14,14 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.runtime import get_runtime
 from langgraph.types import StreamWriter
 
-from orchestrator.intents.classifier_agent import (
+from orchestrator.classifier.classifier_agent import (
     build_intent_info,
     classify_question_with_history,
+    ClassificationResult
 )
-from orchestrator.intents.intent_store import IntentStoreBase, create_intent_store
+from orchestrator.classifier.intent_store import IntentStoreBase, create_intent_store
 from orchestrator.llm.llm_adapter import LLMAdapter, build_llm
 from orchestrator.memory.memory_adapter import MemoryAdapter
-from orchestrator.prompts.query_classifier import ClassificationResult
 from orchestrator.rag.rag_factory import create_retriever
 from orchestrator.routes import data_router
 from orchestrator.routes import intent_router as intent_router
@@ -484,6 +484,10 @@ def _get_last_indicator_context(session_id: Optional[str]) -> Optional[Dict[str,
     for record in reversed(records or []):
         context = _extract_indicator_context_from_entities(getattr(record, "entities", None))
         if context:
+            try:
+                logger.debug("[GRAPH] indicator_context_resolved session_id=%s context=%s", session_id, context)
+            except Exception:
+                logger.exception("[GRAPH] Failed to log indicator_context")
             return context
     return None
 
