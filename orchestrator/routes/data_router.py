@@ -41,7 +41,7 @@ def _extract_year(question: str) -> Optional[int]:
 
 def can_handle_data(classification: Any) -> bool:
     try:
-        return getattr(classification, "query_type", "") == "DATA"
+        return getattr(classification, "intent", "").lower() in ('value', 'data', 'last', 'table')
     except Exception:
         return False
 
@@ -58,7 +58,17 @@ def stream_data_flow(
 
     Si falla, usa el placeholder metodológico+banner.
     """
-    domain = getattr(classification, "data_domain", "") or "OTRO"
+    # Extraer indicador desde normalized
+    indicator = "OTRO"
+    normalized = getattr(classification, "normalized", None)
+    if normalized and isinstance(normalized, dict):
+        indicator_data = normalized.get('indicator', {})
+        if isinstance(indicator_data, dict):
+            ind = indicator_data.get('standard_name') or indicator_data.get('normalized')
+            if ind:
+                indicator = str(ind).upper()
+    
+    domain = indicator
     year = _extract_year(question)
 
     try:

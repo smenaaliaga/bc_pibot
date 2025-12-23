@@ -27,7 +27,29 @@ except Exception:
     AIMessage = None
     LANGCHAIN_AVAILABLE = False
 
-from orchestrator.prompts.registry import GuardrailMode, build_guardrail_prompt
+# Tipos y prompts inline
+from typing import Literal
+GuardrailMode = Literal["rag", "fallback"]
+
+
+def _chunk_logs_enabled() -> bool:
+    return os.getenv("STREAM_CHUNK_LOGS", "0").lower() in ("1", "true", "yes", "on")
+
+
+def _build_system_prompt(mode: GuardrailMode = "rag") -> str:
+    """Construye el prompt del sistema basado en el modo."""
+    base = """Eres el asistente económico del Banco Central de Chile (PIBot).
+Respondes SIEMPRE en español.
+
+Ayudas con consultas sobre indicadores económicos chilenos (IMACEC, PIB).
+- Responde de forma clara y concisa
+- Usa los datos proporcionados cuando estén disponibles
+- Si no tienes información, indícalo claramente
+- No inventes datos numéricos"""
+    
+    if mode == "rag":
+        return base + "\n\nMODO RAG: Usa el contexto de documentos recuperados para responder consultas metodológicas."
+    return base + "\n\nMODO FALLBACK: Responde basándote en tu conocimiento general sobre economía chilena."
 
 
 class LLMAdapter:
@@ -55,7 +77,7 @@ class LLMAdapter:
                 self._chat = None
 
     def _build_messages(self, question: str, history: List[Dict[str, str]], intent_info: Optional[Dict[str, Any]]):
-        system_content = build_guardrail_prompt(mode=self.mode, include_guards=True)
+        system_content = _build_system_prompt(mode=self.mode)
         if intent_info:
             try:
                 intent = intent_info.get("intent")
@@ -199,7 +221,8 @@ class LLMAdapter:
                         text = getattr(chunk, "content", None) or getattr(chunk, "text", None) or ""
                         if text:
                             try:
-                                logger.debug("[LLM_STREAM_CHUNK] %s", text[:200])
+                                if _chunk_logs_enabled():
+                                    logger.debug("[LLM_STREAM_CHUNK] %s", text[:200])
                             except Exception:
                                 pass
                             yield str(text)
@@ -217,6 +240,7 @@ class LLMAdapter:
                     for chunk in llm.stream(msgs):
                         text = getattr(chunk, "content", None) or getattr(chunk, "text", None) or ""
                         if text:
+                            # No per-chunk logs here; agent_graph handles optional logging
                             yield str(text)
                 finally:
                     if hasattr(llm, "close"):

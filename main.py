@@ -67,7 +67,7 @@ def main() -> None:
 
     # Pre-cargar modelo JointBERT al inicio (carga única, reutilización global)
     try:
-        from orchestrator import get_predictor
+        from orchestrator.classifier.joint_bert_classifier import get_predictor
         predictor = get_predictor()
         logger.info("✓ JointBERT predictor inicializado exitosamente")
         logger.info(f"  - Modelo: {predictor.args.model_type}")
@@ -173,7 +173,9 @@ def main() -> None:
                             continue
                         final_output_text += chunk_text
                         try:
-                            logger.info("[STREAM_OUT] chunk=%s", chunk_text[:120])
+                            # Gate per-chunk logs with env flag
+                            if os.getenv("STREAM_CHUNK_LOGS", "0").lower() in {"1", "true", "yes", "on"}:
+                                logger.debug("[STREAM_OUT] chunk=%s", chunk_text[:120])
                         except Exception:
                             pass
                         got_any = True

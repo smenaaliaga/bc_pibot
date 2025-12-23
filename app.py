@@ -228,17 +228,18 @@ def run_app(
         _debug_chunk_idx += 1
         try:
             preview = text[:200].replace("\n", "\\n")
-            _ui_logger.info(
-                "[UI_STREAM_CHUNK] idx=%s len=%s preview=%s",
-                _debug_chunk_idx,
-                len(text),
-                text[:120].replace("\n", " "),
-            )
-            _ui_logger.info(
-                "[UI_STREAM_CHUNK_RAW] idx=%s repr=%s",
-                _debug_chunk_idx,
-                preview,
-            )
+            if os.getenv("STREAM_CHUNK_LOGS", "0").lower() in {"1", "true", "yes", "on"}:
+                _ui_logger.debug(
+                    "[UI_STREAM_CHUNK] idx=%s len=%s preview=%s",
+                    _debug_chunk_idx,
+                    len(text),
+                    text[:120].replace("\n", " "),
+                )
+                _ui_logger.debug(
+                    "[UI_STREAM_CHUNK_RAW] idx=%s repr=%s",
+                    _debug_chunk_idx,
+                    preview,
+                )
         except Exception:
             pass
         out_lines: List[str] = []
@@ -291,11 +292,12 @@ def run_app(
         handle_chunk(_chunk)
     response_text = text_accum
     try:
-        _ui_logger.info(
-            "[UI_STREAM_END] total_len=%s preview=%s",
-            len(response_text),
-            response_text[:200].replace("\n", " "),
-        )
+        if os.getenv("STREAM_CHUNK_LOGS", "0").lower() in {"1", "true", "yes", "on"}:
+            _ui_logger.debug(
+                "[UI_STREAM_END] total_len=%s preview=%s",
+                len(response_text),
+                response_text[:200].replace("\n", " "),
+            )
     except Exception:
         pass
     status_placeholder.empty()

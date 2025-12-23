@@ -17,7 +17,7 @@ from langgraph.types import StreamWriter
 from orchestrator.classifier.classifier_agent import (
     build_intent_info,
     classify_question_with_history,
-    ClassificationResult
+    ClassificationResult,
 )
 from orchestrator.classifier.intent_store import IntentStoreBase, create_intent_store
 from orchestrator.llm.llm_adapter import LLMAdapter, build_llm
@@ -353,7 +353,7 @@ def classify_node(state: AgentState) -> AgentState:
         classification, history_text = classify_question_with_history(question, history)
     except Exception:
         logger.exception("[GRAPH] classify_question_with_history failed")
-        classification = ClassificationResult(query_type="METHODOLOGICAL")
+        classification = ClassificationResult(intent="methodology")
         history_text = ""
     intent_info = build_intent_info(classification)
     facts = state.get("facts") or {}
@@ -382,7 +382,7 @@ def _persist_intent_event(
     payload = intent_info or {}
     raw_intent = payload.get("intent")
     if not raw_intent and classification:
-        raw_intent = getattr(classification, "query_type", None)
+        raw_intent = getattr(classification, "intent", None)
     intent = _ensure_text(raw_intent)
     if not intent:
         return
@@ -541,30 +541,20 @@ def data_node(state: AgentState, *, writer: Optional[StreamWriter] = None):
     session_id = state.get("session_id")
     # Imprime classificación para depuración
     try:
-        summary = (
-            _ensure_text(getattr(classification, "query_type", "")),
-            _ensure_text(getattr(classification, "data_domain", "")),
-            str(getattr(classification, "is_generic", "")),
-            _ensure_text(getattr(classification, "default_key", "")),
-            _ensure_text(getattr(classification, "error", "")),
-        )
-        logger.debug(
-            "[CLASSIFIER] query_type=%s data_domain=%s is_generic=%s default_key=%s error=%s",
-            *summary,
-        )
-        # Log adicional de campos JointBERT
-        intent = getattr(classification, "intent", None)
-        confidence = getattr(classification, "confidence", None)
-        entities = getattr(classification, "entities", None)
+        # Extraer indicador normalizado
+        indicator = None
         normalized = getattr(classification, "normalized", None)
-        if intent or confidence or entities or normalized:
-            logger.debug(
-                "[CLASSIFIER_JOINTBERT] intent=%s confidence=%.4f entities=%s normalized=%s",
-                intent,
-                confidence if confidence is not None else 0.0,
-                entities,
-                normalized,
-            )
+        if normalized and isinstance(normalized, dict):
+            indicator_data = normalized.get('indicator', {})
+            if isinstance(indicator_data, dict):
+                indicator = indicator_data.get('standard_name') or indicator_data.get('normalized')
+        
+        logger.info(
+            "[CLASSIFIER] intent=%s confidence=%.3f indicator=%s",
+            _ensure_text(getattr(classification, "intent", "")),
+            float(getattr(classification, "confidence", 0.0) or 0.0),
+            _ensure_text(indicator or ""),
+        )
     except Exception:
         logger.exception("[CLASSIFIER] Failed to log classification summary")
         
@@ -629,7 +619,8 @@ def _run_llm(
             if not chunk_text:
                 continue
             try:
-                logger.debug("[GRAPH_LLM_CHUNK] %s", chunk_text[:200])
+                if os.getenv("STREAM_CHUNK_LOGS", "0").lower() in {"1", "true", "yes", "on"}:
+                    logger.debug("[GRAPH_LLM_CHUNK] %s", chunk_text[:200])
             except Exception:
                 pass
             if not chunk_filter.allow(chunk_text):
@@ -683,9 +674,9 @@ def memory_node(state: AgentState) -> AgentState:
                 "route_decision": state.get("route_decision"),
             }
             classification = state.get("classification")
-            query_type = getattr(classification, "query_type", None) if classification else None
-            if query_type:
-                checkpoint_payload["query_type"] = query_type
+            intent = getattr(classification, "intent", None) if classification else None
+            if intent:
+                checkpoint_payload["intent"] = intent
             facts = state.get("facts")
             if facts:
                 checkpoint_payload["facts"] = facts
@@ -735,10 +726,12 @@ def route_decider(state: AgentState) -> str:
     if decision:
         return decision
     classification = state.get("classification")
-    query_type = _ensure_text(getattr(classification, "query_type", "")).upper()
-    if query_type == "DATA":
+    intent = _ensure_text(getattr(classification, "intent", "")).lower()
+    
+    # Mapeo de intenciones a rutas
+    if intent in ('value', 'data', 'last', 'table'):
         return "data"
-    if query_type == "METHODOLOGICAL":
+    if intent in ('methodology', 'definition', 'greeting'):
         return "rag"
     return "fallback"
 

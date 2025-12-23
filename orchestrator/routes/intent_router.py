@@ -126,27 +126,32 @@ def route_intents(
     TODO lo demás lo maneja JointBERT + data_node.
     """
     try:
-        domain = getattr(classification, "data_domain", "") or ""
-        domain_upper = domain.upper()
-        query_type = (getattr(classification, "query_type", "") or "").upper()
+        # Extraer indicador desde normalized
+        indicator = None
+        normalized = getattr(classification, "normalized", None)
+        if normalized and isinstance(normalized, dict):
+            indicator_data = normalized.get('indicator', {})
+            if isinstance(indicator_data, dict):
+                indicator = indicator_data.get('standard_name') or indicator_data.get('normalized')
+        
+        intent = (getattr(classification, "intent", "") or "").lower()
     except Exception:
-        domain_upper = ""
-        query_type = ""
+        indicator = None
+        intent = ""
 
     # 1. Chart follow-ups (usa contexto)
-    chart_iter = _handle_chart_followup(question, domain_upper, memory, session_id, facts)
+    chart_iter = _handle_chart_followup(question, str(indicator or "").upper(), memory, session_id, facts)
     if chart_iter:
         logger.info("[INTENT_ROUTER] Manejando chart follow-up")
         return chart_iter
 
     # 2. Metodología → delega a RAG
-    if query_type == "METHODOLOGICAL":
+    if intent in ('methodology', 'definition', 'greeting'):
         logger.debug("[INTENT_ROUTER] Query metodológica, delegando a RAG")
         return None
 
     # 3. Si JointBERT detectó entidades → delega a data_node
-    normalized = getattr(classification, "normalized", None)
-    if normalized and isinstance(normalized, dict) and query_type == "DATA":
+    if normalized and isinstance(normalized, dict) and intent in ('value', 'data', 'last', 'table'):
         logger.debug("[INTENT_ROUTER] JointBERT detectó entidades, delegando a data_node")
         return None
 

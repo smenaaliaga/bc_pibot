@@ -9,9 +9,13 @@ from .memory.memory_adapter import MemoryAdapter
 from .llm.llm_adapter import LLMAdapter
 from .rag.rag_factory import create_retriever
 from .classifier.intent_memory import IntentMemory
-from .classifier.intent_classifier import IntentClassifierProtocol, SimpleIntentClassifier
-from .classifier.intent_store import IntentStoreBase, InMemoryIntentStore, PostgresIntentStore, RedisIntentStore, create_intent_store
-from .classifier.classifier_agent import classify_question, build_intent_info
+from .classifier.intent_store import (
+    IntentStoreBase,
+    InMemoryIntentStore,
+    PostgresIntentStore,
+    RedisIntentStore,
+    create_intent_store,
+)
 
 # Exponer JointBERT predictor globalmente
 try:
@@ -29,15 +33,11 @@ __all__ = [
     "LLMAdapter",
     "create_retriever",
     "IntentMemory",
-    "IntentClassifierProtocol",
-    "SimpleIntentClassifier",
     "IntentStoreBase",
     "InMemoryIntentStore",
     "PostgresIntentStore",
     "RedisIntentStore",
     "create_intent_store",
-    "classify_question",
-    "build_intent_info",
     "logger",
 ]
 

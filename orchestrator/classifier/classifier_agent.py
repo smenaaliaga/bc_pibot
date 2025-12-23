@@ -4,10 +4,11 @@ from __future__ import annotations
 import logging
 import os
 import time
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 # JointBERT imports
-from orchestrator import get_predictor
+from orchestrator.classifier.joint_bert_classifier import get_predictor
 from orchestrator.classifier.entity_normalizer import normalize_entities
 
 logger = logging.getLogger(__name__)
@@ -15,8 +16,23 @@ logger = logging.getLogger(__name__)
 # MODEL
 MODEL_JOINTBERT_NAME = os.getenv("JOINT_BERT_MODEL_NAME", "pibot_model_beto")
 
-# Data classes
-from orchestrator.classifier.classifier_dataclass import ClassificationResult
+
+# ============================================================
+# DATA CLASSES
+# ============================================================
+
+@dataclass
+class ClassificationResult:
+    """Resultado de la clasificación de una consulta económica."""
+    intent: Optional[str] = None  # Intención ('value', 'methodology', 'ambiguous', etc.)
+    confidence: Optional[float] = None  # Confianza del modelo
+    entities: Optional[dict] = None  # Entidades raw extraídas
+    normalized: Optional[dict] = None  # Entidades normalizadas
+
+
+# ============================================================
+# HELPER FUNCTIONS
+# ============================================================
 
 def _build_history_text(history: Optional[List[Dict[str, str]]]) -> str:
     """Concatena el historial en formato 'role: content' por línea."""
@@ -39,7 +55,7 @@ def _classify_with_jointbert(question: str) -> ClassificationResult:
     
     # Aplicar normalización de entidades
     normalized = normalize_entities(result.get('entities', {}))
-    
+     
     # Extraer intentención y entidades
     intent = result.get('intent', 'unknown')
     entities = result.get('entities', {})
@@ -65,52 +81,35 @@ def _classify_with_jointbert(question: str) -> ClassificationResult:
     else:
         indicator = entities.get('indicator', '').lower()
     
-    # Extraer período (priorizar normalizado)
-    if period_norm:
-        period = str(period_norm)  # La normalización retorna un dict estructurado
-    else:
-        period = entities.get('period', '')
+    # Detectar small talk
+    _SMALL_TALK_GREETINGS = ("hola", "holi", "buenas", "buenos dias", "buenas tardes", "buenas noches", "saludos", "que tal")
+    _SMALL_TALK_DATA_TOKENS = ("imacec", "pib", "inflacion", "dato", "serie", "valor", "porcentaje", "indicador", "consulta")
     
-    # Mapeo de intenciones JointBERT a query_type
-    query_type_map = {
-        'value': 'DATA',
-        'data': 'DATA',
-        'last': 'DATA',
-        'table': 'DATA',
-        'methodology': 'METHODOLOGICAL',
-        'definition': 'METHODOLOGICAL',
-    }
-    query_type = query_type_map.get(intent.lower(), None)
-    
-    entities_out = entities
-    normalized_out = normalized
+    def _looks_like_small_talk(q: str, ind: str) -> bool:
+        ql = q.lower().strip()
+        for greeting in _SMALL_TALK_GREETINGS:
+            if ql.startswith(greeting):
+                has_data_token = any(tok in ql for tok in _SMALL_TALK_DATA_TOKENS)
+                return not has_data_token
+        return False
 
+    # Override para small talk
     if _looks_like_small_talk(question, indicator):
-        logger.info("[JOINTBERT] Greeting-like query detected, forcing METHODOLOGICAL flow")
-        query_type = 'METHODOLOGICAL'
-        data_domain = None
-        default_key = None
-        is_generic = True
-        entities_out = {}
-        normalized_out = {}
+        logger.info("[JOINTBERT] Greeting-like query detected, forcing 'greeting' intent")
+        intent = 'greeting'
+        entities = {}
+        normalized = {}
 
     logger.info(
-        "[JOINTBERT MAPPED] query_type=%s data_domain=%s is_generic=%s default_key=%s",
-        query_type, data_domain, is_generic, default_key
+        "[JOINTBERT FINAL] intent=%s confidence=%.3f indicator=%s",
+        intent, result.get('confidence', 0.0), indicator
     )
     
     return ClassificationResult(
-        query_type=query_type,
-        data_domain=data_domain,
-        is_generic=is_generic,
-        default_key=default_key,
-        imacec=imacec_tree,
-        pibe=pibe_tree,
-        # Info adicional de JointBERT
         intent=intent,
         confidence=result.get('confidence', 0.0),
-        entities=entities_out,
-        normalized=normalized_out,
+        entities=entities,
+        normalized=normalized,
     )
 
 
@@ -138,18 +137,19 @@ def classify_question_with_history(
         logger.exception("[CLASSIFICATION] Failed to log classification payload")
     
     t_end = time.perf_counter()
-    summary = (
-        classification.query_type,
-        classification.data_domain,
-        classification.is_generic,
-        classification.default_key,
-        getattr(classification, "error", None),
-    )
+    # Extraer indicador normalizado
+    indicator = None
+    if classification.normalized and isinstance(classification.normalized, dict):
+        indicator_data = classification.normalized.get('indicator', {})
+        if isinstance(indicator_data, dict):
+            indicator = indicator_data.get('standard_name') or indicator_data.get('normalized')
+    
     logger.info(
-        "[FASE] end: Fase C1: Clasificación de consulta (%.3fs) | query_type=%s | data_domain=%s | "
-        "is_generic=%s | default_key=%s | error=%s",
+        "[FASE] end: Fase C1: Clasificación de consulta (%.3fs) | intent=%s | confidence=%.3f | indicator=%s",
         t_end - t_start,
-        *summary,
+        classification.intent,
+        classification.confidence or 0.0,
+        indicator,
     )
     # Fallback: asegurarse de que quede registrado en el archivo de log configurado por RUN_MAIN_LOG,
     # pero sin truncar ni reescribir; solo append.
@@ -160,8 +160,8 @@ def classify_question_with_history(
         path = os.path.join(logs_dir, fixed)
         with open(path, "a", encoding="utf-8") as f:
             f.write(
-                "[CLASSIFIER_FILE] query_type=%s data_domain=%s is_generic=%s default_key=%s error=%s\n"
-                % summary
+                "[CLASSIFIER_FILE] intent=%s confidence=%.3f indicator=%s\n"
+                % (classification.intent, classification.confidence or 0.0, indicator)
             )
     except Exception:
         pass
@@ -174,18 +174,20 @@ def build_intent_info(cls: Optional[ClassificationResult]) -> Optional[Dict[str,
     if cls is None:
         return None
     try:
+        # Extraer indicador desde normalized
+        indicator = None
+        if cls.normalized and isinstance(cls.normalized, dict):
+            indicator_data = cls.normalized.get('indicator', {})
+            if isinstance(indicator_data, dict):
+                indicator = indicator_data.get('standard_name') or indicator_data.get('normalized')
+        
         return {
-            "intent": cls.query_type or "unknown",
-            "score": 1.0 if cls.query_type else 0.0,
-            "entities": {
-                "data_domain": cls.data_domain,
-                "is_generic": cls.is_generic,
-                "default_key": cls.default_key,
-                "imacec": cls.imacec.__dict__ if getattr(cls, "imacec", None) else None,
-                "pibe": cls.pibe.__dict__ if getattr(cls, "pibe", None) else None,
-                "intent_frequency_change": getattr(cls, "intent_frequency_change", None),
-            },
-            "spans": [],  # placeholder para el modelo BIO
+            "intent": cls.intent or "unknown",
+            "score": cls.confidence or 0.0,
+            "entities": cls.entities or {},
+            "normalized": cls.normalized or {},
+            "indicator": indicator,
+            "spans": [],
         }
     except Exception:
         logger.exception("build_intent_info failed")
