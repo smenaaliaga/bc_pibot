@@ -23,7 +23,7 @@ from orchestrator.classifier.intent_store import IntentStoreBase, create_intent_
 from orchestrator.llm.llm_adapter import LLMAdapter, build_llm
 from orchestrator.memory.memory_adapter import MemoryAdapter
 from orchestrator.rag.rag_factory import create_retriever
-from orchestrator.routes import data_router
+from orchestrator.data import flow_data
 from orchestrator.routes import intent_router as intent_router
 
 logger = logging.getLogger(__name__)
@@ -518,14 +518,13 @@ def intent_shortcuts_node(state: AgentState, *, writer: Optional[StreamWriter] =
     collected: List[str] = []
     memory_metadata = getattr(direct_iter, "metadata", None)
     chunk_filter = _StreamChunkFilter()
+    # Consumir stream: valida chunks, filtra duplicados, emite en tiempo real,
+    # y acumula para retornar output final
     for chunk in direct_iter:
         chunk_text = _ensure_text(chunk)
-        if not chunk_text:
-            continue
-        if not chunk_filter.allow(chunk_text):
-            continue
-        collected.append(chunk_text)
-        _emit_stream_chunk(chunk_text, writer)
+        if chunk_text and chunk_filter.allow(chunk_text):
+            collected.append(chunk_text)
+            _emit_stream_chunk(chunk_text, writer)
     if collected:
         yield {
             "output": "".join(collected),
@@ -535,53 +534,31 @@ def intent_shortcuts_node(state: AgentState, *, writer: Optional[StreamWriter] =
 
 
 def data_node(state: AgentState, *, writer: Optional[StreamWriter] = None):
+    
     classification = state.get("classification")
-    question = state.get("question", "")
-    history_text = state.get("history_text", "")
     session_id = state.get("session_id")
-    # Imprime classificación para depuración
-    try:
-        # Extraer indicador normalizado
-        indicator = None
-        normalized = getattr(classification, "normalized", None)
-        if normalized and isinstance(normalized, dict):
-            indicator_data = normalized.get('indicator', {})
-            if isinstance(indicator_data, dict):
-                indicator = indicator_data.get('standard_name') or indicator_data.get('normalized')
-        
-        logger.info(
-            "[CLASSIFIER] intent=%s confidence=%.3f indicator=%s",
-            _ensure_text(getattr(classification, "intent", "")),
-            float(getattr(classification, "confidence", 0.0) or 0.0),
-            _ensure_text(indicator or ""),
-        )
-    except Exception:
-        logger.exception("[CLASSIFIER] Failed to log classification summary")
         
     if not classification:
-        text = "No pude clasificar la consulta para obtener datos."
+        text = "[GRAPH] No se recibió clasificación para el nodo DATA."
         _emit_stream_chunk(text, writer)
         return {"output": text}
     collected: List[str] = []
     chunk_filter = _StreamChunkFilter()
 
-    indicator_context = _get_last_indicator_context(session_id)
-
-    try:
-        stream = data_router.stream_data_flow(
+    try: 
+        # Invocar flujo de datos directamente: usa session_id para acceder a Redis,
+        # detecta serie y genera mensaje, tabla y marcador CSV
+        stream = flow_data.stream_data_flow(
             classification,
-            question,
-            history_text,
-            indicator_context=indicator_context,
+            session_id=session_id,
         )
+        # Consumir stream: valida chunks, filtra duplicados, emite en tiempo real,
+        # y acumula para retornar output final
         for chunk in stream:
             chunk_text = _ensure_text(chunk)
-            if not chunk_text:
-                continue
-            if not chunk_filter.allow(chunk_text):
-                continue
-            collected.append(chunk_text)
-            _emit_stream_chunk(chunk_text, writer)
+            if chunk_text and chunk_filter.allow(chunk_text):
+                collected.append(chunk_text)
+                _emit_stream_chunk(chunk_text, writer)
     except Exception:
         logger.exception("[GRAPH] data route failed")
         if not collected:

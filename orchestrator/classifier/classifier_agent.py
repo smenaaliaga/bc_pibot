@@ -61,7 +61,6 @@ def _classify_with_jointbert(question: str) -> ClassificationResult:
     entities = result.get('entities', {})
     
     # Mostrar predicción completa
-    logger.info(f"[JOINTBERT PREDICTION] question='{question}'")
     logger.info(f"[JOINTBERT PREDICTION] intent={intent}, confidence={result.get('confidence', 0.0):.3f}")
     logger.info(f"[JOINTBERT PREDICTION] Raw entities: {entities}")
     logger.info(f"[JOINTBERT PREDICTION] Normalized entities: {normalized}")
@@ -99,11 +98,6 @@ def _classify_with_jointbert(question: str) -> ClassificationResult:
         intent = 'greeting'
         entities = {}
         normalized = {}
-
-    logger.info(
-        "[JOINTBERT FINAL] intent=%s confidence=%.3f indicator=%s",
-        intent, result.get('confidence', 0.0), indicator
-    )
     
     return ClassificationResult(
         intent=intent,
@@ -126,17 +120,7 @@ def classify_question_with_history(
         t_end = time.perf_counter()
         logger.error("[CLASSIFICATION] ERROR al clasificar | time='%s' | error=%s", t_end - t_start, exc)
         raise
-    t_end = time.perf_counter()
-    logger.error("[CLASSIFICATION] Clasificación finalizada | time='%s'", t_end - t_start)
     
-    # DEBUG
-    try:
-        raw_payload = classification.__dict__ if hasattr(classification, "__dict__") else classification
-        logger.debug("[CLASSIFICATION] classification_payload=%s", raw_payload)
-    except Exception:
-        logger.exception("[CLASSIFICATION] Failed to log classification payload")
-    
-    t_end = time.perf_counter()
     # Extraer indicador normalizado
     indicator = None
     if classification.normalized and isinstance(classification.normalized, dict):
@@ -144,13 +128,16 @@ def classify_question_with_history(
         if isinstance(indicator_data, dict):
             indicator = indicator_data.get('standard_name') or indicator_data.get('normalized')
     
+    t_end = time.perf_counter()
     logger.info(
-        "[FASE] end: Fase C1: Clasificación de consulta (%.3fs) | intent=%s | confidence=%.3f | indicator=%s",
+        "[CLASSIFICATION] Clasificación finalizada (%.3fs) | intent=%s | confidence=%.3f | indicator=%s",
         t_end - t_start,
         classification.intent,
         classification.confidence or 0.0,
         indicator,
     )
+    
+    
     # Fallback: asegurarse de que quede registrado en el archivo de log configurado por RUN_MAIN_LOG,
     # pero sin truncar ni reescribir; solo append.
     try:

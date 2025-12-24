@@ -147,12 +147,12 @@ def route_intents(
 
     # 2. Metodología → delega a RAG
     if intent in ('methodology', 'definition', 'greeting'):
-        logger.debug("[INTENT_ROUTER] Query metodológica, delegando a RAG")
+        logger.debug("[INTENT_ROUTER] Consulta metodológica, delegando a RAG")
         return None
 
     # 3. Si JointBERT detectó entidades → delega a data_node
     if normalized and isinstance(normalized, dict) and intent in ('value', 'data', 'last', 'table'):
-        logger.debug("[INTENT_ROUTER] JointBERT detectó entidades, delegando a data_node")
+        logger.debug("[INTENT_ROUTER] Consulta de datos, delegando a data_node")
         return None
 
     # 4. Todo lo demás → continuar con flujo normal

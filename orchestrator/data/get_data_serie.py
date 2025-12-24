@@ -550,17 +550,12 @@ def get_series_api_rest_bcch(
             tag = "IMACEC"
         else:
             tag = "SERIE"
-        # Siempre registrar la versión enmascarada con trazabilidad completa
-        logger.info(
-            f"[API_REQUEST_URL:{tag}] caller_file={caller.get('file')} caller_func={caller.get('func')} "
-            f"params={args_summary} url={url_masked}"
-        )
-        if LOG_EXPOSE_API_LINKS:
-            # Registrar también la URL expuesta y legible (para copia/pega en navegador)
-            logger.info(
-                f"[API_REQUEST_URL_EXPOSED:{tag}] caller_file={caller.get('file')} caller_func={caller.get('func')} "
-                f"params={args_summary} url={url_plain_readable}"
-            )
+        # # Siempre registrar la versión enmascarada con trazabilidad completa
+        # logger.info(
+        #     f"[API_REQUEST_URL:{tag}] caller_file={caller.get('file')} caller_func={caller.get('func')} "
+        #     f"params={args_summary} url={url_masked}"
+        # )
+
     except Exception as _e_url:
         logger.error(f"[API_REQUEST_URL_ERROR] No se pudo construir URL de log: {_e_url}")
 
