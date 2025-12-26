@@ -118,25 +118,36 @@ def _match_observation(observations: list, candidates: list[str]) -> Optional[Di
     return None
 
 
-def _format_period_label(date_str: Optional[str], freq: str) -> str:
-    """Format period label based on frequency (quarterly or monthly)."""
+def _format_period_labels(date_str: Optional[str], freq: str) -> list[str]:
+    """Return both long and short period labels as a list [long, short].
+    - Quarterly: ["el 3er trimestre del 2025", "3T 2025"]
+    - Monthly:   ["Marzo 2025", "Mar 2025"]
+    """
     if not date_str:
-        return "--"
+        return ["--", "--"]
     try:
         y = int(date_str[:4])
         m = int(date_str[5:7])
         if freq in {"Q", "T"}:
             q = ((m - 1) // 3) + 1
-            return f"{q}T {y}"
+            ordinal = {1: "1er", 2: "2do", 3: "3er", 4: "4to"}.get(q, f"{q}º")
+            long_label = f"el {ordinal} trimestre del {y}"
+            short_label = f"{q}T {y}"
+            return [long_label, short_label]
         else:
             meses_es = [
                 "", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
                 "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
             ]
+            meses_abrev = [
+                "", "Ene", "Feb", "Mar", "Abr", "May", "Jun",
+                "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"
+            ]
             mes_nombre = meses_es[m] if 1 <= m <= 12 else str(m)
-            return f"{mes_nombre} {y}"
+            mes_abrev = meses_abrev[m] if 1 <= m <= 12 else str(m)
+            return [f"{mes_nombre} {y}", f"{mes_abrev} {y}"]
     except Exception:
-        return date_str
+        return [date_str or "--", date_str or "--"]
 
 
 def _calculate_variation(
@@ -305,6 +316,8 @@ def stream_data_flow(
     if not data:
         logger.warning("La API no devolvió datos")
         return
+
+    api_meta = data.get("meta", {}) or {}
     
     # Obtener observaciones
     obs = data.get("observations", [])
@@ -325,11 +338,22 @@ def stream_data_flow(
         chosen_date = chosen_row.get("date") if chosen_row else None
         freq_label = {"Q": "trimestral", "T": "trimestral", "M": "mensual"}.get(freq, "anual")
         
+        # Datos finales
+        date_raw = chosen_row.get("date")
+        value = chosen_row.get("value")
+        
+        # Obtiene el formato de mostrar el periodo
+        # TODO: normalizar classification.frequency, y usar si es dada por el usuario
+        if (indicator_context_val or "").strip().lower() == "pib":
+            period_labels = _format_period_labels(date_raw, "Q")
+        else:
+            period_labels = _format_period_labels(date_raw, freq)
+        
         payload = {
             "indicator": (indicator_context_val or "indicador").upper(),
             "var_label": freq_label if show_qoq else "anual",
             "var_value": float(var_value) if var_value is not None else None,
-            "period_label": _format_period_label(chosen_date, freq),
+            "period_label": period_labels[0]
         }
         tmpl_ctx = {
             "has_indicator": bool(indicator_context_val),
@@ -344,46 +368,15 @@ def stream_data_flow(
         # Tabla markdown
         yield f"Periodo | Valor | {var_label}\n"
         yield f"--------|-------|{'-'*len(var_label)}\n"
-        if chosen_row:
-            date = chosen_row.get("date")
-            value = chosen_row.get("value")
-            yield f"{_format_period_label(date, freq)} | {_format_value(value)} | {_format_percentage(var_value)}\n"
-        else:
-            yield "-- | -- | --\n"
+        yield f"{period_labels[1]} | {_format_value(value)} | {_format_percentage(var_value)}\n"
+        # yield "-- | -- | --\n"
         yield "\n"
+        
+        # Fuente (link corto)
+        yield f"**Fuente:** Banco Central de Chile (BDE) — [Ver serie en la BDE]({detection_result.get('metadata', {}).get('source_url')})"
 
         # CSV download marker
         if chosen_row:
             yield from _generate_csv_marker(chosen_row, series_id, var_value, var_label, var_key)
-
-    # # Mostrar metadatos de la serie
-    # if metadata:
-    #     yield f"- Código: `{series_id}`\n"
-    #     yield f"- Título: {metadata.get('title', '')}\n"
-    #     # Frecuencia: buscar en varios campos posibles
-    #     freq = metadata.get('freq_effective') or metadata.get('default_frequency') or metadata.get('original_frequency') or metadata.get('frequency') or ''
-    #     yield f"- Frecuencia: {freq}\n"
-    #     yield f"- Unidad: {metadata.get('unit', '')}\n"
-
-    #     # Gráfico: mostrar siempre el campo, aunque esté vacío
-    #     grafico_url = metadata.get('source_url', '')
-    #     yield f"- Gráfico: {grafico_url}\n"
-
-    #     # Metodología: mostrar siempre el campo, aunque esté vacío
-    #     metodologia = ''
-    #     notes = metadata.get('notes', {})
-    #     if isinstance(notes, dict):
-    #         metodologia = notes.get('metodologia', '')
-            
-    #     if metodologia:
-    #         if isinstance(metodologia, str) and metodologia.startswith('http'):
-    #             metodologia_str = f"[Ver documento]({metodologia})"
-    #         else:
-    #             metodologia_str = metodologia
-    #     else:
-    #         metodologia_str = ''
-    #     yield f"- Metodología: {metodologia_str}\n"
-    #     yield "\n"
-
     
     return

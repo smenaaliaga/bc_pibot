@@ -6,26 +6,34 @@ from typing import Any, Callable, Dict, List
 
 
 # Plantillas para consultas de datos (value, last, table)
-DATA_TEMPLATES: List[Dict[str, Any]] = [
+DATA_TEMPLATES = [
     {
         "match": lambda ctx: (
             ctx.get("has_indicator") and ctx.get("has_value") and ctx.get("has_period")
         ),
-        "text": "Acorde al {indicator} disponible en la BDE, la variación {var_label} para {period_label} fue de {var_value:.1f}%",
+        "text": (
+            "Según la Base de Datos Estadísticos (BDE) del Banco Central de Chile, "
+            "en {period_label} el {indicator} registró una variación {var_label} de "
+            "{var_value:.1f}%."
+        ),
     },
     {
-        "match": lambda ctx: (
-            ctx.get("has_indicator") and ctx.get("has_value")
+        "match": lambda ctx: (ctx.get("has_indicator") and ctx.get("has_value")),
+        "text": (
+            "Según la Base de Datos Estadísticos (BDE) del Banco Central de Chile, "
+            "la última variación {var_label} del {indicator} fue {var_value:.1f}% "
+            "({period_label})."
         ),
-        "text": "Acorde al {indicator} disponible en la BDE, la última variación {var_label} fue de {var_value:.1f}% (período {period_label}).",
     },
     {
-        "match": lambda ctx: (
-            ctx.get("has_indicator") and ctx.get("no_data")
+        "match": lambda ctx: (ctx.get("has_indicator") and ctx.get("no_data")),
+        "text": (
+            "Según la Base de Datos Estadísticos (BDE) del Banco Central de Chile, "
+            "no se encontraron registros del {indicator} para el período o rango consultado."
         ),
-        "text": "No encontré datos recientes para {indicator} en el rango consultado.",
     },
 ]
+
 
 # Plantillas para saludos y general
 GREETING_TEMPLATES: List[Dict[str, Any]] = [
