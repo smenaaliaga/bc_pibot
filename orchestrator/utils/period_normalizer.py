@@ -74,10 +74,11 @@ def strip_accents(s: str) -> str:
 def normalize_text(s: str) -> str:
     s = s.lower().strip()
     s = strip_accents(s)
-    # Normalizar typos en "último" - ultima, ultimo, ultmo, ultim, ulto, ulta -> ultimo
-    s = re.sub(r"\bult[io]?m?[oa]?\b", "ultimo", s)
-    s = re.sub(r"\bultim\b", "ultimo", s)  # "ultim" sin vocal final
-    s = re.sub(r"\bultmo\b", "ultimo", s)  # "ultmo" orden incorrecto
+    # Normalizar typos/variantes en "ultimo/ultima/ultimos/ultimas"
+    s = re.sub(r"\bult[io]?m?[oa]s?\b", "ultimo", s)   # ultimo, ultima, ultimos, ultimas, ultmo, ultim
+    s = re.sub(r"\bul[t]?im[oa]s?\b", "ultimo", s)
+    s = re.sub(r"\bultim\b", "ultimo", s)
+    s = re.sub(r"\bultmo\b", "ultimo", s)
     # Normalizar sinónimos de "último": reciente, más reciente -> ultimo
     s = re.sub(r"\b(mas|muy)?\s*r[eai]c[ie][ei]nte?\b", "ultimo", s)
     # Tolera errores en "nuevo": nuevo, nuebo, nueo, nevo
@@ -148,6 +149,20 @@ def parse_explicit_month(text: str) -> Optional[StandardPeriod]:
     m = re.search(
         r"\b(" + "|".join(sorted(MONTHS.keys(), key=len, reverse=True)) + r")\b"
         r"(?:\s+de|\s+del|\s+)?\s*(20\d{2})\b",
+        text
+    )
+    if m:
+        mon_str = m.group(1)
+        year = int(m.group(2))
+        month = MONTHS[mon_str]
+        start, end = month_range(year, month)
+        return StandardPeriod("month", start, end, f"{year:04d}-{month:02d}")
+
+    # 2b) Mes con "del ano" explícito entre mes y año: "marzo del ano 2023"
+    # Nota: el texto ya viene sin acentos ("año" -> "ano") desde normalize_text/strip_accents
+    m = re.search(
+        r"\b(" + "|".join(sorted(MONTHS.keys(), key=len, reverse=True)) + r")\b" 
+        r"(?:\s+de|\s+del)?\s+ano\s+(20\d{2})\b",
         text
     )
     if m:
@@ -305,6 +320,48 @@ def parse_relative_periods(text: str, base: date) -> Optional[StandardPeriod]:
         ord_map = {"primer": 1, "segundo": 2, "tercer": 3, "cuarto": 4}
         q = ord_map[m.group(1)]
         year = base.year
+        start, end = quarter_range(year, q)
+        return StandardPeriod("quarter", start, end, f"{year:04d}-Q{q}", source="rules")
+
+    # "ultimo mes del ano" -> Diciembre del año base
+    m = re.search(r"\bultimo\s+mes\s+del\s+ano\b", text)
+    if m:
+        year = base.year
+        start, end = month_range(year, 12)
+        return StandardPeriod("month", start, end, f"{year:04d}-12", source="rules")
+
+    # "ultimo trimestre del ano" -> Q4 del año base
+    m = re.search(r"\bultimo\s+trimestre\s+del\s+ano\b", text)
+    if m:
+        year = base.year
+        start, end = quarter_range(year, 4)
+        return StandardPeriod("quarter", start, end, f"{year:04d}-Q4", source="rules")
+
+    # "ultimo ano" -> año base
+    m = re.search(r"\bultimo\s+ano\b", text)
+    if m:
+        year = base.year
+        start, end = year_range(year)
+        return StandardPeriod("year", start, end, f"{year:04d}", source="rules")
+
+    # "ultimo mes" -> mes anterior completo al base
+    m = re.search(r"\bultimo\s+mes\b", text)
+    if m:
+        prev = pd.Period(base, freq="M") - 1
+        year = prev.start_time.year
+        month = prev.start_time.month
+        start, end = month_range(year, month)
+        return StandardPeriod("month", start, end, f"{year:04d}-{month:02d}", source="rules")
+
+    # "ultimo trimestre" -> trimestre anterior al base
+    m = re.search(r"\bultimo\s+trimestre\b", text)
+    if m:
+        q_current = (base.month - 1) // 3 + 1
+        year = base.year
+        q = q_current - 1
+        if q == 0:
+            q = 4
+            year -= 1
         start, end = quarter_range(year, q)
         return StandardPeriod("quarter", start, end, f"{year:04d}-Q{q}", source="rules")
     

@@ -316,6 +316,7 @@ class MemoryAdapter:
     def _set_facts_json(self, pool: Any, session_id: str, facts: Dict[str, str]) -> None:
         with pool.connection(timeout=3) as conn:
             with conn.cursor() as cur:
+                payload = Json(facts) if Json else json.dumps(facts, ensure_ascii=False)
                 cur.execute(
                     """
                     INSERT INTO session_facts(session_id, facts, updated_at)
@@ -324,7 +325,7 @@ class MemoryAdapter:
                         SET facts = EXCLUDED.facts,
                             updated_at = NOW()
                     """,
-                    (session_id, facts),
+                    (session_id, payload),
                 )
             conn.commit()
 
@@ -351,8 +352,23 @@ class MemoryAdapter:
             with conn.cursor() as cur:
                 cur.execute("SELECT facts FROM session_facts WHERE session_id=%s", (session_id,))
                 row = cur.fetchone()
-                if row and row[0]:
-                    return dict(row[0])
+                if not row:
+                    return {}
+                try:
+                    # Support dict_row (row is a dict) and tuple row
+                    val = row.get("facts") if hasattr(row, "get") else row[0]
+                except Exception:
+                    val = None
+                if val is None:
+                    return {}
+                if isinstance(val, dict):
+                    return dict(val)
+                if isinstance(val, str):
+                    try:
+                        parsed = json.loads(val)
+                        return dict(parsed) if isinstance(parsed, dict) else {}
+                    except Exception:
+                        return {}
         return {}
 
     def _read_facts_kv(self, pool: Any, session_id: str) -> Dict[str, str]:

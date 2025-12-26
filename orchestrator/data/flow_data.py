@@ -49,13 +49,26 @@ def _resolve_period_context(normalized: Dict[str, Any], facts: Optional[Dict[str
     """Resuelve período: primero clasificación, luego Redis (requiere firstdate/lastdate)."""
     period_obj = normalized.get("period")
     if isinstance(period_obj, dict) and period_obj.get("firstdate") and period_obj.get("lastdate"):
+        try:
+            logger.debug(
+                f"Periodo desde clasificación: firstdate={period_obj.get('firstdate')} lastdate={period_obj.get('lastdate')} granularity={period_obj.get('granularity')}"
+            )
+        except Exception:
+            pass
         return period_obj
     if isinstance(facts, dict):
         facts_period = facts.get("period")
         if isinstance(facts_period, dict) and facts_period.get("firstdate") and facts_period.get("lastdate"):
+            try:
+                logger.debug(
+                    f"Periodo desde memoria: firstdate={facts_period.get('firstdate')} lastdate={facts_period.get('lastdate')} granularity={facts_period.get('granularity')}"
+                )
+            except Exception:
+                pass
             return facts_period
         if isinstance(facts_period, dict):
             logger.debug("facts.period presente pero sin 'firstdate/lastdate'; usando ventana auto")
+    logger.debug("Periodo no determinado en clasificación/memoria; se utilizará ventana automática (None)")
     return None
 
 
@@ -65,11 +78,14 @@ def _resolve_indicator_context(normalized: Dict[str, Any], facts: Optional[Dict[
     if isinstance(indicator_obj, dict):
         val = indicator_obj.get("normalized")
         if isinstance(val, str) and val.strip():
+            logger.debug(f"Indicador desde clasificación: {val}")
             return val
     if isinstance(facts, dict):
         ind = facts.get("indicator")
         if isinstance(ind, str) and ind.strip():
+            logger.debug(f"Indicador desde memoria: {ind.strip()}")
             return ind.strip()
+    logger.debug("Indicador no determinado (clasificación/memoria)")
     return None
 
 
@@ -79,11 +95,14 @@ def _resolve_component_context(normalized: Dict[str, Any], facts: Optional[Dict[
     if isinstance(comp_obj, dict):
         val = comp_obj.get("normalized")
         if isinstance(val, str) and val.strip():
+            logger.debug(f"Componente desde clasificación: {val}")
             return val
     if isinstance(facts, dict):
         comp = facts.get("component")
         if isinstance(comp, str) and comp.strip():
+            logger.debug(f"Componente desde memoria: {comp.strip()}")
             return comp.strip()
+    logger.debug("Componente no determinado (clasificación/memoria)")
     return None
 
 
@@ -93,13 +112,17 @@ def _resolve_seasonality_context(normalized: Dict[str, Any], facts: Optional[Dic
     if isinstance(seasonality_obj, dict):
         val = seasonality_obj.get("normalized") or seasonality_obj.get("label")
         if isinstance(val, str) and val.strip():
+            logger.debug(f"Estacionalidad desde clasificación: {val.strip()}")
             return val.strip()
     elif isinstance(seasonality_obj, str) and seasonality_obj.strip():
+        logger.debug(f"Estacionalidad desde clasificación (texto): {seasonality_obj.strip()}")
         return seasonality_obj.strip()
     if isinstance(facts, dict):
         seas = facts.get("seasonality")
         if isinstance(seas, str) and seas.strip():
+            logger.debug(f"Estacionalidad desde memoria: {seas.strip()}")
             return seas.strip()
+    logger.debug("Estacionalidad no determinada (clasificación/memoria)")
     return None
 
 
@@ -244,6 +267,13 @@ def stream_data_flow(
     redis_ctx = _get_context(session_id=session_id)
     ctx_map = _as_mapping(redis_ctx)
     facts = _as_mapping(ctx_map.get("facts"))
+    try:
+        logger.debug(
+            "Facts cargados desde memoria: %s",
+            list(facts.keys()) if isinstance(facts, dict) else facts,
+        )
+    except Exception:
+        pass
     
     # Extraer entidades normalizados desde classification
     normalized = {}
@@ -256,6 +286,28 @@ def stream_data_flow(
     indicator_context_val = _resolve_indicator_context(normalized, facts)
     component_context_val = _resolve_component_context(normalized, facts)
     seasonality_context_val = _resolve_seasonality_context(normalized, facts)
+
+    # Persistir entidades resueltas en memoria (simple)
+    if session_id:
+        try:
+            mem = MemoryAdapter()
+            to_save: Dict[str, Any] = {}
+            if indicator_context_val:
+                to_save["indicator"] = indicator_context_val
+            if component_context_val:
+                to_save["component"] = component_context_val
+            if seasonality_context_val:
+                to_save["seasonality"] = seasonality_context_val
+            if period_context:
+                to_save["period"] = period_context
+            if to_save:
+                try:
+                    mem.set_facts(session_id, to_save)
+                    logger.debug(f"Memoria actualizada con entidades: {list(to_save.keys())}")
+                except Exception:
+                    logger.debug("No se pudo guardar entidades en memoria", exc_info=True)
+        except Exception:
+            logger.debug("MemoryAdapter no disponible para persistencia", exc_info=True)
 
     # Detectar código de serie
     detection_result = detect_series_code(
