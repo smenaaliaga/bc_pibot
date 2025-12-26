@@ -192,9 +192,11 @@ def _find_best_match(indicator: str, component: str) -> Optional[str]:
 
 
 def detect_series_code(
+    normalized: Optional[Dict[str, Any]] = None,
+    entities: Optional[Dict[str, Any]] = None,
     indicator: Optional[str] = None,
     component: Optional[str] = None,
-    seasonality: Optional[str] = None,
+    sector: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Detecta el código de serie correcto basado en las entidades normalizadas.
@@ -203,37 +205,86 @@ def detect_series_code(
     usando los facets del catálogo como referencia.
     
     Args:
-        indicator: Indicador normalizado (ej: "imacec", "pib")
-        component: Componente/sector normalizado (ej: "minero", "pib")
-        seasonality: Estacionalidad normalizada (ej: "desestacionalizado", "original")
+        normalized: Diccionario con datos normalizados del clasificador
+        entities: Diccionario con entidades extraídas (alias de normalized)
+        indicator: Indicador específico (sobrescribe detección automática)
+        component: Componente/sector específico (sobrescribe detección) - DEPRECATED: usar sector
+        sector: Sector específico (sobrescribe detección) - alineado con facets del catálogo
         
     Returns:
         Dict con:
             - series_code: Código de la serie detectada
             - indicator: Indicador detectado/usado
-            - component: Componente detectado/usado
+            - sector: Sector detectado/usado
             - metadata: Metadata de la serie del catálogo
             - matched_by: Método de detección usado
     
     Ejemplos:
-        >>> detect_series_code(indicator="imacec")
+        >>> detect_series_code()
         {'series_code': 'F032.IMC.IND.Z.Z.EP18.Z.Z.0.M', ...}
         
-        >>> detect_series_code(indicator="imacec", component="minero")
+        >>> detect_series_code(indicator="imacec", sector="minero")
         {'series_code': 'F032.IMC.IND.Z.Z.EP18.03.Z.0.M', ...}
     """
-    # Usar valores provistos directamente; aplicar defaults si faltan
-    final_indicator = indicator or DEFAULT_INDICATOR
-    final_component = component
+    # Extraer valores de los parámetros (con prioridad a argumentos explícitos)
+    if normalized is None:
+        normalized = entities or {}
     
-    # Si no hay componente, usar default basado en indicador
-    if not final_component:
-        if (final_indicator or "").lower() == "pib":
-            final_component = "pib"
+    # Extraer indicator (normalizar a lowercase)
+    if indicator:
+        final_indicator = _normalize_text(indicator)
+    else:
+        indicator_value = normalized.get("indicator")
+        if isinstance(indicator_value, dict):
+            # Formato: {"standard_name": "IMACEC", ...}
+            final_indicator = _normalize_text(indicator_value.get("standard_name") or indicator_value.get("original") or DEFAULT_INDICATOR)
+        elif isinstance(indicator_value, str):
+            final_indicator = _normalize_text(indicator_value)
         else:
-            final_component = DEFAULT_COMPONENT
+            final_indicator = _normalize_text(DEFAULT_INDICATOR)
     
-    # Normalizar estacionalidad para comparación
+    # Extraer sector (normalizar a lowercase)
+    # Prioridad: sector > component > normalized.sector > normalized.component > default
+    final_sector = None
+
+    if sector:
+        final_sector = _normalize_text(sector)
+    elif component:
+        final_sector = _normalize_text(component)
+    else:
+        # Intentar extraer de normalized
+        sector_value = normalized.get("sector")
+        if isinstance(sector_value, dict):
+            final_sector = _normalize_text(sector_value.get("standard_name") or sector_value.get("original") or "")
+        elif isinstance(sector_value, str):
+            final_sector = _normalize_text(sector_value)
+
+        # Fallback a 'component' si no hay 'sector'
+        if not final_sector:
+            component_value = normalized.get("component")
+            if isinstance(component_value, dict):
+                final_sector = _normalize_text(component_value.get("standard_name") or component_value.get("original") or "")
+            elif isinstance(component_value, str):
+                final_sector = _normalize_text(component_value)
+
+        # Si aún no hay sector, usar default
+        if not final_sector:
+            # Si el indicador es 'pib', usar 'pib' como componente por defecto
+            if final_indicator == "pib":
+                final_sector = _normalize_text("pib")
+            else:
+                final_sector = _normalize_text(DEFAULT_COMPONENT)
+    
+
+
+    # Buscar serie desestacionalizada solo si se pide explícitamente
+    seasonality = None
+    if 'seasonality' in normalized:
+        s = normalized['seasonality']
+        if isinstance(s, dict):
+            seasonality = s.get('standard_name') or s.get('normalized') or s.get('original') or s.get('text_normalized') or s.get('label')
+        else:
+            seasonality = s
     seasonality_norm = _normalize_text(str(seasonality)) if seasonality else None
 
     catalog = _load_series_catalog()
@@ -246,8 +297,8 @@ def detect_series_code(
         for code, meta in catalog.items():
             std = meta.get("standard_names", {})
             if (
-                _normalize_text(std.get("indicator", "")) == _normalize_text(final_indicator) and
-                _normalize_text(std.get("component", "")) == _normalize_text(final_component) and
+                _normalize_text(std.get("indicator", "")) == final_indicator and
+                _normalize_text(std.get("component", "")) == final_sector and
                 _normalize_text(std.get("seasonality", "")) == "desestacionalizado"
             ):
                 series_code = code
@@ -259,8 +310,8 @@ def detect_series_code(
         for code, meta in catalog.items():
             std = meta.get("standard_names", {})
             if (
-                _normalize_text(std.get("indicator", "")) == _normalize_text(final_indicator) and
-                _normalize_text(std.get("component", "")) == _normalize_text(final_component) and
+                _normalize_text(std.get("indicator", "")) == final_indicator and
+                _normalize_text(std.get("component", "")) == final_sector and
                 (not std.get("seasonality") or _normalize_text(std.get("seasonality", "")) != "desestacionalizado")
             ):
                 series_code = code
@@ -273,7 +324,7 @@ def detect_series_code(
         # Buscar por indicador solo (sin componente)
         for code, meta in catalog.items():
             std = meta.get("standard_names", {})
-            if _normalize_text(std.get("indicator", "")) == _normalize_text(final_indicator):
+            if _normalize_text(std.get("indicator", "")) == final_indicator:
                 # Si tiene campo seasonality, debe ser distinto de 'desestacionalizado'
                 if std.get("seasonality") and _normalize_text(std.get("seasonality", "")) == "desestacionalizado":
                     continue
@@ -285,23 +336,24 @@ def detect_series_code(
     # Si aún no se encuentra, solo entonces usar el fallback global (imacec)
     if not series_code:
         logger.warning(
-            f"No se encontró serie para indicator='{final_indicator}', component='{final_component}'. "
+            f"No se encontró serie para indicator='{final_indicator}', component='{final_sector}'. "
             f"Usando valores por defecto globales."
         )
-        series_code = _find_best_match(DEFAULT_INDICATOR, DEFAULT_COMPONENT)
+        series_code = _find_best_match(_normalize_text(DEFAULT_INDICATOR), _normalize_text(DEFAULT_COMPONENT))
         metadata = catalog.get(series_code, {}) if series_code else {}
 
     result = {
         "series_code": series_code,
         "indicator": final_indicator,
-        "component": final_component,
+        "component": final_sector,  # Usar component como campo principal
+        "sector": final_sector,      # Mantener por compatibilidad
         "metadata": metadata if metadata else {},
         "matched_by": matched_by,
     }
 
     logger.info(
         f"Serie detectada: {series_code} | "
-        f"indicator={final_indicator}, component={final_component}, seasonality={seasonality_norm}"
+        f"indicator={final_indicator}, component={final_sector}, seasonality={seasonality_norm}"
     )
 
     return result
