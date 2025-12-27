@@ -42,6 +42,11 @@ class AgentState(TypedDict, total=False):
     route_decision: str
     output: str
     stream_chunks: Annotated[List[str], Topic(str, accumulate=True)]
+    # Entidades normalizadas desde clasificación (transversal)
+    period_context: Optional[Dict[str, Any]]
+    indicator_context: Optional[str]
+    component_context: Optional[str]
+    seasonality_context: Optional[str]
 
 
 def _emit_stream_chunk(chunk_text: str, writer: Optional[StreamWriter]) -> None:
@@ -361,11 +366,56 @@ def classify_node(state: AgentState) -> AgentState:
         intent_info = intent_info or {}
         intent_info.setdefault("facts", facts)
     _persist_intent_event(state, classification, intent_info)
-    return {
+    
+    # Extraer entidades normalizadas desde clasificación para acceso transversal
+    normalized = getattr(classification, "normalized", None) or {}
+    period_ctx = None
+    indicator_ctx = None
+    component_ctx = None
+    seasonality_ctx = None
+    
+    if isinstance(normalized, dict):
+        # Period
+        period_obj = normalized.get("period")
+        if isinstance(period_obj, dict) and period_obj.get("firstdate") and period_obj.get("lastdate"):
+            period_ctx = period_obj
+        
+        # Indicator
+        ind_obj = normalized.get("indicator")
+        if isinstance(ind_obj, dict):
+            indicator_ctx = ind_obj.get("normalized") or ind_obj.get("label")
+        elif isinstance(ind_obj, str) and ind_obj.strip():
+            indicator_ctx = ind_obj.strip()
+        
+        # Component
+        comp_obj = normalized.get("component")
+        if isinstance(comp_obj, dict):
+            component_ctx = comp_obj.get("normalized") or comp_obj.get("label")
+        elif isinstance(comp_obj, str) and comp_obj.strip():
+            component_ctx = comp_obj.strip()
+        
+        # Seasonality
+        seas_obj = normalized.get("seasonality")
+        if isinstance(seas_obj, dict):
+            seasonality_ctx = seas_obj.get("normalized") or seas_obj.get("label")
+        elif isinstance(seas_obj, str) and seas_obj.strip():
+            seasonality_ctx = seas_obj.strip()
+    
+    result: AgentState = {
         "classification": classification,
         "history_text": history_text,
         "intent_info": intent_info,
     }
+    if period_ctx:
+        result["period_context"] = period_ctx
+    if indicator_ctx:
+        result["indicator_context"] = indicator_ctx
+    if component_ctx:
+        result["component_context"] = component_ctx
+    if seasonality_ctx:
+        result["seasonality_context"] = seasonality_ctx
+    
+    return result
 
 
 def _persist_intent_event(
@@ -645,6 +695,24 @@ def memory_node(state: AgentState) -> AgentState:
                 _persist_chart_state(session_id, metadata)
             else:
                 _maybe_clear_chart_state(session_id, state.get("facts"))
+            
+            # Persistir entidades normalizadas desde state en facts (transversal)
+            entities_to_persist: Dict[str, Any] = {}
+            if state.get("indicator_context"):
+                entities_to_persist["indicator"] = state["indicator_context"]
+            if state.get("component_context"):
+                entities_to_persist["component"] = state["component_context"]
+            if state.get("seasonality_context"):
+                entities_to_persist["seasonality"] = state["seasonality_context"]
+            if state.get("period_context"):
+                entities_to_persist["period"] = state["period_context"]
+            if entities_to_persist:
+                try:
+                    _MEMORY.set_facts(session_id, entities_to_persist)  # type: ignore
+                    logger.debug("[GRAPH] Entidades normalizadas guardadas en facts: %s", list(entities_to_persist.keys()))
+                except Exception:
+                    logger.debug("[GRAPH] Unable to persist normalized entities to facts", exc_info=True)
+            
             checkpoint_payload = {
                 "question": state.get("question"),
                 "output": output,

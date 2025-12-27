@@ -12,7 +12,7 @@ DATA_TEMPLATES = [
             ctx.get("has_indicator") and ctx.get("has_value") and ctx.get("has_period")
         ),
         "text": (
-            "Según la Base de Datos Estadísticos (BDE) del Banco Central de Chile, "
+            "Acorde a la Base de Datos Estadísticos (BDE), " #  del Banco Central de Chile
             "en {period_label} el {indicator} registró una variación {var_label} de "
             "{var_value:.1f}%."
         ),
@@ -20,7 +20,7 @@ DATA_TEMPLATES = [
     {
         "match": lambda ctx: (ctx.get("has_indicator") and ctx.get("has_value")),
         "text": (
-            "Según la Base de Datos Estadísticos (BDE) del Banco Central de Chile, "
+            "Acorde a la Base de Datos Estadísticos (BDE), " # del Banco Central de Chile
             "la última variación {var_label} del {indicator} fue {var_value:.1f}% "
             "({period_label})."
         ),

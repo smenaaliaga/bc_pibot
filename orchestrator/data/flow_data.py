@@ -281,11 +281,42 @@ def stream_data_flow(
         normalized_raw = getattr(classification, "normalized", None)
         normalized = _as_mapping(normalized_raw)
     
-    # Resolver entidades desde clasificación y Redis (helpers)
-    period_context = _resolve_period_context(normalized, facts)
-    indicator_context_val = _resolve_indicator_context(normalized, facts)
-    component_context_val = _resolve_component_context(normalized, facts)
-    seasonality_context_val = _resolve_seasonality_context(normalized, facts)
+    # Regla: si la consulta cambia el indicador, no usar memoria para llenar entidades
+    normalized_indicator_key = None
+    ind_obj = normalized.get("indicator")
+    if isinstance(ind_obj, dict):
+        normalized_indicator_key = str(
+            (ind_obj.get("normalized") or ind_obj.get("label") or "")
+        ).strip().lower()
+    elif isinstance(ind_obj, str):
+        normalized_indicator_key = ind_obj.strip().lower()
+
+    facts_indicator_key = None
+    if isinstance(facts, dict):
+        facts_indicator_key = str(facts.get("indicator") or "").strip().lower()
+
+    ignore_memory = (
+        (
+            normalized_indicator_key == "pib"
+            and isinstance(facts_indicator_key, str)
+            and ("imacec" in facts_indicator_key)
+        )
+        or (
+            isinstance(normalized_indicator_key, str)
+            and ("imacec" in normalized_indicator_key)
+            and isinstance(facts_indicator_key, str)
+            and ("pib" in facts_indicator_key)
+        )
+    )
+    if ignore_memory:
+        logger.debug("Ignorando memoria para entidades (cambio entre IMACEC↔PIB)")
+    facts_for_resolvers = None if ignore_memory else facts
+
+    # Resolver entidades desde clasificación y (opcional) Redis
+    period_context = _resolve_period_context(normalized, facts_for_resolvers)
+    indicator_context_val = _resolve_indicator_context(normalized, facts_for_resolvers)
+    component_context_val = _resolve_component_context(normalized, facts_for_resolvers)
+    seasonality_context_val = _resolve_seasonality_context(normalized, facts_for_resolvers)
 
     # Persistir entidades resueltas en memoria (simple)
     if session_id:
@@ -400,15 +431,26 @@ def stream_data_flow(
             period_labels = _format_period_labels(date_raw, "Q")
         else:
             period_labels = _format_period_labels(date_raw, freq)
+            
+        # Nombre final del indicador: indicador + componente (si aplica) + estacionalidad (si aplica)
+        indicator_parts: list[str] = []
+        if isinstance(indicator_context_val, str) and indicator_context_val.strip():
+            indicator_parts.append(indicator_context_val.upper().strip())
+        if isinstance(component_context_val, str) and component_context_val.strip():
+            indicator_parts.append(component_context_val.strip())
+        if isinstance(seasonality_context_val, str) and seasonality_context_val.strip():
+            indicator_parts.append(seasonality_context_val.strip())
+        final_indicator_name = " ".join(indicator_parts) if indicator_parts else "indicador"
+        
         
         payload = {
-            "indicator": (indicator_context_val or "indicador").upper(),
+            "indicator": final_indicator_name,
             "var_label": freq_label if show_qoq else "anual",
             "var_value": float(var_value) if var_value is not None else None,
             "period_label": period_labels[0]
         }
         tmpl_ctx = {
-            "has_indicator": bool(indicator_context_val),
+            "has_indicator": bool(final_indicator_name),
             "has_value": var_value is not None,
             "has_period": bool(chosen_date),
             "has_seasonality": bool(seasonality_context_val),
@@ -426,6 +468,7 @@ def stream_data_flow(
         
         # Fuente (link corto)
         yield f"**Fuente:** Banco Central de Chile (BDE) — [Ver serie en la BDE]({detection_result.get('metadata', {}).get('source_url')})"
+        yield "\n\n" + api_meta.get("descripEsp", "")
 
         # CSV download marker
         if chosen_row:
