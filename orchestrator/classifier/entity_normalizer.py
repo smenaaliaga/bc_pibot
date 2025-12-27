@@ -214,75 +214,21 @@ class EntityNormalizer:
 
     def _enrich_period_window(self, period_result: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Agrega 'firstdate', 'lastdate' y 'match_candidates' al período normalizado para
-        consumo directo por el flujo de datos.
+        Simplifica el período normalizado a solo granularity y target_date.
         """
-        raw_start = period_result.get("start_date") or period_result.get("startDate")
-        raw_end = period_result.get("end_date") or period_result.get("endDate")
-        gran = str(period_result.get("granularity") or period_result.get("period_type") or "").lower()
-
-        start = self._coerce_date(raw_start)
-        end = self._coerce_date(raw_end)
-        if not start and end:
-            start = end
-        if start and not end:
-            end = self._end_of_period(start, gran)
-
-        # Si no hay fechas, intentar derivar desde period_key
-        if not start and not end:
-            key_date = self._date_from_period_key(period_result.get("period_key"))
-            if key_date:
-                try:
-                    end_dt = datetime.strptime(key_date, "%Y-%m-%d").date()
-                    end = end_dt
-                    # Inferir granularidad por el formato del key
-                    pk = str(period_result.get("period_key") or "")
-                    if re.match(r"^\d{4}-\d{2}$", pk):
-                        gran = "month"
-                        start = date(end_dt.year, end_dt.month, 1)
-                    elif re.match(r"^\d{4}-Q[1-4]$", pk.upper()):
-                        gran = "quarter"
-                        # calcular inicio de trimestre
-                        q = int(pk[-1])
-                        first_month = (q - 1) * 3 + 1
-                        start = date(end_dt.year, first_month, 1)
-                    else:
-                        gran = gran or "year"
-                        start = date(end_dt.year, 1, 1)
-                except Exception:
-                    pass
-
-        # Construir ventana de consulta
-        target = end or start
-        firstdate = None
-        lastdate = None
-        candidates: list[str] = []
-        if target:
-            buffer_months = {"month": 15, "quarter": 24, "year": 60}.get(gran, 18)
-            first_candidate = self._subtract_months(target, buffer_months)
-            firstdate = self._format_date(first_candidate)
-            lastdate = self._format_date(target)
-        for dt in (start, end):
-            formatted = self._format_date(dt)
-            if formatted:
-                candidates.append(formatted)
-
-        key_date = self._date_from_period_key(period_result.get("period_key"))
-        if key_date:
-            candidates.append(key_date)
-
-        label = period_result.get("label") or period_result.get("period_key") or lastdate or firstdate
-
-        # Escribir de vuelta
-        if firstdate:
-            period_result["firstdate"] = firstdate
-        if lastdate:
-            period_result["lastdate"] = lastdate
-        period_result["granularity"] = gran or period_result.get("granularity")
-        period_result["match_candidates"] = [c for c in candidates if c]
-        period_result["label"] = label
-
-        return period_result
+        gran = period_result.get("granularity", "")
+        target_date_obj = period_result.get("target_date")
+        
+        # Convertir a string si es date
+        if isinstance(target_date_obj, date):
+            target_date_str = target_date_obj.strftime("%Y-%m-%d")
+        else:
+            target_date_str = str(target_date_obj) if target_date_obj else None
+        
+        return {
+            "granularity": gran,
+            "target_date": target_date_str
+        }
     
     def _normalize_indicator(self, indicator: str) -> Optional[str]:
         """Normaliza indicador y devuelve el valor normalizado simple."""

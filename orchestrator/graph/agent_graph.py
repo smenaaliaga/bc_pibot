@@ -180,6 +180,16 @@ class _InProcessMemoryAdapter:
             "facts_sessions": len(self._facts),
         }
 
+    def clear_session(self, session_id: str) -> bool:
+        if not session_id:
+            return False
+        try:
+            self._facts.pop(session_id, None)
+            self._history.pop(session_id, None)
+            return True
+        except Exception:
+            return False
+
 
 def _safe_retriever():
     try:

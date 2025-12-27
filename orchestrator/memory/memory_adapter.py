@@ -322,7 +322,7 @@ class MemoryAdapter:
                     INSERT INTO session_facts(session_id, facts, updated_at)
                     VALUES (%s, %s, NOW())
                     ON CONFLICT (session_id) DO UPDATE
-                        SET facts = EXCLUDED.facts,
+                        SET facts = session_facts.facts || EXCLUDED.facts,
                             updated_at = NOW()
                     """,
                     (session_id, payload),
@@ -333,7 +333,6 @@ class MemoryAdapter:
         rows = [(session_id, key, str(value)) for key, value in facts.items()]
         with pool.connection(timeout=3) as conn:
             with conn.cursor() as cur:
-                cur.execute("DELETE FROM session_facts WHERE session_id=%s", (session_id,))
                 if rows:
                     cur.executemany(
                         """
@@ -685,6 +684,48 @@ class MemoryAdapter:
         if turns:
             return turns if not limit else turns[-limit:]
         return self._fallback_turn_rows(session_id, limit=limit)
+
+    def clear_session(self, session_id: str) -> bool:
+        """Clear all memory for a given session: facts, turns, and caches.
+        Ensures no data is carried over when session changes.
+        """
+        if not session_id:
+            return False
+        # Clear local caches
+        try:
+            self._local_facts.pop(session_id, None)
+            self._fallback_turns.pop(session_id, None)
+            self._fallback_turn_seq.pop(session_id, None)
+            self._fallback_checkpoints.pop(session_id, None)
+        except Exception:
+            logger.debug("clear_session: error limpiando caches locales", exc_info=True)
+
+        pool = self._conn_pool()
+        if not pool:
+            # If no PG, consider local clear successful
+            return True
+        # Delete facts
+        layout = self._ensure_facts_layout()
+        try:
+            with pool.connection(timeout=3) as conn:
+                with conn.cursor() as cur:
+                    if layout == "json":
+                        cur.execute("DELETE FROM session_facts WHERE session_id=%s", (session_id,))
+                    else:
+                        cur.execute("DELETE FROM session_facts WHERE session_id=%s", (session_id,))
+                conn.commit()
+        except Exception as e:
+            self._log_pg_error("clear_session: error borrando facts: %s" % e, session_id=session_id, op="facts_clear", table="session_facts")
+        # Delete turns
+        try:
+            if self._ensure_session_turns_table():
+                with pool.connection(timeout=3) as conn:
+                    with conn.cursor() as cur:
+                        cur.execute("DELETE FROM session_turns WHERE session_id=%s", (session_id,))
+                    conn.commit()
+        except Exception as e:
+            self._log_pg_error("clear_session: error borrando turns: %s" % e, session_id=session_id, op="turns_clear", table="session_turns")
+        return True
 
     def get_window_for_llm(self, session_id: str, max_turns: Optional[int] = None) -> List[Dict[str, str]]:
         limit = max_turns or self._max_turns_prompt

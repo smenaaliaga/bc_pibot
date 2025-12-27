@@ -99,30 +99,23 @@ def normalize_text(s: str) -> str:
 @dataclass
 class StandardPeriod:
     granularity: str            # "month" | "quarter" | "year"
-    start_date: date
-    end_date: date              # inclusive
-    period_key: str             # "YYYY-MM" | "YYYY-Qn" | "YYYY"
-    confidence: str = "high"    # "high" | "medium" | "low"
-    source: str = "rules"       # "rules" | "dateparser"
+    target_date: str            # formato: "YYYY-MM-DD" (month), "YYYY-MM-DD" (quarter, primer día del trimestre), "YYYY" (year)
 
 
-def month_range(year: int, month: int):
-    p = pd.Period(f"{year:04d}-{month:02d}", freq="M")
-    start = p.start_time.date()
-    end = p.end_time.date()
-    return start, end
+def month_range(year: int, month: int) -> str:
+    """Retorna fecha en formato YYYY-MM-DD."""
+    return f"{year:04d}-{month:02d}-01"
 
-def quarter_range(year: int, q: int):
-    p = pd.Period(f"{year:04d}Q{q}", freq="Q")
-    start = p.start_time.date()
-    end = p.end_time.date()
-    return start, end
+def quarter_range(year: int, q: int) -> str:
+    """Retorna periodo en formato YYYY-MM-DD (primer día del trimestre)."""
+    first_month = {1: 1, 2: 4, 3: 7, 4: 10}.get(q)
+    if not first_month:
+        first_month = 1
+    return f"{year:04d}-{first_month:02d}-01"
 
-def year_range(year: int):
-    p = pd.Period(f"{year:04d}", freq="Y")
-    start = p.start_time.date()
-    end = p.end_time.date()
-    return start, end
+def year_range(year: int) -> str:
+    """Retorna año en formato YYYY."""
+    return f"{year:04d}"
 
 
 # ---------------------------
@@ -131,61 +124,60 @@ def year_range(year: int):
 
 def parse_explicit_month(text: str) -> Optional[StandardPeriod]:
     # 1) Formatos numéricos: 08/2024, 08-2024, 2024-08
-    m = re.search(r"\b(0?[1-9]|1[0-2])\s*[\/\-]\s*(20\d{2})\b", text)
+    m = re.search(r"\b(0?[1-9]|1[0-2])\s*[\/\-]\s*((19|20)\d{2})\b", text)
     if m:
         month = int(m.group(1))
         year = int(m.group(2))
-        start, end = month_range(year, month)
-        return StandardPeriod("month", start, end, f"{year:04d}-{month:02d}")
+        target = month_range(year, month)
+        return StandardPeriod("month", target)
 
-    m = re.search(r"\b(20\d{2})\s*[\/\-]\s*(0?[1-9]|1[0-2])\b", text)
+    m = re.search(r"\b((19|20)\d{2})\s*[\/\-]\s*(0?[1-9]|1[0-2])\b", text)
     if m:
         year = int(m.group(1))
-        month = int(m.group(2))
-        start, end = month_range(year, month)
-        return StandardPeriod("month", start, end, f"{year:04d}-{month:02d}")
+        month = int(m.group(3))
+        target = month_range(year, month)
+        return StandardPeriod("month", target)
 
     # 2) Mes en texto: "agosto 2024", "ago 2024", "mes de abril del 2021"
     m = re.search(
         r"\b(" + "|".join(sorted(MONTHS.keys(), key=len, reverse=True)) + r")\b"
-        r"(?:\s+de|\s+del|\s+)?\s*(20\d{2})\b",
+        r"(?:\s+de|\s+del|\s+)?\s*((19|20)\d{2})\b",
         text
     )
     if m:
         mon_str = m.group(1)
         year = int(m.group(2))
         month = MONTHS[mon_str]
-        start, end = month_range(year, month)
-        return StandardPeriod("month", start, end, f"{year:04d}-{month:02d}")
+        target = month_range(year, month)
+        return StandardPeriod("month", target)
 
     # 2b) Mes con "del ano" explícito entre mes y año: "marzo del ano 2023"
     # Nota: el texto ya viene sin acentos ("año" -> "ano") desde normalize_text/strip_accents
     m = re.search(
         r"\b(" + "|".join(sorted(MONTHS.keys(), key=len, reverse=True)) + r")\b" 
-        r"(?:\s+de|\s+del)?\s+ano\s+(20\d{2})\b",
+        r"(?:\s+de|\s+del)?\s+ano\s+((19|20)\d{2})\b",
         text
     )
     if m:
         mon_str = m.group(1)
         year = int(m.group(2))
         month = MONTHS[mon_str]
-        start, end = month_range(year, month)
-        return StandardPeriod("month", start, end, f"{year:04d}-{month:02d}")
+        target = month_range(year, month)
+        return StandardPeriod("month", target)
 
     # 3) Fuzzy matching para meses con errores ortográficos: "agousto 2024", "del feberero del ano 2023"
     # Patrón 1: "del PALABRA del ano YYYY"
-    m = re.search(r"\bdel\s+(\w{4,12})\s+del\s+ano\s+(20\d{2})\b", text)
+    m = re.search(r"\bdel\s+(\w{4,12})\s+del\s+ano\s+((19|20)\d{2})\b", text)
     if m:
         potential_month = m.group(1)
         year = int(m.group(2))
         month_num = fuzzy_match_month(potential_month, cutoff=0.7)
         if month_num:
-            start, end = month_range(year, month_num)
-            return StandardPeriod("month", start, end, f"{year:04d}-{month_num:02d}", 
-                                confidence="medium", source="fuzzy")
+            target = month_range(year, month_num)
+            return StandardPeriod("month", target)
     
     # Patrón 2: "PALABRA YYYY" o "de PALABRA del YYYY"
-    m = re.search(r"(?:de|del)?\s*(\w{4,10})\s+(?:de|del)?\s*(20\d{2})\b", text)
+    m = re.search(r"(?:de|del)?\s*(\w{4,10})\s+(?:de|del)?\s*((19|20)\d{2})\b", text)
     if m:
         potential_month = m.group(1)
         # Evitar falsos positivos con palabras comunes
@@ -193,9 +185,8 @@ def parse_explicit_month(text: str) -> Optional[StandardPeriod]:
             year = int(m.group(2))
             month_num = fuzzy_match_month(potential_month, cutoff=0.7)
             if month_num:
-                start, end = month_range(year, month_num)
-                return StandardPeriod("month", start, end, f"{year:04d}-{month_num:02d}", 
-                                    confidence="medium", source="fuzzy")
+                target = month_range(year, month_num)
+                return StandardPeriod("month", target)
 
     return None
 
@@ -215,14 +206,14 @@ def parse_explicit_quarter(text: str, base_date: Optional[date] = None) -> Optio
     fuzzy_ordinals = ["primer", "segundo", "tercer", "cuarto", "1er", "2do", "3er", "4to", "1ro", "2do", "3ro", "4to"]
     for ord in fuzzy_ordinals:
         for tri in fuzzy_trimestre:
-            pat = fr"\b({ord})\s+{tri}(?:\s+(?:de|del))?\s*(20\d{{2}})\b"
+            pat = fr"\b({ord})\s+{tri}(?:\s+(?:de|del))?\s*((19|20)\d{{2}})\b"
             m = re.search(pat, text, re.IGNORECASE)
             if m:
                 q = ord_map.get(m.group(1).lower(), None)
                 year = int(m.group(2))
                 if q and year:
-                    start, end = quarter_range(year, q)
-                    return StandardPeriod("quarter", start, end, f"{year:04d}-Q{q}", confidence="medium")
+                    target = quarter_range(year, q)
+                    return StandardPeriod("quarter", target)
 
     def roman_extractor(m):
         roman = m.group(1)
@@ -237,22 +228,22 @@ def parse_explicit_quarter(text: str, base_date: Optional[date] = None) -> Optio
         return (q, None)
 
     patterns = [
-        (r"\b([ivx]{1,3})\s*trimestre(?:\s+(?:de|del))?\s*(20\d{2})\b", roman_extractor),
+        (r"\b([ivx]{1,3})\s*trimestre(?:\s+(?:de|del))?\s*((19|20)\d{2})\b", roman_extractor),
         (r"\b([ivx]{1,3})\s*trimestre\b", roman_extractor_no_year),
-        (r"\b([1-4])\s*[TtQq]\s*[- ]?(20\d{2})\b", lambda m: (int(m.group(1)), int(m.group(2)))),
-        (r"\b([1-4])[TtQq](20\d{2})\b", lambda m: (int(m.group(1)), int(m.group(2)))),
+        (r"\b([1-4])\s*[TtQq]\s*[- ]?((19|20)\d{2})\b", lambda m: (int(m.group(1)), int(m.group(2)))),
+        (r"\b([1-4])[TtQq]((19|20)\d{2})\b", lambda m: (int(m.group(1)), int(m.group(2)))),
         (r"\b([1-4])\s*[TtQq]\b", lambda m: (int(m.group(1)), None)),
         (r"\b([1-4])[TtQq]\b", lambda m: (int(m.group(1)), None)),
-        (r"\b[TtQq]\s*([1-4])\s*[- ]?(20\d{2})\b", lambda m: (int(m.group(1)), int(m.group(2)))),
-        (r"\b[TtQq]([1-4])(20\d{2})\b", lambda m: (int(m.group(1)), int(m.group(2)))),
+        (r"\b[TtQq]\s*([1-4])\s*[- ]?((19|20)\d{2})\b", lambda m: (int(m.group(1)), int(m.group(2)))),
+        (r"\b[TtQq]([1-4])((19|20)\d{2})\b", lambda m: (int(m.group(1)), int(m.group(2)))),
         (r"\b[TtQq]\s*([1-4])\b", lambda m: (int(m.group(1)), None)),
         (r"\b[TtQq]([1-4])\b", lambda m: (int(m.group(1)), None)),
-        (r"\b([1-4])(er|ro|do|to)?\s*trimestre(?:\s+(?:de|del))?\s*(20\d{2})\b", lambda m: (int(m.group(1)), int(m.group(3)))),
+        (r"\b([1-4])(er|ro|do|to)?\s*trimestre(?:\s+(?:de|del))?\s*((19|20)\d{2})\b", lambda m: (int(m.group(1)), int(m.group(3)))),
         (r"\b([1-4])(er|ro|do|to)?\s*trimestre\b", lambda m: (int(m.group(1)), None)),
-        (r"\b(primer|segundo|tercer|cuarto|1er|2do|3er|4to|1ro|2do|3ro|4to)\s+trimestre(?:\s+(?:de|del))?\s*(20\d{2})\b", lambda m: (ord_map.get(m.group(1).lower()), int(m.group(2)))),
+        (r"\b(primer|segundo|tercer|cuarto|1er|2do|3er|4to|1ro|2do|3ro|4to)\s+trimestre(?:\s+(?:de|del))?\s*((19|20)\d{2})\b", lambda m: (ord_map.get(m.group(1).lower()), int(m.group(2)))),
         (r"\b(primer|segundo|tercer|cuarto|1er|2do|3er|4to|1ro|2do|3ro|4to)\s+trimestre\b", lambda m: (ord_map.get(m.group(1).lower()), None)),
-        (r"\btrimestre\s*([1-4])(?:\s+(?:de|del))?\s*(20\d{2})\b", lambda m: (int(m.group(1)), int(m.group(2)))),
-        (r"\b([1-4])\s*trimestre(?:\s+(?:de|del))?\s*(20\d{2})\b", lambda m: (int(m.group(1)), int(m.group(2)))),
+        (r"\btrimestre\s*([1-4])(?:\s+(?:de|del))?\s*((19|20)\d{2})\b", lambda m: (int(m.group(1)), int(m.group(2)))),
+        (r"\b([1-4])\s*trimestre(?:\s+(?:de|del))?\s*((19|20)\d{2})\b", lambda m: (int(m.group(1)), int(m.group(2)))),
     ]
 
     for pat, extractor in patterns:
@@ -265,26 +256,24 @@ def parse_explicit_quarter(text: str, base_date: Optional[date] = None) -> Optio
                 if year is None:
                     year = base.year
                     confidence = "medium"
-                else:
-                    confidence = "high"
-                start, end = quarter_range(year, q)
-                return StandardPeriod("quarter", start, end, f"{year:04d}-Q{q}", confidence=confidence)
+                target = quarter_range(year, q)
+                return StandardPeriod("quarter", target)
 
     # 4) "primer/segundo/tercer/cuarto trimestre de/del 2025" (palabra, sin variantes)
-    m = re.search(r"\b(primer|segundo|tercer|cuarto)\s+trimestre(?:\s+(?:de|del))?\s*(20\d{2})\b", text)
+    m = re.search(r"\b(primer|segundo|tercer|cuarto)\s+trimestre(?:\s+(?:de|del))?\s*((19|20)\d{2})\b", text)
     if m:
         ord_map = {"primer": 1, "segundo": 2, "tercer": 3, "cuarto": 4}
         q = ord_map[m.group(1)]
         year = int(m.group(2))
-        start, end = quarter_range(year, q)
-        return StandardPeriod("quarter", start, end, f"{year:04d}-Q{q}")
+        target = quarter_range(year, q)
+        return StandardPeriod("quarter", target)
 
     # 4) Rangos por meses: "enero-marzo 2025", "abril a junio 2025"
     m = re.search(
         r"\b(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)"
         r"\s*(?:-|a)\s*"
         r"(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)"
-        r"\s*(20\d{2})\b",
+        r"\s*((19|20)\d{2})\b",
         text
     )
     if m:
@@ -294,20 +283,20 @@ def parse_explicit_quarter(text: str, base_date: Optional[date] = None) -> Optio
         # Si coincide exactamente con un trimestre canónico, lo expresamos como quarter
         for q, (qs, qe) in RANGE_QUARTER_MONTHS.items():
             if (m1, m2) == (qs, qe):
-                start, end = quarter_range(year, q)
-                return StandardPeriod("quarter", start, end, f"{year:04d}-Q{q}")
+                target = quarter_range(year, q)
+                return StandardPeriod("quarter", target)
         # Si no coincide, podrías optar por devolver un rango mensual genérico
         # pero aquí dejamos que otro nivel lo resuelva.
     return None
 
 
 def parse_explicit_year(text: str) -> Optional[StandardPeriod]:
-    m = re.search(r"\b(20\d{2})\b", text)
+    m = re.search(r"\b((19|20)\d{2})\b", text)
     # Ojo: esto es muy laxo, por eso solo úsalo si NO detectaste mes/trimestre antes.
     if m:
         year = int(m.group(1))
-        start, end = year_range(year)
-        return StandardPeriod("year", start, end, f"{year:04d}")
+        target = year_range(year)
+        return StandardPeriod("year", target)
     return None
 
 
@@ -320,29 +309,29 @@ def parse_relative_periods(text: str, base: date) -> Optional[StandardPeriod]:
         ord_map = {"primer": 1, "segundo": 2, "tercer": 3, "cuarto": 4}
         q = ord_map[m.group(1)]
         year = base.year
-        start, end = quarter_range(year, q)
-        return StandardPeriod("quarter", start, end, f"{year:04d}-Q{q}", source="rules")
+        target = quarter_range(year, q)
+        return StandardPeriod("quarter", target)
 
     # "ultimo mes del ano" -> Diciembre del año base
     m = re.search(r"\bultimo\s+mes\s+del\s+ano\b", text)
     if m:
         year = base.year
-        start, end = month_range(year, 12)
-        return StandardPeriod("month", start, end, f"{year:04d}-12", source="rules")
+        target = month_range(year, 12)
+        return StandardPeriod("month", target)
 
     # "ultimo trimestre del ano" -> Q4 del año base
     m = re.search(r"\bultimo\s+trimestre\s+del\s+ano\b", text)
     if m:
         year = base.year
-        start, end = quarter_range(year, 4)
-        return StandardPeriod("quarter", start, end, f"{year:04d}-Q4", source="rules")
+        target = quarter_range(year, 4)
+        return StandardPeriod("quarter", target)
 
     # "ultimo ano" -> año base
     m = re.search(r"\bultimo\s+ano\b", text)
     if m:
         year = base.year
-        start, end = year_range(year)
-        return StandardPeriod("year", start, end, f"{year:04d}", source="rules")
+        target = year_range(year)
+        return StandardPeriod("year", target)
 
     # "ultimo mes" -> mes anterior completo al base
     m = re.search(r"\bultimo\s+mes\b", text)
@@ -350,8 +339,8 @@ def parse_relative_periods(text: str, base: date) -> Optional[StandardPeriod]:
         prev = pd.Period(base, freq="M") - 1
         year = prev.start_time.year
         month = prev.start_time.month
-        start, end = month_range(year, month)
-        return StandardPeriod("month", start, end, f"{year:04d}-{month:02d}", source="rules")
+        target = month_range(year, month)
+        return StandardPeriod("month", target)
 
     # "ultimo trimestre" -> trimestre anterior al base
     m = re.search(r"\bultimo\s+trimestre\b", text)
@@ -362,8 +351,8 @@ def parse_relative_periods(text: str, base: date) -> Optional[StandardPeriod]:
         if q == 0:
             q = 4
             year -= 1
-        start, end = quarter_range(year, q)
-        return StandardPeriod("quarter", start, end, f"{year:04d}-Q{q}", source="rules")
+        target = quarter_range(year, q)
+        return StandardPeriod("quarter", target)
     
     # "primer mes del año" (antes de capturar solo "este ano")
     m = re.search(r"\b(primer|segundo|tercer|cuarto)\s+mes\s+del\s+ano\b", text)
@@ -376,18 +365,18 @@ def parse_relative_periods(text: str, base: date) -> Optional[StandardPeriod]:
         # 1) Notaciones cortas y variantes: 1T, 1Q, 1er trimestre, I trimestre, etc.
         # Orden de patrones: primero los más específicos y con año explícito
         patterns = [
-            (r"\b([1-4])\s*[TQ]\s*[- ]?(20\d{2})\b", lambda m: (int(m.group(1)), int(m.group(2)))),
+            (r"\b([1-4])\s*[TQ]\s*[- ]?((19|20)\d{2})\b", lambda m: (int(m.group(1)), int(m.group(2)))),
             (r"\b([1-4])\s*[TQ]\b", lambda m: (int(m.group(1)), None)),
-            (r"\b[TQ]\s*([1-4])\s*[- ]?(20\d{2})\b", lambda m: (int(m.group(1)), int(m.group(2)))),
+            (r"\b[TQ]\s*([1-4])\s*[- ]?((19|20)\d{2})\b", lambda m: (int(m.group(1)), int(m.group(2)))),
             (r"\b[TQ]\s*([1-4])\b", lambda m: (int(m.group(1)), None)),
-            (r"\b([1-4])(er|ro|do|to)?\s*trimestre(?:\s+(?:de|del))?\s*(20\d{2})\b", lambda m: (int(m.group(1)), int(m.group(3)))),
+            (r"\b([1-4])(er|ro|do|to)?\s*trimestre(?:\s+(?:de|del))?\s*((19|20)\d{2})\b", lambda m: (int(m.group(1)), int(m.group(3)))),
             (r"\b([1-4])(er|ro|do|to)?\s*trimestre\b", lambda m: (int(m.group(1)), None)),
-            (r"\b(primer|segundo|tercer|cuarto|1er|2do|3er|4to|1ro|2do|3ro|4to)\s+trimestre(?:\s+(?:de|del))?\s*(20\d{2})\b", lambda m: (ord_map.get(m.group(1).lower()), int(m.group(2)))),
+            (r"\b(primer|segundo|tercer|cuarto|1er|2do|3er|4to|1ro|2do|3ro|4to)\s+trimestre(?:\s+(?:de|del))?\s*((19|20)\d{2})\b", lambda m: (ord_map.get(m.group(1).lower()), int(m.group(2)))),
             (r"\b(primer|segundo|tercer|cuarto|1er|2do|3er|4to|1ro|2do|3ro|4to)\s+trimestre\b", lambda m: (ord_map.get(m.group(1).lower()), None)),
-            (r"\b([IVX]{1,3})\s*trimestre(?:\s+(?:de|del))?\s*(20\d{2})\b", lambda m: (roman_map.get(m.group(1).upper()), int(m.group(2)))),
+            (r"\b([IVX]{1,3})\s*trimestre(?:\s+(?:de|del))?\s*((19|20)\d{2})\b", lambda m: (roman_map.get(m.group(1).upper()), int(m.group(2)))),
             (r"\b([IVX]{1,3})\s*trimestre\b", lambda m: (roman_map.get(m.group(1).upper()), None)),
-            (r"\btrimestre\s*([1-4])(?:\s+(?:de|del))?\s*(20\d{2})\b", lambda m: (int(m.group(1)), int(m.group(2)))),
-            (r"\b([1-4])\s*trimestre(?:\s+(?:de|del))?\s*(20\d{2})\b", lambda m: (int(m.group(1)), int(m.group(2)))),
+            (r"\btrimestre\s*([1-4])(?:\s+(?:de|del))?\s*((19|20)\d{2})\b", lambda m: (int(m.group(1)), int(m.group(2)))),
+            (r"\b([1-4])\s*trimestre(?:\s+(?:de|del))?\s*((19|20)\d{2})\b", lambda m: (int(m.group(1)), int(m.group(2)))),
         ]
 
         for pat, extractor in patterns:
@@ -397,32 +386,29 @@ def parse_relative_periods(text: str, base: date) -> Optional[StandardPeriod]:
                 if q and (year or year is None):
                     if year is None:
                         year = base.year
-                        confidence = "medium"
-                    else:
-                        confidence = "high"
-                    start, end = quarter_range(year, q)
-                    return StandardPeriod("quarter", start, end, f"{year:04d}-Q{q}", confidence=confidence)
+                    target = quarter_range(year, q)
+                    return StandardPeriod("quarter", target)
 
         # Fuzzy matching para "trimestre" y ordinales (tolerancia a errores ortográficos)
         fuzzy_ordinals = ["primer", "segundo", "tercer", "cuarto", "1er", "2do", "3er", "4to", "1ro", "2do", "3ro", "4to"]
         fuzzy_trimestre = ["trimestre", "trimstre", "trimetre", "trimestr", "trimesttre", "trimestte"]
         for ord in fuzzy_ordinals:
             for tri in fuzzy_trimestre:
-                pat = fr"\b({ord})\s+{tri}(?:\s+(?:de|del))?\s*(20\d{{2}})\b"
+                pat = fr"\b({ord})\s+{tri}(?:\s+(?:de|del))?\s*((19|20)\d{{2}})\b"
                 m = re.search(pat, text, re.IGNORECASE)
                 if m:
                     q = ord_map.get(m.group(1).lower(), None)
                     year = int(m.group(2))
                     if q and year:
-                        start, end = quarter_range(year, q)
-                        return StandardPeriod("quarter", start, end, f"{year:04d}-Q{q}", confidence="medium")
+                        target = quarter_range(year, q)
+                        return StandardPeriod("quarter", target)
 
         # 4) Rangos por meses: "enero-marzo 2025", "abril a junio 2025"
         m = re.search(
             r"\b(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)"
             r"\s*(?:-|a)\s*"
             r"(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)"
-            r"\s*(20\d{2})\b",
+            r"\s*((19|20)\d{2})\b",
             text
         )
         if m:
@@ -432,15 +418,15 @@ def parse_relative_periods(text: str, base: date) -> Optional[StandardPeriod]:
             # Si coincide exactamente con un trimestre canónico, lo expresamos como quarter
             for q, (qs, qe) in RANGE_QUARTER_MONTHS.items():
                 if (m1, m2) == (qs, qe):
-                    start, end = quarter_range(year, q)
-                    return StandardPeriod("quarter", start, end, f"{year:04d}-Q{q}")
+                    target = quarter_range(year, q)
+                    return StandardPeriod("quarter", target)
             # Si no coincide, podrías optar por devolver un rango mensual genérico
             # pero aquí dejamos que otro nivel lo resuelva.
         return None
     if re.search(r"\b(ultimo reporte del ano|comunicado del ano pasado)\b", text):
         year = base.year - 1 if "pasado" in text else base.year
-        start, end = year_range(year)
-        return StandardPeriod("year", start, end, f"{year:04d}", confidence="low", source="rules")
+        target = year_range(year)
+        return StandardPeriod("year", target)
 
     return None
 
@@ -467,16 +453,16 @@ def parse_with_dateparser(text: str, base: date) -> Optional[StandardPeriod]:
     has_year = re.search(r"\b(20\d{2})\b", t) is not None
 
     if has_month_word and has_year:
-        start, end = month_range(dt.year, dt.month)
-        return StandardPeriod("month", start, end, f"{dt.year:04d}-{dt.month:02d}", confidence="medium", source="dateparser")
+        target = month_range(dt.year, dt.month)
+        return StandardPeriod("month", target)
 
     if has_year and not has_month_word:
-        start, end = year_range(dt.year)
-        return StandardPeriod("year", start, end, f"{dt.year:04d}", confidence="low", source="dateparser")
+        target = year_range(dt.year)
+        return StandardPeriod("year", target)
 
     # Si no está claro, asumimos mes del dt.
-    start, end = month_range(dt.year, dt.month)
-    return StandardPeriod("month", start, end, f"{dt.year:04d}-{dt.month:02d}", confidence="low", source="dateparser")
+    target = month_range(dt.year, dt.month)
+    return StandardPeriod("month", target)
 
 
 # ---------------------------

@@ -1,6 +1,7 @@
 from __future__ import annotations
 import logging
 import time
+import json
 from typing import Any, Dict, Iterable, Optional
 
 from orchestrator.memory.memory_adapter import MemoryAdapter
@@ -46,28 +47,60 @@ def _as_mapping(payload: Any) -> Dict[str, Any]:
 
 
 def _resolve_period_context(normalized: Dict[str, Any], facts: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-    """Resuelve período: primero clasificación, luego Redis (requiere firstdate/lastdate)."""
+    """Resuelve período: primero clasificación (nuevo formato: granularity + target_date), luego Redis."""
     period_obj = normalized.get("period")
+    # Nuevo formato simplificado: granularity + target_date
+    if isinstance(period_obj, dict) and period_obj.get("granularity") and period_obj.get("target_date"):
+        try:
+            logger.debug(
+                f"Periodo desde clasificación: granularity={period_obj.get('granularity')} target_date={period_obj.get('target_date')}"
+            )
+        except Exception:
+            pass
+        return period_obj
+    # Formato legacy: firstdate + lastdate (para compatibilidad con Redis)
     if isinstance(period_obj, dict) and period_obj.get("firstdate") and period_obj.get("lastdate"):
         try:
             logger.debug(
-                f"Periodo desde clasificación: firstdate={period_obj.get('firstdate')} lastdate={period_obj.get('lastdate')} granularity={period_obj.get('granularity')}"
+                f"Periodo desde clasificación (legacy): firstdate={period_obj.get('firstdate')} lastdate={period_obj.get('lastdate')}"
             )
         except Exception:
             pass
         return period_obj
     if isinstance(facts, dict):
         facts_period = facts.get("period")
-        if isinstance(facts_period, dict) and facts_period.get("firstdate") and facts_period.get("lastdate"):
+        logger.debug(f"Verificando facts.period: {facts_period}")
+        # Si viene como string JSON desde memoria, intentar parsearlo
+        if isinstance(facts_period, str):
+            try:
+                parsed = json.loads(facts_period)
+                if isinstance(parsed, dict):
+                    facts_period = parsed
+                    logger.debug("facts.period parseado desde JSON correctamente")
+            except Exception:
+                logger.debug("No se pudo parsear facts.period como JSON", exc_info=False)
+        # Nuevo formato
+        if isinstance(facts_period, dict) and facts_period.get("granularity") and facts_period.get("target_date"):
             try:
                 logger.debug(
-                    f"Periodo desde memoria: firstdate={facts_period.get('firstdate')} lastdate={facts_period.get('lastdate')} granularity={facts_period.get('granularity')}"
+                    f"Periodo desde memoria: granularity={facts_period.get('granularity')} target_date={facts_period.get('target_date')}"
                 )
             except Exception:
                 pass
             return facts_period
-        if isinstance(facts_period, dict):
-            logger.debug("facts.period presente pero sin 'firstdate/lastdate'; usando ventana auto")
+        # Formato legacy
+        if isinstance(facts_period, dict) and facts_period.get("firstdate") and facts_period.get("lastdate"):
+            try:
+                logger.debug(
+                    f"Periodo desde memoria (legacy): firstdate={facts_period.get('firstdate')} lastdate={facts_period.get('lastdate')}"
+                )
+            except Exception:
+                pass
+            return facts_period
+        if facts_period is not None:
+            logger.debug(f"facts.period existe pero no tiene el formato esperado: {facts_period}")
+    else:
+        logger.debug("facts es None o no es dict")
     logger.debug("Periodo no determinado en clasificación/memoria; se utilizará ventana automática (None)")
     return None
 
@@ -126,18 +159,85 @@ def _resolve_seasonality_context(normalized: Dict[str, Any], facts: Optional[Dic
     return None
 
 
-def _match_observation(observations: list, candidates: list[str]) -> Optional[Dict[str, Any]]:
-    if not observations or not candidates:
+def _match_observation(
+    observations: list,
+    target_date_str: Optional[str],
+    granularity: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
+    """Match observation using target_date and granularity.
+    - target_date formats: "YYYY-MM-DD" (month), "YYYY-QN" (quarter), "YYYY" (year)
+    - Monthly: match by YYYY-MM
+    - Quarterly: map to quarter-end month (03, 06, 09, 12)
+    - Year: match by YYYY (choose last observation in year)
+    """
+    if not observations or not target_date_str:
         return None
-    for candidate in candidates:
-        for obs in observations:
-            date_str = obs.get("date")
-            if not date_str:
-                continue
-            if date_str == candidate:
-                return obs
-            if date_str[:7] == candidate[:7]:
-                return obs
+
+    try:
+        gran = (granularity or "").lower()
+        
+        # Monthly: match by year-month (YYYY-MM-DD -> YYYY-MM)
+        if gran == "month":
+            ym_target = target_date_str[:7]
+            logger.debug(f"Matching month: buscando {ym_target}")
+            for obs in observations:
+                ds = obs.get("date")
+                if ds and ds[:7] == ym_target:
+                    return obs
+
+        # Quarterly: handle either symbolic quarter (YYYY-QN) or explicit date
+        elif gran == "quarter":
+            # Observations are quarter-end (e.g., 1996-03-31, 1996-06-30, ...)
+            # Convert target to last month of quarter for matching
+            import re
+            m = re.match(r"(\d{4})-Q([1-4])", target_date_str)
+            if m:
+                year = int(m.group(1))
+                quarter = int(m.group(2))
+                last_month = quarter * 3
+                ym_target = f"{year:04d}-{last_month:02d}"
+                logger.debug(f"Matching quarter: {target_date_str}, buscando mes de cierre {ym_target}")
+                for obs in observations:
+                    ds = obs.get("date")
+                    if ds and ds[:7] == ym_target:
+                        logger.debug(f"Encontrado: {ds}")
+                        return obs
+                logger.debug(f"No se encontró observación para {ym_target}")
+            else:
+                # If target_date_str already is a date, map month to quarter-end month
+                m2 = re.match(r"^(\d{4})-(0[1-9]|1[0-2])(-\d{2})?$", target_date_str)
+                if m2:
+                    year = int(m2.group(1))
+                    month = int(m2.group(2))
+                    quarter = ((month - 1) // 3) + 1
+                    last_month = quarter * 3
+                    ym_target = f"{year:04d}-{last_month:02d}"
+                    logger.debug(f"Matching quarter (fecha explícita): buscando mes de cierre {ym_target}")
+                    for obs in observations:
+                        ds = obs.get("date")
+                        if ds and ds[:7] == ym_target:
+                            logger.debug(f"Encontrado: {ds}")
+                            return obs
+
+        # Year: target_date_str is "YYYY"
+        elif gran == "year":
+            y_target = target_date_str[:4]
+            logger.debug(f"Matching year: buscando {y_target}")
+            # Find last observation in that year
+            year_obs = [o for o in observations if o.get("date", "")[:4] == y_target]
+            if year_obs:
+                return max(year_obs, key=lambda o: o.get("date", ""))
+
+        # Fallback: try year-month match if target is in YYYY-MM-DD format
+        if "-" in target_date_str and len(target_date_str) >= 7:
+            ym_target = target_date_str[:7]
+            logger.debug(f"Fallback: buscando {ym_target}")
+            for obs in observations:
+                ds = obs.get("date")
+                if ds and ds[:7] == ym_target:
+                    return obs
+    except Exception as e:
+        logger.warning(f"Error en _match_observation: {e}")
     return None
 
 
@@ -206,7 +306,7 @@ def _calculate_variation(
 def _format_value(value: Any) -> str:
     """Format numeric value with thousand separators."""
     try:
-        return f"{float(value):,.2f}".replace(",", "_").replace("_", ".")
+        return f"{float(value):,.0f}".replace(",", "_").replace("_", ".")
     except Exception:
         return "--"
 
@@ -353,23 +453,17 @@ def stream_data_flow(
     if not series_id:
         logger.error("No se pudo determinar el código de serie")
         return
-    
+
     # Determinar frecuencia objetivo desde el período normalizado
     freq = "M"  # default mensual
     if period_context and isinstance(period_context, dict):
-        granularity = str(period_context.get("granularity") or period_context.get("period_type") or "").lower()
-        if granularity in ("quarter", "q", "t", "trimestre", "trimestral"):
+        granularity = period_context.get("granularity")
+        if granularity == "quarter":
             freq = "Q"
-        elif granularity in ("year", "y", "anual", "annual"):
+        elif granularity == "year":
             freq = "A"
 
-    if period_context and period_context.get("firstdate") and period_context.get("lastdate"):
-        firstdate = period_context["firstdate"]
-        lastdate = period_context["lastdate"]
-    else:
-        # Sin período explícito: dejar "auto" en la API (None)
-        firstdate = None
-        lastdate = None
+    target_date = period_context.get("target_date") if period_context else None
 
     # Obtener datos de la serie 
     data = None
@@ -379,8 +473,7 @@ def stream_data_flow(
             # yield f"Intento {attempt + 1}/{max_retries + 1}...\n\n"
             data = get_series_api_rest_bcch(
                 series_id=series_id,
-                firstdate=firstdate,
-                lastdate=lastdate,
+                target_date=target_date,
                 target_frequency=freq,
                 agg="avg"
             )
@@ -407,9 +500,19 @@ def stream_data_flow(
 
     if obs:
         
-        candidates = period_context["match_candidates"] if period_context else []
-        obs_match = _match_observation(obs, candidates)
+        # Si hay target_date, buscar observación que coincida
+        target_date_str = period_context.get("target_date") if period_context else None
+        granularity = period_context.get("granularity") if period_context else None
+        
+        logger.debug(f"Buscando observación con target_date={target_date_str}, granularity={granularity}")
+        obs_match = _match_observation(obs, target_date_str, granularity)
         obs_latest = max(obs, key=lambda o: o.get("date", "")) if obs else None
+        
+        if obs_match:
+            logger.debug(f"Observación encontrada: {obs_match.get('date')}")
+        else:
+            logger.debug(f"No se encontró observación para target_date, usando último período: {obs_latest.get('date') if obs_latest else None}")
+        
         chosen_row = obs_match or obs_latest
         
         show_qoq = seasonality_context_val and 'desestacionalizado' in seasonality_context_val.lower()
@@ -442,19 +545,39 @@ def stream_data_flow(
             indicator_parts.append(seasonality_context_val.strip())
         final_indicator_name = " ".join(indicator_parts) if indicator_parts else "indicador"
         
-        
+        # Flags sobre la posición de lastdate respecto al rango disponible
+        position = str(api_meta.get("lastdate_position") or "").strip().lower()
+        last_available_date = api_meta.get("last_available_date")
+        first_available_date = api_meta.get("first_available_date")
+
+        # Etiquetas legibles para límites de la serie
+        if (indicator_context_val or "").strip().lower() == "pib":
+            last_available_labels = _format_period_labels(last_available_date, "Q") if last_available_date else ["--", "--"]
+            first_available_labels = _format_period_labels(first_available_date, "Q") if first_available_date else ["--", "--"]
+        else:
+            last_available_labels = _format_period_labels(last_available_date, freq) if last_available_date else ["--", "--"]
+            first_available_labels = _format_period_labels(first_available_date, freq) if first_available_date else ["--", "--"]
+
+        # Inicializar payload con todos los componentes desde el principio
         payload = {
             "indicator": final_indicator_name,
+            "value": _format_value(value),
             "var_label": freq_label if show_qoq else "anual",
             "var_value": float(var_value) if var_value is not None else None,
-            "period_label": period_labels[0]
+            "period_label": period_labels[0],
+            "last_available_label": last_available_labels[0], # Flags de posición
+            "first_available_label": first_available_labels[0], # Flags de posición
         }
+
         tmpl_ctx = {
             "has_indicator": bool(final_indicator_name),
-            "has_value": var_value is not None,
+            "has_value": value is not None,
+            "has_var_value": var_value is not None,
             "has_period": bool(chosen_date),
             "has_seasonality": bool(seasonality_context_val),
             "no_data": False,
+            "lastdate_position": position, # Flags de posición
+            "value": value,
         }
         message = render_template(select_template(tmpl_ctx), payload)
         yield f"{message}\n"
@@ -462,13 +585,14 @@ def stream_data_flow(
         # Tabla markdown
         yield f"Periodo | Valor | {var_label}\n"
         yield f"--------|-------|{'-'*len(var_label)}\n"
-        yield f"{period_labels[1]} | {_format_value(value)} | {_format_percentage(var_value)}\n"
+        yield f"{period_labels[1]} | {_format_value(value)} * | {_format_percentage(var_value)}\n"
         # yield "-- | -- | --\n"
         yield "\n"
         
         # Fuente (link corto)
+        yield "\* _Índice_\n\n" if final_indicator_name == "imacec" else "\* _Miles de millones de pesos_\n\n"
         yield f"**Fuente:** Banco Central de Chile (BDE) — [Ver serie en la BDE]({detection_result.get('metadata', {}).get('source_url')})"
-        yield "\n\n" + api_meta.get("descripEsp", "")
+        # yield "\n\n" + api_meta.get("descripEsp", "")
 
         # CSV download marker
         if chosen_row:

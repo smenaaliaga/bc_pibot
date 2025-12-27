@@ -7,9 +7,57 @@ from typing import Any, Callable, Dict, List
 
 # Plantillas para consultas de datos (value, last, table)
 DATA_TEMPLATES = [
+    # Sin variación calculable (primer año o sin datos previos)
     {
         "match": lambda ctx: (
-            ctx.get("has_indicator") and ctx.get("has_value") and ctx.get("has_period")
+            ctx.get("has_indicator")
+            and ctx.get("has_value")
+            and not ctx.get("has_var_value")
+            and ctx.get("has_period")
+        ),
+        "text": (
+            "Acorde a la Base de Datos Estadísticos (BDE), en {period_label} el {indicator} "
+            "registró un valor de {value} *, "
+            "sin variación {var_label} disponible por no existir un período comparable para su cálculo."
+        ),
+    },
+    # Consultas fuera de rango: posterior al último dato disponible
+    {
+        "match": lambda ctx: (
+            ctx.get("has_indicator")
+            and ctx.get("has_var_value")
+            and ctx.get("has_period")
+            and ctx.get("lastdate_position") == "gt_latest"
+        ),
+        "text": (
+            "El período consultado está fuera del rango disponible "
+            "(último dato disponible: {last_available_label}). "
+            "Acorde a la Base de Datos Estadísticos (BDE), el último período disponible del "
+            "{indicator} registró una variación {var_label} de {var_value:.1f}%."
+        ),
+    },
+    # Consultas fuera de rango: anterior al inicio de la serie
+    {
+        "match": lambda ctx: (
+            ctx.get("has_indicator")
+            and ctx.get("has_var_value")
+            and ctx.get("has_period")
+            and ctx.get("lastdate_position") == "lt_first"
+        ),
+        "text": (
+            "El período consultado está fuera del rango disponible "
+            "(primer dato disponible: {first_available_label}). "
+            "Acorde a la Base de Datos Estadísticos (BDE), el primer período disponible del "
+            "{indicator} registró una variación {var_label} de {var_value:.1f}%."
+        ),
+    },
+    # Consultas exactas al último dato disponible
+    {
+        "match": lambda ctx: (
+            ctx.get("has_indicator")
+            and ctx.get("has_var_value")
+            and ctx.get("has_period")
+            and ctx.get("lastdate_position") == "eq_latest"
         ),
         "text": (
             "Acorde a la Base de Datos Estadísticos (BDE), " #  del Banco Central de Chile
@@ -17,14 +65,27 @@ DATA_TEMPLATES = [
             "{var_value:.1f}%."
         ),
     },
+    # Consulta dentro de rango con período determinado
     {
-        "match": lambda ctx: (ctx.get("has_indicator") and ctx.get("has_value")),
+        "match": lambda ctx: (
+            ctx.get("has_indicator") and ctx.get("has_var_value") and ctx.get("has_period")
+        ),
+        "text": (
+            "Acorde a la Base de Datos Estadísticos (BDE), " #  del Banco Central de Chile
+            "en {period_label} el {indicator} registró una variación {var_label} de "
+            "{var_value:.1f}%."
+        ),
+    },
+    # Consulta general sin período determinado
+    {
+        "match": lambda ctx: (ctx.get("has_indicator") and ctx.get("has_var_value")),
         "text": (
             "Acorde a la Base de Datos Estadísticos (BDE), " # del Banco Central de Chile
             "la última variación {var_label} del {indicator} fue {var_value:.1f}% "
             "({period_label})."
         ),
     },
+    # Sin datos
     {
         "match": lambda ctx: (ctx.get("has_indicator") and ctx.get("no_data")),
         "text": (
@@ -89,9 +150,12 @@ def render_template(text: str, payload: Dict[str, Any]) -> str:
     """
     safe = {
         "indicator": payload.get("indicator") or "el indicador",
+        "value": payload.get("value") if payload.get("value") is not None else "--",
         "var_label": payload.get("var_label") or "variación anual",
         "var_value": payload.get("var_value") if payload.get("var_value") is not None else 0.0,
         "period_label": payload.get("period_label") or "el período consultado",
+        "last_available_label": payload.get("last_available_label") or "el último período disponible",
+        "first_available_label": payload.get("first_available_label") or "el primer período disponible",
         "rag_summary": payload.get("rag_summary") or "",
         "definition_snippet": payload.get("definition_snippet") or "",
     }
