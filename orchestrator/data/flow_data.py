@@ -8,6 +8,7 @@ from orchestrator.memory.memory_adapter import MemoryAdapter
 from orchestrator.data.get_series import detect_series_code 
 from orchestrator.data.get_data_serie import get_series_api_rest_bcch
 from orchestrator.data.templates import select_template, render_template
+from orchestrator.llm.llm_adapter import build_llm
     
 logger = logging.getLogger(__name__)
 
@@ -544,29 +545,98 @@ def stream_data_flow(
             last_available_labels = _format_period_labels(last_available_date, freq) if last_available_date else ["--", "--"]
             first_available_labels = _format_period_labels(first_available_date, freq) if first_available_date else ["--", "--"]
 
-        # Inicializar payload con todos los componentes desde el principio
-        payload = {
-            "indicator": final_indicator_name,
-            "value": _format_value(value),
-            "var_label": freq_label if show_qoq else "anual",
-            "var_value": float(var_value) if var_value is not None else None,
-            "period_label": period_labels[0],
-            "last_available_label": last_available_labels[0], # Flags de posición
-            "first_available_label": first_available_labels[0], # Flags de posición
-        }
-
-        tmpl_ctx = {
-            "has_indicator": bool(final_indicator_name),
-            "has_value": value is not None,
-            "has_var_value": var_value is not None,
-            "has_period": bool(chosen_date),
-            "has_seasonality": bool(seasonality_context_val),
-            "no_data": False,
-            "lastdate_position": position, # Flags de posición
-            "value": value,
-        }
-        message = render_template(select_template(tmpl_ctx), payload)
-        yield f"{message}\n"
+        # Construir prompt para el LLM con los datos disponibles
+        llm_prompt_parts = []
+        
+        # Contexto específico según la posición del período consultado
+        if position == "gt_latest":
+            # Período consultado está después del último dato disponible
+            llm_prompt_parts.append("SITUACIÓN: El usuario preguntó por un período que aún no tiene datos disponibles.")
+            llm_prompt_parts.append(f"Redacta una respuesta breve (máximo 2 oraciones) que:")
+            llm_prompt_parts.append(f"1. Indique claramente que ese período no tiene datos disponibles todavía")
+            llm_prompt_parts.append(f"2. Mencione que los datos más recientes del {final_indicator_name} son de {last_available_labels[0]}")
+            if var_value is not None:
+                llm_prompt_parts.append(f"3. Opcionalmente menciona que en ese último período registró una variación {freq_label if show_qoq else 'anual'} de {var_value:.1f}% (esto es VARIACIÓN PORCENTUAL, no el valor del índice)")
+        
+        elif position == "lt_first":
+            # Período consultado está antes del primer dato disponible
+            llm_prompt_parts.append("SITUACIÓN: El usuario preguntó por un período anterior al inicio de la serie.")
+            llm_prompt_parts.append(f"Redacta una respuesta breve (máximo 2 oraciones) que:")
+            llm_prompt_parts.append(f"1. Indique que no hay datos para ese período porque es anterior al inicio de la serie")
+            llm_prompt_parts.append(f"2. Mencione que la serie del {final_indicator_name} comienza en {first_available_labels[0]}")
+            if var_value is not None:
+                llm_prompt_parts.append(f"3. Opcionalmente menciona que en ese primer período registró una variación {freq_label if show_qoq else 'anual'} de {var_value:.1f}% (esto es VARIACIÓN PORCENTUAL, no el valor del índice)")
+        
+        elif position == "eq_latest":
+            # Período consultado es exactamente el último dato disponible
+            llm_prompt_parts.append("SITUACIÓN: El usuario preguntó por el período más reciente disponible.")
+            llm_prompt_parts.append(f"Redacta una respuesta breve (máximo 2 oraciones) informando:")
+            llm_prompt_parts.append(f"- Indicador: {final_indicator_name}")
+            llm_prompt_parts.append(f"- Período: {period_labels[0]}")
+            if var_value is not None:
+                llm_prompt_parts.append(f"- Variación {freq_label if show_qoq else 'anual'}: {var_value:.1f}%")
+                llm_prompt_parts.append(f"IMPORTANTE: {var_value:.1f}% es la VARIACIÓN PORCENTUAL (crecimiento/caída), NO menciones el valor absoluto del índice")
+            llm_prompt_parts.append(f"- Opcional: menciona que este es el dato más reciente")
+        
+        elif not var_value:
+            # Caso especial: hay valor pero no hay variación (primer período de la serie)
+            llm_prompt_parts.append("SITUACIÓN: El usuario preguntó por un período que tiene datos pero no tiene variación calculable.")
+            llm_prompt_parts.append(f"Redacta una respuesta breve (máximo 2 oraciones) que:")
+            llm_prompt_parts.append(f"1. Mencione que en {period_labels[0]} el {final_indicator_name} registró un índice de {_format_value(value)} puntos")
+            llm_prompt_parts.append(f"2. Explique brevemente que no hay variación porcentual disponible porque no existe un período anterior para comparar")
+        
+        else:
+            # Caso normal: período dentro del rango disponible
+            llm_prompt_parts.append("SITUACIÓN: El usuario preguntó por un período que tiene datos disponibles.")
+            llm_prompt_parts.append(f"Redacta una respuesta breve (máximo 2 oraciones) informando:")
+            llm_prompt_parts.append(f"- Indicador: {final_indicator_name}")
+            llm_prompt_parts.append(f"- Período: {period_labels[0]}")
+            if var_value is not None:
+                llm_prompt_parts.append(f"- Variación {freq_label if show_qoq else 'anual'}: {var_value:.1f}%")
+                llm_prompt_parts.append(f"IMPORTANTE: {var_value:.1f}% es la VARIACIÓN PORCENTUAL (crecimiento/caída respecto al período anterior), NO es el valor absoluto del índice")
+        
+        llm_prompt_parts.append("\nREQUISITOS DE ESTILO:")
+        llm_prompt_parts.append("- Usa un tono conversacional y directo, como si hablaras con un colega")
+        llm_prompt_parts.append("- Puedes mencionar 'Base de Datos Estadísticos' o 'BDE' o 'Banco Central', pero varía la forma y no lo uses siempre")
+        llm_prompt_parts.append("- Varía la estructura: no empieces siempre igual (alterna 'En [período]...', 'Durante [período]...', 'Los datos de [período]...', etc.)")
+        llm_prompt_parts.append("- No des opiniones, análisis económico ni explicaciones extras")
+        llm_prompt_parts.append("- Sé conciso: máximo 2 oraciones")
+        
+        llm_prompt = "\n".join(llm_prompt_parts)
+        
+        # Generar respuesta con el LLM
+        try:
+            llm = build_llm(streaming=True, temperature=0.7, mode="fallback")
+            for chunk in llm.stream(llm_prompt, history=[], intent_info=None):
+                yield chunk
+            yield "\n"
+        except Exception as e:
+            logger.warning(f"Error generando con LLM, usando plantilla: {e}")
+            
+            # Inicializar payload con todos los componentes desde el principio
+            payload = {
+                "indicator": final_indicator_name,
+                "value": _format_value(value),
+                "var_label": freq_label if show_qoq else "anual",
+                "var_value": float(var_value) if var_value is not None else None,
+                "period_label": period_labels[0],
+                "last_available_label": last_available_labels[0], # Flags de posición
+                "first_available_label": first_available_labels[0], # Flags de posición
+            }
+        
+            # Fallback a plantillas si el LLM falla
+            tmpl_ctx = {
+                "has_indicator": bool(final_indicator_name),
+                "has_value": value is not None,
+                "has_var_value": var_value is not None,
+                "has_period": bool(chosen_date),
+                "has_seasonality": bool(seasonality_context_val),
+                "no_data": False,
+                "lastdate_position": position,
+                "value": value,
+            }
+            message = render_template(select_template(tmpl_ctx), payload)
+            yield f"{message}\n"
         
         # Tabla markdown
         yield f"Periodo | Valor | {var_label}\n"
@@ -576,7 +646,7 @@ def stream_data_flow(
         yield "\n"
         
         # Fuente (link corto)
-        yield r"\* _Índice_" + "\n\n" if final_indicator_name == "imacec" else r"\* _Miles de millones de pesos_" + "\n\n"
+        yield r"\* _Índice_" + "\n\n" if indicator_context_val == "imacec" else r"\* _Miles de millones de pesos_" + "\n\n"
         yield f"**Fuente:** Banco Central de Chile (BDE) — [Ver serie en la BDE]({detection_result.get('metadata', {}).get('source_url')})"
         # yield "\n\n" + api_meta.get("descripEsp", "")
 
