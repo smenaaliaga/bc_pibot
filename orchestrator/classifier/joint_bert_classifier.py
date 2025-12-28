@@ -2,12 +2,12 @@
 Módulo de predicción de intención y entidades usando Joint BERT.
 
 Uso:
-    # Inicializar
-    predictor = PIBotPredictor(model_dir='model_out/pibot_model_beto')
-    
+    # Inicializar (ruta a pesos entrenados y labels)
+    predictor = PIBotPredictor(model_dir='model/weights/pibot_model_beto')
+
     # Predecir
     result = predictor.predict("cual fue el imacec de agosto 2024")
-    
+
     # Resultado:
     # {
     #     'intent': 'value',
@@ -25,16 +25,27 @@ import torch
 from typing import Dict, Optional, Any
 from transformers import BertTokenizer
 
+# Opcional: soporte de fallback remoto vía Hugging Face
+try:
+    from huggingface_hub import snapshot_download  # type: ignore
+except Exception:
+    snapshot_download = None  # se intenta si está disponible
+
 logger = logging.getLogger(__name__)
 
-# Importar JointBERT model dinámicamente desde model/in
+# Importar JointBERT model dinámicamente (src_model → fallback a in)
 try:
     import sys
     import importlib.util
     from pathlib import Path
     
-    # Cargar el módulo dinámicamente
-    model_path = Path(__file__).parent.parent.parent / 'model' / 'in' / 'modeling_jointbert.py'
+    # Cargar el módulo dinámicamente: primero en src_model/, luego fallback a in/
+    base_dir = Path(__file__).parent.parent.parent / 'model'
+    candidate_paths = [
+        base_dir / 'src_model' / 'modeling_jointbert.py',
+        base_dir / 'in' / 'modeling_jointbert.py',
+    ]
+    model_path = next((p for p in candidate_paths if p.is_file()), candidate_paths[0])
     spec = importlib.util.spec_from_file_location("modeling_jointbert", model_path)
     if spec and spec.loader:
         modeling_module = importlib.util.module_from_spec(spec)
@@ -91,15 +102,55 @@ class JointBERTPredictor:
         
         # Cargar modelo
         self._load_model()
-        
-        logger.info(f"PIBotPredictor inicializado en {self.device}")
+    
     
     def _load_model(self):
         """Carga el modelo y componentes necesarios."""
-        # Cargar args
+        # Resolver ruta local o fallback remoto
+        local_only = os.getenv("HF_LOCAL_ONLY", "false").lower() in {"1", "true", "yes", "on"}
+        weights_origin = "local"
         args_path = os.path.join(self.model_dir, 'training_args.bin')
         if not os.path.exists(args_path):
-            raise FileNotFoundError(f"No se encuentra {args_path}")
+            # Determinar si podemos intentar remoto
+            remote_repo = os.getenv("JOINT_BERT_REMOTE_REPO")
+            if not remote_repo and ('/' in self.model_dir) and (not os.path.isdir(self.model_dir)):
+                # Si model_dir luce como repo id (org/name) y no es carpeta local
+                remote_repo = self.model_dir
+            if local_only:
+                logger.info("HF_LOCAL_ONLY habilitado; no se intentará fallback remoto de pesos.")
+            if not local_only and remote_repo:
+                if snapshot_download is None:
+                    raise FileNotFoundError(
+                        f"No se encuentra {args_path} y huggingface_hub no está disponible para fallback remoto."
+                    )
+                try:
+                    from pathlib import Path
+                    project_root = Path(__file__).resolve().parents[2]
+                    dest_root = project_root / 'model' / 'weights'
+                    dest_root.mkdir(parents=True, exist_ok=True)
+                    name = remote_repo.split('/')[-1]
+                    dest_dir = dest_root / name
+                    logger.info(
+                        f"Pesos locales no encontrados; intentando fallback remoto desde {remote_repo} → {dest_dir}"
+                    )
+                    snapshot_download(remote_repo, local_dir=str(dest_dir))
+                    # Reasignar model_dir a la carpeta descargada
+                    self.model_dir = str(dest_dir)
+                    weights_origin = "remote-clone"
+                    args_path = os.path.join(self.model_dir, 'training_args.bin')
+                    if not os.path.exists(args_path):
+                        raise FileNotFoundError(
+                            f"Descarga remota completada pero falta training_args.bin en {self.model_dir}"
+                        )
+                except Exception as e:
+                    raise FileNotFoundError(f"Fallback remoto fallido ({remote_repo}): {e}")
+            else:
+                if not remote_repo:
+                    logger.info("JOINT_BERT_REMOTE_REPO no definido; sin fallback remoto de pesos.")
+                raise FileNotFoundError(
+                    f"No se encuentra {args_path}. "
+                    f"Configura JOINT_BERT_MODEL_DIR con carpeta local válida o JOINT_BERT_REMOTE_REPO para fallback."
+                )
         
         self.args = torch.load(args_path, weights_only=False)
         
@@ -112,22 +163,59 @@ class JointBERTPredictor:
         self.slot_label_lst = get_slot_labels(self.args)
         
 
-        # Si model_name_or_path no existe o el path no es válido, usar valor de entorno o BETO público
-        model_name = getattr(self.args, "model_name_or_path", None)
-        env_model_name = os.getenv("BERT_MODEL_NAME")
-        if not model_name or not os.path.exists(str(model_name)):
-            model_name = env_model_name or "dccuchile/bert-base-spanish-wwm-cased"
-            logger.warning(
-                "model_name_or_path inválido o inexistente, usando: %s",
-                model_name
+        # Preferir carga local del tokenizer; si no está, intentar fallback remoto explícito
+        model_name = os.getenv("BERT_MODEL_NAME") or "dccuchile/bert-base-spanish-wwm-cased"
+        try:
+            self.tokenizer = BertTokenizer.from_pretrained(model_name, local_files_only=True)
+            logger.info(
+                f"Tokenizador cargado (local): {model_name} | vocab={getattr(self.tokenizer, 'vocab_size', 'N/A')}"
             )
-            self.args.model_name_or_path = model_name
-
-        # Cargar tokenizer con el model_name corregido
-        self.tokenizer = BertTokenizer.from_pretrained(self.args.model_name_or_path)
+        except Exception as _e_tok_local:
+            remote_repo = os.getenv("BERT_REMOTE_REPO")
+            # Si BERT_MODEL_NAME luce como repo id y no es carpeta local, usarlo como remote_repo
+            try:
+                from pathlib import Path
+                if not remote_repo and ('/' in model_name) and (not Path(model_name).is_dir()):
+                    remote_repo = model_name
+            except Exception:
+                pass
+            if not local_only and remote_repo and snapshot_download is not None:
+                try:
+                    from pathlib import Path
+                    project_root = Path(__file__).resolve().parents[2]
+                    dest_root = project_root / 'model' / 'tokenizers'
+                    dest_root.mkdir(parents=True, exist_ok=True)
+                    name = remote_repo.split('/')[-1]
+                    dest_dir = dest_root / name
+                    logger.info(
+                        f"Tokenizador local no encontrado; fallback remoto desde {remote_repo} → {dest_dir}"
+                    )
+                    snapshot_download(remote_repo, local_dir=str(dest_dir))
+                    # Cargar nuevamente desde la carpeta descargada, en modo local-only
+                    self.tokenizer = BertTokenizer.from_pretrained(str(dest_dir), local_files_only=True)
+                    logger.info(
+                        f"Tokenizador descargado y cargado (local-clone): {dest_dir} | vocab={getattr(self.tokenizer, 'vocab_size', 'N/A')}"
+                    )
+                except Exception as e:
+                    logger.warning(f"Fallback remoto de tokenizador fallido ({remote_repo}): {e}")
+                    # Último recurso: carga remota directa (transformers gestionará cache)
+                    self.tokenizer = BertTokenizer.from_pretrained(model_name)
+                    logger.info(
+                        f"Tokenizador cargado (remoto directo): {model_name} | vocab={getattr(self.tokenizer, 'vocab_size', 'N/A')}"
+                    )
+            else:
+                # Remote deshabilitado o no configurado: intenta remota directa
+                self.tokenizer = BertTokenizer.from_pretrained(model_name)
+                logger.info(
+                    f"Tokenizador cargado (remoto): {model_name} | vocab={getattr(self.tokenizer, 'vocab_size', 'N/A')}"
+                )
         
         # Cargar modelo
         model_class = MODEL_CLASSES[self.args.model_type][1]
+        if model_class is None:
+            raise ImportError(
+                "JointBERT no disponible. Verifica que 'model/src_model/modeling_jointbert.py' exista y se haya importado."
+            )
         self.model = model_class.from_pretrained(
             self.model_dir,
             args=self.args,
@@ -136,9 +224,13 @@ class JointBERTPredictor:
         )
         self.model.to(self.device)
         self.model.eval()
-        
-        logger.info(f"Modelo cargado: {len(self.intent_label_lst)} intenciones, "
-                   f"{len(self.slot_label_lst)} slots")
+
+        logger.info(f"Pesos del modelo cargados ({weights_origin}) desde {self.model_dir}")
+        logger.info(
+            f"Modelo listo: device={self.device}, tipo={self.args.model_type}, "
+            f"max_seq_len={self.args.max_seq_len}, CRF={'sí' if getattr(self.args, 'use_crf', False) else 'no'}; "
+            f"intenciones={len(self.intent_label_lst)}, slots={len(self.slot_label_lst)}"
+        )
     
     def predict(self, text: str) -> Dict[str, Any]:
         """
@@ -181,6 +273,14 @@ class JointBERTPredictor:
             'confidence': raw_prediction['intent_confidence'],
             'entities': entities
         }
+
+    # Backward-compatibility shim: some callers use `classify()`
+    def classify(self, text: str) -> Dict[str, Any]:
+        """
+        Compat wrapper for older code paths that expect `classify()`.
+        Delegates to `predict()` and returns the same structure.
+        """
+        return self.predict(text)
     
     def _predict_raw(self, text: str) -> Dict[str, Any]:
         """
@@ -370,7 +470,7 @@ def get_predictor(model_dir: Optional[str] = None, **kwargs) -> JointBERTPredict
     global _global_predictor
 
     if _global_predictor is None:
-        model_dir_env = os.getenv('JOINT_BERT_MODEL_DIR', 'model/out/pibot_model_beto')
+        model_dir_env = os.getenv('JOINT_BERT_MODEL_DIR', 'model/weights/pibot_model_beto')
         # logger.info(f"[SINGLETON] Cargando JointBERT predictor desde {model_dir_env}")
         _global_predictor = JointBERTPredictor(model_dir_env, **kwargs)
 
@@ -424,4 +524,10 @@ def predict(text: str, model_dir: Optional[str] = None) -> Dict[str, Any]:
     """
     predictor = get_predictor(model_dir)
     return predictor.predict(text)
+
+# ---------------------------------------------------------------------------
+# Backward-compatibility alias: keep old import name working.
+# Many modules/tests still import `PIBotPredictor`.
+# ---------------------------------------------------------------------------
+PIBotPredictor = JointBERTPredictor
 

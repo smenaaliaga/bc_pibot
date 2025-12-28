@@ -285,3 +285,11 @@ config.local.py
 *.h5
 *.pkl
 *.pickle
+
+# ------------------------------------------------------------------------------
+# Hugging Face cloned artifacts (keep out of Git)
+# ------------------------------------------------------------------------------
+model/tokenizers/*
+!model/tokenizers/.gitkeep
+model/weights/*
+!model/weights/.gitkeep

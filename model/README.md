@@ -1,57 +1,64 @@
-# Clonado de modelos Hugging Face
+# Model — Arquitectura, Pesos y Scripts (local-first)
 
-Para descargar cualquier modelo público de Hugging Face directamente a la carpeta `model/out/{modelo}`, usa el script incluido:
-
-```bash
-pip install huggingface_hub
-python model/clone_hf_model.py <nombre-del-modelo> [ruta_destino]
-```
-
-Ejemplo para pibot-jointbert:
-
-```bash
-python model/clone_hf_model.py smenaaliaga/pibot-jointbert model/out/beto
-```
-
-Esto descargará todos los archivos del modelo a la carpeta indicada.
-
-> Si necesitas autenticación (por ejemplo, para modelos privados), configura tu token de Hugging Face con:
-> ```bash
-> huggingface-cli login
-> ```
-# Modelo JointBERT
-
-Estructura de directorios para el clasificador de intenciones y entidades usando Joint BERT.
-
-## Estructura
+Estructura recomendada para mantener código del modelo, artefactos y utilidades de manera clara:
 
 ```
 model/
-├── in/              # Código del modelo (arquitectura)
+├── src_model/           # Código importable del modelo (arquitectura)
 │   ├── __init__.py
-│   ├── modeling_jointbert.py  # Clase JointBERT
-│   └── module.py              # Clasificadores Intent/Slot
-└── out/             # Modelos entrenados
-    └── pibot_model_beto/      # Modelo en producción
-        ├── config.json
-        ├── intent_label.txt
-        ├── model.safetensors
-        ├── slot_label.txt
-        └── training_args.bin
+│   └── modeling_jointbert.py   # Clase `JointBERT`
+├── weights/             # Pesos entrenados y snapshots de modelos
+│   └── pibot_model_beto/
+│       ├── config.json
+│       ├── intent_label.txt
+│       ├── model.safetensors
+│       ├── slot_label.txt
+│       └── training_args.bin
+├── tokenizers/          # (Opcional) Tokenizadores/base models clonados localmente
+│   └── bert-base-spanish-wwm-cased/
+└── scripts/             # Scripts CLI (no importables como librería)
+  └── clone_hf_model.py
 ```
 
-## Modelo (in/)
+La aplicación intenta primero cargar el tokenizer desde una ruta local (`BERT_MODEL_NAME`) y, si no existe, cae a carga remota.
+
+## Clonado de modelos/tokenizers (local-first)
+
+Usa el script en `model/scripts/clone_hf_model.py` para clonar repos de Hugging Face dentro del proyecto.
+
+```bash
+# Instalar dependencia si hace falta
+uv run pip install huggingface_hub
+
+# 1) Clonar BETO (tokenizer/base) → model/tokenizers/
+uv run python model/scripts/clone_hf_model.py dccuchile/bert-base-spanish-wwm-cased tokenizers
+
+# 2) Clonar un modelo entrenado (si aplica) → model/weights/
+uv run python model/scripts/clone_hf_model.py smenaaliaga/pibot-jointbert weights
+```
+
+Configura variables de entorno para uso local y fallback:
+
+```powershell
+# PowerShell (Windows)
+$env:BERT_MODEL_NAME = "model/tokenizers/bert-base-spanish-wwm-cased"
+$env:BERT_REMOTE_REPO = "dccuchile/bert-base-spanish-wwm-cased"   # fallback si falta local
+$env:JOINT_BERT_MODEL_DIR = "model/weights/pibot_model_beto"
+uv run streamlit run main.py
+```
+
+> Para modelos privados, inicia sesión:
+> ```bash
+> huggingface-cli login
+> ```
+## Arquitectura (src_model/)
 
 Contiene la **arquitectura** del modelo Joint BERT:
 
 - **`modeling_jointbert.py`**: Implementación principal de `JointBERT`
-  - Basado en `BertPreTrainedModel` de HuggingFace
-  - Clasificación dual: intenciones + slots (etiquetado de entidades)
-  - Soporta CRF opcional para mejor secuenciado
-
-- **`module.py`**: Clasificadores auxiliares
-  - `IntentClassifier`: Clasificador de intenciones
-  - `SlotClassifier`: Etiquetador de slots (entidades)
+  - Basado en `BertPreTrainedModel` de Hugging Face
+  - Cabezas de clasificación: intenciones + slots (entidades BIO)
+  - Soporte opcional de CRF para coherencia de secuencias
 
 ### Dependencias
 
@@ -59,9 +66,26 @@ Contiene la **arquitectura** del modelo Joint BERT:
 pip install transformers pytorch-crf torch
 ```
 
-## Modelos Entrenados (out/)
+### Uso local-first en la app
 
-Contiene los **pesos** del modelo ya entrenado:
+1. Descarga el modelo/tokenizer con el script (ver arriba).
+2. Indica la ruta local en la app:
+  - Desde la barra lateral: fija "Modelo BERT" a `model/tokenizers/bert-base-spanish-wwm-cased` (o la carpeta descargada) y haz clic en "Nueva sesión".
+  - O usando variable de entorno antes de ejecutar:
+
+```powershell
+# PowerShell (Windows)
+$env:BERT_MODEL_NAME = "model/tokenizers/bert-base-spanish-wwm-cased"
+uv run streamlit run main.py
+```
+
+La app intentará cargar el tokenizer localmente (`local_files_only=True`). Si no está disponible:
+- Si `HF_LOCAL_ONLY=false` y `BERT_REMOTE_REPO` está definido, clonará el tokenizador en `model/tokenizers/` y lo cargará localmente.
+- En último recurso, hará carga remota directa (cache de Hugging Face) si el clon falla o está deshabilitado.
+
+## Pesos Entrenados (weights/)
+
+Contiene los **pesos** del modelo entrenado y también puede contener **snapshots** descargados desde Hugging Face para uso offline.
 
 ### `pibot_model_beto/`
 
@@ -85,6 +109,8 @@ Modelo basado en BETO (BERT español) entrenado para:
 - `training_args.bin`: Argumentos de entrenamiento
 - `intent_label.txt`: Lista de intenciones
 - `slot_label.txt`: Lista de etiquetas BIO
+
+Si clonaste un modelo HF, también verás archivos de tokenizer como `tokenizer.json`, `vocab.txt`, `tokenizer_config.json` para operar en modo offline.
 
 ## Uso
 
@@ -119,7 +145,7 @@ Si necesitas reentrenar el modelo:
 
 2. Entrena usando el script correspondiente (no incluido en este repo)
 
-3. Guarda los pesos en `model/out/pibot_model_beto/`
+3. Guarda los pesos en `model/weights/pibot_model_beto/`
 
 ## Notas Técnicas
 

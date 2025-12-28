@@ -19,6 +19,7 @@ try:
     from orchestrator.graph.agent_graph import build_graph  # type: ignore
 except Exception:
     build_graph = None  # type: ignore
+from orchestrator.classifier.joint_bert_classifier import get_predictor
 import app
 import logging
 import os
@@ -65,18 +66,13 @@ def main() -> None:
 
     settings = get_settings()
 
-    # Pre-cargar modelo JointBERT al inicio (carga única, reutilización global)
+    # Pre-cargar modelo JointBERT (singleton global dentro de get_predictor)
+    logger.info("Inicializando predictor")
     try:
-        from orchestrator.classifier.joint_bert_classifier import get_predictor
-        predictor = get_predictor()
-        logger.info("✓ JointBERT predictor inicializado exitosamente")
-        logger.info(f"  - Modelo: {predictor.args.model_type}")
-        logger.info(f"  - Device: {predictor.device}")
-        logger.info(f"  - Intenciones: {len(predictor.intent_label_lst)}")
-        logger.info(f"  - Slots: {len(predictor.slot_label_lst)}")
+        get_predictor()  # fuerza la inicialización una sola vez
+        # logger.info("Predictor inicializado")
     except Exception as e:
-        logger.warning(f"⚠ JointBERT predictor no disponible: {e}")
-        logger.warning("  El sistema funcionará sin clasificación JointBERT")
+        logger.warning(f"Predictor no disponible: {e}")
 
     orch = None
     graph = None

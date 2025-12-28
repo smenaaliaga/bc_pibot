@@ -127,7 +127,13 @@ def run_app(
             st.error("No se pudo cargar el módulo orchestrator.")
             return
         try:
-            st.session_state.orch = st.session_state.get("orch") or _orch.create_orchestrator_with_langchain(model=model_sel, temperature=float(temp_sel))
+            # Usar valores por defecto desde entorno para evitar depender del orden del sidebar
+            _model_default = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
+            try:
+                _temp_default = float(os.getenv("OPENAI_TEMPERATURE", "0") or 0.0)
+            except Exception:
+                _temp_default = 0.0
+            st.session_state.orch = st.session_state.get("orch") or _orch.create_orchestrator_with_langchain(model=_model_default, temperature=_temp_default)
             try:
                 import logging as _logging
                 if hasattr(_orch, "logger"):
@@ -154,7 +160,7 @@ def run_app(
         st.subheader("Debug")
         st.write(f"Session ID: `{st.session_state.session_id}`")
         model_sel = st.text_input("Modelo", value=os.getenv("OPENAI_MODEL", "gpt-3.5-turbo"))
-        temp_sel = st.slider("Temperatura", min_value=0.0, max_value=1.0, value=0.0, step=0.1)
+        temp_sel = st.slider("Temperatura", min_value=0.0, max_value=1.0, value=float(os.getenv("OPENAI_TEMPERATURE", "0") or 0.0), step=0.1)
         bert_model_name = st.text_input("Modelo BERT", value=os.getenv("BERT_MODEL_NAME", ""))
         # Mostrar solo el nombre de la carpeta final, pero mantener el path completo
         joint_bert_model_dir_full = os.getenv("JOINT_BERT_MODEL_DIR", "")
@@ -163,10 +169,29 @@ def run_app(
         # Reconstruir el path completo si el usuario lo cambia
         if joint_bert_model_dir_name_new != joint_bert_model_dir_name and joint_bert_model_dir_name_new:
             # Mantener el directorio padre original si existe, si no, usar el valor nuevo tal cual
-            parent_dir = os.path.dirname(joint_bert_model_dir_full) if joint_bert_model_dir_full else "model/out"
+            parent_dir = os.path.dirname(joint_bert_model_dir_full) if joint_bert_model_dir_full else "model/weights"
             joint_bert_model_dir = os.path.join(parent_dir, joint_bert_model_dir_name_new)
         else:
             joint_bert_model_dir = joint_bert_model_dir_full
+        
+        # Aplicar cambios de modelo al entorno para que el predictor los tome
+        _env_changed = False
+        if model_sel and os.getenv("OPENAI_MODEL") != model_sel:
+            os.environ["OPENAI_MODEL"] = model_sel
+            _env_changed = True
+        # Persistir temperatura elegida
+        if os.getenv("OPENAI_TEMPERATURE") != str(temp_sel):
+            os.environ["OPENAI_TEMPERATURE"] = str(temp_sel)
+            _env_changed = True
+        # Tokenizer/base model para JointBERT
+        if bert_model_name and os.getenv("BERT_MODEL_NAME") != bert_model_name:
+            os.environ["BERT_MODEL_NAME"] = bert_model_name
+            _env_changed = True
+        # Directorio del modelo entrenado de JointBERT
+        if joint_bert_model_dir and os.getenv("JOINT_BERT_MODEL_DIR") != joint_bert_model_dir:
+            os.environ["JOINT_BERT_MODEL_DIR"] = joint_bert_model_dir
+            _env_changed = True
+
         if st.button("Nueva sesión", icon=":material/refresh:"):
             _clear_conversation()
             st.experimental_rerun()
