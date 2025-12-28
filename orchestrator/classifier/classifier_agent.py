@@ -14,7 +14,7 @@ from orchestrator.classifier.entity_normalizer import normalize_entities
 logger = logging.getLogger(__name__)
 
 # MODEL
-MODEL_JOINTBERT_NAME = os.getenv("JOINT_BERT_MODEL_NAME", "pibot_model_beto")
+MODEL_JOINTBERT_NAME = os.getenv("JOINT_BERT_MODEL_DIR", "pibot_model_beto")
 
 
 # ============================================================

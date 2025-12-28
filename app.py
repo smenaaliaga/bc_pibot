@@ -9,6 +9,7 @@ Lógica de la aplicación Streamlit (frontend del chatbot).
 """
 import logging
 import uuid
+import json
 from typing import Callable, List, Dict, Optional, Iterable
 import datetime
 import time
@@ -17,6 +18,7 @@ import os
 import streamlit as st
 
 from config import Settings
+from orchestrator.memory.memory_adapter import MemoryAdapter
 from pathlib import Path
 
 # Nuevo: reutilizar el logger unificado del orquestador para escribir en el mismo log
@@ -159,9 +161,16 @@ def run_app(
     with st.sidebar:
         st.subheader("Debug")
         st.write(f"Session ID: `{st.session_state.session_id}`")
+        
+        st.subheader("Modelo generativo")
         model_sel = st.text_input("Modelo", value=os.getenv("OPENAI_MODEL", "gpt-3.5-turbo"))
         temp_sel = st.slider("Temperatura", min_value=0.0, max_value=1.0, value=float(os.getenv("OPENAI_TEMPERATURE", "0") or 0.0), step=0.1)
-        bert_model_name = st.text_input("Modelo BERT", value=os.getenv("BERT_MODEL_NAME", ""))
+        
+        st.subheader("Modelo predictror")
+        # Mostrar solo el nombre de la carpeta final del BERT base/tokenizer, sin permitir edición
+        bert_model_full = os.getenv("BERT_MODEL_NAME", "")
+        bert_model_name = os.path.basename(bert_model_full.rstrip("/\\")) if bert_model_full else ""
+        st.text_input("Modelo BERT", value=bert_model_name)
         # Mostrar solo el nombre de la carpeta final, pero mantener el path completo
         joint_bert_model_dir_full = os.getenv("JOINT_BERT_MODEL_DIR", "")
         joint_bert_model_dir_name = os.path.basename(joint_bert_model_dir_full.rstrip("/\\")) if joint_bert_model_dir_full else ""
@@ -183,14 +192,65 @@ def run_app(
         if os.getenv("OPENAI_TEMPERATURE") != str(temp_sel):
             os.environ["OPENAI_TEMPERATURE"] = str(temp_sel)
             _env_changed = True
-        # Tokenizer/base model para JointBERT
-        if bert_model_name and os.getenv("BERT_MODEL_NAME") != bert_model_name:
-            os.environ["BERT_MODEL_NAME"] = bert_model_name
-            _env_changed = True
+        # Tokenizer/base model para JointBERT (solo lectura desde UI)
         # Directorio del modelo entrenado de JointBERT
         if joint_bert_model_dir and os.getenv("JOINT_BERT_MODEL_DIR") != joint_bert_model_dir:
             os.environ["JOINT_BERT_MODEL_DIR"] = joint_bert_model_dir
             _env_changed = True
+
+        # --- Panel dinámico: Memoria y clasificación ---------------------
+        def _get_mem_adapter() -> MemoryAdapter:
+            _ma = st.session_state.get("_mem_adapter")
+            if not _ma:
+                _ma = MemoryAdapter(pg_dsn=os.getenv("PG_DSN", "postgresql://postgres:postgres@localhost:5432/pibot"))
+                st.session_state._mem_adapter = _ma
+            return _ma  # type: ignore
+
+        def _render_memory_debug(dst_container):
+            try:
+                _ma = _get_mem_adapter()
+                _sid = st.session_state.session_id
+                # Header
+                dst_container.subheader("Clasificación y memoria")
+                # Backend
+                try:
+                    backend = _ma.get_backend_status() or {}
+                except Exception:
+                    backend = {}
+                using_pg = bool(backend.get("using_pg"))
+                dsn = str(backend.get("dsn") or "")
+                # dst_container.caption(f"Backend: {'Postgres' if using_pg else 'Local'}{(' · ' + dsn) if dsn else ''}")
+                # Facts
+                try:
+                    facts = _ma.get_facts(_sid) or {}
+                except Exception:
+                    facts = {}
+                
+                # Deserializar facts si vienen como strings JSON
+                facts_display = {}
+                for k, v in facts.items():
+                    if isinstance(v, str):
+                        try:
+                            # Intentar parsear como JSON
+                            facts_display[k] = json.loads(v)
+                        except Exception:
+                            # Si no es JSON válido, mostrar como string
+                            facts_display[k] = v
+                    else:
+                        facts_display[k] = v
+                
+                if facts_display:
+                    # dst_container.markdown("**Clasificación (memoria)**")
+                    dst_container.json(facts_display)
+                else:
+                    dst_container.caption("Sin facts de clasificación en memoria")
+            except Exception as _e_mem:
+                dst_container.caption(f"Memoria no disponible: {str(_e_mem)[:200]}")
+
+        # Placeholder del panel para poder refrescarlo dinámicamente
+        _mem_debug_ph = st.empty()
+        st.session_state._mem_debug_placeholder = _mem_debug_ph
+        _render_memory_debug(_mem_debug_ph.container())
 
         if st.button("Nueva sesión", icon=":material/refresh:"):
             _clear_conversation()
@@ -219,6 +279,30 @@ def run_app(
     # Mostrar mensaje del usuario
     with st.chat_message("user"):
         st.markdown(user_message)
+
+    # Registrar turno de usuario en memoria
+    try:
+        _mem_adapter = st.session_state.get("_mem_adapter") or MemoryAdapter(pg_dsn=os.getenv("PG_DSN", "postgresql://postgres:postgres@localhost:5432/pibot"))
+        st.session_state._mem_adapter = _mem_adapter
+        _mem_adapter.on_user_turn(
+            st.session_state.session_id,
+            user_message,
+            metadata={
+                "source": "ui",
+                "model": os.getenv("OPENAI_MODEL", "gpt-3.5-turbo"),
+                "temperature": os.getenv("OPENAI_TEMPERATURE", "0"),
+            },
+        )
+        # Refrescar panel de memoria tras turno de usuario
+        try:
+            _ph = st.session_state.get("_mem_debug_placeholder")
+            if _ph:
+                _ph.empty()
+                _render_memory_debug(_ph.container())
+        except Exception:
+            pass
+    except Exception:
+        pass
 
     # Rate limiting simple
     now = datetime.datetime.now()
@@ -330,6 +414,30 @@ def run_app(
     # Almacenar markers en session_state (sin limpiar)
     st.session_state.csv_markers = markers_csv
     st.session_state.chart_markers = markers_chart
+
+    # Registrar turno del asistente en memoria
+    try:
+        _mem_adapter = st.session_state.get("_mem_adapter") or MemoryAdapter(pg_dsn=os.getenv("PG_DSN", "postgresql://postgres:postgres@localhost:5432/pibot"))
+        st.session_state._mem_adapter = _mem_adapter
+        _mem_adapter.on_assistant_turn(
+            st.session_state.session_id,
+            response_text,
+            metadata={
+                "source": "ui",
+                "model": os.getenv("OPENAI_MODEL", "gpt-3.5-turbo"),
+                "temperature": os.getenv("OPENAI_TEMPERATURE", "0"),
+            },
+        )
+        # Refrescar panel de memoria tras turno del asistente
+        try:
+            _ph = st.session_state.get("_mem_debug_placeholder")
+            if _ph:
+                _ph.empty()
+                _render_memory_debug(_ph.container())
+        except Exception:
+            pass
+    except Exception:
+        pass
 
     # Renderizar descargas CSV
     if st.session_state.csv_markers:

@@ -411,6 +411,29 @@ def classify_node(state: AgentState) -> AgentState:
         elif isinstance(seas_obj, str) and seas_obj.strip():
             seasonality_ctx = seas_obj.strip()
     
+    # Persistir entidades resueltas en memoria (independiente del flujo de datos)
+    session_id = state.get("session_id")
+    if session_id and _MEMORY:
+        try:
+            to_save: Dict[str, Any] = {}
+            intent_val = getattr(classification, "intent", None)
+            if intent_val:
+                to_save["intent"] = str(intent_val)
+            if indicator_ctx:
+                to_save["indicator"] = indicator_ctx
+            if component_ctx:
+                to_save["component"] = component_ctx
+            if seasonality_ctx:
+                to_save["seasonality"] = seasonality_ctx
+            if period_ctx:
+                to_save["period"] = period_ctx
+            
+            if to_save:
+                _MEMORY.set_facts(session_id, to_save)
+                logger.debug(f"[CLASSIFY_NODE] Facts persistidos: {list(to_save.keys())}")
+        except Exception:
+            logger.debug("[CLASSIFY_NODE] Error al persistir facts", exc_info=True)
+    
     result: AgentState = {
         "classification": classification,
         "history_text": history_text,

@@ -363,6 +363,14 @@ def stream_data_flow(
 ) -> Iterable[str]:
     """Fetch de datos y tabla."""
 
+    # Debug: inspeccionar classification recibido
+    logger.debug(f"[FLOW_DATA] classification type: {type(classification)}")
+    logger.debug(f"[FLOW_DATA] classification hasattr 'intent': {hasattr(classification, 'intent')}")
+    if hasattr(classification, "intent"):
+        logger.debug(f"[FLOW_DATA] classification.intent = {getattr(classification, 'intent', None)}")
+    if hasattr(classification, "__dict__"):
+        logger.debug(f"[FLOW_DATA] classification.__dict__ = {classification.__dict__}")
+
     # Obtiene memoria de Redis
     redis_ctx = _get_context(session_id=session_id)
     ctx_map = _as_mapping(redis_ctx)
@@ -417,28 +425,6 @@ def stream_data_flow(
     indicator_context_val = _resolve_indicator_context(normalized, facts_for_resolvers)
     component_context_val = _resolve_component_context(normalized, facts_for_resolvers)
     seasonality_context_val = _resolve_seasonality_context(normalized, facts_for_resolvers)
-
-    # Persistir entidades resueltas en memoria (simple)
-    if session_id:
-        try:
-            mem = MemoryAdapter()
-            to_save: Dict[str, Any] = {}
-            if indicator_context_val:
-                to_save["indicator"] = indicator_context_val
-            if component_context_val:
-                to_save["component"] = component_context_val
-            if seasonality_context_val:
-                to_save["seasonality"] = seasonality_context_val
-            if period_context:
-                to_save["period"] = period_context
-            if to_save:
-                try:
-                    mem.set_facts(session_id, to_save)
-                    logger.debug(f"Memoria actualizada con entidades: {list(to_save.keys())}")
-                except Exception:
-                    logger.debug("No se pudo guardar entidades en memoria", exc_info=True)
-        except Exception:
-            logger.debug("MemoryAdapter no disponible para persistencia", exc_info=True)
 
     # Detectar código de serie
     detection_result = detect_series_code(
@@ -590,7 +576,7 @@ def stream_data_flow(
         yield "\n"
         
         # Fuente (link corto)
-        yield "\* _Índice_\n\n" if final_indicator_name == "imacec" else "\* _Miles de millones de pesos_\n\n"
+        yield r"\* _Índice_" + "\n\n" if final_indicator_name == "imacec" else r"\* _Miles de millones de pesos_" + "\n\n"
         yield f"**Fuente:** Banco Central de Chile (BDE) — [Ver serie en la BDE]({detection_result.get('metadata', {}).get('source_url')})"
         # yield "\n\n" + api_meta.get("descripEsp", "")
 
