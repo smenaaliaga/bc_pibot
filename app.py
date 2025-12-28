@@ -254,7 +254,7 @@ def run_app(
 
         if st.button("Nueva sesión", icon=":material/refresh:"):
             _clear_conversation()
-            st.experimental_rerun()
+            st.rerun()
 
     # Título y botón de restart
     col_title, col_btn = st.columns([4, 1])
@@ -604,4 +604,4 @@ def run_app(
                     st.session_state.messages.append({"role": "assistant", "content": response_text2})
                     st.session_state.vector_matches = []
                     st.session_state.vm_block_id = None
-                    st.experimental_rerun()
+                    st.rerun()
