@@ -216,12 +216,21 @@ class JointBERTPredictor:
             raise ImportError(
                 "JointBERT no disponible. Verifica que 'model/src_model/modeling_jointbert.py' exista y se haya importado."
             )
+        load_kwargs = {
+            "args": self.args,
+            "intent_label_lst": self.intent_label_lst,
+            "slot_label_lst": self.slot_label_lst,
+            # Evitar carga en meta tensors; cargar pesos completos en CPU/GPU
+            "low_cpu_mem_usage": False,
+        }
+        # Asegurar que no se use device_map auto (que puede crear meta tensors)
+        load_kwargs["device_map"] = None
+
         self.model = model_class.from_pretrained(
             self.model_dir,
-            args=self.args,
-            intent_label_lst=self.intent_label_lst,
-            slot_label_lst=self.slot_label_lst
+            **load_kwargs,
         )
+        # Mover al dispositivo elegido
         self.model.to(self.device)
         self.model.eval()
 

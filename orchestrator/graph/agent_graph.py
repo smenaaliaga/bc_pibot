@@ -224,6 +224,86 @@ _INTENT_STORE: Optional[IntentStoreBase] = None
 _CHART_BLOCK_PATTERN = re.compile(r"##CHART_START(?P<body>.*?)##CHART_END", re.DOTALL)
 
 
+def _generate_suggested_questions(
+    state: AgentState,
+) -> List[str]:
+    """Generate contextual follow-up questions based on normalized entities in memory."""
+    suggestions: List[str] = []
+    
+    # Entradas desde el estado y memoria previa
+    session_id = state.get("session_id")
+    facts = state.get("facts") or {}
+    indicator = state.get("indicator_context") or facts.get("indicator")
+    component = state.get("component_context") or facts.get("component")
+    seasonality = state.get("seasonality_context") or facts.get("seasonality")
+    period = state.get("period_context") or facts.get("period")
+    classification = state.get("classification")
+    intent = getattr(classification, "intent", "") if classification else ""
+
+    # Fallback: si no hay indicador en estado/facts, mirar historial del intent store
+    if not indicator:
+        last_ctx = _get_last_indicator_context(session_id)
+        if last_ctx:
+            indicator = last_ctx.get("indicator") or indicator
+            component = component or last_ctx.get("component") or last_ctx.get("sector")
+
+    # Si no hay indicador, ofrecer sugerencias genéricas
+    if not indicator:
+        suggestions.extend(
+            [
+                "¿Quieres que busque los datos más recientes?",
+                "¿Te muestro un gráfico con la última variación?",
+                "¿Prefieres consultar IMACEC o PIB?",
+            ]
+        )
+    else:
+        indicator_lower = indicator.lower()
+
+        # Sugerencia sobre estacionalidad
+        if seasonality:
+            if "desestacionalizado" in seasonality.lower():
+                suggestions.append(f"¿Cuál es el {indicator} sin desestacionalizar?")
+            else:
+                suggestions.append(f"¿Cuál es el {indicator} desestacionalizado?")
+        else:
+            suggestions.append(f"¿Cuál es el {indicator} desestacionalizado?")
+
+        # Sugerencias específicas por indicador
+        if "imacec" in indicator_lower:
+            if not component or str(component).lower() == "total":
+                suggestions.append("¿Cómo estuvo el IMACEC minero?")
+            elif "minero" in str(component).lower():
+                suggestions.append("¿Cómo estuvo el IMACEC no minero?")
+            else:
+                suggestions.append("¿Cómo estuvo el IMACEC total?")
+
+        if "pib" in indicator_lower:
+            if not component:
+                suggestions.append("¿Cuál es la variación del PIB por sectores?")
+
+        # Sugerencia sobre metodología
+        suggestions.append(f"¿Qué mide el {indicator}?")
+
+        # Sugerencia sobre periodos
+        if period:
+            suggestions.append(f"¿Cómo ha evolucionado el {indicator} en los últimos años?")
+
+        # Si la intención es metodológica/definición, priorizar datos puntuales
+        if intent and intent.lower() in ("methodology", "definition"):
+            suggestions.insert(0, f"¿Cuál es el último valor del {indicator}?")
+
+    # Deduplicar y limitar a 3
+    seen = set()
+    unique_suggestions = []
+    for s in suggestions:
+        normalized_key = re.sub(r"[^a-z0-9]+", "", s.lower())
+        if normalized_key not in seen:
+            seen.add(normalized_key)
+            unique_suggestions.append(s)
+
+    return unique_suggestions[:3]
+
+
 def _extract_chart_metadata_from_output(output: str) -> Optional[Dict[str, str]]:
     if not output:
         return None
@@ -765,6 +845,22 @@ def memory_node(state: AgentState) -> AgentState:
             )
         except Exception:
             logger.debug("[GRAPH] Unable to persist assistant turn", exc_info=True)
+    
+    # Generar preguntas sugeridas basadas en entidades
+    suggested_questions = _generate_suggested_questions(state)
+    if not suggested_questions:
+        # Fallback absoluto para garantizar botones
+        suggested_questions = [
+            "¿Quieres que busque los datos más recientes?",
+            "¿Te muestro un gráfico con la última variación?",
+            "¿Prefieres consultar IMACEC o PIB?",
+        ]
+    followup_block = "\n\n##FOLLOWUP_START\n"
+    for i, question in enumerate(suggested_questions[:3], start=1):
+        followup_block += f"suggestion_{i}={question}\n"
+    followup_block += "##FOLLOWUP_END"
+    output = output + followup_block
+    
     return {"output": output}
 
 

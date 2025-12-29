@@ -357,6 +357,41 @@ def _generate_csv_marker(
         logger.warning(f"No se pudo generar CSV para descarga: {e}")
 
 
+def _generate_followup_suggestions(
+    indicator: str,
+    component: Optional[str],
+    seasonality: Optional[str],
+    period_label: str,
+) -> list[str]:
+    """Generate contextual follow-up question suggestions."""
+    suggestions = []
+    
+    # Sugerencia sobre estacionalidad
+    if seasonality and "desestacionalizado" in seasonality.lower():
+        suggestions.append(f"¿Indicame el valor del {indicator} de la serie original (sin desestacionalizar)?")
+    elif not seasonality or "desestacionalizado" not in seasonality.lower():
+        suggestions.append(f"¿Indicame el valor del {indicator} desestacionalizado?")
+    
+    # Sugerencia sobre definición/metodología
+    suggestions.append(f"¿Qué mide el {indicator}?")
+    
+    # # Sugerencia sobre variación interanual vs mensual/trimestral
+    # if seasonality and "desestacionalizado" in seasonality.lower():
+    #     suggestions.append(f"¿Cuál fue la variación anual?")
+    # else:
+    #     suggestions.append(f"¿Cuál fue la variación mensual?")
+    
+    # Sugerencia sobre componentes (si es IMACEC)
+    if "imacec" in indicator.lower():
+        if not component or component == "Total":
+            suggestions.append("¿Cómo fue el IMACEC minero?")
+        else:
+            suggestions.append("¿Cómo fue el IMACEC total?")
+    
+    # Limitar a 3 sugerencias
+    return suggestions[:3]
+
+
 
 def stream_data_flow(
     classification: Any,
@@ -653,5 +688,7 @@ def stream_data_flow(
         # CSV download marker
         if chosen_row:
             yield from _generate_csv_marker(chosen_row, series_id, var_value, var_label, var_key)
+        
+        # Sugerencias se generan globalmente en memory_node para todas las rutas
     
     return
