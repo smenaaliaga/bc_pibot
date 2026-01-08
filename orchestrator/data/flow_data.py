@@ -418,12 +418,25 @@ def stream_data_flow(
     )
     if ignore_memory:
         logger.debug("Ignorando memoria para entidades (cambio entre IMACEC↔PIB)")
-    facts_for_resolvers = None if ignore_memory else facts
+    # Solicitud: no usar memoria para resolver la serie; solo la clasificación actual
+    facts_for_resolvers = None
 
     # Resolver entidades desde clasificación y (opcional) Redis
     period_context = _resolve_period_context(normalized, facts_for_resolvers)
     indicator_context_val = _resolve_indicator_context(normalized, facts_for_resolvers)
-    component_context_val = _resolve_component_context(normalized, facts_for_resolvers)
+    component_in_classification = False
+    comp_obj = normalized.get("component")
+    if isinstance(comp_obj, dict):
+        comp_val = comp_obj.get("normalized") or comp_obj.get("label")
+        if isinstance(comp_val, str) and comp_val.strip():
+            component_in_classification = True
+    elif isinstance(comp_obj, str) and comp_obj.strip():
+        component_in_classification = True
+
+    # No usar memoria para componente si falta en la clasificación
+    facts_for_component = facts_for_resolvers if component_in_classification else None
+
+    component_context_val = _resolve_component_context(normalized, facts_for_component)
     seasonality_context_val = _resolve_seasonality_context(normalized, facts_for_resolvers)
 
     # Detectar código de serie
