@@ -23,7 +23,7 @@ import os
 import logging
 import torch
 from typing import Dict, Optional, Any
-from transformers import BertTokenizer
+from transformers import BertTokenizer, BertConfig
 
 # Opcional: soporte de fallback remoto vía Hugging Face
 try:
@@ -210,6 +210,23 @@ class JointBERTPredictor:
                     f"Tokenizador cargado (remoto): {model_name} | vocab={getattr(self.tokenizer, 'vocab_size', 'N/A')}"
                 )
         
+        # Cargar config alineada con el tokenizer para evitar desajustes de vocabulario
+        try:
+            config = BertConfig.from_pretrained(model_name, local_files_only=local_only)
+            logger.info(
+                f"Config cargado: {model_name} | vocab_size={getattr(config, 'vocab_size', 'N/A')}"
+            )
+        except Exception as e_cfg:
+            logger.warning(
+                f"Config no encontrado para {model_name} (local_only={local_only}); se usará BertConfig por defecto: {e_cfg}"
+            )
+            config = BertConfig()
+        # Alinear explícitamente el vocab_size con el tokenizer para que los embeddings coincidan con los pesos
+        try:
+            config.vocab_size = len(self.tokenizer)
+        except Exception:
+            pass
+
         # Cargar modelo
         model_class = MODEL_CLASSES[self.args.model_type][1]
         if model_class is None:
@@ -228,6 +245,7 @@ class JointBERTPredictor:
 
         self.model = model_class.from_pretrained(
             self.model_dir,
+            config=config,
             **load_kwargs,
         )
         # Mover al dispositivo elegido
