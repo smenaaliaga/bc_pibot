@@ -68,16 +68,14 @@ def main() -> int:
             target_frequency = default_freq
 
     year = args.year
-    firstdate = f"{year-1}-01-01"
-    lastdate = f"{year}-12-31"
+    target_date = f"{year}-12-31"
 
     print(
-        f"Consultando {series_id} | dominio={domain} | rango={firstdate}→{lastdate} | freq={target_frequency or 'orig'}"
+        f"Consultando {series_id} | dominio={domain} | target_date={target_date} | freq={target_frequency or 'orig'}"
     )
     data = get_series_api_rest_bcch(
         series_id=series_id,
-        firstdate=firstdate,
-        lastdate=lastdate,
+        target_date=target_date,
         target_frequency=target_frequency,
         agg=args.agg,
     )

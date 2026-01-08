@@ -8,7 +8,7 @@ con cálculo de variaciones y cacheo en Redis.
 Funciones principales
 =====================
 
-1) get_series_api_rest_bcch(...)
+   - get_series_api_rest_bcch(...)
    - Llama a la API REST del BCCh (SieteRestWS).
    - Normaliza las observaciones (fecha, valor, status).
    - Opcionalmente remuestrea a otra frecuencia (D/M/Q/A) con agregación (avg/sum/first/last).
@@ -28,8 +28,6 @@ Funciones principales
 
    La clave de Redis incluye:
        - series_id
-       - firstdate
-       - lastdate
        - target_frequency
        - agg
 
@@ -476,8 +474,7 @@ def _compute_variations(df: pd.DataFrame, freq: str) -> pd.DataFrame:
 
 def get_series_api_rest_bcch(
     series_id: str,
-    firstdate: Optional[str] = None,
-    lastdate: Optional[str] = None,
+    target_date: Optional[str] = None,
     target_frequency: Optional[str] = None,
     agg: str = "avg",
 ) -> Dict[str, Any]:
@@ -490,10 +487,8 @@ def get_series_api_rest_bcch(
         Identificador de la serie BCCh (ej: "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M").
         Para IMACEC, PIB y PIB regional, normalmente se obtienen desde los JSON
         de configuración por defecto (config_default.json).
-    firstdate : str, opcional
-        Fecha inicial (YYYY-MM-DD) o None/"auto" para "primer dato disponible".
-    lastdate : str, opcional
-        Fecha final (YYYY-MM-DD) o None/"auto" para "último dato disponible".
+    target_date : str, opcional
+        Fecha de referencia (YYYY-MM-DD) para calcular flags de posición; la serie se trae completa.
     target_frequency : str, opcional
         Frecuencia objetivo: "D", "M", "Q" o "A". Si None, se mantiene la original.
     agg : str
@@ -510,8 +505,8 @@ def get_series_api_rest_bcch(
     if not BCCH_USER or not BCCH_PASS:
         raise RuntimeError("BCCH_USER/BCCH_PASS no configurados (.env)")
 
-    fd = None if firstdate in (None, "", "auto") else firstdate
-    ld = None if lastdate in (None, "", "auto") else lastdate
+    # Ignorar firstdate: siempre traemos la serie completa. target_date se usa solo para flags.
+    target_date = None if target_date in (None, "", "auto") else target_date
 
     params = {
         "user": BCCH_USER,
@@ -519,10 +514,7 @@ def get_series_api_rest_bcch(
         "function": "GetSeries",
         "timeseries": series_id,
     }
-    if fd:
-        params["firstdate"] = fd
-    if ld:
-        params["lastdate"] = ld
+    # No se envían firstdate/lastdate: se trae la serie completa.
 
     headers = {"Accept": "application/json"}
     log_params = {**params}
@@ -533,8 +525,8 @@ def get_series_api_rest_bcch(
         caller = _caller_info_for_log()
         args_summary = {
             "series_id": series_id,
-            "firstdate": fd or "auto",
-            "lastdate": ld or "auto",
+            "firstdate": "auto",  # siempre auto
+            "lastdate": target_date or "auto",
             "target_frequency": (target_frequency or None),
             "agg": agg,
         }
@@ -550,21 +542,23 @@ def get_series_api_rest_bcch(
             tag = "IMACEC"
         else:
             tag = "SERIE"
-        # Siempre registrar la versión enmascarada con trazabilidad completa
+        # Registrar siempre la versión enmascarada (sin credenciales)
         logger.info(
             f"[API_REQUEST_URL:{tag}] caller_file={caller.get('file')} caller_func={caller.get('func')} "
             f"params={args_summary} url={url_masked}"
         )
+        # Opcional: exponer link plano completo sólo si está habilitado explícitamente
         if LOG_EXPOSE_API_LINKS:
-            # Registrar también la URL expuesta y legible (para copia/pega en navegador)
             logger.info(
-                f"[API_REQUEST_URL_EXPOSED:{tag}] caller_file={caller.get('file')} caller_func={caller.get('func')} "
+                f"[API_REQUEST_URL_PLAIN:{tag}] caller_file={caller.get('file')} caller_func={caller.get('func')} "
                 f"params={args_summary} url={url_plain_readable}"
             )
+
     except Exception as _e_url:
         logger.error(f"[API_REQUEST_URL_ERROR] No se pudo construir URL de log: {_e_url}")
 
-    cache_key = _make_cache_key(series_id, fd, ld, target_frequency, agg)
+    # Cache sin depender de fechas: siempre se guarda la serie completa para la combinación serie+freq+agg
+    cache_key = _make_cache_key(series_id, None, None, target_frequency, agg)
     logger.info(
         f"[get_series_api_rest_bcch] Consultando serie de datos | "
         f"series_id='{series_id}' | cache_key='{cache_key}' | params={log_params}"
@@ -576,8 +570,8 @@ def get_series_api_rest_bcch(
         "Fase 3: Llamada a BCCh",
         {
             "series_id": series_id,
-            "firstdate": fd,
-            "lastdate": ld,
+            "firstdate": None,
+            "lastdate": None,
             "target_frequency": target_frequency,
             "agg": agg,
         },
@@ -647,8 +641,9 @@ def get_series_api_rest_bcch(
             "target_frequency": target_frequency or original_freq,
             "freq_effective": effective_freq,
             "agg": agg,
-            "firstdate": fd or "primer dato disponible",
-            "lastdate": ld or "último dato disponible",
+            "firstdate": "primer dato disponible",
+            "lastdate": target_date or "último dato disponible",
+            "target_date": target_date or "auto",
         }
 
         observations = []
@@ -673,6 +668,68 @@ def get_series_api_rest_bcch(
             "observations_raw": observations_raw,
         }
 
+    # --- Verificación de lastdate vs rango disponible (primera y última fecha) ---
+    try:
+        # Fechas disponibles en las observaciones devueltas
+        first_available_str = None
+        last_available_str = None
+        if observations:
+            dates_iter = [o.get("date") for o in observations if isinstance(o.get("date"), str) and o.get("date")]
+            if dates_iter:
+                first_available_str = min(dates_iter)
+                last_available_str = max(dates_iter)
+
+        # Clasificar la posición de lastdate respecto del rango disponible
+        lastdate_position = "unknown"
+        is_auto = target_date in (None, "", "auto")
+        if is_auto:
+            lastdate_position = "auto"
+        elif first_available_str and last_available_str:
+            try:
+                d_first = dateparser.parse(first_available_str).date()
+                d_latest = dateparser.parse(last_available_str).date()
+                d_req = dateparser.parse(target_date).date()  # type: ignore[arg-type]
+                if d_req > d_latest:
+                    lastdate_position = "gt_latest"
+                elif d_req == d_latest:
+                    lastdate_position = "eq_latest"
+                elif d_req >= d_first and d_req < d_latest:
+                    lastdate_position = "within_range"
+                elif d_req < d_first:
+                    lastdate_position = "lt_first"
+            except Exception:
+                # Fallback lexicográfico si el parse falla
+                if str(target_date) > str(last_available_str):
+                    lastdate_position = "gt_latest"
+                elif str(target_date) == str(last_available_str):
+                    lastdate_position = "eq_latest"
+                elif str(first_available_str) <= str(target_date) < str(last_available_str):
+                    lastdate_position = "within_range"
+                elif str(target_date) < str(first_available_str):
+                    lastdate_position = "lt_first"
+
+        # Booleans derivados
+        lastdate_ge_latest = lastdate_position in {"eq_latest", "gt_latest"}
+        lastdate_lt_first = lastdate_position == "lt_first"
+        lastdate_within_range = lastdate_position == "within_range"
+
+        # Anotar en meta
+        meta_ref = result.setdefault("meta", {})
+        meta_ref["first_available_date"] = first_available_str or ""
+        meta_ref["last_available_date"] = last_available_str or ""
+        meta_ref["lastdate_position"] = lastdate_position
+        meta_ref["lastdate_ge_latest"] = bool(lastdate_ge_latest)
+        meta_ref["lastdate_within_range"] = bool(lastdate_within_range)
+        meta_ref["lastdate_lt_first"] = bool(lastdate_lt_first)
+
+        logger.info(
+            "[get_series_api_rest_bcch] lastdate check | "
+            f"first_available={first_available_str} last_available={last_available_str} "
+            f"requested={target_date or 'auto'} position={lastdate_position}"
+        )
+    except Exception as _e_lastchk:
+        logger.debug(f"[get_series_api_rest_bcch] No se pudo verificar lastdate vs último dato: {_e_lastchk}")
+
     # --- Log de salida a test/log.text ---
     try:
         sample_api = ", ".join(
@@ -680,7 +737,7 @@ def get_series_api_rest_bcch(
         )
         _append_test_log(
             (
-                f"source=api | serie={series_id} | rango={fd or 'auto'}→{ld or 'auto'} | "
+                f"source=api | serie={series_id} | rango=auto→{target_date or 'auto'} | "
                 f"freq={meta.get('freq_effective', '')} | agg={agg} | rows={len(observations)} | sample=[{sample_api}]"
             )
         )
@@ -758,7 +815,8 @@ def get_series_from_redis(
     fd = None if firstdate in (None, "", "auto") else firstdate
     ld = None if lastdate in (None, "", "auto") else lastdate
 
-    cache_key = _make_cache_key(series_id, fd, ld, target_frequency, agg)
+    # Cache siempre con fechas auto (serie completa); fd/ld solo para filtro posterior
+    cache_key = _make_cache_key(series_id, None, None, target_frequency, agg)
     logger.info(
         f"[get_series_from_redis] Intentando recuperar serie desde Redis | "
         f"series_id='{series_id}' | cache_key='{cache_key}'"
@@ -773,8 +831,7 @@ def get_series_from_redis(
         return (
             get_series_api_rest_bcch(
                 series_id=series_id,
-                firstdate=fd,
-                lastdate=ld,
+                target_date=ld,
                 target_frequency=target_frequency,
                 agg=agg,
             )
@@ -793,8 +850,7 @@ def get_series_from_redis(
             return None
         return get_series_api_rest_bcch(
             series_id=series_id,
-            firstdate=fd,
-            lastdate=ld,
+            target_date=ld,
             target_frequency=target_frequency,
             agg=agg,
         )
@@ -807,8 +863,7 @@ def get_series_from_redis(
         # Poblar Redis llamando a la API
         return get_series_api_rest_bcch(
             series_id=series_id,
-            firstdate=fd,
-            lastdate=ld,
+            target_date=ld,
             target_frequency=target_frequency,
             agg=agg,
         )
@@ -826,13 +881,48 @@ def get_series_from_redis(
             return None
         return get_series_api_rest_bcch(
             series_id=series_id,
-            firstdate=fd,
-            lastdate=ld,
+            target_date=ld,
             target_frequency=target_frequency,
             agg=agg,
         )
 
     obs = data.get("observations", [])
+
+    # Recalcular flags de posición según el target_date (ld)
+    try:
+        first_available_str = None
+        last_available_str = None
+        if obs:
+            dates_iter = [o.get("date") for o in obs if isinstance(o.get("date"), str) and o.get("date")]
+            if dates_iter:
+                first_available_str = min(dates_iter)
+                last_available_str = max(dates_iter)
+
+        lastdate_position = data.get("meta", {}).get("lastdate_position", "unknown")
+        if ld:
+            try:
+                d_first = dateparser.parse(first_available_str).date() if first_available_str else None
+                d_latest = dateparser.parse(last_available_str).date() if last_available_str else None
+                d_req = dateparser.parse(ld).date()
+                if d_latest and d_req > d_latest:
+                    lastdate_position = "gt_latest"
+                elif d_latest and d_req == d_latest:
+                    lastdate_position = "eq_latest"
+                elif d_first and d_latest and d_req >= d_first and d_req < d_latest:
+                    lastdate_position = "within_range"
+                elif d_first and d_req < d_first:
+                    lastdate_position = "lt_first"
+            except Exception:
+                pass
+
+        meta_ref = data.setdefault("meta", {})
+        meta_ref["first_available_date"] = first_available_str or meta_ref.get("first_available_date", "")
+        meta_ref["last_available_date"] = last_available_str or meta_ref.get("last_available_date", "")
+        meta_ref["lastdate_position"] = lastdate_position
+        if ld:
+            meta_ref["target_date"] = ld
+    except Exception:
+        pass
     if not fd and not ld:
         # Log simple de lectura completa
         try:
@@ -999,8 +1089,7 @@ def fetch_series_with_calc(
 
     data = get_series_api_rest_bcch(
         series_id=series_id,
-        firstdate=fd_fetch,
-        lastdate=lastdate,
+        target_date=lastdate,
         target_frequency=freq,
         agg=agg,
     )

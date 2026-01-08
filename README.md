@@ -54,7 +54,7 @@ Este script comprueba:
 | --- | --- | --- |
 | `OPENAI_API_KEY`, `OPENAI_MODEL` | Modelo y clave usados por `LLMAdapter` | ✓ Sí |
 | `BCCH_USER`, `BCCH_PASS` | Credenciales para `get_series.py` | ✓ Sí |
-| `JOINT_BERT_MODEL_DIR` | Ruta al modelo JointBERT entrenado | No (default: `model/out/pibot_model_beto`) |
+| `JOINT_BERT_MODEL_DIR` | Ruta al modelo JointBERT entrenado | No (default: `model/weights/pibot_model_beto`) |
 | `USE_AGENT_GRAPH=1` | Habilita el grafo LangGraph en `main.py` | No |
 | `PG_DSN`, `REQUIRE_PG_MEMORY` | Configuran memoria conversacional y checkpoints | No |
 | `REDIS_URL`, `USE_REDIS_CACHE` | Cache para consultas BCCh | No |

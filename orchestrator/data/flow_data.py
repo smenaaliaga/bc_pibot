@@ -1,133 +1,39 @@
 from __future__ import annotations
-import calendar
 import logging
-import re
 import time
-from datetime import date, datetime
+import json
 from typing import Any, Dict, Iterable, Optional
 
-from config import get_settings
-
-try:
-    from orchestrator.data.get_series import detect_series_code 
-except Exception:
-    detect_series_code = None 
+from orchestrator.memory.memory_adapter import MemoryAdapter
+from orchestrator.data.get_series import detect_series_code 
+from orchestrator.data.get_data_serie import get_series_api_rest_bcch
+from orchestrator.data.templates import select_template, render_template
+from orchestrator.llm.llm_adapter import build_llm
     
 logger = logging.getLogger(__name__)
-_settings = get_settings()
 
 
-def _coerce_date(value: Any) -> Optional[date]:
-    if isinstance(value, datetime):
-        return value.date()
-    if isinstance(value, date):
-        return value
-    if value in (None, ""):
-        return None
-    text = str(value).strip()
-    if not text:
-        return None
-    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y-%m", "%Y"):
-        try:
-            parsed = datetime.strptime(text[: len(fmt)], fmt)
-            if fmt == "%Y":
-                return date(parsed.year, 1, 1)
-            if fmt == "%Y-%m":
-                return date(parsed.year, parsed.month, 1)
-            return parsed.date()
-        except Exception:
-            continue
-    return None
-
-
-def _end_of_period(value: date, granularity: str) -> date:
-    gran = (granularity or "").lower()
-    if gran == "month":
-        last_day = calendar.monthrange(value.year, value.month)[1]
-        return value.replace(day=last_day)
-    if gran == "quarter":
-        quarter = ((value.month - 1) // 3) + 1
-        last_month = quarter * 3
-        last_day = calendar.monthrange(value.year, last_month)[1]
-        return value.replace(month=last_month, day=last_day)
-    if gran == "year":
-        return value.replace(month=12, day=31)
-    return value
-
-
-def _subtract_months(value: date, months: int) -> date:
-    total_months = value.year * 12 + (value.month - 1) - max(months, 0)
-    year = total_months // 12
-    month = total_months % 12 + 1
-    last_day = calendar.monthrange(year, month)[1]
-    day = min(value.day, last_day)
-    return value.replace(year=year, month=month, day=day)
-
-
-def _format_date(value: Optional[date]) -> Optional[str]:
-    return value.strftime("%Y-%m-%d") if value else None
-
-
-def _date_from_period_key(period_key: Any) -> Optional[str]:
-    if not period_key:
-        return None
-    key = str(period_key).strip()
-    if re.match(r"^\d{4}-\d{2}$", key):
-        try:
-            dt = datetime.strptime(key, "%Y-%m").date()
-            return _format_date(dt)
-        except Exception:
-            return None
-    if re.match(r"^\d{4}-Q[1-4]$", key.upper()):
-        year = int(key[:4])
-        quarter = int(key[-1])
-        month = quarter * 3
-        last_day = calendar.monthrange(year, month)[1]
-        return f"{year:04d}-{month:02d}-{last_day:02d}"
-    return None
-
-
-def _build_period_context(normalized: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-    period_obj: Any = None
-    if isinstance(normalized, dict):
-        period_obj = normalized.get("period")
-    if not period_obj:
-        return None
-    period_dict = period_obj if isinstance(period_obj, dict) else getattr(period_obj, "__dict__", {})
-    raw_start = period_dict.get("start_date") or period_dict.get("startDate")
-    raw_end = period_dict.get("end_date") or period_dict.get("endDate")
-    gran = str(period_dict.get("granularity") or period_dict.get("period_type") or "").lower()
-    start = _coerce_date(raw_start)
-    end = _coerce_date(raw_end)
-    if not start and end:
-        start = end
-    if start and not end:
-        end = _end_of_period(start, gran)
-    if not start and not end:
-        return None
-    target = end or start
-    buffer_months = {"month": 15, "quarter": 24, "year": 60}.get(gran, 18)
-    first_candidate = _subtract_months(target, buffer_months)
-    firstdate = _format_date(first_candidate)
-    lastdate = _format_date(target)
-    candidates = []
-    for dt in (start, end):
-        formatted = _format_date(dt)
-        if formatted:
-            candidates.append(formatted)
-    key_date = _date_from_period_key(period_dict.get("period_key"))
-    if key_date:
-        candidates.append(key_date)
-    label = period_dict.get("period_key") or period_dict.get("label") or lastdate or firstdate
-    return {
-        "start": start,
-        "end": end,
-        "granularity": gran,
-        "firstdate": firstdate,
-        "lastdate": lastdate,
-        "match_candidates": [c for c in candidates if c],
-        "label": label,
+def _get_context(
+    *,
+    session_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Cargar memoria/historial desde Redis."""
+    ctx: Dict[str, Any] = {
+        "session_id": session_id,
+        "facts": None,
+        "history": None,
     }
+
+    # Obtener memoria/historial desde Redis (MemoryAdapter) si hay session_id
+    if session_id:
+        try:
+            mem = MemoryAdapter()
+            ctx["facts"] = mem.get_facts(session_id)
+            ctx["history"] = mem.get_history_for_llm(session_id)
+        except Exception:
+            ctx["facts_error"] = "memory_unavailable"
+
+    return ctx
 
 
 def _as_mapping(payload: Any) -> Dict[str, Any]:
@@ -141,101 +47,403 @@ def _as_mapping(payload: Any) -> Dict[str, Any]:
     return {}
 
 
-def _coerce_meta_value(value: Any) -> Optional[str]:
-    if value is None:
-        return None
-    if isinstance(value, str):
-        text = value.strip()
-        return text or None
-    if isinstance(value, dict):
-        for key in ("standard_name", "normalized", "original", "text_normalized", "label"):
-            candidate = value.get(key)
-            if isinstance(candidate, str) and candidate.strip():
-                return candidate.strip()
+def _resolve_period_context(normalized: Dict[str, Any], facts: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Resuelve período: primero clasificación (nuevo formato: granularity + target_date), luego Redis."""
+    period_obj = normalized.get("period")
+    # Nuevo formato simplificado: granularity + target_date
+    if isinstance(period_obj, dict) and period_obj.get("granularity") and period_obj.get("target_date"):
+        try:
+            logger.debug(
+                f"Periodo desde clasificación: granularity={period_obj.get('granularity')} target_date={period_obj.get('target_date')}"
+            )
+        except Exception:
+            pass
+        return period_obj
+    # Formato legacy: firstdate + lastdate (para compatibilidad con Redis)
+    if isinstance(period_obj, dict) and period_obj.get("firstdate") and period_obj.get("lastdate"):
+        try:
+            logger.debug(
+                f"Periodo desde clasificación (legacy): firstdate={period_obj.get('firstdate')} lastdate={period_obj.get('lastdate')}"
+            )
+        except Exception:
+            pass
+        return period_obj
+    if isinstance(facts, dict):
+        facts_period = facts.get("period")
+        logger.debug(f"Verificando facts.period: {facts_period}")
+        # Si viene como string JSON desde memoria, intentar parsearlo
+        if isinstance(facts_period, str):
+            try:
+                parsed = json.loads(facts_period)
+                if isinstance(parsed, dict):
+                    facts_period = parsed
+                    logger.debug("facts.period parseado desde JSON correctamente")
+            except Exception:
+                logger.debug("No se pudo parsear facts.period como JSON", exc_info=False)
+        # Nuevo formato
+        if isinstance(facts_period, dict) and facts_period.get("granularity") and facts_period.get("target_date"):
+            try:
+                logger.debug(
+                    f"Periodo desde memoria: granularity={facts_period.get('granularity')} target_date={facts_period.get('target_date')}"
+                )
+            except Exception:
+                pass
+            return facts_period
+        # Formato legacy
+        if isinstance(facts_period, dict) and facts_period.get("firstdate") and facts_period.get("lastdate"):
+            try:
+                logger.debug(
+                    f"Periodo desde memoria (legacy): firstdate={facts_period.get('firstdate')} lastdate={facts_period.get('lastdate')}"
+                )
+            except Exception:
+                pass
+            return facts_period
+        if facts_period is not None:
+            logger.debug(f"facts.period existe pero no tiene el formato esperado: {facts_period}")
+    else:
+        logger.debug("facts es None o no es dict")
+    logger.debug("Periodo no determinado en clasificación/memoria; se utilizará ventana automática (None)")
     return None
 
 
-def _has_indicator_info(normalized: Dict[str, Any], entities: Dict[str, Any]) -> bool:
-    indicator = _coerce_meta_value(normalized.get("indicator"))
-    if indicator:
-        return True
-    indicator = _coerce_meta_value(entities.get("indicator"))
-    return bool(indicator)
-
-
-def _has_sector_info(normalized: Dict[str, Any]) -> bool:
-    if _coerce_meta_value(normalized.get("sector")):
-        return True
-    if _coerce_meta_value(normalized.get("component")):
-        return True
-    return False
-
-
-def _match_observation(observations: list, candidates: list[str]) -> Optional[Dict[str, Any]]:
-    if not observations or not candidates:
-        return None
-    for candidate in candidates:
-        for obs in observations:
-            date_str = obs.get("date")
-            if not date_str:
-                continue
-            if date_str == candidate:
-                return obs
-            if date_str[:7] == candidate[:7]:
-                return obs
+def _resolve_indicator_context(normalized: Dict[str, Any], facts: Optional[Dict[str, Any]]) -> Optional[str]:
+    """Resuelve indicador: primero clasificación, luego Redis."""
+    indicator_obj = normalized.get("indicator")
+    if isinstance(indicator_obj, dict):
+        val = indicator_obj.get("normalized")
+        if isinstance(val, str) and val.strip():
+            logger.debug(f"Indicador desde clasificación: {val}")
+            return val
+    if isinstance(facts, dict):
+        ind = facts.get("indicator")
+        if isinstance(ind, str) and ind.strip():
+            logger.debug(f"Indicador desde memoria: {ind.strip()}")
+            return ind.strip()
+    logger.debug("Indicador no determinado (clasificación/memoria)")
     return None
 
-_last_period_context = None  # Memoria de periodo consultado
+
+def _resolve_component_context(normalized: Dict[str, Any], facts: Optional[Dict[str, Any]]) -> Optional[str]:
+    """Resuelve componente: primero clasificación, luego Redis."""
+    comp_obj = normalized.get("component")
+    if isinstance(comp_obj, dict):
+        val = comp_obj.get("normalized")
+        if isinstance(val, str) and val.strip():
+            logger.debug(f"Componente desde clasificación: {val}")
+            return val
+    if isinstance(facts, dict):
+        comp = facts.get("component")
+        if isinstance(comp, str) and comp.strip():
+            logger.debug(f"Componente desde memoria: {comp.strip()}")
+            return comp.strip()
+    logger.debug("Componente no determinado (clasificación/memoria)")
+    return None
+
+
+def _resolve_seasonality_context(normalized: Dict[str, Any], facts: Optional[Dict[str, Any]]) -> Optional[str]:
+    """Resuelve estacionalidad: primero clasificación, luego Redis."""
+    seasonality_obj = normalized.get("seasonality")
+    if isinstance(seasonality_obj, dict):
+        val = seasonality_obj.get("normalized") or seasonality_obj.get("label")
+        if isinstance(val, str) and val.strip():
+            logger.debug(f"Estacionalidad desde clasificación: {val.strip()}")
+            return val.strip()
+    elif isinstance(seasonality_obj, str) and seasonality_obj.strip():
+        logger.debug(f"Estacionalidad desde clasificación (texto): {seasonality_obj.strip()}")
+        return seasonality_obj.strip()
+    if isinstance(facts, dict):
+        seas = facts.get("seasonality")
+        if isinstance(seas, str) and seas.strip():
+            logger.debug(f"Estacionalidad desde memoria: {seas.strip()}")
+            return seas.strip()
+    logger.debug("Estacionalidad no determinada (clasificación/memoria)")
+    return None
+
+
+def _match_observation(
+    observations: list,
+    target_date_str: Optional[str],
+    granularity: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
+    """Match observation using target_date and granularity.
+    - target_date formats: "YYYY-MM-DD" (month), "YYYY-QN" (quarter), "YYYY" (year)
+    - Monthly: match by YYYY-MM
+    - Quarterly: map to quarter-end month (03, 06, 09, 12)
+    - Year: match by YYYY (choose last observation in year)
+    """
+    if not observations or not target_date_str:
+        return None
+
+    try:
+        gran = (granularity or "").lower()
+        
+        # Monthly: match by year-month (YYYY-MM-DD -> YYYY-MM)
+        if gran == "month":
+            ym_target = target_date_str[:7]
+            logger.debug(f"Matching month: buscando {ym_target}")
+            for obs in observations:
+                ds = obs.get("date")
+                if ds and ds[:7] == ym_target:
+                    return obs
+
+        # Quarterly: handle either symbolic quarter (YYYY-QN) or explicit date
+        elif gran == "quarter":
+            # Observations are quarter-end (e.g., 1996-03-31, 1996-06-30, ...)
+            # Convert target to last month of quarter for matching
+            import re
+            m = re.match(r"(\d{4})-Q([1-4])", target_date_str)
+            if m:
+                year = int(m.group(1))
+                quarter = int(m.group(2))
+                last_month = quarter * 3
+                ym_target = f"{year:04d}-{last_month:02d}"
+                logger.debug(f"Matching quarter: {target_date_str}, buscando mes de cierre {ym_target}")
+                for obs in observations:
+                    ds = obs.get("date")
+                    if ds and ds[:7] == ym_target:
+                        logger.debug(f"Encontrado: {ds}")
+                        return obs
+                logger.debug(f"No se encontró observación para {ym_target}")
+            else:
+                # If target_date_str already is a date, map month to quarter-end month
+                m2 = re.match(r"^(\d{4})-(0[1-9]|1[0-2])(-\d{2})?$", target_date_str)
+                if m2:
+                    year = int(m2.group(1))
+                    month = int(m2.group(2))
+                    quarter = ((month - 1) // 3) + 1
+                    last_month = quarter * 3
+                    ym_target = f"{year:04d}-{last_month:02d}"
+                    logger.debug(f"Matching quarter (fecha explícita): buscando mes de cierre {ym_target}")
+                    for obs in observations:
+                        ds = obs.get("date")
+                        if ds and ds[:7] == ym_target:
+                            logger.debug(f"Encontrado: {ds}")
+                            return obs
+
+        # Year: target_date_str is "YYYY"
+        elif gran == "year":
+            y_target = target_date_str[:4]
+            logger.debug(f"Matching year: buscando {y_target}")
+            # Find last observation in that year
+            year_obs = [o for o in observations if o.get("date", "")[:4] == y_target]
+            if year_obs:
+                return max(year_obs, key=lambda o: o.get("date", ""))
+
+        # Fallback: try year-month match if target is in YYYY-MM-DD format
+        if "-" in target_date_str and len(target_date_str) >= 7:
+            ym_target = target_date_str[:7]
+            logger.debug(f"Fallback: buscando {ym_target}")
+            for obs in observations:
+                ds = obs.get("date")
+                if ds and ds[:7] == ym_target:
+                    return obs
+    except Exception as e:
+        logger.warning(f"Error en _match_observation: {e}")
+    return None
+
+
+def _format_period_labels(date_str: Optional[str], freq: str) -> list[str]:
+    """Return both long and short period labels as a list [long, short].
+    - Quarterly: ["el 3er trimestre del 2025", "3T 2025"]
+    - Monthly:   ["Marzo 2025", "Mar 2025"]
+    """
+    if not date_str:
+        return ["--", "--"]
+    try:
+        y = int(date_str[:4])
+        m = int(date_str[5:7])
+        if freq in {"Q", "T"}:
+            q = ((m - 1) // 3) + 1
+            ordinal = {1: "1er", 2: "2do", 3: "3er", 4: "4to"}.get(q, f"{q}º")
+            long_label = f"el {ordinal} trimestre del {y}"
+            short_label = f"{q}T {y}"
+            return [long_label, short_label]
+        else:
+            meses_es = [
+                "", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+                "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+            ]
+            meses_abrev = [
+                "", "Ene", "Feb", "Mar", "Abr", "May", "Jun",
+                "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"
+            ]
+            mes_nombre = meses_es[m] if 1 <= m <= 12 else str(m)
+            mes_abrev = meses_abrev[m] if 1 <= m <= 12 else str(m)
+            return [f"{mes_nombre} {y}", f"{mes_abrev} {y}"]
+    except Exception:
+        return [date_str or "--", date_str or "--"]
+
+
+def _calculate_variation(
+    obs: list,
+    target_row: Optional[Dict[str, Any]],
+    show_qoq: bool,
+    freq: str,
+) -> tuple[Optional[float], str, str]:
+    """Calculate variation (QoQ if desestacionalizado, else YoY). Returns (value, label, key)."""
+    if not target_row:
+        return None, "Variación anual", "yoy_pct"
+    
+    freq_label = {"Q": "trimestral", "T": "trimestral", "M": "mensual"}.get(freq, "anual")
+    
+    if show_qoq:
+        obs_sorted = sorted(obs, key=lambda o: o.get("date", ""))
+        idx = next((i for i, o in enumerate(obs_sorted) if o.get("date") == target_row.get("date")), None)
+        if idx is not None and idx > 0:
+            prev = obs_sorted[idx - 1]
+            try:
+                v_now = float(target_row.get("value"))
+                v_prev = float(prev.get("value"))
+                if v_prev != 0:
+                    var_value = 100.0 * (v_now - v_prev) / abs(v_prev)
+                    return var_value, f"Variación {freq_label}", "qoq_pct"
+            except Exception:
+                pass
+    
+    yoy_val = target_row.get("yoy_pct")
+    return yoy_val, f"Variación {freq_label if show_qoq else 'anual'}", "yoy_pct"
+
+
+def _format_value(value: Any) -> str:
+    """Format numeric value with thousand separators."""
+    try:
+        return f"{float(value):,.0f}".replace(",", "_").replace("_", ".")
+    except Exception:
+        return "--"
+
+
+def _format_percentage(value: Any) -> str:
+    """Format percentage value."""
+    try:
+        return f"{float(value):.1f}%"
+    except Exception:
+        return "--"
+
+
+def _generate_csv_marker(
+    row: Dict[str, Any],
+    series_id: str,
+    var_value: Optional[float],
+    var_label: str,
+    var_key: str,
+) -> Iterable[str]:
+    """Generate CSV download marker for export."""
+    try:
+        import pandas as _pd
+        import tempfile
+        
+        export_map = {
+            "date": "Periodo",
+            "value": "Valor",
+            var_key: var_label
+        }
+        export_row = {
+            export_map[c]: row.get(c) if c != var_key else var_value
+            for c in export_map if c in row or c == var_key
+        }
+        df_export = _pd.DataFrame([export_row])
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".csv", prefix="serie_", mode="w", encoding="utf-8") as tmp:
+            df_export.to_csv(tmp, index=False)
+            tmp_path = tmp.name
+        
+        filename = f"serie_{series_id}.csv"
+        yield "##CSV_DOWNLOAD_START\n"
+        yield f"path={tmp_path}\n"
+        yield f"filename={filename}\n"
+        yield "label=Descargar CSV\n"
+        yield "mimetype=text/csv\n"
+        yield "##CSV_DOWNLOAD_END\n"
+    except Exception as e:
+        logger.warning(f"No se pudo generar CSV para descarga: {e}")
+
 
 def stream_data_flow(
     classification: Any,
-    question: str,
-    history_text: str,
-    *,
-    indicator_context: Optional[Dict[str, str]] = None,
+    session_id: Optional[str] = None,
 ) -> Iterable[str]:
     """Fetch de datos y tabla."""
+
+    # Debug: inspeccionar classification recibido
+    logger.debug(f"[FLOW_DATA] classification type: {type(classification)}")
+    logger.debug(f"[FLOW_DATA] classification hasattr 'intent': {hasattr(classification, 'intent')}")
+    if hasattr(classification, "intent"):
+        logger.debug(f"[FLOW_DATA] classification.intent = {getattr(classification, 'intent', None)}")
+    if hasattr(classification, "__dict__"):
+        logger.debug(f"[FLOW_DATA] classification.__dict__ = {classification.__dict__}")
+
+    # Obtiene memoria de Redis
+    redis_ctx = _get_context(session_id=session_id)
+    ctx_map = _as_mapping(redis_ctx)
+    facts = _as_mapping(ctx_map.get("facts"))
+    try:
+        logger.debug(
+            "Facts cargados desde memoria: %s",
+            list(facts.keys()) if isinstance(facts, dict) else facts,
+        )
+    except Exception:
+        pass
     
-    # Extraer info de JointBERT si está disponible
-    entities_raw = getattr(classification, "entities", None)
-    normalized_raw = getattr(classification, "normalized", None)
-    entities = entities_raw if isinstance(entities_raw, dict) else {}
-    normalized = normalized_raw if isinstance(normalized_raw, dict) else _as_mapping(normalized_raw)
-    global _last_period_context
-    period_context = _build_period_context(normalized)
-    # Si no hay periodo en la consulta pero hay memoria previa, usarla
-    if (not period_context or not period_context.get("start")) and _last_period_context and _last_period_context.get("start"):
-        period_context = _last_period_context
-
-    year = None
-    if period_context and period_context.get("start"):
-        year = period_context["start"].year  # type: ignore[index]
-    if year is None:
-        try:
-            year = int(time.strftime("%Y"))
-        except Exception:
-            logger.error("No se pudo determinar el año")
-            return
-
-    # 2. Detectar serie usando el módulo series_detector
-    if detect_series_code is None:
-        logger.error("No se pudo importar detect_series_code")
-        return
+    # Extraer entidades normalizados desde classification
+    normalized = {}
+    if classification is not None:
+        normalized_raw = getattr(classification, "normalized", None)
+        normalized = _as_mapping(normalized_raw)
     
-    indicator_override = None
-    sector_override = None
-    if indicator_context:
-        if not _has_indicator_info(normalized, entities):
-            indicator_override = indicator_context.get("indicator")
-        if not _has_sector_info(normalized):
-            sector_override = indicator_context.get("sector") or indicator_context.get("component")
+    # Regla: si la consulta cambia el indicador, no usar memoria para llenar entidades
+    normalized_indicator_key = None
+    ind_obj = normalized.get("indicator")
+    if isinstance(ind_obj, dict):
+        normalized_indicator_key = str(
+            (ind_obj.get("normalized") or ind_obj.get("label") or "")
+        ).strip().lower()
+    elif isinstance(ind_obj, str):
+        normalized_indicator_key = ind_obj.strip().lower()
 
+    facts_indicator_key = None
+    if isinstance(facts, dict):
+        facts_indicator_key = str(facts.get("indicator") or "").strip().lower()
+
+    ignore_memory = (
+        (
+            normalized_indicator_key == "pib"
+            and isinstance(facts_indicator_key, str)
+            and ("imacec" in facts_indicator_key)
+        )
+        or (
+            isinstance(normalized_indicator_key, str)
+            and ("imacec" in normalized_indicator_key)
+            and isinstance(facts_indicator_key, str)
+            and ("pib" in facts_indicator_key)
+        )
+    )
+    if ignore_memory:
+        logger.debug("Ignorando memoria para entidades (cambio entre IMACEC↔PIB)")
+    # Solicitud: no usar memoria para resolver la serie; solo la clasificación actual
+    facts_for_resolvers = None
+
+    # Resolver entidades desde clasificación y (opcional) Redis
+    period_context = _resolve_period_context(normalized, facts_for_resolvers)
+    indicator_context_val = _resolve_indicator_context(normalized, facts_for_resolvers)
+    component_in_classification = False
+    comp_obj = normalized.get("component")
+    if isinstance(comp_obj, dict):
+        comp_val = comp_obj.get("normalized") or comp_obj.get("label")
+        if isinstance(comp_val, str) and comp_val.strip():
+            component_in_classification = True
+    elif isinstance(comp_obj, str) and comp_obj.strip():
+        component_in_classification = True
+
+    # No usar memoria para componente si falta en la clasificación
+    facts_for_component = facts_for_resolvers if component_in_classification else None
+
+    component_context_val = _resolve_component_context(normalized, facts_for_component)
+    seasonality_context_val = _resolve_seasonality_context(normalized, facts_for_resolvers)
+
+    # Detectar código de serie
     detection_result = detect_series_code(
-        normalized=normalized,
-        entities=entities,
-        indicator=indicator_override,
-        sector=sector_override,
-        component=sector_override,
+        indicator=indicator_context_val,
+        component=component_context_val,
+        seasonality=seasonality_context_val,
     )
     
     series_id = detection_result.get("series_code")
@@ -244,30 +452,19 @@ def stream_data_flow(
     if not series_id:
         logger.error("No se pudo determinar el código de serie")
         return
-    
-    # Determinar frecuencia objetivo: trimestral para PIB, mensual por defecto
-    freq = "M"
-    if metadata:
-        # Detectar si es PIB trimestral por el código o descripción
-        desc = (metadata.get('title') or metadata.get('descripEsp') or '').lower()
-        code = (series_id or '').upper()
-        if ("pib" in desc or "producto interno bruto" in desc or "PIB" in code) and ("trimes" in desc or code.endswith(".T")):
+
+    # Determinar frecuencia objetivo desde el período normalizado
+    freq = "M"  # default mensual
+    if period_context and isinstance(period_context, dict):
+        granularity = period_context.get("granularity")
+        if granularity == "quarter":
             freq = "Q"
+        elif granularity == "year":
+            freq = "A"
 
-    if period_context and period_context.get("firstdate") and period_context.get("lastdate"):
-        firstdate = period_context["firstdate"]
-        lastdate = period_context["lastdate"]
-    else:
-        firstdate = f"{year-1}-01-01"
-        lastdate = f"{year}-12-31"
+    target_date = period_context.get("target_date") if period_context else None
 
-    # Llamar a get_series_api_rest_bcch
-    try:
-        from orchestrator.data.get_data_serie import get_series_api_rest_bcch
-    except Exception as e:
-        logger.error(f"No se pudo importar get_series_api_rest_bcch: {e}")
-        return
-
+    # Obtener datos de la serie 
     data = None
     max_retries = 2
     for attempt in range(max_retries + 1):
@@ -275,12 +472,11 @@ def stream_data_flow(
             # yield f"Intento {attempt + 1}/{max_retries + 1}...\n\n"
             data = get_series_api_rest_bcch(
                 series_id=series_id,
-                firstdate=firstdate,
-                lastdate=lastdate,
+                target_date=target_date,
                 target_frequency=freq,
                 agg="avg"
             )
-            # Si llegamos aquí, tuvo éxito
+            # Exito
             break
         except Exception as e:
             logger.warning(f"Error en intento {attempt + 1}: {type(e).__name__}: {e}")
@@ -295,159 +491,181 @@ def stream_data_flow(
     if not data:
         logger.warning("La API no devolvió datos")
         return
+
+    api_meta = data.get("meta", {}) or {}
     
     # Obtener observaciones
     obs = data.get("observations", [])
 
     if obs:
-        # Guardar el periodo consultado en memoria para la próxima consulta
-        if period_context:
-            _last_period_context = period_context
-        candidates = period_context["match_candidates"] if period_context else []
-        obs_match = _match_observation(obs, candidates)
+        
+        # Si hay target_date, buscar observación que coincida
+        target_date_str = period_context.get("target_date") if period_context else None
+        granularity = period_context.get("granularity") if period_context else None
+        
+        logger.debug(f"Buscando observación con target_date={target_date_str}, granularity={granularity}")
+        obs_match = _match_observation(obs, target_date_str, granularity)
         obs_latest = max(obs, key=lambda o: o.get("date", "")) if obs else None
+        
+        if obs_match:
+            logger.debug(f"Observación encontrada: {obs_match.get('date')}")
+        else:
+            logger.debug(f"No se encontró observación para target_date, usando último período: {obs_latest.get('date') if obs_latest else None}")
+        
+        chosen_row = obs_match or obs_latest
+        
+        show_qoq = seasonality_context_val and 'desestacionalizado' in seasonality_context_val.lower()
 
-        # Detectar frecuencia efectiva
-        freq = metadata.get('freq_effective') or metadata.get('default_frequency') or metadata.get('original_frequency') or metadata.get('frequency') or ''
-        freq = str(freq).upper()
+        # Calcular variación
+        var_value, var_label, var_key = _calculate_variation(obs, chosen_row, show_qoq, freq)
 
-        # Detectar si es PIB o desestacionalizado
-        indicator_is_pib = (series_id or '').lower().startswith('pib') or metadata.get('indicator', '') == 'pib' or (metadata.get('title','').lower().startswith('pib'))
-        seasonality_norm = None
-        if 'seasonality' in normalized:
-            s = normalized['seasonality']
-            if isinstance(s, dict):
-                seasonality_norm = s.get('standard_name') or s.get('normalized') or s.get('original') or s.get('text_normalized') or s.get('label')
-            else:
-                seasonality_norm = s
-            seasonality_norm = str(seasonality_norm).lower()
+        # Seleccionar y renderizar plantilla de mensaje
+        chosen_date = chosen_row.get("date") if chosen_row else None
+        freq_label = {"Q": "trimestral", "T": "trimestral", "M": "mensual"}.get(freq, "anual")
+        
+        # Datos finales
+        date_raw = chosen_row.get("date")
+        value = chosen_row.get("value")
+        
+        # Obtiene el formato de mostrar el periodo
+        # TODO: normalizar classification.frequency, y usar si es dada por el usuario
+        if (indicator_context_val or "").strip().lower() == "pib":
+            period_labels = _format_period_labels(date_raw, "Q")
+        else:
+            period_labels = _format_period_labels(date_raw, freq)
+            
+        # Nombre final del indicador: indicador + componente (si aplica) + estacionalidad (si aplica)
+        indicator_parts: list[str] = []
+        if isinstance(indicator_context_val, str) and indicator_context_val.strip():
+            indicator_parts.append(indicator_context_val.upper().strip())
+        if isinstance(component_context_val, str) and component_context_val.strip():
+            indicator_parts.append(component_context_val.strip())
+        if isinstance(seasonality_context_val, str) and seasonality_context_val.strip():
+            indicator_parts.append(seasonality_context_val.strip())
+        final_indicator_name = " ".join(indicator_parts) if indicator_parts else "indicador"
+        
+        # Flags sobre la posición de lastdate respecto al rango disponible
+        position = str(api_meta.get("lastdate_position") or "").strip().lower()
+        last_available_date = api_meta.get("last_available_date")
+        first_available_date = api_meta.get("first_available_date")
 
-        def period_label(date_str):
-            if not date_str:
-                return "--"
-            try:
-                y = int(date_str[:4])
-                m = int(date_str[5:7])
-                if freq in {"Q", "T"}:
-                    q = ((m - 1) // 3) + 1
-                    return f"{q}T {y}"
-                else:
-                    meses_es = [
-                        "", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-                        "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
-                    ]
-                    mes_nombre = meses_es[m] if 1 <= m <= 12 else str(m)
-                    return f"{mes_nombre} {y}"
-            except Exception:
-                return date_str
+        # Etiquetas legibles para límites de la serie
+        if (indicator_context_val or "").strip().lower() == "pib":
+            last_available_labels = _format_period_labels(last_available_date, "Q") if last_available_date else ["--", "--"]
+            first_available_labels = _format_period_labels(first_available_date, "Q") if first_available_date else ["--", "--"]
+        else:
+            last_available_labels = _format_period_labels(last_available_date, freq) if last_available_date else ["--", "--"]
+            first_available_labels = _format_period_labels(first_available_date, freq) if first_available_date else ["--", "--"]
 
-
-        # Calcular variación t-1 si corresponde
-        show_qoq = seasonality_norm and 'desestacionalizado' in seasonality_norm
-        freq_label = 'anual'
-        if freq in {'Q', 'T'}:
-            freq_label = 'trimestral'
-        elif freq == 'M':
-            freq_label = 'mensual'
-
-        var_label = f"Variación {freq_label if show_qoq else 'anual'}"
-        var_key = "yoy_pct"
-        var_value = None
-        row = obs_match or obs_latest
-        if show_qoq and row:
-            # Buscar el periodo anterior
-            obs_sorted = sorted(obs, key=lambda o: o.get("date", ""))
-            idx = next((i for i, o in enumerate(obs_sorted) if o.get("date") == row.get("date")), None)
-            if idx is not None and idx > 0:
-                prev = obs_sorted[idx-1]
-                try:
-                    v_now = float(row.get("value"))
-                    v_prev = float(prev.get("value"))
-                    if v_prev != 0:
-                        var_value = 100.0 * (v_now - v_prev) / abs(v_prev)
-                        var_label = f"Variación {freq_label}"
-                        var_key = "qoq_pct"
-                except Exception:
-                    pass
-        if not var_value and row:
-            var_value = row.get("yoy_pct")
-
-        mensaje_emitido = False
-        if period_context and obs_match and var_value is not None:
-            date = obs_match.get("date")
-            yield f"La variación {freq_label if show_qoq else 'anual'} para {period_label(date)} fue {float(var_value):.1f}%\n"
-            mensaje_emitido = True
-        if not mensaje_emitido and obs_latest and var_value is not None:
-            date = obs_latest.get("date")
-            yield f"La última variación {freq_label if show_qoq else 'anual'} disponible es {float(var_value):.1f}% (período {period_label(date)}).\n"
-
+        # Construir prompt para el LLM con los datos disponibles
+        llm_prompt_parts = []
+        
+        # Contexto específico según la posición del período consultado
+        if position == "gt_latest":
+            # Período consultado está después del último dato disponible
+            llm_prompt_parts.append("SITUACIÓN: El usuario preguntó por un período que aún no tiene datos disponibles.")
+            llm_prompt_parts.append(f"Redacta una respuesta breve (máximo 2 oraciones) que:")
+            llm_prompt_parts.append(f"1. Indique claramente que ese período no tiene datos disponibles todavía")
+            llm_prompt_parts.append(f"2. Mencione que los datos más recientes del {final_indicator_name} son de {last_available_labels[0]}")
+            if var_value is not None:
+                llm_prompt_parts.append(f"3. Opcionalmente menciona que en ese último período registró una variación {freq_label if show_qoq else 'anual'} de {var_value:.1f}% (esto es VARIACIÓN PORCENTUAL, no el valor del índice)")
+        
+        elif position == "lt_first":
+            # Período consultado está antes del primer dato disponible
+            llm_prompt_parts.append("SITUACIÓN: El usuario preguntó por un período anterior al inicio de la serie.")
+            llm_prompt_parts.append(f"Redacta una respuesta breve (máximo 2 oraciones) que:")
+            llm_prompt_parts.append(f"1. Indique que no hay datos para ese período porque es anterior al inicio de la serie")
+            llm_prompt_parts.append(f"2. Mencione que la serie del {final_indicator_name} comienza en {first_available_labels[0]}")
+            if var_value is not None:
+                llm_prompt_parts.append(f"3. Opcionalmente menciona que en ese primer período registró una variación {freq_label if show_qoq else 'anual'} de {var_value:.1f}% (esto es VARIACIÓN PORCENTUAL, no el valor del índice)")
+        
+        elif position == "eq_latest":
+            # Período consultado es exactamente el último dato disponible
+            llm_prompt_parts.append("SITUACIÓN: El usuario preguntó por el período más reciente disponible.")
+            llm_prompt_parts.append(f"Redacta una respuesta breve (máximo 2 oraciones) informando:")
+            llm_prompt_parts.append(f"- Indicador: {final_indicator_name}")
+            llm_prompt_parts.append(f"- Período: {period_labels[0]}")
+            if var_value is not None:
+                llm_prompt_parts.append(f"- Variación {freq_label if show_qoq else 'anual'}: {var_value:.1f}%")
+                llm_prompt_parts.append(f"IMPORTANTE: {var_value:.1f}% es la VARIACIÓN PORCENTUAL (crecimiento/caída), NO menciones el valor absoluto del índice")
+            llm_prompt_parts.append(f"- Opcional: menciona que este es el dato más reciente")
+        
+        elif not var_value:
+            # Caso especial: hay valor pero no hay variación (primer período de la serie)
+            llm_prompt_parts.append("SITUACIÓN: El usuario preguntó por un período que tiene datos pero no tiene variación calculable.")
+            llm_prompt_parts.append(f"Redacta una respuesta breve (máximo 2 oraciones) que:")
+            llm_prompt_parts.append(f"1. Mencione que en {period_labels[0]} el {final_indicator_name} registró un índice de {_format_value(value)} puntos")
+            llm_prompt_parts.append(f"2. Explique brevemente que no hay variación porcentual disponible porque no existe un período anterior para comparar")
+        
+        else:
+            # Caso normal: período dentro del rango disponible
+            llm_prompt_parts.append("SITUACIÓN: El usuario preguntó por un período que tiene datos disponibles.")
+            llm_prompt_parts.append(f"Redacta una respuesta breve (máximo 2 oraciones) informando:")
+            llm_prompt_parts.append(f"- Indicador: {final_indicator_name}")
+            llm_prompt_parts.append(f"- Período: {period_labels[0]}")
+            if var_value is not None:
+                llm_prompt_parts.append(f"- Variación {freq_label if show_qoq else 'anual'}: {var_value:.1f}%")
+                llm_prompt_parts.append(f"IMPORTANTE: {var_value:.1f}% es la VARIACIÓN PORCENTUAL (crecimiento/caída respecto al período anterior), NO es el valor absoluto del índice")
+        
+        llm_prompt_parts.append("\nREQUISITOS DE ESTILO:")
+        llm_prompt_parts.append("- Usa un tono conversacional y directo, como si hablaras con un colega")
+        llm_prompt_parts.append("- Puedes mencionar 'Base de Datos Estadísticos' o 'BDE' o 'Banco Central', pero varía la forma y no lo uses siempre")
+        llm_prompt_parts.append("- Varía la estructura: no empieces siempre igual (alterna 'En [período]...', 'Durante [período]...', 'Los datos de [período]...', etc.)")
+        llm_prompt_parts.append("- No des opiniones, análisis económico ni explicaciones extras")
+        llm_prompt_parts.append("- Sé conciso: máximo 2 oraciones")
+        
+        llm_prompt = "\n".join(llm_prompt_parts)
+        
+        # Generar respuesta con el LLM
+        try:
+            llm = build_llm(streaming=True, temperature=0.7, mode="fallback")
+            for chunk in llm.stream(llm_prompt, history=[], intent_info=None):
+                yield chunk
+            yield "\n"
+        except Exception as e:
+            logger.warning(f"Error generando con LLM, usando plantilla: {e}")
+            
+            # Inicializar payload con todos los componentes desde el principio
+            payload = {
+                "indicator": final_indicator_name,
+                "value": _format_value(value),
+                "var_label": freq_label if show_qoq else "anual",
+                "var_value": float(var_value) if var_value is not None else None,
+                "period_label": period_labels[0],
+                "last_available_label": last_available_labels[0], # Flags de posición
+                "first_available_label": first_available_labels[0], # Flags de posición
+            }
+        
+            # Fallback a plantillas si el LLM falla
+            tmpl_ctx = {
+                "has_indicator": bool(final_indicator_name),
+                "has_value": value is not None,
+                "has_var_value": var_value is not None,
+                "has_period": bool(chosen_date),
+                "has_seasonality": bool(seasonality_context_val),
+                "no_data": False,
+                "lastdate_position": position,
+                "value": value,
+            }
+            message = render_template(select_template(tmpl_ctx), payload)
+            yield f"{message}\n"
+        
+        # Tabla markdown
         yield f"Periodo | Valor | {var_label}\n"
         yield f"--------|-------|{'-'*len(var_label)}\n"
-        if row:
-            date = row.get("date")
-            value = row.get("value")
-            val_fmt = f"{float(value):,.2f}".replace(",", "_").replace("_", ".") if value is not None else "--"
-            var_fmt = f"{float(var_value):.1f}%" if var_value is not None else "--"
-            yield f"{period_label(date)} | {val_fmt} | {var_fmt}\n"
-        else:
-            yield "-- | -- | --\n"
+        yield f"{period_labels[1]} | {_format_value(value)} * | {_format_percentage(var_value)}\n"
+        # yield "-- | -- | --\n"
         yield "\n"
+        
+        # Fuente (link corto)
+        yield r"\* _Índice_" + "\n\n" if indicator_context_val == "imacec" else r"\* _Miles de millones de pesos_" + "\n\n"
+        yield f"**Fuente:** Banco Central de Chile (BDE) — [Ver serie en la BDE]({detection_result.get('metadata', {}).get('source_url')})"
+        # yield "\n\n" + api_meta.get("descripEsp", "")
 
-        # --- NUEVO: Emitir marcador de descarga CSV ---
-        try:
-            import pandas as _pd
-            import tempfile
-            import os
-            if row:
-                export_map = {
-                    "date": "Periodo",
-                    "value": "Valor",
-                    var_key: var_label
-                }
-                export_row = {export_map[c]: row.get(c) if c != var_key else var_value for c in export_map if c in row or c == var_key}
-                df_export = _pd.DataFrame([export_row])
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".csv", prefix="serie_", mode="w", encoding="utf-8") as tmp:
-                    df_export.to_csv(tmp, index=False)
-                    tmp_path = tmp.name
-                filename = f"serie_{series_id}.csv"
-                label = "Descargar CSV"
-                yield "##CSV_DOWNLOAD_START\n"
-                yield f"path={tmp_path}\n"
-                yield f"filename={filename}\n"
-                yield f"label={label}\n"
-                yield "mimetype=text/csv\n"
-                yield "##CSV_DOWNLOAD_END\n"
-        except Exception as e:
-            logger.warning(f"No se pudo generar CSV para descarga: {e}")
-
-    # # Mostrar metadatos de la serie
-    # if metadata:
-    #     yield f"- Código: `{series_id}`\n"
-    #     yield f"- Título: {metadata.get('title', '')}\n"
-    #     # Frecuencia: buscar en varios campos posibles
-    #     freq = metadata.get('freq_effective') or metadata.get('default_frequency') or metadata.get('original_frequency') or metadata.get('frequency') or ''
-    #     yield f"- Frecuencia: {freq}\n"
-    #     yield f"- Unidad: {metadata.get('unit', '')}\n"
-
-    #     # Gráfico: mostrar siempre el campo, aunque esté vacío
-    #     grafico_url = metadata.get('source_url', '')
-    #     yield f"- Gráfico: {grafico_url}\n"
-
-    #     # Metodología: mostrar siempre el campo, aunque esté vacío
-    #     metodologia = ''
-    #     notes = metadata.get('notes', {})
-    #     if isinstance(notes, dict):
-    #         metodologia = notes.get('metodologia', '')
-            
-    #     if metodologia:
-    #         if isinstance(metodologia, str) and metodologia.startswith('http'):
-    #             metodologia_str = f"[Ver documento]({metodologia})"
-    #         else:
-    #             metodologia_str = metodologia
-    #     else:
-    #         metodologia_str = ''
-    #     yield f"- Metodología: {metodologia_str}\n"
-    #     yield "\n"
-
+        # CSV download marker
+        if chosen_row:
+            yield from _generate_csv_marker(chosen_row, series_id, var_value, var_label, var_key)
+        
+        # Sugerencias se generan globalmente en memory_node para todas las rutas
     
     return

@@ -19,7 +19,7 @@ except Exception:
 
 def can_handle_method(classification: Any) -> bool:
     try:
-        return getattr(classification, "query_type", "") == "METHODOLOGICAL"
+        return getattr(classification, "intent", "").lower() in ('methodology', 'definition')
     except Exception:
         return False
 

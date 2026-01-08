@@ -14,16 +14,16 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.runtime import get_runtime
 from langgraph.types import StreamWriter
 
-from orchestrator.intents.classifier_agent import (
+from orchestrator.classifier.classifier_agent import (
     build_intent_info,
     classify_question_with_history,
+    ClassificationResult,
 )
-from orchestrator.intents.intent_store import IntentStoreBase, create_intent_store
+from orchestrator.classifier.intent_store import IntentStoreBase, create_intent_store
 from orchestrator.llm.llm_adapter import LLMAdapter, build_llm
 from orchestrator.memory.memory_adapter import MemoryAdapter
-from orchestrator.prompts.query_classifier import ClassificationResult
 from orchestrator.rag.rag_factory import create_retriever
-from orchestrator.routes import data_router
+from orchestrator.data import flow_data
 from orchestrator.routes import intent_router as intent_router
 
 logger = logging.getLogger(__name__)
@@ -42,6 +42,11 @@ class AgentState(TypedDict, total=False):
     route_decision: str
     output: str
     stream_chunks: Annotated[List[str], Topic(str, accumulate=True)]
+    # Entidades normalizadas desde clasificación (transversal)
+    period_context: Optional[Dict[str, Any]]
+    indicator_context: Optional[str]
+    component_context: Optional[str]
+    seasonality_context: Optional[str]
 
 
 def _emit_stream_chunk(chunk_text: str, writer: Optional[StreamWriter]) -> None:
@@ -175,6 +180,16 @@ class _InProcessMemoryAdapter:
             "facts_sessions": len(self._facts),
         }
 
+    def clear_session(self, session_id: str) -> bool:
+        if not session_id:
+            return False
+        try:
+            self._facts.pop(session_id, None)
+            self._history.pop(session_id, None)
+            return True
+        except Exception:
+            return False
+
 
 def _safe_retriever():
     try:
@@ -207,6 +222,86 @@ _FALLBACK_LLM = None
 _INTENT_STORE: Optional[IntentStoreBase] = None
 
 _CHART_BLOCK_PATTERN = re.compile(r"##CHART_START(?P<body>.*?)##CHART_END", re.DOTALL)
+
+
+def _generate_suggested_questions(
+    state: AgentState,
+) -> List[str]:
+    """Generate contextual follow-up questions based on normalized entities in memory."""
+    suggestions: List[str] = []
+    
+    # Entradas desde el estado y memoria previa
+    session_id = state.get("session_id")
+    facts = state.get("facts") or {}
+    indicator = state.get("indicator_context") or facts.get("indicator")
+    component = state.get("component_context") or facts.get("component")
+    seasonality = state.get("seasonality_context") or facts.get("seasonality")
+    period = state.get("period_context") or facts.get("period")
+    classification = state.get("classification")
+    intent = getattr(classification, "intent", "") if classification else ""
+
+    # Fallback: si no hay indicador en estado/facts, mirar historial del intent store
+    if not indicator:
+        last_ctx = _get_last_indicator_context(session_id)
+        if last_ctx:
+            indicator = last_ctx.get("indicator") or indicator
+            component = component or last_ctx.get("component") or last_ctx.get("sector")
+
+    # Si no hay indicador, ofrecer sugerencias genéricas
+    if not indicator:
+        suggestions.extend(
+            [
+                "¿Quieres que busque los datos más recientes?",
+                "¿Te muestro un gráfico con la última variación?",
+                "¿Prefieres consultar IMACEC o PIB?",
+            ]
+        )
+    else:
+        indicator_lower = indicator.lower()
+
+        # Sugerencia sobre estacionalidad
+        if seasonality:
+            if "desestacionalizado" in seasonality.lower():
+                suggestions.append(f"¿Cuál es el {indicator} sin desestacionalizar?")
+            else:
+                suggestions.append(f"¿Cuál es el {indicator} desestacionalizado?")
+        else:
+            suggestions.append(f"¿Cuál es el {indicator} desestacionalizado?")
+
+        # Sugerencias específicas por indicador
+        if "imacec" in indicator_lower:
+            if not component or str(component).lower() == "total":
+                suggestions.append("¿Cómo estuvo el IMACEC minero?")
+            elif "minero" in str(component).lower():
+                suggestions.append("¿Cómo estuvo el IMACEC no minero?")
+            else:
+                suggestions.append("¿Cómo estuvo el IMACEC total?")
+
+        if "pib" in indicator_lower:
+            if not component:
+                suggestions.append("¿Cuál es la variación del PIB por sectores?")
+
+        # Sugerencia sobre metodología
+        suggestions.append(f"¿Qué mide el {indicator}?")
+
+        # Sugerencia sobre periodos
+        if period:
+            suggestions.append(f"¿Cómo ha evolucionado el {indicator} en los últimos años?")
+
+        # Si la intención es metodológica/definición, priorizar datos puntuales
+        if intent and intent.lower() in ("methodology", "definition"):
+            suggestions.insert(0, f"¿Cuál es el último valor del {indicator}?")
+
+    # Deduplicar y limitar a 3
+    seen = set()
+    unique_suggestions = []
+    for s in suggestions:
+        normalized_key = re.sub(r"[^a-z0-9]+", "", s.lower())
+        if normalized_key not in seen:
+            seen.add(normalized_key)
+            unique_suggestions.append(s)
+
+    return unique_suggestions[:3]
 
 
 def _extract_chart_metadata_from_output(output: str) -> Optional[Dict[str, str]]:
@@ -353,7 +448,7 @@ def classify_node(state: AgentState) -> AgentState:
         classification, history_text = classify_question_with_history(question, history)
     except Exception:
         logger.exception("[GRAPH] classify_question_with_history failed")
-        classification = ClassificationResult(query_type="METHODOLOGICAL")
+        classification = ClassificationResult(intent="methodology")
         history_text = ""
     intent_info = build_intent_info(classification)
     facts = state.get("facts") or {}
@@ -361,11 +456,79 @@ def classify_node(state: AgentState) -> AgentState:
         intent_info = intent_info or {}
         intent_info.setdefault("facts", facts)
     _persist_intent_event(state, classification, intent_info)
-    return {
+    
+    # Extraer entidades normalizadas desde clasificación para acceso transversal
+    normalized = getattr(classification, "normalized", None) or {}
+    period_ctx = None
+    indicator_ctx = None
+    component_ctx = None
+    seasonality_ctx = None
+    
+    if isinstance(normalized, dict):
+        # Period
+        period_obj = normalized.get("period")
+        if isinstance(period_obj, dict) and period_obj.get("firstdate") and period_obj.get("lastdate"):
+            period_ctx = period_obj
+        
+        # Indicator
+        ind_obj = normalized.get("indicator")
+        if isinstance(ind_obj, dict):
+            indicator_ctx = ind_obj.get("normalized") or ind_obj.get("label")
+        elif isinstance(ind_obj, str) and ind_obj.strip():
+            indicator_ctx = ind_obj.strip()
+        
+        # Component
+        comp_obj = normalized.get("component")
+        if isinstance(comp_obj, dict):
+            component_ctx = comp_obj.get("normalized") or comp_obj.get("label")
+        elif isinstance(comp_obj, str) and comp_obj.strip():
+            component_ctx = comp_obj.strip()
+        
+        # Seasonality
+        seas_obj = normalized.get("seasonality")
+        if isinstance(seas_obj, dict):
+            seasonality_ctx = seas_obj.get("normalized") or seas_obj.get("label")
+        elif isinstance(seas_obj, str) and seas_obj.strip():
+            seasonality_ctx = seas_obj.strip()
+    
+    # Persistir entidades resueltas en memoria (independiente del flujo de datos)
+    session_id = state.get("session_id")
+    if session_id and _MEMORY:
+        try:
+            to_save: Dict[str, Any] = {}
+            intent_val = getattr(classification, "intent", None)
+            if intent_val:
+                to_save["intent"] = str(intent_val)
+            if indicator_ctx:
+                to_save["indicator"] = indicator_ctx
+            if component_ctx:
+                to_save["component"] = component_ctx
+            if seasonality_ctx:
+                to_save["seasonality"] = seasonality_ctx
+            if period_ctx:
+                to_save["period"] = period_ctx
+            
+            if to_save:
+                _MEMORY.set_facts(session_id, to_save)
+                logger.debug(f"[CLASSIFY_NODE] Facts persistidos: {list(to_save.keys())}")
+        except Exception:
+            logger.debug("[CLASSIFY_NODE] Error al persistir facts", exc_info=True)
+    
+    result: AgentState = {
         "classification": classification,
         "history_text": history_text,
         "intent_info": intent_info,
     }
+    if period_ctx:
+        result["period_context"] = period_ctx
+    if indicator_ctx:
+        result["indicator_context"] = indicator_ctx
+    if component_ctx:
+        result["component_context"] = component_ctx
+    if seasonality_ctx:
+        result["seasonality_context"] = seasonality_ctx
+    
+    return result
 
 
 def _persist_intent_event(
@@ -382,7 +545,7 @@ def _persist_intent_event(
     payload = intent_info or {}
     raw_intent = payload.get("intent")
     if not raw_intent and classification:
-        raw_intent = getattr(classification, "query_type", None)
+        raw_intent = getattr(classification, "intent", None)
     intent = _ensure_text(raw_intent)
     if not intent:
         return
@@ -484,6 +647,10 @@ def _get_last_indicator_context(session_id: Optional[str]) -> Optional[Dict[str,
     for record in reversed(records or []):
         context = _extract_indicator_context_from_entities(getattr(record, "entities", None))
         if context:
+            try:
+                logger.debug("[GRAPH] indicator_context_resolved session_id=%s context=%s", session_id, context)
+            except Exception:
+                logger.exception("[GRAPH] Failed to log indicator_context")
             return context
     return None
 
@@ -514,14 +681,13 @@ def intent_shortcuts_node(state: AgentState, *, writer: Optional[StreamWriter] =
     collected: List[str] = []
     memory_metadata = getattr(direct_iter, "metadata", None)
     chunk_filter = _StreamChunkFilter()
+    # Consumir stream: valida chunks, filtra duplicados, emite en tiempo real,
+    # y acumula para retornar output final
     for chunk in direct_iter:
         chunk_text = _ensure_text(chunk)
-        if not chunk_text:
-            continue
-        if not chunk_filter.allow(chunk_text):
-            continue
-        collected.append(chunk_text)
-        _emit_stream_chunk(chunk_text, writer)
+        if chunk_text and chunk_filter.allow(chunk_text):
+            collected.append(chunk_text)
+            _emit_stream_chunk(chunk_text, writer)
     if collected:
         yield {
             "output": "".join(collected),
@@ -531,63 +697,31 @@ def intent_shortcuts_node(state: AgentState, *, writer: Optional[StreamWriter] =
 
 
 def data_node(state: AgentState, *, writer: Optional[StreamWriter] = None):
+    
     classification = state.get("classification")
-    question = state.get("question", "")
-    history_text = state.get("history_text", "")
     session_id = state.get("session_id")
-    # Imprime classificación para depuración
-    try:
-        summary = (
-            _ensure_text(getattr(classification, "query_type", "")),
-            _ensure_text(getattr(classification, "data_domain", "")),
-            str(getattr(classification, "is_generic", "")),
-            _ensure_text(getattr(classification, "default_key", "")),
-            _ensure_text(getattr(classification, "error", "")),
-        )
-        logger.debug(
-            "[CLASSIFIER] query_type=%s data_domain=%s is_generic=%s default_key=%s error=%s",
-            *summary,
-        )
-        # Log adicional de campos JointBERT
-        intent = getattr(classification, "intent", None)
-        confidence = getattr(classification, "confidence", None)
-        entities = getattr(classification, "entities", None)
-        normalized = getattr(classification, "normalized", None)
-        if intent or confidence or entities or normalized:
-            logger.debug(
-                "[CLASSIFIER_JOINTBERT] intent=%s confidence=%.4f entities=%s normalized=%s",
-                intent,
-                confidence if confidence is not None else 0.0,
-                entities,
-                normalized,
-            )
-    except Exception:
-        logger.exception("[CLASSIFIER] Failed to log classification summary")
         
     if not classification:
-        text = "No pude clasificar la consulta para obtener datos."
+        text = "[GRAPH] No se recibió clasificación para el nodo DATA."
         _emit_stream_chunk(text, writer)
         return {"output": text}
     collected: List[str] = []
     chunk_filter = _StreamChunkFilter()
 
-    indicator_context = _get_last_indicator_context(session_id)
-
-    try:
-        stream = data_router.stream_data_flow(
+    try: 
+        # Invocar flujo de datos directamente: usa session_id para acceder a Redis,
+        # detecta serie y genera mensaje, tabla y marcador CSV
+        stream = flow_data.stream_data_flow(
             classification,
-            question,
-            history_text,
-            indicator_context=indicator_context,
+            session_id=session_id,
         )
+        # Consumir stream: valida chunks, filtra duplicados, emite en tiempo real,
+        # y acumula para retornar output final
         for chunk in stream:
             chunk_text = _ensure_text(chunk)
-            if not chunk_text:
-                continue
-            if not chunk_filter.allow(chunk_text):
-                continue
-            collected.append(chunk_text)
-            _emit_stream_chunk(chunk_text, writer)
+            if chunk_text and chunk_filter.allow(chunk_text):
+                collected.append(chunk_text)
+                _emit_stream_chunk(chunk_text, writer)
     except Exception:
         logger.exception("[GRAPH] data route failed")
         if not collected:
@@ -625,7 +759,8 @@ def _run_llm(
             if not chunk_text:
                 continue
             try:
-                logger.debug("[GRAPH_LLM_CHUNK] %s", chunk_text[:200])
+                if os.getenv("STREAM_CHUNK_LOGS", "0").lower() in {"1", "true", "yes", "on"}:
+                    logger.debug("[GRAPH_LLM_CHUNK] %s", chunk_text[:200])
             except Exception:
                 pass
             if not chunk_filter.allow(chunk_text):
@@ -673,15 +808,33 @@ def memory_node(state: AgentState) -> AgentState:
                 _persist_chart_state(session_id, metadata)
             else:
                 _maybe_clear_chart_state(session_id, state.get("facts"))
+            
+            # Persistir entidades normalizadas desde state en facts (transversal)
+            entities_to_persist: Dict[str, Any] = {}
+            if state.get("indicator_context"):
+                entities_to_persist["indicator"] = state["indicator_context"]
+            if state.get("component_context"):
+                entities_to_persist["component"] = state["component_context"]
+            if state.get("seasonality_context"):
+                entities_to_persist["seasonality"] = state["seasonality_context"]
+            if state.get("period_context"):
+                entities_to_persist["period"] = state["period_context"]
+            if entities_to_persist:
+                try:
+                    _MEMORY.set_facts(session_id, entities_to_persist)  # type: ignore
+                    logger.debug("[GRAPH] Entidades normalizadas guardadas en facts: %s", list(entities_to_persist.keys()))
+                except Exception:
+                    logger.debug("[GRAPH] Unable to persist normalized entities to facts", exc_info=True)
+            
             checkpoint_payload = {
                 "question": state.get("question"),
                 "output": output,
                 "route_decision": state.get("route_decision"),
             }
             classification = state.get("classification")
-            query_type = getattr(classification, "query_type", None) if classification else None
-            if query_type:
-                checkpoint_payload["query_type"] = query_type
+            intent = getattr(classification, "intent", None) if classification else None
+            if intent:
+                checkpoint_payload["intent"] = intent
             facts = state.get("facts")
             if facts:
                 checkpoint_payload["facts"] = facts
@@ -692,6 +845,22 @@ def memory_node(state: AgentState) -> AgentState:
             )
         except Exception:
             logger.debug("[GRAPH] Unable to persist assistant turn", exc_info=True)
+    
+    # Generar preguntas sugeridas basadas en entidades
+    suggested_questions = _generate_suggested_questions(state)
+    if not suggested_questions:
+        # Fallback absoluto para garantizar botones
+        suggested_questions = [
+            "¿Quieres que busque los datos más recientes?",
+            "¿Te muestro un gráfico con la última variación?",
+            "¿Prefieres consultar IMACEC o PIB?",
+        ]
+    followup_block = "\n\n##FOLLOWUP_START\n"
+    for i, question in enumerate(suggested_questions[:3], start=1):
+        followup_block += f"suggestion_{i}={question}\n"
+    followup_block += "##FOLLOWUP_END"
+    output = output + followup_block
+    
     return {"output": output}
 
 
@@ -731,10 +900,12 @@ def route_decider(state: AgentState) -> str:
     if decision:
         return decision
     classification = state.get("classification")
-    query_type = _ensure_text(getattr(classification, "query_type", "")).upper()
-    if query_type == "DATA":
+    intent = _ensure_text(getattr(classification, "intent", "")).lower()
+    
+    # Mapeo de intenciones a rutas
+    if intent in ('value', 'data', 'last', 'table'):
         return "data"
-    if query_type == "METHODOLOGICAL":
+    if intent in ('methodology', 'definition', 'greeting'):
         return "rag"
     return "fallback"
 

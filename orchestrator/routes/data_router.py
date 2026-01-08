@@ -41,41 +41,46 @@ def _extract_year(question: str) -> Optional[int]:
 
 def can_handle_data(classification: Any) -> bool:
     try:
-        return getattr(classification, "query_type", "") == "DATA"
+        return getattr(classification, "intent", "").lower() in ('value', 'data', 'last', 'table')
     except Exception:
         return False
 
 
 def stream_data_flow(
     classification: Any,
-    question: str,
-    history_text: str,
-    *,
-    indicator_context: Optional[Dict[str, str]] = None,
+    context_payload: Optional[Dict[str, Any]] = None,
 ) -> Iterable[str]:
     """
-    Intenta usar el flujo DATA completo (fase 1 + fetch + tabla).
+    Delegado del flujo de datos simplificado.
 
-    Si falla, usa el placeholder metodológico+banner.
+    - Extrae `session_id` del payload para permitir a `flow_data` acceder a Redis.
+    - Delegar completamente a `flow_data.stream_data_flow` (sin question/history).
     """
-    domain = getattr(classification, "data_domain", "") or "OTRO"
-    year = _extract_year(question)
-
     try:
         from orchestrator.data import flow_data
 
+        session_id = None
+        if isinstance(context_payload, dict):
+            session_id = context_payload.get("session_id")
+
         for chunk in flow_data.stream_data_flow(
             classification,
-            question,
-            history_text,
-            indicator_context=indicator_context,
+            session_id=session_id,
         ):
             if chunk:
                 yield chunk
         return
     except Exception as e:
         logger.error(f"[DATA_DELEGATE] fallo flujo DATA: {e}")
-
-    yield _simple_methodological_intro(domain)
-    yield DATA_BANNER
-    yield from _default_data_reply(domain, year)
+        # Fallback mínimo si el flujo falla
+        indicator = "OTRO"
+        normalized = getattr(classification, "normalized", None)
+        if normalized and isinstance(normalized, dict):
+            indicator_data = normalized.get('indicator', {})
+            if isinstance(indicator_data, dict):
+                ind = indicator_data.get('standard_name') or indicator_data.get('normalized')
+                if ind:
+                    indicator = str(ind).upper()
+        yield _simple_methodological_intro(indicator)
+        yield DATA_BANNER
+        yield from _default_data_reply(indicator, None)
