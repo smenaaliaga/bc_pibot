@@ -60,6 +60,22 @@ Este script comprueba:
 | `REDIS_URL`, `USE_REDIS_CACHE` | Cache para consultas BCCh | No |
 | `RAG_ENABLED`, `RAG_BACKEND`, `RAG_PGVECTOR_URL` | Activa el retriever metodológico | No |
 
+### Clonar modelo clasificador
+
+```
+# 1) Clonar BETO (tokenizer/base) → model/tokenizers/
+hf download 
+
+# 2) Clonar un modelo entrenado → model/weights/
+uv run python model/scripts/clone_hf_model.py smenaaliaga/pibot-jointbert weights
+
+# Opción 2 (versión antigua)
+hf download smenaaliaga/pibot-jointbert \
+  --revision e693d2bb422fa86c1bf2a493eba40b5a6c948020 \
+  --local-dir ./model/out/pibot_model_beto \
+  --local-dir-use-symlinks False
+```
+
 ### Ejecuta la aplicación
 ```bash
 uv run streamlit run main.py
