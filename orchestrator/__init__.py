@@ -18,15 +18,15 @@ from .classifier.intent_store import (
 )
 
 # Exponer JointBERT predictor globalmente
-try:
-    from .classifier.joint_bert_classifier import get_predictor, predict, PIBotPredictor
-    _JOINT_BERT_AVAILABLE = True
-except ImportError as e:
-    logger.warning(f"No se pudo importar JointBERT predictor: {e}")
-    _JOINT_BERT_AVAILABLE = False
-    get_predictor = None  # type: ignore
-    predict = None  # type: ignore
-    PIBotPredictor = None  # type: ignore
+# try:
+#     from .classifier.joint_bert_classifier import get_predictor, predict, PIBotPredictor
+#     _JOINT_BERT_AVAILABLE = True
+# except ImportError as e:
+#     # logger.warning(f"No se pudo importar JointBERT predictor: {e}")
+#     # _JOINT_BERT_AVAILABLE = False
+#     # get_predictor = None  # type: ignore
+#     # predict = None  # type: ignore
+#     # PIBotPredictor = None  # type: ignore
 
 __all__ = [
     "MemoryAdapter",
@@ -41,6 +41,6 @@ __all__ = [
     "logger",
 ]
 
-# Agregar JointBERT si está disponible
-if _JOINT_BERT_AVAILABLE:
-    __all__.extend(["get_predictor", "predict", "PIBotPredictor"])
+# # Agregar JointBERT si está disponible
+# if _JOINT_BERT_AVAILABLE:
+#     __all__.extend(["get_predictor", "predict", "PIBotPredictor"])

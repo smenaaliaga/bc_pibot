@@ -25,7 +25,7 @@ try:
     from orchestrator.graph.agent_graph import build_graph  # type: ignore
 except Exception:
     build_graph = None  # type: ignore
-from orchestrator.classifier.joint_bert_classifier import get_predictor
+# from orchestrator.classifier.joint_bert_classifier import get_predictor
 from registry import warmup_models
 import app
 

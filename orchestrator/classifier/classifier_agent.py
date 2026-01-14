@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 # JointBERT imports
-from orchestrator.classifier.joint_bert_classifier import get_predictor
+# from orchestrator.classifier.joint_bert_classifier import get_predictor
 from orchestrator.classifier.entity_normalizer import normalize_entities
 from registry import get_intent_router, get_series_interpreter
 
@@ -117,7 +117,7 @@ def _classify_with_jointbert(question: str) -> ClassificationResult:
     Clasificación usando JointBERT
     """
     # Obtener predictor JointBERT
-    predictor = get_predictor()
+    predictor = None #get_predictor()
     result = predictor.predict(question)
     
     # Aplicar normalización de entidades

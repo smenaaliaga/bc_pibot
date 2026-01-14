@@ -30,7 +30,7 @@ print(f"Intent: {intent.intent.label} (confidence: {intent.intent.confidence:.2f
 
 series = interpreter.predict("Imacec mensual")
 if series.frequency.confidence and series.frequency.confidence < 0.7:
-  print("⚠️ Baja confianza en frequency, verificar query")
+  print("Baja confianza en frequency, verificar query")
 ```
 
 ## Estructura
@@ -71,11 +71,11 @@ huggingface-cli login
 
 # IntentRouter (SentenceTransformer + LogisticRegression)
 huggingface-cli download smenaaliaga/pibot-intent-router \
-  --local-dir ./src/models/pibot_intent_router/pibot-intent-router
+  --local-dir ./models/pibot_intent_router/pibot-intent-router
 
 # SeriesInterpreter (JointBERT multi-head)
 huggingface-cli download smenaaliaga/pibot-jointbert \
-  --local-dir ./src/models/pibot_series_interpreter/pibot-jointbert
+  --local-dir ./models/pibot_series_interpreter/pibot-jointbert
 ```
 
 ## base.py - Contratos de Tipos
