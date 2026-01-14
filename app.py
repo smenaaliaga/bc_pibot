@@ -304,32 +304,32 @@ def run_app(
 
                 if not indicator:
                     suggestions.extend([
-                        "¿Dame la cifra del IMACEC más reciente?",
-                        "¿Explicame que es el PIB?",
+                        "Cuanto aceleró la economía el último mes",
+                        "Explícame que es el PIB",
                     ])
                 else:
                     ind_lower = str(indicator).lower()
                     # Estacionalidad
-                    if seasonality and "desestacionalizado" in str(seasonality).lower():
-                        suggestions.append(f"¿Dame la cifra del {indicator} sin desestacionalizar?")
+                    if seasonality and "sa" in str(seasonality).lower():
+                        suggestions.append(f"Cuanto creció el {indicator.upper()}")
                     else:
-                        suggestions.append(f"¿Dame la cifra del {indicator} desestacionalizado?")
+                        suggestions.append(f"Cuanto creció el {indicator.upper()} desestacionalizado")
                     # Específico IMACEC
                     if "imacec" in ind_lower:
                         comp_lower = str(component or "").lower()
                         if not comp_lower or comp_lower == "total":
-                            suggestions.append("¿Dame la cifra del IMACEC minero?")
+                            suggestions.append("Cuanto creció el IMACEC minero")
                         elif "minero" in comp_lower:
-                            suggestions.append("¿Dame la cifra del IMACEC no minero?")
+                            suggestions.append("Cuanto varió el IMACEC no minero")
                         else:
-                            suggestions.append("¿Dame la cifra del IMACEC?")
+                            suggestions.append("Cuanto creció el IMACEC")
                     # Específico PIB
                     if "pib" in ind_lower and not component:
                         suggestions.append("¿Cuál es la variación del PIB por sectores?")
                     # Metodología / general
-                    suggestions.append(f"¿Qué mide el {indicator}?")
+                    suggestions.append(f"¿Qué mide el {indicator.upper()}?")
                     if period:
-                        suggestions.append(f"¿Cómo ha evolucionado el {indicator} en los últimos años?")
+                        suggestions.append(f"¿Cómo ha evolucionado el {indicator.upper()} en los últimos años?")
             # Dedup y limitar
             seen = set()
             uniq = []

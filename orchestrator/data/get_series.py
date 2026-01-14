@@ -57,8 +57,16 @@ def _load_series_catalog() -> Dict[str, Any]:
     
     try:
         with open(catalog_path, 'r', encoding='utf-8') as f:
-            _SERIES_CATALOG = json.load(f)
-        logger.info(f"Catálogo cargado: {len(_SERIES_CATALOG)} series")
+            data = json.load(f)
+        
+        # Si es una lista, convertir a diccionario indexado por 'id'
+        if isinstance(data, list):
+            _SERIES_CATALOG = {entry.get("id"): entry for entry in data if entry.get("id")}
+            logger.info(f"Catálogo cargado: {len(_SERIES_CATALOG)} series (convertido de lista a dict)")
+        else:
+            _SERIES_CATALOG = data
+            logger.info(f"Catálogo cargado: {len(_SERIES_CATALOG)} series")
+        
         return _SERIES_CATALOG
     except Exception as e:
         logger.error(f"Error cargando catálogo: {e}")
@@ -205,7 +213,7 @@ def detect_series_code(
     Args:
         indicator: Indicador (ej: "imacec", "pib"). Si no se indica, se usa el por defecto.
         component: Componente (ej: "minero", "no minero", "produccion de bienes").
-        seasonality: Estacionalidad (ej: "desestacionalizado"). Si no se indica, se asume serie original.
+        seasonality: Estacionalidad (ej: "sa"). Si no se indica, se asume serie original.
         
     Returns:
         Dict con:
@@ -236,14 +244,14 @@ def detect_series_code(
     metadata = {}
     matched_by = "catalog_standard_names"
 
-    if seasonality_norm == "desestacionalizado":
-        # Buscar en el catálogo una serie que coincida con indicator, component y seasonality=desestacionalizado
+    if seasonality_norm == "sa":
+        # Buscar en el catálogo una serie que coincida con indicator, component y seasonality=sa
         for code, meta in catalog.items():
             std = meta.get("standard_names", {})
             if (
                 _normalize_text(std.get("indicator", "")) == final_indicator and
                 _normalize_text(std.get("component", "")) == final_component and
-                _normalize_text(std.get("seasonality", "")) == "desestacionalizado"
+                _normalize_text(std.get("seasonality", "")) == "sa"
             ):
                 series_code = code
                 metadata = meta
@@ -256,7 +264,7 @@ def detect_series_code(
             if (
                 _normalize_text(std.get("indicator", "")) == final_indicator and
                 _normalize_text(std.get("component", "")) == final_component and
-                (not std.get("seasonality") or _normalize_text(std.get("seasonality", "")) != "desestacionalizado")
+                (not std.get("seasonality") or _normalize_text(std.get("seasonality", "")) != "sa")
             ):
                 series_code = code
                 metadata = meta
@@ -269,8 +277,8 @@ def detect_series_code(
         for code, meta in catalog.items():
             std = meta.get("standard_names", {})
             if _normalize_text(std.get("indicator", "")) == final_indicator:
-                # Si tiene campo seasonality, debe ser distinto de 'desestacionalizado'
-                if std.get("seasonality") and _normalize_text(std.get("seasonality", "")) == "desestacionalizado":
+                # Si tiene campo seasonality, debe ser distinto de 'sa'
+                if std.get("seasonality") and _normalize_text(std.get("seasonality", "")) == "sa":
                     continue
                 series_code = code
                 metadata = meta

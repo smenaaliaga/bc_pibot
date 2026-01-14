@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional, Tuple
 # JointBERT imports
 from orchestrator.classifier.joint_bert_classifier import get_predictor
 from orchestrator.classifier.entity_normalizer import normalize_entities
+from registry import get_intent_router, get_series_interpreter
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,72 @@ class ClassificationResult:
     confidence: Optional[float] = None  # Confianza del modelo
     entities: Optional[dict] = None  # Entidades raw extraídas
     normalized: Optional[dict] = None  # Entidades normalizadas
+
+
+# ============================================================
+# SHARED MODEL ACCESSORS
+# ============================================================
+
+def get_router_model(path: Optional[str] = None):
+    """Singleton IntentRouter (cached en registry.py)."""
+    return get_intent_router(path)
+
+
+def get_series_interpreter_model(path: Optional[str] = None):
+    """Singleton SeriesInterpreter (cached en registry.py)."""
+    return get_series_interpreter(path)
+
+
+def load_intent_router(path: Optional[str] = None):
+    """Alias simple para obtener el IntentRouter compartido."""
+    return get_router_model(path)
+
+
+def load_series_interpreter(path: Optional[str] = None):
+    """Alias simple para obtener el SeriesInterpreter compartido."""
+    return get_series_interpreter_model(path)
+
+
+def predict_with_router(query: str) -> Any:
+    """
+    Predice la intención usando el IntentRouter compartido.
+
+    Args:
+        query: Texto a clasificar.
+
+    Returns:
+        Resultado retornado por el IntentRouter.
+    """
+    router = load_intent_router()
+    return router.predict(query)
+
+
+def predict_with_interpreter(query: str) -> Any:
+    """
+    Predice interpretaciones de series usando el SeriesInterpreter compartido.
+
+    Args:
+        query: Texto a interpretar.
+
+    Returns:
+        Resultado retornado por el SeriesInterpreter.
+    """
+    interpreter = load_series_interpreter()
+    return interpreter.predict(query)
+
+
+def predict_with_router_and_interpreter(query: str) -> Dict[str, Any]:
+    """Ejecuta predicción usando IntentRouter y SeriesInterpreter con caché global.
+
+    Args:
+        query: Texto a clasificar/interpetar.
+
+    Returns:
+        Dict con llaves `router` y `interpreter` conteniendo las respuestas de cada modelo.
+    """
+    router_out = predict_with_router(query)
+    interpreter_out = predict_with_interpreter(query)
+    return {"router": router_out, "interpreter": interpreter_out}
 
 
 # ============================================================

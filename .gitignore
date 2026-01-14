@@ -293,3 +293,9 @@ model/tokenizers/*
 !model/tokenizers/.gitkeep
 model/weights/*
 !model/weights/.gitkeep
+
+# ------------------------------------------------------------------------------
+# Model weights (downloaded from HuggingFace)
+# ------------------------------------------------------------------------------
+models/pibot_intent_router/pibot-intent-router/
+models/pibot_series_interpreter/pibot-jointbert/
