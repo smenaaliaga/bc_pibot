@@ -522,14 +522,14 @@ def get_slot_labels(args):
         label_file = os.path.join(model_dir, 'slot_label.txt')
         if os.path.exists(label_file):
             return [label.strip() for label in open(label_file, 'r', encoding='utf-8')]
-    # Fallback
+    # Fallback: 10 labels para coincidir con el modelo del commit e693d2b
     return [
         'O',
         'B-indicator', 'I-indicator',
         'B-frequency', 'I-frequency',
         'B-period', 'I-period',
         'B-component', 'I-component',
-        'B-seasonality', 'I-seasonality',
+        'B-seasonality',
     ]
 
 

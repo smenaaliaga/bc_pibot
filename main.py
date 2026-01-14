@@ -13,6 +13,12 @@ Ejecutar con:
 
 from typing import List, Dict, Optional
 import uuid
+import os
+import logging
+import datetime
+
+import streamlit as st
+from dotenv import load_dotenv
 
 from config import get_settings
 try:
@@ -20,14 +26,29 @@ try:
 except Exception:
     build_graph = None  # type: ignore
 from orchestrator.classifier.joint_bert_classifier import get_predictor
+from registry import warmup_models
 import app
-import logging
-import os
-import datetime
 
 
 def main() -> None:
     """Punto de entrada principal."""
+    # Cargar variables de entorno desde .env
+    load_dotenv()
+    
+    # Usar st.session_state para rastrear si ya se inicializó
+    if "app_initialized" in st.session_state:
+        # Ya se inicializó, solo ejecutar la app
+        settings = st.session_state.get("settings")
+        stream_fn = st.session_state.get("stream_fn")
+        invoke_fn = st.session_state.get("invoke_fn")
+        if all([settings, stream_fn, invoke_fn]):
+            app.run_app(
+                settings=settings,
+                stream_fn=stream_fn,
+                invoke_fn=invoke_fn,
+            )
+        return
+    
     # Configurar logger local por ejecución
     logs_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), "logs")
     os.makedirs(logs_dir, exist_ok=True)
@@ -47,8 +68,18 @@ def main() -> None:
         ],
         force=True,  # asegura un único set de handlers por ejecución/rerun
     )
-    # Reducir ruido de streaming HTTP (httpcore/httpx/openai) que imprime GeneratorExit al cerrar streams
-    for noisy in ["httpcore", "httpx", "openai"]:
+    # Reducir ruido de clientes HTTP/HF (urllib3, huggingface_hub, transformers, etc.)
+    for noisy in [
+        "httpcore",
+        "httpx",
+        "openai",
+        "urllib3",
+        "huggingface_hub",
+        "transformers",
+        "hf_transfer",
+        "datasets",
+        "sentence_transformers",
+    ]:
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
     class SessionFilter(logging.Filter):
@@ -66,13 +97,21 @@ def main() -> None:
 
     settings = get_settings()
 
-    # Pre-cargar modelo JointBERT (singleton global dentro de get_predictor)
-    logger.info("Inicializando predictor")
+    # # Pre-cargar modelo JointBERT (singleton global dentro de get_predictor)
+    # logger.info("Inicializando predictor")
+    # try:
+    #     get_predictor()  # fuerza la inicialización una sola vez
+    #     # logger.info("Predictor inicializado")
+    # except Exception as e:
+    #     logger.warning(f"Predictor no disponible: {e}")
+
+    # Warm-up de modelos (router + interpreter) para evitar recargas en reruns
+    # Leer PRELOAD_CATALOG de variables de entorno (default: False)
+    preload_catalog = os.getenv("PRELOAD_CATALOG", "0").lower() in {"1", "true", "yes", "on"}
     try:
-        get_predictor()  # fuerza la inicialización una sola vez
-        # logger.info("Predictor inicializado")
+        warmup_models(preload_catalog=preload_catalog)
     except Exception as e:
-        logger.warning(f"Predictor no disponible: {e}")
+        logger.warning(f"Warmup de modelos adicionales falló: {e}")
 
     orch = None
     graph = None
@@ -194,6 +233,12 @@ def main() -> None:
         logger.info(f"[INVOKE] question={question[:80]}")
         return "".join(stream_fn(question, history=history, session_id=None))
 
+    # Guardar en session_state para evitar reinicialización en reruns
+    st.session_state.settings = settings
+    st.session_state.stream_fn = stream_fn
+    st.session_state.invoke_fn = invoke_fn
+    st.session_state.app_initialized = True
+    
     # Delegar la construcción de la UI a app.py
     logger.info("Lanzando UI Streamlit")
     app.run_app(

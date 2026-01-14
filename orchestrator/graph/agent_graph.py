@@ -7,17 +7,21 @@ import logging
 import os
 import re
 import uuid
-from typing import Annotated, Any, Dict, Iterable, List, Optional, TypedDict
+from typing import Annotated, Any, Dict, Iterable, List, Optional, TypedDict, Tuple
 
 from langgraph.channels.topic import Topic
 from langgraph.graph import END, START, StateGraph
 from langgraph.runtime import get_runtime
 from langgraph.types import StreamWriter
 
+
 from orchestrator.classifier.classifier_agent import (
     build_intent_info,
     classify_question_with_history,
     ClassificationResult,
+    predict_with_interpreter,
+    predict_with_router,
+    predict_with_router_and_interpreter,
 )
 from orchestrator.classifier.intent_store import IntentStoreBase, create_intent_store
 from orchestrator.llm.llm_adapter import LLMAdapter, build_llm
@@ -441,94 +445,40 @@ def ingest_node(state: AgentState) -> AgentState:
     return next_state
 
 
-def classify_node(state: AgentState) -> AgentState:
+def intent_node(state: AgentState) -> AgentState:
+    """Nodo simple: usa IntentRouter y decide la ruta siguiente.
+
+    - value  -> data
+    - methodology -> rag
+    - otro  -> fallback
+    """
     question = state.get("question", "")
-    history = state.get("history") or []
-    try:
-        classification, history_text = classify_question_with_history(question, history)
-    except Exception:
-        logger.exception("[GRAPH] classify_question_with_history failed")
-        classification = ClassificationResult(intent="methodology")
-        history_text = ""
-    intent_info = build_intent_info(classification)
-    facts = state.get("facts") or {}
-    if facts:
-        intent_info = intent_info or {}
-        intent_info.setdefault("facts", facts)
-    _persist_intent_event(state, classification, intent_info)
-    
-    # Extraer entidades normalizadas desde clasificación para acceso transversal
-    normalized = getattr(classification, "normalized", None) or {}
-    period_ctx = None
-    indicator_ctx = None
-    component_ctx = None
-    seasonality_ctx = None
-    
-    if isinstance(normalized, dict):
-        # Period
-        period_obj = normalized.get("period")
-        if isinstance(period_obj, dict) and period_obj.get("firstdate") and period_obj.get("lastdate"):
-            period_ctx = period_obj
-        
-        # Indicator
-        ind_obj = normalized.get("indicator")
-        if isinstance(ind_obj, dict):
-            indicator_ctx = ind_obj.get("normalized") or ind_obj.get("label")
-        elif isinstance(ind_obj, str) and ind_obj.strip():
-            indicator_ctx = ind_obj.strip()
-        
-        # Component
-        comp_obj = normalized.get("component")
-        if isinstance(comp_obj, dict):
-            component_ctx = comp_obj.get("normalized") or comp_obj.get("label")
-        elif isinstance(comp_obj, str) and comp_obj.strip():
-            component_ctx = comp_obj.strip()
-        
-        # Seasonality
-        seas_obj = normalized.get("seasonality")
-        if isinstance(seas_obj, dict):
-            seasonality_ctx = seas_obj.get("normalized") or seas_obj.get("label")
-        elif isinstance(seas_obj, str) and seas_obj.strip():
-            seasonality_ctx = seas_obj.strip()
-    
-    # Persistir entidades resueltas en memoria (independiente del flujo de datos)
-    session_id = state.get("session_id")
+    session_id = state.get("session_id", "")
+
+    results = predict_with_router(question)
+    intent_label = getattr(getattr(results, "intent", None), "label", "") or ""
+
+    if intent_label == "value":
+        decision = "data"
+    elif intent_label == "methodology":
+        decision = "rag"
+    else:
+        decision = "fallback"
+
+    logger.info(
+        "[INTENT_NODE] PIBOT_INTENT_ROUTE | intent=%s | decision=%s",
+        intent_label,
+        decision,
+    )
+
+    # Persistir intención mínima en memoria (opcional)
     if session_id and _MEMORY:
         try:
-            to_save: Dict[str, Any] = {}
-            intent_val = getattr(classification, "intent", None)
-            if intent_val:
-                to_save["intent"] = str(intent_val)
-            if indicator_ctx:
-                to_save["indicator"] = indicator_ctx
-            if component_ctx:
-                to_save["component"] = component_ctx
-            if seasonality_ctx:
-                to_save["seasonality"] = seasonality_ctx
-            if period_ctx:
-                to_save["period"] = period_ctx
-            
-            if to_save:
-                _MEMORY.set_facts(session_id, to_save)
-                logger.debug(f"[CLASSIFY_NODE] Facts persistidos: {list(to_save.keys())}")
+            _MEMORY.set_facts(session_id, {"intent": intent_label})
         except Exception:
-            logger.debug("[CLASSIFY_NODE] Error al persistir facts", exc_info=True)
-    
-    result: AgentState = {
-        "classification": classification,
-        "history_text": history_text,
-        "intent_info": intent_info,
-    }
-    if period_ctx:
-        result["period_context"] = period_ctx
-    if indicator_ctx:
-        result["indicator_context"] = indicator_ctx
-    if component_ctx:
-        result["component_context"] = component_ctx
-    if seasonality_ctx:
-        result["seasonality_context"] = seasonality_ctx
-    
-    return result
+            logger.debug("[INTENT_NODE] Unable to persist intent fact", exc_info=True)
+
+    return {"route_decision": decision, "intent": intent_label}
 
 
 def _persist_intent_event(
@@ -697,22 +647,194 @@ def intent_shortcuts_node(state: AgentState, *, writer: Optional[StreamWriter] =
 
 
 def data_node(state: AgentState, *, writer: Optional[StreamWriter] = None):
+    """Nodo de datos: obtiene series económicas reales.
     
-    classification = state.get("classification")
-    session_id = state.get("session_id")
-        
-    if not classification:
+    Estado disponible:
+    - question: pregunta del usuario
+    - session_id: identificador de sesión
+    - facts: hechos acumulados en memoria
+    """
+    question = state.get("question", "")
+    session_id = state.get("session_id", "")
+    
+    # Usar predict_with_interpreter para obtener clasificación desde question
+    result = predict_with_interpreter(question)
+    
+    logger.info(
+        "[=====DATA_NODE=====] PIBOT_SERIES_INTERPRETER | %s",
+        vars(result) if hasattr(result, '__dict__') else result
+    )
+    
+    if not result:
         text = "[GRAPH] No se recibió clasificación para el nodo DATA."
+        logger.warning("[=====DATA_NODE=====] %s", text)
         _emit_stream_chunk(text, writer)
         return {"output": text}
     collected: List[str] = []
     chunk_filter = _StreamChunkFilter()
+    
+    # OBTENER FECHA
+    from orchestrator.data.date_parser import parse_point_date, parse_range
+    
+    parsed_point: Optional[str] = None
+    parsed_range: Optional[Tuple[str, str]] = None
+    if result.req_form.label == "point":
+        parsed_point = parse_point_date(question, result.frequency.label)
+        if not parsed_point:
+            logger.warning("[=====DATA_NODE=====] parse_point_date falló | question=%s | frequency=%s", question, result.frequency.label)
+        logger.info("[=====DATA_NODE=====] parse_point_date exitoso | parsed_point=%s | frequency=%s", parsed_point, result.frequency.label)
+    elif result.req_form.label == "range":
+        parsed_range = parse_range(question, result.frequency.label)
+        if not parsed_range:
+            logger.warning("[=====DATA_NODE=====] parse_range falló | question=%s | frequency=%s", question, result.frequency.label)
+        
+        logger.info("[=====DATA_NODE=====] parse_range exitoso | parsed_range=%s | frequency=%s", parsed_range, result.frequency.label)
+        
+    # OBTENER SERIES
+    from registry import get_catalog_service, get_bde_client
+    
+    catalog = get_catalog_service(catalog_path="catalog/series_catalog.json")
+    bde = get_bde_client()
+    
+    # Locate matching series in the catalog.
+    match = catalog.find_series(
+        indicator=result.indicator.label,
+        metric_type=result.metric_type.label,
+        seasonality=result.seasonality.label,
+        activity=result.activity.label,
+        frequency=result.frequency.label,
+    )
+    
+    logger.info(
+        "[=====DATA_NODE=====] catalog.find_series | match=%s",
+        match if match else "(no encontrado)"
+    )
+    
+    
+    # OBTENER DATOS
+    from orchestrator.data.common import normalize_series_obs
+    
+    # Fetch and normalize observations from BDE/local source.
+    obs = bde.fetch_series(match["id"])  # list of {date, value}
+    normalized = normalize_series_obs(obs, result.frequency.label)  # list of (datetime, float)
+    
+    # MOSTRAR DATOS
+    from orchestrator.data.variations import yoy as compute_yoy, prev_period as compute_prev, compute_variations_for_range
+    
+    if result.req_form.label == "latest":
+        d, v = normalized[-1]
+        output_dict = {"date": d.strftime("%d-%m-%Y"), "value": v}
+        if result.calc_mode.label == "yoy":
+            var = compute_yoy(normalized, d, v)
+            if var is not None:
+                output_dict["yoy"] = var
+        elif result.calc_mode.label == "prev_period":
+            var = compute_prev(normalized, d, v)
+            if var is not None:
+                output_dict["prev_period"] = var
+        payload = {
+            "intent": "value",
+            "classification": {
+                "indicator": result.indicator.label,
+                "metric_type": result.metric_type.label,
+                "seasonality": result.seasonality.label,
+                "activity": result.activity.label,
+                "frequency": result.frequency.label,
+                "calc_mode": result.calc_mode.label,
+                "req_form": result.req_form.label,
+            },
+            "series": match["id"],
+            "parsed_point": None,
+            "parsed_range": None,
+            "result": output_dict,
+        }
+        logger.info(f"[=====DATA_NODE=====] Result (latest): {payload}")
+        # return payload
+
+    elif result.req_form.label == "point":
+        # parsed_point already computed above
+        target_dt = datetime.datetime.strptime(parsed_point, "%d-%m-%Y")  # type: ignore[arg-type]
+        d_target = None
+        for d, v in normalized:
+            if d == target_dt:
+                d_target = d
+                v_target = v
+                break
+        if d_target is None:
+            return {"error": f"No existe observación para la fecha {parsed_point}."}
+        output_dict = {"date": d_target.strftime("%d-%m-%Y"), "value": v_target}
+        if result.calc_mode.label == "yoy":
+            var = compute_yoy(normalized, d_target, v_target)
+            if var is not None:
+                output_dict["yoy"] = var
+        elif result.calc_mode.label == "prev_period":
+            var = compute_prev(normalized, d_target, v_target)
+            if var is not None:
+                output_dict["prev_period"] = var
+        payload = {
+            "intent": "value",
+            "classification": {
+                "indicator": result.indicator.label,
+                "metric_type": result.metric_type.label,
+                "seasonality": result.seasonality.label,
+                "activity": result.activity.label,
+                "frequency": result.frequency.label,
+                "calc_mode": result.calc_mode.label,
+                "req_form": result.req_form.label,
+            },
+            "series": match["id"],
+            "parsed_point": parsed_point,
+            "parsed_range": None,
+            "result": output_dict,
+        }
+        logger.info(f"[=====DATA_NODE=====] Result (point): {payload}")
+        # return payload
+
+    elif result.req_form.label == "range":
+        # parsed_range already computed above
+        start_str, end_str = parsed_range  # type: ignore[misc]
+        from_dt = None
+        to_dt = None
+        
+        logger.info(f"[=====DATA_NODE=====] Attempting to parse range | start_str={start_str} end_str={end_str}")
+        
+        try:
+            from_dt = datetime.datetime.strptime(start_str, "%d-%m-%Y")
+            to_dt = datetime.datetime.strptime(end_str, "%d-%m-%Y")
+            logger.info(f"[=====DATA_NODE=====] Successfully parsed range dates | from_dt={from_dt} to_dt={to_dt}")
+        except Exception as e:
+            logger.error(f"[=====DATA_NODE=====] Failed to parse range dates | start_str={start_str} end_str={end_str} error={type(e).__name__}: {e}")
+            from_dt = normalized[0][0]
+            to_dt = normalized[-1][0]
+            logger.info(f"[=====DATA_NODE=====] Using fallback range (full history) | from_dt={from_dt} to_dt={to_dt}")
+
+        logger.info(f"[=====DATA_NODE=====] Calling compute_variations_for_range | normalized_size={len(normalized)} from_dt={from_dt} to_dt={to_dt}")
+        values = compute_variations_for_range(normalized, result.calc_mode.label, from_dt, to_dt)
+        logger.info(f"[=====DATA_NODE=====] Computed range values | count={len(values)} first_date={values[0]['date'] if values else 'N/A'} last_date={values[-1]['date'] if values else 'N/A'}")
+        
+        payload = {
+            "intent": "value",
+            "classification": {
+                "indicator": result.indicator.label,
+                "metric_type": result.metric_type.label,
+                "seasonality": result.seasonality.label,
+                "activity": result.activity.label,
+                "frequency": result.frequency.label,
+                "calc_mode": result.calc_mode.label,
+                "req_form": result.req_form.label,
+            },
+            "series": match["id"],
+            "parsed_point": None,
+            "parsed_range": parsed_range,
+            "result": values,
+        }
+        logger.info(f"[=====DATA_NODE=====] Result (range): payload with {len(values)} observations")
+
 
     try: 
-        # Invocar flujo de datos directamente: usa session_id para acceder a Redis,
-        # detecta serie y genera mensaje, tabla y marcador CSV
+        # Invocar flujo de datos directamente: usa payload con serie, clasificación y resultados ya procesados
         stream = flow_data.stream_data_flow(
-            classification,
+            payload,
             session_id=session_id,
         )
         # Consumir stream: valida chunks, filtra duplicados, emite en tiempo real,
@@ -723,13 +845,31 @@ def data_node(state: AgentState, *, writer: Optional[StreamWriter] = None):
                 collected.append(chunk_text)
                 _emit_stream_chunk(chunk_text, writer)
     except Exception:
-        logger.exception("[GRAPH] data route failed")
+        logger.exception("[DATA_NODE] Flujo fallido")
         if not collected:
             fallback = "Ocurrió un problema al obtener los datos solicitados."
             collected.append(fallback)
             _emit_stream_chunk(fallback, writer)
         return {"output": "".join(collected)}
 
+    # Guardar clasificación en memoria para reutilización en siguientes turnos
+    if _MEMORY and session_id:
+        try:
+            classification_facts = {
+                "indicator": result.indicator.label,
+                "metric_type": result.metric_type.label,
+                "seasonality": result.seasonality.label,
+                "activity": result.activity.label,
+                "frequency": result.frequency.label,
+                "calc_mode": result.calc_mode.label,
+                "req_form": result.req_form.label,
+            }
+            _MEMORY.set_facts(session_id, classification_facts)
+            logger.info("[DATA_NODE] Clasificación guardada en memoria | session=%s | facts=%s", session_id, list(classification_facts.keys()))
+        except Exception:
+            logger.debug("[DATA_NODE] Unable to persist classification facts", exc_info=True)
+
+    logger.info("[DATA_NODE] Completado | chunks=%d", len(collected))
     return {"output": "".join(collected)}
 
 
@@ -778,7 +918,35 @@ def _run_llm(
 
 
 def rag_node(state: AgentState, *, writer: Optional[StreamWriter] = None):
-    return _run_llm(state, _RAG_LLM, writer=writer)
+    """Nodo RAG: búsqueda y generación con contexto.
+    
+    Estado disponible:
+    - question: pregunta del usuario
+    - intent: intención clasificada (ej: 'methodology', 'definition')
+    - history: historial de conversación
+    - session_id: identificador de sesión
+    - facts: hechos acumulados en memoria
+    """
+    question = state.get("question", "")
+    intent = state.get("intent", "")
+    history = state.get("history", [])
+    session_id = state.get("session_id", "")
+    
+    logger.info(
+        "[RAG_NODE] Iniciando | intent=%s | question=%s | history_len=%d | session=%s",
+        intent,
+        question[:100] if question else "(vacío)",
+        len(history),
+        session_id[:12] if session_id else "(vacío)",
+    )
+    
+    result = _run_llm(state, _RAG_LLM, writer=writer)
+    
+    logger.info(
+        "[RAG_NODE] Completado | output_len=%d",
+        len(result.get("output", "")),
+    )
+    return result
 
 
 def fallback_node(state: AgentState, *, writer: Optional[StreamWriter] = None):
@@ -895,27 +1063,11 @@ def _maybe_clear_chart_state(session_id: str, prior_facts: Optional[Dict[str, st
         logger.debug("[GRAPH] Unable to clear chart facts", exc_info=True)
 
 
-def route_decider(state: AgentState) -> str:
-    decision = _ensure_text(state.get("route_decision", "")).strip()
-    if decision:
-        return decision
-    classification = state.get("classification")
-    intent = _ensure_text(getattr(classification, "intent", "")).lower()
-    
-    # Mapeo de intenciones a rutas
-    if intent in ('value', 'data', 'last', 'table'):
-        return "data"
-    if intent in ('methodology', 'definition', 'greeting'):
-        return "rag"
-    return "fallback"
-
-
 def build_graph():
     _ensure_backends()
     builder = StateGraph(AgentState)
     builder.add_node("ingest", ingest_node)
-    builder.add_node("classify", classify_node)
-    builder.add_node("intent_shortcuts", intent_shortcuts_node)
+    builder.add_node("intent", intent_node)
     builder.add_node("direct", direct_node)
     builder.add_node("data", data_node)
     builder.add_node("rag", rag_node)
@@ -923,19 +1075,13 @@ def build_graph():
     builder.add_node("memory", memory_node)
 
     builder.add_edge(START, "ingest")
-    builder.add_edge("ingest", "classify")
-    builder.add_edge("classify", "intent_shortcuts")
+    builder.add_edge("ingest", "intent")
+    # intent_node ya decide la ruta (data, rag o fallback) y la pone en route_decision
     builder.add_conditional_edges(
-        "intent_shortcuts",
-        route_decider,
-        {
-            "direct": "direct",
-            "data": "data",
-            "rag": "rag",
-            "fallback": "fallback",
-        },
+        "intent",
+        lambda state: state.get("route_decision", "fallback"),
+        {"data": "data", "rag": "rag", "fallback": "fallback"},
     )
-    builder.add_edge("direct", "memory")
     builder.add_edge("data", "memory")
     builder.add_edge("rag", "memory")
     builder.add_edge("fallback", "memory")
@@ -948,6 +1094,5 @@ def build_graph():
 __all__ = [
     "AgentState",
     "build_graph",
-    "route_decider",
     "_yield_openai_stream_chunks",
 ]
