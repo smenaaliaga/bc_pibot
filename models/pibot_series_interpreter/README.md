@@ -21,7 +21,7 @@ Este modelo clasifica 7 dimensiones de la consulta:
 El modelo `pibot-jointbert` (7-head JointBERT) está disponible en HuggingFace. **Sin descargarlo, el sistema funciona en modo heurístico**.
 
 ```bash
-huggingface-cli download smenaaliaga/pibot-jointbert \
+hf download smenaaliaga/pibot-jointbert \
   --local-dir ./src/models/pibot_series_interpreter/pibot-jointbert
 ```
 

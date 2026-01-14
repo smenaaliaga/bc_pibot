@@ -67,14 +67,16 @@ Por defecto usa **modo heurístico** (reglas). Para mayor precisión, descarga l
 
 ```bash
 # Autenticación
-huggingface-cli login
+hf login
 
 # IntentRouter (SentenceTransformer + LogisticRegression)
-huggingface-cli download smenaaliaga/pibot-intent-router \
+hf download sentence-transformers/all-MiniLM-L6-v2 --local-dir ./models/pibot_intent_router/all-MiniLM-L6-v2
+
+hf download smenaaliaga/pibot-intent-router \
   --local-dir ./models/pibot_intent_router/pibot-intent-router
 
 # SeriesInterpreter (JointBERT multi-head)
-huggingface-cli download smenaaliaga/pibot-jointbert \
+hf download smenaaliaga/pibot-jointbert \
   --local-dir ./models/pibot_series_interpreter/pibot-jointbert
 ```
 

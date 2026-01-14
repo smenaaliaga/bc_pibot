@@ -297,5 +297,6 @@ model/weights/*
 # ------------------------------------------------------------------------------
 # Model weights (downloaded from HuggingFace)
 # ------------------------------------------------------------------------------
+models/pibot_intent_router/all-MiniLM-L6-v2/
 models/pibot_intent_router/pibot-intent-router/
 models/pibot_series_interpreter/pibot-jointbert/

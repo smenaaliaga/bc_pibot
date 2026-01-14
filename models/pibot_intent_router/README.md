@@ -8,12 +8,16 @@ Este modelo predice 2 dimensiones:
 - `intent`: `value` (quiere datos) | `methodology` (quiere explicacion)
 - `context_mode`: `standalone` (pregunta nueva) | `followup` (continuacion)
 
-## Descargar modelo (opcional)
+## Descargar modelo
 
 Sin descargar, funciona en modo heuristico. Para mayor precision (ML):
+
 ```bash
-huggingface-cli login
-huggingface-cli download smenaaliaga/pibot-intent-router \
+hf login
+
+hf download sentence-transformers/all-MiniLM-L6-v2 --local-dir ./models/pibot_intent_router/all-MiniLM-L6-v2
+
+hf download smenaaliaga/pibot-intent-router \
   --local-dir ./src/models/pibot_intent_router/pibot-intent-router
 ```
 Esto deja los pesos en `pibot-intent-router/`:

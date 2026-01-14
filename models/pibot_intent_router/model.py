@@ -67,8 +67,8 @@ class IntentRouter(BaseClassifier):
             base_dir = Path(__file__).parent
             model_dir = base_dir / model_path
         
-        # Cargar embedder
-        embedder = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+        # Cargar embedder local: sentence-transformers/all-MiniLM-L6-v2
+        embedder = SentenceTransformer('./models/pibot_intent_router/all-MiniLM-L6-v2')
         
         # Cargar clasificadores
         intent_clf_path = model_dir / "intent_clf.joblib"
