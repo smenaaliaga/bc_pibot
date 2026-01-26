@@ -122,7 +122,8 @@ def stream_data_flow(
                 'series': 'F032.IMC.IND.Z.Z.EP18.Z.Z.0.M',
                 'parsed_point': 'DD-MM-YYYY' or None,  # fecha específica para point
                 'parsed_range': ('DD-MM-YYYY', 'DD-MM-YYYY') or None,  # rango para range
-                'result': [...]  # datos ya procesados (dict para latest/point, lista para range)
+                'result': [...],  # datos ya procesados (dict para latest/point, lista para range)
+                'source_url': 'https://...'  # URL de la fuente
             }
         session_id: Identificador de sesión (opcional)
     """
@@ -135,6 +136,8 @@ def stream_data_flow(
     req_form = classification_dict.get("req_form", "latest")
     parsed_point = payload.get("parsed_point")  # DD-MM-YYYY o None
     parsed_range = payload.get("parsed_range")  # Tupla (DD-MM-YYYY, DD-MM-YYYY) o None
+    all_series_data = payload.get("all_series_data")  # Lista con todas las series (para contribución con activity=none)
+    source_url = payload.get("source_url")  # URL de la fuente
     
     if not series_id:
         logger.error("[STREAM_DATA_FLOW] No se encontró 'series' en payload")
@@ -194,6 +197,13 @@ def stream_data_flow(
         elif seasonality_context_val.lower() != "nsa":
             indicator_parts.append(seasonality_context_val.strip())
     final_indicator_name = " ".join(indicator_parts).strip() if indicator_parts else "indicador"
+    
+    # Determinar si component_context_val es una actividad concreta o no
+    is_specific_activity = (
+        isinstance(component_context_val, str)
+        and component_context_val.strip()
+        and component_context_val.lower() not in {"none", "total", ""}
+    )
 
     # Flag para lógica especial de contribución
     is_contribution = (
@@ -285,11 +295,72 @@ def stream_data_flow(
             prefer_yoy = seasonality_lower == "nsa"
             contrib_label = "contribución interanual" if prefer_yoy else "contribución vs período anterior"
             contrib_value = row.get("value")
-
-            llm_prompt_parts.append(f"El usuario preguntó por la contribución de {final_indicator_name} en {display_period_label}.")
-            llm_prompt_parts.append(f"Cierre: {contrib_label} de {_format_percentage(contrib_value)} (1 decimal).")
-            llm_prompt_parts.append("")
-            llm_prompt_parts.append("TAREA: Reporta solo la contribución (porcentaje, 1 decimal). No menciones el valor absoluto del índice. Máximo 2 oraciones. Neutral y factual.")
+            
+            # Determinar si debemos mencionar la actividad específica (con all_series_data)
+            if is_specific_activity and all_series_data:
+                # Caso especial: tenemos todas las series de contribución
+                # Buscar el valor del IMACEC total
+                imacec_total_value = None
+                for s in all_series_data:
+                    if s.get("activity", "").lower() == "total":
+                        imacec_total_value = s.get("value")
+                        break
+                
+                # Nombre de la actividad ganadora (normalizar a lenguaje natural)
+                activity_name_raw = component_context_val.strip().replace("_", " ")
+                
+                # Mapear actividades a nombres más naturales para la redacción
+                activity_name_mapping = {
+                    "no minero": "no minera",
+                    "minero": "minera",
+                    "bienes": "producción de bienes",
+                    "industria": "industria manufacturera",
+                    "resto bienes": "resto de bienes",
+                    "comercio": "comercio",
+                    "servicios": "servicios",
+                    "impuestos sobre los productos": "impuestos sobre los productos",
+                }
+                activity_name = activity_name_mapping.get(activity_name_raw.lower(), activity_name_raw)
+                
+                # Construir prompt para frase natural siguiendo el patrón
+                llm_prompt_parts.append(f"CONTEXTO:")
+                llm_prompt_parts.append(f"- Indicador: {indicator_context_val.upper()}")
+                llm_prompt_parts.append(f"- Período: {display_period_label}")
+                llm_prompt_parts.append(f"- Variación total: {_format_percentage(imacec_total_value) if imacec_total_value else 'N/A'}")
+                llm_prompt_parts.append(f"- Actividad con mayor contribución: {activity_name}")
+                llm_prompt_parts.append(f"- Valor de contribución: {_format_percentage(contrib_value)}")
+                llm_prompt_parts.append("")
+                llm_prompt_parts.append("TAREA:")
+                llm_prompt_parts.append("Redacta 2 oraciones siguiendo esta estructura (sin usar comillas):")
+                llm_prompt_parts.append("")
+                llm_prompt_parts.append("Primera oración:")
+                llm_prompt_parts.append(f"- Inicia con: De acuerdo con la BDE, el {indicator_context_val.upper()} de [período] creció [variación] en comparación con igual mes del año anterior (ver tabla).")
+                llm_prompt_parts.append("")
+                llm_prompt_parts.append("Segunda oración:")
+                llm_prompt_parts.append(f"- Explica: El resultado del {indicator_context_val.upper()} se explicó por el crecimiento de la actividad [nombre actividad] con una contribución de [valor].")
+                llm_prompt_parts.append("")
+                llm_prompt_parts.append("IMPORTANTE:")
+                llm_prompt_parts.append("- NO uses comillas en el texto")
+                llm_prompt_parts.append("- Redacta de forma natural y fluida")
+                llm_prompt_parts.append(f"- Para el período usa: {display_period_label}")
+                llm_prompt_parts.append(f"- Para la variación usa: {_format_percentage(imacec_total_value) if imacec_total_value else 'N/A'}")
+                llm_prompt_parts.append(f"- Para la actividad usa una forma natural de: {activity_name}")
+                llm_prompt_parts.append(f"- Para la contribución usa: {_format_percentage(contrib_value)}")
+                llm_prompt_parts.append("- Si el valor es negativo, cambia 'creció' por 'decreció' o 'cayó'")
+                llm_prompt_parts.append("- Ajusta el género de la actividad (ej: 'la actividad minera', 'el comercio', 'los servicios')")
+            elif is_specific_activity:
+                # Tenemos una actividad específica pero sin all_series_data
+                activity_name = component_context_val.strip().replace("_", " ")
+                llm_prompt_parts.append(f"El usuario preguntó cuál actividad contribuyó más al crecimiento del {indicator_context_val.upper()} en {display_period_label}.")
+                llm_prompt_parts.append(f"La actividad con mayor contribución fue: {activity_name}, con {_format_percentage(contrib_value)} (1 decimal).")
+                llm_prompt_parts.append("")
+                llm_prompt_parts.append(f"TAREA: Responde indicando que {activity_name} fue la actividad que más contribuyó al crecimiento del {indicator_context_val.upper()} en {display_period_label}, con una contribución de {_format_percentage(contrib_value)}. Máximo 2 oraciones. Neutral y factual.")
+            else:
+                # No hay actividad específica: respuesta genérica
+                llm_prompt_parts.append(f"El usuario preguntó por la contribución de {final_indicator_name} en {display_period_label}.")
+                llm_prompt_parts.append(f"Cierre: {contrib_label} de {_format_percentage(contrib_value)} (1 decimal).")
+                llm_prompt_parts.append("")
+                llm_prompt_parts.append("TAREA: Reporta solo la contribución (porcentaje, 1 decimal). No menciones el valor absoluto del índice. Máximo 2 oraciones. Neutral y factual.")
         else:
             row = obs_to_show[0]
             var_value = row.get("yoy") if "yoy" in row else row.get("prev_period")
@@ -324,7 +395,62 @@ def stream_data_flow(
         yield "\n\n"
     
     # Tabla markdown - mostrar todas las filas para range, una para latest
-    if is_contribution:
+    if is_contribution and all_series_data:
+        # Construir tabla completa con todas las series de contribución
+        yield f"Actividad | Contribución (a/a)\n"
+        yield f"----------|-------------------\n"
+        
+        # Mapear nombres de actividades a nombres legibles y definir orden
+        activity_display_names = {
+            "total": "IMACEC",
+            "bienes": "Producción de bienes",
+            "minero": "  Minería",
+            "industria": "  Industria manufacturera",
+            "resto_bienes": "  Resto de bienes",
+            "comercio": "Comercio",
+            "servicios": "Servicios",
+            "impuestos sobre los productos": "Impuestos sobre los productos",
+            "no_minero": "IMACEC No Minero",
+        }
+        
+        # Ordenar según el orden deseado (como en la imagen)
+        activity_order = [
+            "total", "bienes", "minero", "industria", "resto_bienes",
+            "comercio", "servicios", "impuestos sobre los productos", "no_minero"
+        ]
+        
+        # Crear un diccionario para acceso rápido por actividad
+        series_by_activity = {s["activity"]: s for s in all_series_data}
+        
+        # Encontrar la actividad con el mayor valor (excluyendo "total")
+        max_activity = None
+        max_value = float("-inf")
+        for s in all_series_data:
+            activity = s.get("activity", "")
+            value = s.get("value", 0)
+            if activity and activity.lower() != "total" and value > max_value:
+                max_value = value
+                max_activity = activity
+        
+        # Mostrar en el orden correcto
+        for activity_key in activity_order:
+            if activity_key in series_by_activity:
+                series_info = series_by_activity[activity_key]
+                display_name = activity_display_names.get(activity_key, activity_key)
+                value = series_info.get("value", 0)
+                
+                # Marcar en negrita si es la actividad con mayor contribución
+                if activity_key == max_activity:
+                    yield f"**{display_name}** | **{_format_percentage(value)}**\n"
+                else:
+                    yield f"{display_name} | {_format_percentage(value)}\n"
+        
+        # Agregar nota en itálica después de la tabla
+        yield "\n"
+        yield "_Tasa de variación porcentual_\n"
+        
+    elif is_contribution:
+        # Tabla simple para contribución (cuando no hay all_series_data)
         yield f"Periodo | Contribución\n"
         yield f"--------|---------------\n"
         for row in obs_to_show:
@@ -343,16 +469,23 @@ def stream_data_flow(
             yield f"{period_label} | {_format_value(value)} | {_format_percentage(var_value)}\n"
     yield "\n"
     
-    # Fuente
-    if indicator_context_val == "imacec":
-        yield r"\* _Índice_" + "\n\n"
+    # Fuente y nota
+    if is_contribution and all_series_data:
+        # Para tabla de contribuciones, no mostrar nota de unidades
+        bde_url = source_url if source_url else "https://si3.bcentral.cl/siete"
+        yield f"**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)]({bde_url}) del Banco Central de Chile."
     else:
-        yield r"\* _Miles de millones de pesos_" + "\n\n"
+        # Fuente con nota de unidades
+        if indicator_context_val == "imacec":
+            yield r"\* _Índice_" + "\n\n"
+        else:
+            yield r"\* _Miles de millones de pesos_" + "\n\n"
+        
+        bde_url = source_url if source_url else "https://si3.bcentral.cl/siete"
+        yield f"**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)]({bde_url}) del Banco Central de Chile."
     
-    yield f"**Fuente:** Banco Central de Chile (BDE)"
-    
-    # CSV download marker solo si no es range (para range, demasiadas filas)
-    if req_form != "range" and obs_to_show:
+    # CSV download marker solo si no es range y no es tabla de contribuciones completa
+    if req_form != "range" and obs_to_show and not (is_contribution and all_series_data):
         first_row = obs_to_show[0]
         var_value = first_row.get("yoy") if "yoy" in first_row else first_row.get("prev_period")
         var_label = "Variación anual" if "yoy" in first_row else "Variación período anterior"

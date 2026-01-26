@@ -8,7 +8,8 @@
       "seasonality": "nsa",
       "activity": "total",
       "frequency": "m"
-    }
+    },
+    "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_01_A&idSerie=F032.IMC.IND.Z.Z.EP18.Z.Z.0.M"
   },
   {
     "id": "F032.IMC.IND.Z.Z.EP18.PB.Z.0.M",
@@ -19,7 +20,8 @@
       "seasonality": "nsa",
       "activity": "bienes",
       "frequency": "m"
-    }
+    },
+    "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_01_A&idSerie=F032.IMC.IND.Z.Z.EP18.PB.Z.0.M"
   },
   {
     "id": "F032.IMC.IND.Z.Z.EP18.03.Z.0.M",
@@ -30,7 +32,8 @@
       "seasonality": "nsa",
       "activity": "minero",
       "frequency": "m"
-    }
+    },
+    "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_01_A&idSerie=F032.IMC.IND.Z.Z.EP18.03.Z.0.M"
   },
   {
     "id": "F032.IMC.IND.Z.Z.EP18.04.Z.0.M",
@@ -41,7 +44,8 @@
       "seasonality": "nsa",
       "activity": "industria",
       "frequency": "m"
-    }
+    },
+    "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_01_A&idSerie=F032.IMC.IND.Z.Z.EP18.04.Z.0.M"
   },
   {
     "id": "F032.IMC.IND.Z.Z.EP18.RB.Z.0.M",
@@ -52,7 +56,8 @@
       "seasonality": "nsa",
       "activity": "resto_bienes",
       "frequency": "m"
-    }
+    },
+    "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_01_A&idSerie=F032.IMC.IND.Z.Z.EP18.RB.Z.0.M"
   },
   {
     "id": "F032.IMC.IND.Z.Z.EP18.COM.Z.0.M",
@@ -63,7 +68,8 @@
       "seasonality": "nsa",
       "activity": "comercio",
       "frequency": "m"
-    }
+    },
+    "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_01_A&idSerie=F032.IMC.IND.Z.Z.EP18.COM.Z.0.M"
   },
   {
     "id": "F032.IMC.IND.Z.Z.EP18.SERV.Z.0.M",
@@ -74,7 +80,8 @@
       "seasonality": "nsa",
       "activity": "servicios",
       "frequency": "m"
-    }
+    },
+    "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_01_A&idSerie=F032.IMC.IND.Z.Z.EP18.SERV.Z.0.M"
   },
   {
     "id": "F032.ICF.IND.Z.Z.EP18.Z.Z.0.M",
@@ -85,7 +92,8 @@
       "seasonality": "nsa",
       "activity": "a costo de factores",
       "frequency": "m"
-    }
+    },
+    "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_01_A&idSerie=F032.ICF.IND.Z.Z.EP18.Z.Z.0.M"
   },
   {
     "id": "F032.IMC.IND.Z.Z.EP18.IMP.Z.0.M",
@@ -96,7 +104,8 @@
       "seasonality": "nsa",
       "activity": "impuestos sobre los productos",
       "frequency": "m"
-    }
+    },
+    "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_01_A&idSerie=F032.IMC.IND.Z.Z.EP18.IMP.Z.0.M"
   },
   {
     "id": "F032.IMC.IND.Z.Z.EP18.N03.Z.0.M",
@@ -107,7 +116,8 @@
       "seasonality": "nsa",
       "activity": "no_minero",
       "frequency": "m"
-    }
+    },
+    "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_01_A&idSerie=F032.IMC.IND.Z.Z.EP18.N03.Z.0.M"
   },
   {
     "id": "F032.IMC.IND.Z.Z.EP18.Z.Z.1.M",
@@ -118,7 +128,8 @@
       "seasonality": "sa",
       "activity": "total",
       "frequency": "m"
-    }
+    },
+    "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_03_A&idSerie=F032.IMC.IND.Z.Z.EP18.Z.Z.1.M"
   },
   {
     "id": "F032.IMC.IND.Z.Z.EP18.PB.Z.1.M",
@@ -129,7 +140,8 @@
       "seasonality": "sa",
       "activity": "bienes",
       "frequency": "m"
-    }
+    },
+    "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_03_A&idSerie=F032.IMC.IND.Z.Z.EP18.PB.Z.1.M"
   },
   {
     "id": "F032.IMC.IND.Z.Z.EP18.03.Z.1.M",
@@ -140,7 +152,8 @@
       "seasonality": "sa",
       "activity": "minero",
       "frequency": "m"
-    }
+    },
+    "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_03_A&idSerie=F032.IMC.IND.Z.Z.EP18.03.Z.1.M"
   },
   {
     "id": "F032.IMC.IND.Z.Z.EP18.04.Z.1.M",
@@ -151,7 +164,8 @@
       "seasonality": "sa",
       "activity": "industria",
       "frequency": "m"
-    }
+    },
+    "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_03_A&idSerie=F032.IMC.IND.Z.Z.EP18.04.Z.1.M"
   },
   {
     "id": "F032.IMC.IND.Z.Z.EP18.RB.Z.1.M",
@@ -162,7 +176,8 @@
       "seasonality": "sa",
       "activity": "resto_bienes",
       "frequency": "m"
-    }
+    },
+    "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_03_A&idSerie=F032.IMC.IND.Z.Z.EP18.RB.Z.1.M"
   },
   {
     "id": "F032.IMC.IND.Z.Z.EP18.COM.Z.1.M",
@@ -173,7 +188,8 @@
       "seasonality": "sa",
       "activity": "comercio",
       "frequency": "m"
-    }
+    },
+    "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_03_A&idSerie=F032.IMC.IND.Z.Z.EP18.COM.Z.1.M"
   },
   {
     "id": "F032.IMC.IND.Z.Z.EP18.SERV.Z.1.M",
@@ -184,7 +200,8 @@
       "seasonality": "sa",
       "activity": "servicios",
       "frequency": "m"
-    }
+    },
+    "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_03_A&idSerie=F032.IMC.IND.Z.Z.EP18.SERV.Z.1.M"
   },
   {
     "id": "F032.ICF.IND.Z.Z.EP18.Z.Z.1.M",
@@ -195,7 +212,8 @@
       "seasonality": "sa",
       "activity": "a costo de factores",
       "frequency": "m"
-    }
+    },
+    "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_03_A&idSerie=F032.ICF.IND.Z.Z.EP18.Z.Z.1.M"
   },
   {
     "id": "F032.IMC.IND.Z.Z.EP18.IMP.Z.1.M",
@@ -206,7 +224,8 @@
       "seasonality": "sa",
       "activity": "impuestos sobre los productos",
       "frequency": "m"
-    }
+    },
+    "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_03_A&idSerie=F032.IMC.IND.Z.Z.EP18.IMP.Z.1.M"
   },
   {
     "id": "F032.IMC.IND.Z.Z.EP18.N03.Z.1.M",
@@ -217,7 +236,8 @@
       "seasonality": "sa",
       "activity": "no_minero",
       "frequency": "m"
-    }
+    },
+    "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_03_A&idSerie=F032.IMC.IND.Z.Z.EP18.N03.Z.1.M"
   },
   {
     "id": "F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
@@ -228,7 +248,8 @@
       "seasonality": "nsa",
       "activity": "pib",
       "frequency": "q"
-    }
+    },
+    "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_P0_V2&idSerie=F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T"
   },
   {
     "id": "F032.PIB.FLU.N.CLP.EP18.03.Z.0.T",
@@ -239,7 +260,8 @@
       "seasonality": "nsa",
       "activity": "minero",
       "frequency": "q"
-    }
+    },
+    "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_P1&idSerie=F032.PIB.FLU.N.CLP.EP18.03.Z.0.T"
   },
   {
     "id": "F032.PIB.FLU.N.CLP.EP18.Z.Z.1.T",
@@ -250,7 +272,8 @@
       "seasonality": "sa",
       "activity": "pib",
       "frequency": "q"
-    }
+    },
+    "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_P1_DES&idSerie=F032.PIB.FLU.N.CLP.EP18.Z.Z.1.T"
   },
   {
     "id": "F032.PIB.FLU.N.CLP.EP18.03.Z.1.T",
@@ -261,11 +284,103 @@
       "seasonality": "sa",
       "activity": "minero",
       "frequency": "q"
-    }
+    },
+    "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_P1_DES&idSerie=F032.PIB.FLU.N.CLP.EP18.03.Z.1.T"
+  },
+  {
+    "id": "F032.IMC.V12.Z.Z.2018.Z.Z.0.M",
+    "title": "Imacec, contribución año/año, referencia 2018",
+    "classification": {
+      "indicator": "imacec",
+      "metric_type": "contribution",
+      "seasonality": "nsa",
+      "activity": "total",
+      "frequency": "m",
+      "calc_mode": "yoy"
+    },
+    "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_02_B&idSerie=F032.IMC.V12.Z.Z.2018.Z.Z.0.M"
+  },
+  {
+    "id": "F032.IMC.V12.Z.Z.2018.PB.Z.0.M",
+    "title": "Imacec producción de bienes, contribución año/año, referencia 2018",
+    "classification": {
+      "indicator": "imacec",
+      "metric_type": "contribution",
+      "seasonality": "nsa",
+      "activity": "bienes",
+      "frequency": "m",
+      "calc_mode": "yoy"
+    },
+    "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_02_B&idSerie=F032.IMC.V12.Z.Z.2018.PB.Z.0.M"
+  },
+  {
+    "id": "F032.IMC.V12.Z.Z.2018.04.Z.0.M",
+    "title": "Imacec industria, contribución año/año, referencia 2018",
+    "classification": {
+      "indicator": "imacec",
+      "metric_type": "contribution",
+      "seasonality": "nsa",
+      "activity": "industria",
+      "frequency": "m",
+      "calc_mode": "yoy"
+    },
+    "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_02_B&idSerie=F032.IMC.V12.Z.Z.2018.04.Z.0.M"
+  },
+  {
+    "id": "F032.IMC.V12.Z.Z.2018.RB.Z.0.M",
+    "title": "Imacec resto de bienes, contribución año/año, referencia 2018",
+    "classification": {
+      "indicator": "imacec",
+      "metric_type": "contribution",
+      "seasonality": "nsa",
+      "activity": "resto_bienes",
+      "frequency": "m",
+      "calc_mode": "yoy"
+    },
+    "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_02_B&idSerie=F032.IMC.V12.Z.Z.2018.RB.Z.0.M"
+  },
+  {
+    "id": "F032.IMC.V12.Z.Z.2018.COM.Z.0.M",
+    "title": "Imacec comercio, contribución año/año, referencia 2018",
+    "classification": {
+      "indicator": "imacec",
+      "metric_type": "contribution",
+      "seasonality": "nsa",
+      "activity": "comercio",
+      "frequency": "m",
+      "calc_mode": "yoy"
+    },
+    "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_02_B&idSerie=F032.IMC.V12.Z.Z.2018.COM.Z.0.M"
+  },
+  {
+    "id": "F032.IMC.V12.Z.Z.2018.SERV.Z.0.M",
+    "title": "Imacec servicios, contribución año/año, referencia 2018",
+    "classification": {
+      "indicator": "imacec",
+      "metric_type": "contribution",
+      "seasonality": "nsa",
+      "activity": "servicios",
+      "frequency": "m",
+      "calc_mode": "yoy"
+    },
+    "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_02_B&idSerie=F032.IMC.V12.Z.Z.2018.SERV.Z.0.M"
+  },
+  {
+    "id": "F032.IMC.V12.Z.Z.2018.IMP.Z.0.M",
+    "title": "Imacec impuestos sobre los productos, contribución año/año, referencia 2018",
+    "classification": {
+      "indicator": "imacec",
+      "metric_type": "contribution",
+      "seasonality": "nsa",
+      "activity": "impuestos sobre los productos",
+      "frequency": "m",
+      "calc_mode": "yoy"
+    },
+    "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_02_B&idSerie=F032.IMC.V12.Z.Z.2018.IMP.Z.0.M"
   },
   {
     "id": "F032.IMC.V12.Z.Z.2018.03.Z.0.M",
-    "title": "Imacec minero, contribución año/ año, referencia 2018",
+    "title": "Imacec minero, contribución año/año, referencia 2018",
     "classification": {
       "indicator": "imacec",
       "metric_type": "contribution",
@@ -273,11 +388,12 @@
       "activity": "minero",
       "frequency": "m",
       "calc_mode": "yoy"
-    }
+    },
+    "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_02_B&idSerie=F032.IMC.V12.Z.Z.2018.03.Z.0.M"
   },
   {
     "id": "F032.IMC.V12.Z.Z.2018.N03.Z.0.M",
-    "title": "Imacec no minero, contribución año/ año, referencia 2018",
+    "title": "Imacec no minero, contribución año/año, referencia 2018",
     "classification": {
       "indicator": "imacec",
       "metric_type": "contribution",
@@ -285,6 +401,7 @@
       "activity": "no_minero",
       "frequency": "m",
       "calc_mode": "yoy"
-    }
+    },
+    "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_02_B&idSerie=F032.IMC.V12.Z.Z.2018.N03.Z.0.M"
   }
 ]

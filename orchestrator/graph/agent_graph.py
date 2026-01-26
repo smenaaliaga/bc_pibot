@@ -445,8 +445,60 @@ def ingest_node(state: AgentState) -> AgentState:
     return next_state
 
 
+def _has_contribution_keywords(question: str) -> bool:
+    """Detecta palabras clave relacionadas con contribución/explicación/impacto.
+    
+    Normaliza el texto (sin tildes, minúsculas) y busca palabras relacionadas con:
+    - Impulso/Impacto: impulso, impulsan, impulsaron, impacto, impactos
+    - Explicación: explico, explican, explicaron, explicacion
+    - Incidencia: incidio, inciden, incidencia, incidencias
+    - Contribución: contribuyen, contribuyeron, contribucion, aporte, aportes, aportan
+    - Efecto: efecto, efectos
+    - Variación: variacion, cambio, cambios
+    - Caida/Aumento: caida, aumento, incremento, decremento, disminucion
+    - Comportamiento: comportamiento, comportamientos, evolucion
+    
+    Función momentánea para clasificación.
+    """
+    if not question:
+        return False
+    
+    # Normalizar: remover tildes y convertir a minúsculas
+    import unicodedata
+    
+    def normalize_text(text: str) -> str:
+        # Remover acentos/tildes
+        nfd = unicodedata.normalize('NFD', text)
+        without_accents = ''.join(c for c in nfd if unicodedata.category(c) != 'Mn')
+        return without_accents.lower()
+    
+    normalized_question = normalize_text(question)
+    
+    # Palabras clave relacionadas con contribución, impacto, explicación
+    keywords = [
+        # Impulso/Impacto
+        "impulso", "impulsan", "impulsaron", "impulso",
+        "impacto", "impactos",
+        # Explicación
+        "explico", "explican", "explicaron", "explicacion", "explique",
+        # Incidencia
+        "incidio", "inciden", "incidencia", "incidencias",
+        # Contribución
+        "contribuyen", "contribuyeron", "contribuyo", "contribucion", 
+        "aporte", "aportes", "portacion", "aportan", "aportaron",
+    ]
+    
+    for keyword in keywords:
+        if keyword in normalized_question:
+            return True
+    return False
+
+
 def intent_node(state: AgentState) -> AgentState:
     """Nodo simple: usa IntentRouter y decide la ruta siguiente.
+
+    Primero realiza la predicción con predict_with_router, luego evalúa si existen
+    palabras clave de contribución/impacto. Si las hay, fuerza el resultado a "value".
 
     - value  -> data
     - methodology -> rag
@@ -455,8 +507,17 @@ def intent_node(state: AgentState) -> AgentState:
     question = state.get("question", "")
     session_id = state.get("session_id", "")
 
+    # Obtener predicción del router
     results = predict_with_router(question)
     intent_label = getattr(getattr(results, "intent", None), "label", "") or ""
+
+    # Si la pregunta contiene palabras clave de contribución, forzar a "value"
+    if _has_contribution_keywords(question):
+        intent_label = "value"
+        logger.info(
+            "[INTENT_NODE] Contribution keywords detected, forcing 'value' | question=%s",
+            question[:100],
+        )
 
     if intent_label == "value":
         decision = "data"
@@ -692,34 +753,159 @@ def data_node(state: AgentState, *, writer: Optional[StreamWriter] = None):
         
     # OBTENER SERIES
     from registry import get_catalog_service, get_bde_client
+    from orchestrator.data.common import normalize_series_obs
     
     catalog = get_catalog_service(catalog_path="catalog/series_catalog.json")
     bde = get_bde_client()
     
-    # Locate matching series in the catalog.
-    match = catalog.find_series(
-        indicator=result.indicator.label,
-        metric_type=result.metric_type.label,
-        seasonality=result.seasonality.label,
-        activity=result.activity.label,
-        frequency=result.frequency.label,
+    # Special case: if metric_type=contribution and activity=none, get all contribution series by activity
+    is_contribution_all_activities = (
+        result.metric_type.label == "contribution"
+        and (not result.activity.label or result.activity.label.lower() == "none")
     )
     
-    logger.info(
-        "[=====DATA_NODE=====] catalog.find_series | match=%s",
-        match if match else "(no encontrado)"
-    )
-    
-    
-    # OBTENER DATOS
-    from orchestrator.data.common import normalize_series_obs
-    
-    # Fetch and normalize observations from BDE/local source.
-    obs = bde.fetch_series(match["id"])  # list of {date, value}
-    normalized = normalize_series_obs(obs, result.frequency.label)  # list of (datetime, float)
+    if is_contribution_all_activities:
+        logger.info("[=====DATA_NODE=====] Contribution query detected (activity=none), fetching all contribution series by activity")
+        all_matches = catalog.find_contribution_series_by_activity(
+            indicator=result.indicator.label,
+            metric_type=result.metric_type.label,
+            seasonality=result.seasonality.label,
+            frequency=result.frequency.label,
+        )
+        
+        if not all_matches:
+            error_msg = f"No se encontraron series de contribución para: {result.indicator.label}"
+            logger.warning("[=====DATA_NODE=====] %s", error_msg)
+            _emit_stream_chunk(error_msg, writer)
+            return {"output": error_msg}
+        
+        # Fetch data for all series and find the one with the highest value (excluding total)
+        logger.info("[=====DATA_NODE=====] Fetching data for %d contribution series", len(all_matches))
+        
+        # Determine target date based on req_form
+        target_date = None
+        if result.req_form.label == "point" and parsed_point:
+            target_date = datetime.datetime.strptime(parsed_point, "%d-%m-%Y")
+            logger.info("[=====DATA_NODE=====] Using point date: %s", target_date.strftime("%d-%m-%Y"))
+        elif result.req_form.label == "latest":
+            logger.info("[=====DATA_NODE=====] Using latest available data")
+        
+        max_activity = None
+        max_value = float("-inf")
+        max_series = None
+        max_date = None
+        all_series_data = []  # Store all series data for table construction
+        
+        for series_entry in all_matches:
+            try:
+                series_id = series_entry.get("id")
+                activity_name = series_entry.get("classification", {}).get("activity")
+                
+                # Fetch observations
+                obs = bde.fetch_series(series_id)
+                normalized = normalize_series_obs(obs, result.frequency.label)
+                
+                if not normalized:
+                    logger.warning("[=====DATA_NODE=====] No data for series %s (activity=%s)", series_id, activity_name)
+                    continue
+                
+                # Get value for the target period
+                d = None
+                v = None
+                if target_date:
+                    # Point: find exact date
+                    for date_obs, value_obs in normalized:
+                        if date_obs == target_date:
+                            d = date_obs
+                            v = value_obs
+                            break
+                    if d is None:
+                        logger.warning("[=====DATA_NODE=====] No data for date %s in series %s (activity=%s)", 
+                                     target_date.strftime("%d-%m-%Y"), series_id, activity_name)
+                        continue
+                else:
+                    # Latest: use last observation
+                    d, v = normalized[-1]
+                
+                logger.info(
+                    "[=====DATA_NODE=====] Series activity=%s | series_id=%s | value=%.2f | date=%s",
+                    activity_name, series_id, v, d.strftime("%d-%m-%Y")
+                )
+                
+                # Store data for table construction
+                all_series_data.append({
+                    "series_id": series_id,
+                    "activity": activity_name,
+                    "value": v,
+                    "date": d.strftime("%d-%m-%Y")
+                })
+                
+                # Compare: keep the highest value (exclude "total" activity from comparison)
+                if activity_name and activity_name.lower() != "total" and v > max_value:
+                    max_value = v
+                    max_activity = activity_name
+                    max_series = series_entry
+                    max_date = d
+                    
+            except Exception as e:
+                logger.warning("[=====DATA_NODE=====] Error fetching data for series %s: %s", 
+                             series_entry.get("id"), str(e))
+                continue
+        
+        if max_series is None:
+            error_msg = f"No se pudieron obtener datos de contribución para: {result.indicator.label}"
+            logger.warning("[=====DATA_NODE=====] %s", error_msg)
+            _emit_stream_chunk(error_msg, writer)
+            return {"output": error_msg}
+        
+        # Use the series with the highest contribution
+        match = max_series
+        logger.info(
+            "[=====DATA_NODE=====] Selected highest contribution series | activity=%s | value=%.2f | series_id=%s",
+            max_activity, max_value, match.get("id")
+        )
+        
+        # Fetch data for the selected series
+        obs = bde.fetch_series(match["id"])
+        normalized = normalize_series_obs(obs, result.frequency.label)
+    else:
+        # Normal case: locate matching series in the catalog
+        match = catalog.find_series(
+            indicator=result.indicator.label,
+            metric_type=result.metric_type.label,
+            seasonality=result.seasonality.label,
+            activity=result.activity.label,
+            frequency=result.frequency.label,
+        )
+        
+        logger.info(
+            "[=====DATA_NODE=====] catalog.find_series | match=%s",
+            match if match else "(no encontrado)"
+        )
+        
+        # Validar que se encontró la serie
+        if match is None:
+            error_msg = f"No se encontró serie para: {result.indicator.label} | Tipo: {result.metric_type.label} | Estacionalidad: {result.seasonality.label}"
+            logger.warning("[=====DATA_NODE=====] %s", error_msg)
+            _emit_stream_chunk(error_msg, writer)
+            return {"output": error_msg}
+        
+        # OBTENER DATOS
+        obs = bde.fetch_series(match["id"])  # list of {date, value}
+        normalized = normalize_series_obs(obs, result.frequency.label)  # list of (datetime, float)
     
     # MOSTRAR DATOS
     from orchestrator.data.variations import yoy as compute_yoy, prev_period as compute_prev, compute_variations_for_range
+    
+    # Determine the activity to use in the payload
+    # For contribution with activity=none, use the winning activity from match
+    activity_for_payload = match.get("classification", {}).get("activity", result.activity.label)
+    
+    # Check if we have all_series_data (from contribution query with activity=none)
+    all_series_data_for_payload = locals().get("all_series_data", None)
+    
+    # Get source_url from match
+    source_url = match.get("source_url")
     
     if result.req_form.label == "latest":
         d, v = normalized[-1]
@@ -738,7 +924,7 @@ def data_node(state: AgentState, *, writer: Optional[StreamWriter] = None):
                 "indicator": result.indicator.label,
                 "metric_type": result.metric_type.label,
                 "seasonality": result.seasonality.label,
-                "activity": result.activity.label,
+                "activity": activity_for_payload,
                 "frequency": result.frequency.label,
                 "calc_mode": result.calc_mode.label,
                 "req_form": result.req_form.label,
@@ -747,7 +933,11 @@ def data_node(state: AgentState, *, writer: Optional[StreamWriter] = None):
             "parsed_point": None,
             "parsed_range": None,
             "result": output_dict,
+            "source_url": source_url,
         }
+        # Add all_series_data if available (for contribution queries with activity=none)
+        if all_series_data_for_payload:
+            payload["all_series_data"] = all_series_data_for_payload
         logger.info(f"[=====DATA_NODE=====] Result (latest): {payload}")
         # return payload
 
@@ -777,7 +967,7 @@ def data_node(state: AgentState, *, writer: Optional[StreamWriter] = None):
                 "indicator": result.indicator.label,
                 "metric_type": result.metric_type.label,
                 "seasonality": result.seasonality.label,
-                "activity": result.activity.label,
+                "activity": activity_for_payload,
                 "frequency": result.frequency.label,
                 "calc_mode": result.calc_mode.label,
                 "req_form": result.req_form.label,
@@ -786,7 +976,11 @@ def data_node(state: AgentState, *, writer: Optional[StreamWriter] = None):
             "parsed_point": parsed_point,
             "parsed_range": None,
             "result": output_dict,
+            "source_url": source_url,
         }
+        # Add all_series_data if available (for contribution queries with activity=none)
+        if all_series_data_for_payload:
+            payload["all_series_data"] = all_series_data_for_payload
         logger.info(f"[=====DATA_NODE=====] Result (point): {payload}")
         # return payload
 
@@ -818,7 +1012,7 @@ def data_node(state: AgentState, *, writer: Optional[StreamWriter] = None):
                 "indicator": result.indicator.label,
                 "metric_type": result.metric_type.label,
                 "seasonality": result.seasonality.label,
-                "activity": result.activity.label,
+                "activity": activity_for_payload,
                 "frequency": result.frequency.label,
                 "calc_mode": result.calc_mode.label,
                 "req_form": result.req_form.label,
@@ -827,6 +1021,7 @@ def data_node(state: AgentState, *, writer: Optional[StreamWriter] = None):
             "parsed_point": None,
             "parsed_range": parsed_range,
             "result": values,
+            "source_url": source_url,
         }
         logger.info(f"[=====DATA_NODE=====] Result (range): payload with {len(values)} observations")
 
