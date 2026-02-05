@@ -639,10 +639,13 @@ class MemoryAdapter:
         if saver and hasattr(saver, "put"):
             config = self._saver_config(session_id)
             payload = {
-                "id": '_'.join([session_id, uuid.uuid4().hex]),
+                "v": 4,
+                "id": uuid.uuid4().hex,
                 "ts": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                "values": checkpoint,
-                "channel_values": {},
+                "channel_values": {"checkpoint": checkpoint},
+                "channel_versions": {},
+                "versions_seen": {},
+                "updated_channels": None,
             }
             try:
                 channel_versions: Dict[str, Any] = {}
@@ -658,12 +661,29 @@ class MemoryAdapter:
         if saver and hasattr(saver, "get"):
             config = self._saver_config(session_id)
             try:
-                data = saver.get(config)  # type: ignore[call-arg]
+                data = None
+                if hasattr(saver, "get_tuple"):
+                    checkpoint_tuple = saver.get_tuple(config)  # type: ignore[call-arg]
+                    if checkpoint_tuple:
+                        data = {"checkpoint": checkpoint_tuple.checkpoint, "metadata": checkpoint_tuple.metadata}
+                if data is None:
+                    data = saver.get(config)  # type: ignore[call-arg]
+            except KeyError:
+                logger.info("load_checkpoint: incompatible checkpoint version; usando fallback")
             except Exception:
                 logger.debug("load_checkpoint saver.get failed", exc_info=True)
             else:
                 if isinstance(data, dict):
                     checkpoint_payload = data.get("checkpoint") or data.get("values") or data
+                    if isinstance(checkpoint_payload, dict):
+                        channel_values = checkpoint_payload.get("channel_values")
+                        if isinstance(channel_values, dict):
+                            if "checkpoint" in channel_values:
+                                checkpoint_payload = channel_values.get("checkpoint")
+                            elif "values" in channel_values:
+                                checkpoint_payload = channel_values.get("values")
+                        elif "values" in checkpoint_payload and isinstance(checkpoint_payload.get("values"), dict):
+                            checkpoint_payload = checkpoint_payload.get("values")
                     metadata = data.get("metadata") or {}
                     return {"checkpoint": checkpoint_payload, "metadata": metadata}
         cache = self._fallback_checkpoints.get(session_id)

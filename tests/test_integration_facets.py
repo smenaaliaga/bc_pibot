@@ -16,7 +16,7 @@ def test_integration():
     
     # Inicializar clasificador
     print("\n1. Inicializando JointBERT...")
-    model_dir = "model/weights/pibot_model_beto"  # Ruta al modelo entrenado (pesos + labels)
+    model_dir = "models/pibot_series_interpreter/pibot-jointbert"  # Ruta al modelo entrenado (pesos + labels)
     classifier = PIBotPredictor(model_dir=model_dir)
     
     # Casos de prueba

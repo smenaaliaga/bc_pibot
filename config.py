@@ -21,7 +21,10 @@ BCCH_PASS: str = os.getenv("BCCH_PASS", "")
 REDIS_URL: Optional[str] = os.getenv("REDIS_URL")
 
 # Modelo JointBERT para clasificación de intenciones
-JOINT_BERT_MODEL_DIR: str = os.getenv("JOINT_BERT_MODEL_DIR", "model/weights/pibot_model_beto")
+JOINT_BERT_MODEL_DIR: str = os.getenv(
+    "JOINT_BERT_MODEL_DIR",
+    "models/pibot_series_interpreter/pibot-jointbert",
+)
 
 # Controla si se exponen enlaces de API con credenciales en texto plano en los logs.
 # Por defecto ACTIVADO en este entorno protegido; puedes desactivarlo con LOG_EXPOSE_API_LINKS=0

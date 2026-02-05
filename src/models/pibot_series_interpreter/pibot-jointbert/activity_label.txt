@@ -1,0 +1,10 @@
+total
+minero
+no_minero
+bienes
+industria
+resto_bienes
+servicios
+comercio
+none
+servicio

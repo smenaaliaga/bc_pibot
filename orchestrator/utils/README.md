@@ -7,7 +7,7 @@ Helpers pequeños reutilizados en varias capas del orquestador.
 	Acepta metadata (`session_id`, `op`, `table`, `pool`) y mantiene un cache temporal para no imprimir
 	el mismo error en cada ciclo.
 - `followups.py`: `build_followups(context)` genera hasta tres sugerencias accionables considerando
-	dominio, `has_table`, `series_id`, `year` y facts almacenados.
+	dominio, `has_table`, `series_id`, `year` y la metadata que emite el nodo de datos (sin depender de facts).
 
 ## Buenas prácticas
 - Usa `throttled_pg_log` en vez de `logger.exception` directo cuando manejes reintentos de DB; te ahorra

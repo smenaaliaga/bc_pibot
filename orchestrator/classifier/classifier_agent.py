@@ -8,14 +8,17 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 # JointBERT imports
-# from orchestrator.classifier.joint_bert_classifier import get_predictor
+from orchestrator.classifier.joint_bert_classifier import get_predictor
 from orchestrator.classifier.entity_normalizer import normalize_entities
 from registry import get_intent_router, get_series_interpreter
 
 logger = logging.getLogger(__name__)
 
 # MODEL
-MODEL_JOINTBERT_NAME = os.getenv("JOINT_BERT_MODEL_DIR", "pibot_model_beto")
+MODEL_JOINTBERT_NAME = os.getenv(
+    "JOINT_BERT_MODEL_DIR",
+    "models/pibot_series_interpreter/pibot-jointbert",
+)
 
 
 # ============================================================
@@ -117,7 +120,7 @@ def _classify_with_jointbert(question: str) -> ClassificationResult:
     Clasificación usando JointBERT
     """
     # Obtener predictor JointBERT
-    predictor = None #get_predictor()
+    predictor = get_predictor(MODEL_JOINTBERT_NAME)
     result = predictor.predict(question)
     
     # Aplicar normalización de entidades

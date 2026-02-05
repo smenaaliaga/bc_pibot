@@ -7,14 +7,23 @@ Lo demás (detección de series, entidades, períodos) lo maneja JointBERT + dat
 """
 
 import logging
+import unicodedata
 from typing import Any, Dict, Iterable, Optional
 
 logger = logging.getLogger(__name__)
 
 
+def _normalize_text(value: str) -> str:
+    if not value:
+        return ""
+    normalized = unicodedata.normalize("NFD", value)
+    stripped = "".join(ch for ch in normalized if unicodedata.category(ch) != "Mn")
+    return stripped.lower()
+
+
 def _extract_chart_domain_hint(question: str) -> Optional[str]:
     """Extrae hints de dominio para gráficos (imacec, pib)."""
-    question_lower = question.lower()
+    question_lower = _normalize_text(question)
     if "imacec" in question_lower:
         return "IMACEC"
     if "pib" in question_lower or "producto" in question_lower:
@@ -39,12 +48,12 @@ def _last_chart_turn_metadata(memory: Optional[Any], session_id: Optional[str]) 
 
 def _looks_like_chart_command(question: str) -> bool:
     """Detecta comandos de gráficos (grafica, visualiza, chart)."""
-    question_lower = question.lower().strip()
+    question_lower = _normalize_text(question).strip()
     chart_keywords = [
-        "grafica", "gráfica", "grafíca",
-        "muestra", "muéstrame", "mostrar",
+        "grafica", "graficar", "graficalo", "grafiquemos", "otro grafico",
+        "muestra", "muestrame", "mostrar",
         "visualiza", "chart", "plot", "dibuja",
-        "genera un grafico", "genera un gráfico"
+        "genera un grafico", "generar un grafico",
     ]
     return any(keyword in question_lower for keyword in chart_keywords)
 
@@ -54,7 +63,6 @@ def _handle_chart_followup(
     domain_upper: str,
     memory: Optional[Any],
     session_id: Optional[str],
-    facts: Optional[Dict[str, str]],
 ) -> Optional[Iterable[str]]:
     """
     Maneja follow-ups de gráficos usando contexto de la conversación.
@@ -66,14 +74,29 @@ def _handle_chart_followup(
     if not _looks_like_chart_command(question):
         return None
 
-    # Intentar obtener domain de la pregunta
-    chart_hint = _extract_chart_domain_hint(question)
-    
-    # Si no hay hint en la pregunta, usar el último gráfico
-    if not chart_hint:
-        last_meta = _last_chart_turn_metadata(memory, session_id)
-        if last_meta:
-            chart_hint = last_meta.get("chart_domain")
+    last_meta = _last_chart_turn_metadata(memory, session_id)
+    last_domain = ((last_meta or {}).get("chart_domain") or "").strip().upper()
+
+    chart_hint: Optional[str] = None
+    explicit_hint = _extract_chart_domain_hint(question)
+
+    if explicit_hint:
+        candidate = explicit_hint.strip().upper()
+        if not last_domain or last_domain != candidate:
+            logger.debug(
+                "[INTENT_ROUTER] Chart follow-up rejected (last=%s, requested=%s)",
+                last_domain or "",
+                candidate,
+            )
+            return None
+        chart_hint = candidate
+    else:
+        if last_domain:
+            chart_hint = last_domain
+        else:
+            normalized_domain = (domain_upper or "").strip().upper()
+            if normalized_domain:
+                chart_hint = normalized_domain
 
     if not chart_hint:
         return None
@@ -95,11 +118,7 @@ def _handle_chart_followup(
         "chart_domain": chart_hint,
         "chart_request": True,
     }
-    
-    # Incluir series_id si está en facts
-    if facts and "series_id" in facts:
-        metadata["series_id"] = facts["series_id"]
-    
+
     return _IterWithMetadata([msg], metadata)
 
 
@@ -110,7 +129,6 @@ def route_intents(
     intent_classifier: Optional[Any] = None,
     memory: Optional[Any] = None,
     session_id: Optional[str] = None,
-    facts: Optional[Dict[str, str]] = None,
 ) -> Optional[Iterable[str]]:
     """
     Router simplificado que solo maneja casos específicos que requieren contexto.
@@ -140,7 +158,7 @@ def route_intents(
         intent = ""
 
     # 1. Chart follow-ups (usa contexto)
-    chart_iter = _handle_chart_followup(question, str(indicator or "").upper(), memory, session_id, facts)
+    chart_iter = _handle_chart_followup(question, str(indicator or "").upper(), memory, session_id)
     if chart_iter:
         logger.info("[INTENT_ROUTER] Manejando chart follow-up")
         return chart_iter

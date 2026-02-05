@@ -1,39 +1,22 @@
-import datetime
-
-import pytest
-
 from orchestrator.graph import agent_graph
 from orchestrator.routes import intent_router
 
 
 class DummyMemory:
     def __init__(self, turns=None):
-        self.facts = {}
         self._turns = turns or []
 
-    def set_facts(self, session_id, facts):
-        self.facts.setdefault(session_id, {}).update(facts)
-
-    def get_recent_turns(self, session_id, limit=6):
-        return list(self._turns)
-
-
-class DummyDF:
-    def __init__(self, domain="PIB"):
-        self._last_data_context = {"domain": domain, "data_full": {"observations": [1]}}
-
-    def _emit_chart_marker(self, domain, data):
-        return f"[chart::{domain}]"
+    def get_turn_metadata(self, session_id, turn=-1):
+        if not self._turns:
+            return None
+        try:
+            entry = self._turns[turn]
+        except IndexError:
+            return None
+        return entry.get("metadata")
 
 
-@pytest.fixture()
-def patch_df(monkeypatch):
-    dummy = DummyDF()
-    monkeypatch.setattr(intent_router, "_df", dummy)
-    return dummy
-
-
-def test_chart_followup_sets_metadata_and_facts(patch_df):
+def test_chart_followup_sets_metadata():
     memory = DummyMemory(
         turns=[{"role": "assistant", "content": "[chart::PIB]", "metadata": {"chart_domain": "PIB"}}]
     )
@@ -42,17 +25,16 @@ def test_chart_followup_sets_metadata_and_facts(patch_df):
         "PIB",
         memory,
         session_id="sess-1",
-        facts={},
     )
 
     assert response is not None
     chunks = list(response)
-    assert chunks == ["[chart::PIB]"]
+    assert chunks and "[CHART:PIB]" in chunks[0]
     assert response.metadata.get("chart_domain") == "PIB"
-    assert "chart_last_domain" in memory.facts["sess-1"]
+    assert response.metadata.get("chart_request") is True
 
 
-def test_chart_followup_skips_mismatched_domain(monkeypatch, patch_df):
+def test_chart_followup_skips_mismatched_domain():
     turns = [
         {"role": "assistant", "content": "[chart::PIB]", "metadata": {"chart_domain": "PIB"}},
     ]
@@ -62,13 +44,12 @@ def test_chart_followup_skips_mismatched_domain(monkeypatch, patch_df):
         "IMACEC",
         memory,
         session_id="sess-2",
-        facts={"chart_last_domain": "PIB", "chart_last_ts": datetime.datetime.now(datetime.timezone.utc).isoformat()},
     )
 
     assert result is None
 
 
-def test_chart_followup_requires_recent_chart_turn(patch_df):
+def test_chart_followup_requires_recent_chart_turn():
     turns = [
         {"role": "assistant", "content": "[chart::PIB]", "metadata": {"chart_domain": "PIB"}},
         {"role": "assistant", "content": "tabla", "metadata": {}},
@@ -80,13 +61,12 @@ def test_chart_followup_requires_recent_chart_turn(patch_df):
         "PIB",
         memory,
         session_id="sess-3",
-        facts={"chart_last_domain": "PIB"},
     )
 
     assert result is None
 
 
-def test_chart_followup_skips_mentions_without_command(patch_df):
+def test_chart_followup_skips_mentions_without_command():
     turns = [
         {"role": "assistant", "content": "[chart::PIB]", "metadata": {"chart_domain": "PIB"}},
     ]
@@ -97,13 +77,12 @@ def test_chart_followup_skips_mentions_without_command(patch_df):
         "PIB",
         memory,
         session_id="sess-4",
-        facts={"chart_last_domain": "PIB"},
     )
 
     assert result is None
 
 
-def test_chart_followup_accepts_explicit_command(patch_df):
+def test_chart_followup_accepts_explicit_command():
     turns = [
         {"role": "assistant", "content": "[chart::PIB]", "metadata": {"chart_domain": "PIB"}},
     ]
@@ -114,14 +93,14 @@ def test_chart_followup_accepts_explicit_command(patch_df):
         "PIB",
         memory,
         session_id="sess-5",
-        facts={"chart_last_domain": "PIB"},
     )
 
     assert response is not None
-    assert list(response) == ["[chart::PIB]"]
+    chunks = list(response)
+    assert chunks and "[CHART:PIB]" in chunks[0]
 
 
-def test_chart_followup_uses_context_without_recent_chart(monkeypatch, patch_df):
+def test_chart_followup_uses_context_without_recent_chart():
     turns = [
         {"role": "assistant", "content": "Tabla reciente", "metadata": {}},
     ]
@@ -132,26 +111,21 @@ def test_chart_followup_uses_context_without_recent_chart(monkeypatch, patch_df)
         "PIB",
         memory,
         session_id="sess-ctx",
-        facts={},
     )
 
     assert response is not None
-    assert list(response) == ["[chart::PIB]"]
+    chunks = list(response)
+    assert chunks and "[CHART:PIB]" in chunks[0]
 
 
 def test_memory_node_records_chart_metadata(monkeypatch):
     class RecorderMemory:
         def __init__(self):
             self.turns = []
-            self.facts = {}
             self.saved = []
-            self.saver = None
 
         def on_assistant_turn(self, session_id, message, *, metadata=None):
             self.turns.append((session_id, message, metadata or {}))
-
-        def set_facts(self, session_id, facts):
-            self.facts.setdefault(session_id, {}).update(facts)
 
         def save_checkpoint(self, session_id, checkpoint, *, metadata=None):
             self.saved.append((session_id, checkpoint, metadata))
@@ -180,12 +154,10 @@ def test_memory_node_records_chart_metadata(monkeypatch):
         "question": "puedes generar un gráfico?",
         "route_decision": "data",
         "classification": _Cls(),
-        "facts": {"chart_last_domain": ""},
     }
 
     result = agent_graph.memory_node(state)
 
-    assert result["output"] == chart_output
+    assert result["output"].startswith(chart_output)
     assert dummy_memory.turns
     assert dummy_memory.turns[-1][2].get("chart_domain") == "PIB"
-    assert dummy_memory.facts["sess-chart"]["chart_last_domain"] == "PIB"

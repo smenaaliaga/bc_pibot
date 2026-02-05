@@ -1,16 +1,18 @@
 # Rutas deterministas
 
-Traducen intents y clasificaciones en decisiones concretas del grafo. Aquí se decide si la respuesta
-se resuelve con lógica específica, con el flujo de datos o con RAG/fallback.
+Traducen intents y clasificaciones en decisiones concretas del grafo. Aquí se centralizan los
+handlers que atienden follow-ups contextuales (ej. gráficos) y los envoltorios que preparan el flujo
+de datos antes de invocar a LangGraph.
 
 ## Archivos
 - `intent_router.py`
-	- Helpers IMACEC/PIB: detección de mes puntual, intervalos (`marzo 2023 a mayo 2023`), toggles m/m vs
-		y/y, cambio de frecuencia (T ↔ A), solicitud de gráficos, respuestas metodológicas cortas.
-	- `route_intents`: combina `catalog/intents.json` + heurísticas codificadas y devuelve iterables para el
-		nodo `intent_shortcuts`.
-	- Handlers destacados: `handle_pib_quarter_year`, `_toggle_imacec_metric`, `_chart_marker_from_context`,
-		`_fetch_imacec_series` (usa `orchestrator.data.get_series`).
+	- `_handle_chart_followup` usa solo metadata de los últimos turnos (sin facts persistidos) para detectar
+		solicitudes como “otro gráfico del PIB”.
+	- `route_intents` mantiene la capa declarativa (`catalog/intents.json`) para herramientas legacy; hoy
+		el grafo principal confía en el IntentRouter ML del nodo `intent`, pero los handlers siguen
+		estando disponibles para flujos CLI/tests.
+	- Los helpers de IMACEC/PIB comparten utilidades con `data_router` para no duplicar llamadas al
+		catálogo ni a `_last_data_context`.
 - `data_router.py`
 	- `stream_data_flow`: envoltorio resiliente sobre `data_flow.stream_data_flow_full`. Captura errores y
 		devuelve mensajes metodológicos cuando la API falla.
@@ -18,8 +20,8 @@ se resuelve con lógica específica, con el flujo de datos o con RAG/fallback.
 		módulos pueden reutilizar.
 
 ## Interacción con el grafo
-1. El nodo `intent_shortcuts` invoca `route_intents`. Si el handler produce texto, el grafo responde
-   inmediatamente por la rama `direct`.
+1. El grafo decide la ruta en el nodo `intent` y valida follow-ups (gráficos) en `router`; los helpers
+	de este módulo son reutilizables desde ahí o desde herramientas CLI.
 2. Si no hubo respuesta determinista, la decisión cae en `route` → `data`/`rag`/`fallback`.
 3. El nodo `data` llama `data_router.stream_data_flow` y consume sus markers.
 
@@ -30,7 +32,7 @@ se resuelve con lógica específica, con el flujo de datos o con RAG/fallback.
   necesitas delegar en otro generador.
 - Registra logs con prefijos consistentes (`[IMACEC_*]`, `[DATA_ROUTER]`) para facilitar el tracing.
 - Cuando agregues un handler nuevo, añade casos en `tests/test_routing.py` o en
-  `tools/test_orch2_chunk.py`.
+	`tools/test_orch2_chunk.py`, aun si el handler solo se consume desde herramientas externas.
 
 ## Documentación relacionada
 - [README del orquestador](../README.md)
