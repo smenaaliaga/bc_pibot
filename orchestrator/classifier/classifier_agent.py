@@ -7,18 +7,15 @@ import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
-# JointBERT imports
-from orchestrator.classifier.joint_bert_classifier import get_predictor
 from orchestrator.classifier.entity_normalizer import normalize_entities
+from orchestrator.utils.http_client import post_json
+from config import PREDICT_URL, INTENT_CLASSIFIER_URL
 from registry import get_intent_router, get_series_interpreter
 
 logger = logging.getLogger(__name__)
 
-# MODEL
-MODEL_JOINTBERT_NAME = os.getenv(
-    "JOINT_BERT_MODEL_DIR",
-    "models/pibot_series_interpreter/pibot-jointbert",
-)
+# Timeouts
+PREDICT_TIMEOUT_SECONDS = float(os.getenv("PREDICT_TIMEOUT_SECONDS", "10"))
 
 
 # ============================================================
@@ -32,6 +29,16 @@ class ClassificationResult:
     confidence: Optional[float] = None  # Confianza del modelo
     entities: Optional[dict] = None  # Entidades raw extraídas
     normalized: Optional[dict] = None  # Entidades normalizadas
+    text: Optional[str] = None
+    words: Optional[List[str]] = None
+    slot_tags: Optional[List[str]] = None
+    calc_mode: Optional[dict] = None
+    activity: Optional[dict] = None
+    region: Optional[dict] = None
+    investment: Optional[dict] = None
+    req_form: Optional[dict] = None
+    macro: Optional[int] = None
+    context: Optional[str] = None
 
 
 # ============================================================
@@ -69,6 +76,9 @@ def predict_with_router(query: str) -> Any:
         Resultado retornado por el IntentRouter.
     """
     router = load_intent_router()
+    if router is None:
+        logger.warning("IntentRouter unavailable; returning None")
+        return None
     return router.predict(query)
 
 
@@ -83,6 +93,9 @@ def predict_with_interpreter(query: str) -> Any:
         Resultado retornado por el SeriesInterpreter.
     """
     interpreter = load_series_interpreter()
+    if interpreter is None:
+        logger.warning("SeriesInterpreter unavailable; returning None")
+        return None
     return interpreter.predict(query)
 
 
@@ -115,65 +128,88 @@ def _build_history_text(history: Optional[List[Dict[str, str]]]) -> str:
         return ""
 
 
+def _flatten_api_entities(entities: Any) -> Dict[str, str]:
+    if not entities or not isinstance(entities, dict):
+        return {}
+    flattened: Dict[str, str] = {}
+    for key, value in entities.items():
+        if isinstance(value, list):
+            first = next((v for v in value if isinstance(v, str) and v.strip()), None)
+            if first:
+                flattened[str(key)] = first
+        elif isinstance(value, str) and value.strip():
+            flattened[str(key)] = value
+    return flattened
+
+
+def _get_first_entity_value(entities: Any, key: str) -> str:
+    if not entities or not isinstance(entities, dict):
+        return ""
+    value = entities.get(key)
+    if isinstance(value, list):
+        for item in value:
+            if isinstance(item, str) and item.strip():
+                return item
+        return ""
+    if isinstance(value, str):
+        return value
+    return ""
+
+
 def _classify_with_jointbert(question: str) -> ClassificationResult:
     """
-    Clasificación usando JointBERT
+    Clasificación usando APIs remotas.
     """
-    # Obtener predictor JointBERT
-    predictor = get_predictor(MODEL_JOINTBERT_NAME)
-    result = predictor.predict(question)
+    predict_payload = {"text": question}
+    predict_result = post_json(PREDICT_URL, predict_payload, timeout=PREDICT_TIMEOUT_SECONDS)
+    logger.debug("[PREDICT_API] response=%s", predict_result)
+
+    intent_payload = {"text": question}
+    intent_result = post_json(INTENT_CLASSIFIER_URL, intent_payload, timeout=PREDICT_TIMEOUT_SECONDS)
+    logger.debug("[INTENT_API] response=%s", intent_result)
+
+    entities_api = predict_result.get("entities", {}) or {}
+    entities_flat = _flatten_api_entities(entities_api)
     
     # Aplicar normalización de entidades
-    normalized = normalize_entities(result.get('entities', {}))
+    normalized = normalize_entities(entities_flat)
      
     # Extraer intentención y entidades
-    intent = result.get('intent', 'unknown')
-    entities = result.get('entities', {})
+    intent = intent_result.get("intent")
+    entities = entities_api
+    macro = intent_result.get("macro")
+    context = intent_result.get("context")
+    confidence = intent_result.get("confidence")
     
     # Mostrar predicción completa
-    logger.info(f"[JOINTBERT PREDICTION] intent={intent}, confidence={result.get('confidence', 0.0):.3f}")
-    logger.info(f"[JOINTBERT PREDICTION] Raw entities: {entities}")
-    logger.info(f"[JOINTBERT PREDICTION] Normalized entities: {normalized}")
-    
-    # Si no hay entidades, tratar como consulta metodológica
-    if not entities or all(not v for v in entities.values()):
-        logger.info("[JOINTBERT] No entities detected, treating as METHODOLOGICAL query")
-        intent = 'methodology'
+    logger.info("[CLASSIFIER_API] intent=%s confidence=%s macro=%s context=%s", intent, confidence, macro, context)
+    logger.info("[CLASSIFIER_API] Raw entities: %s", entities)
+    logger.info("[CLASSIFIER_API] Normalized entities: %s", normalized)
     
     # Usar entidades normalizadas si están disponibles, sino usar raw
     indicator_norm = normalized.get('indicator', {})
-    period_norm = normalized.get('period', {})
     
     # Extraer indicador (priorizar normalizado)
     if indicator_norm and indicator_norm.get('standard_name'):
         indicator = indicator_norm['standard_name'].lower()
     else:
-        indicator = entities.get('indicator', '').lower()
-    
-    # Detectar small talk
-    _SMALL_TALK_GREETINGS = ("hola", "holi", "buenas", "buenos dias", "buenas tardes", "buenas noches", "saludos", "que tal")
-    _SMALL_TALK_DATA_TOKENS = ("imacec", "pib", "inflacion", "dato", "serie", "valor", "porcentaje", "indicador", "consulta")
-    
-    def _looks_like_small_talk(q: str, ind: str) -> bool:
-        ql = q.lower().strip()
-        for greeting in _SMALL_TALK_GREETINGS:
-            if ql.startswith(greeting):
-                has_data_token = any(tok in ql for tok in _SMALL_TALK_DATA_TOKENS)
-                return not has_data_token
-        return False
-
-    # Override para small talk
-    if _looks_like_small_talk(question, indicator):
-        logger.info("[JOINTBERT] Greeting-like query detected, forcing 'greeting' intent")
-        intent = 'greeting'
-        entities = {}
-        normalized = {}
+        indicator = _get_first_entity_value(entities, "indicator").lower()
     
     return ClassificationResult(
         intent=intent,
-        confidence=result.get('confidence', 0.0),
+        confidence=confidence,
         entities=entities,
         normalized=normalized,
+        text=predict_result.get("text", question),
+        words=predict_result.get("words") or [],
+        slot_tags=predict_result.get("slot_tags") or predict_result.get("slots") or [],
+        calc_mode=predict_result.get("calc_mode"),
+        activity=predict_result.get("activity"),
+        region=predict_result.get("region"),
+        investment=predict_result.get("investment"),
+        req_form=predict_result.get("req_form"),
+        macro=macro,
+        context=context,
     )
 
 
@@ -183,7 +219,7 @@ def classify_question_with_history(
     """Clasificación y construcción de history_text."""
     
     t_start = time.perf_counter()
-    logger.info("[CLASSIFICATION] Iniciando clasificación de la consulta | question='%s' | model='%s'", question, MODEL_JOINTBERT_NAME)
+    logger.info("[CLASSIFICATION] Iniciando clasificación de la consulta | question='%s'", question)
     try:
         classification = _classify_with_jointbert(question)
     except Exception as exc:
@@ -245,6 +281,16 @@ def build_intent_info(cls: Optional[ClassificationResult]) -> Optional[Dict[str,
             "normalized": cls.normalized or {},
             "indicator": indicator,
             "spans": [],
+            "macro": cls.macro,
+            "context": cls.context,
+            "calc_mode": cls.calc_mode,
+            "activity": cls.activity,
+            "region": cls.region,
+            "investment": cls.investment,
+            "req_form": cls.req_form,
+            "words": cls.words or [],
+            "slot_tags": cls.slot_tags or [],
+            "text": cls.text,
         }
     except Exception:
         logger.exception("build_intent_info failed")

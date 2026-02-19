@@ -11,7 +11,6 @@ from langgraph.types import StreamWriter
 from orchestrator.classifier.classifier_agent import (
     build_intent_info,
     classify_question_with_history,
-    predict_with_router,
 )
 from orchestrator.classifier.intent_store import IntentStoreBase
 
@@ -70,7 +69,7 @@ def classify_node(state: AgentState) -> AgentState:
 
 
 def intent_node(state: AgentState) -> AgentState:
-    node_fn = make_intent_node(_MEMORY, predict_with_router)
+    node_fn = make_intent_node(_MEMORY)
     return node_fn(state)
 
 
@@ -116,7 +115,7 @@ def build_graph():
         classify_question_with_history,
         build_intent_info,
     )
-    intent = make_intent_node(_MEMORY, predict_with_router)
+    intent = make_intent_node(_MEMORY)
     router = make_router_node()
     data = make_data_node(_MEMORY)
     rag = make_rag_node(_RAG_LLM)

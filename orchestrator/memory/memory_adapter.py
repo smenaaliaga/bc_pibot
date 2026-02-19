@@ -62,7 +62,7 @@ class MemoryAdapter:
         self._max_fallback_checkpoints = int(os.getenv("MEMORY_MAX_CHECKPOINTS", "10"))
         self._checkpoint_ns = os.getenv("LANGGRAPH_CHECKPOINT_NS", "memory")
         self._max_turns_prompt = int(os.getenv("MEMORY_MAX_TURNS_PROMPT", "8"))
-        self._local_facts: Dict[str, Dict[str, str]] = {}
+        self._local_facts: Dict[str, Dict[str, Any]] = {}
         self._pool = None
         self._pool_dsn = None
         self._pool_open = False
@@ -663,7 +663,7 @@ class MemoryAdapter:
         return window[-limit:]
 
     # --- Facts API ---------------------------------------------------------
-    def set_facts(self, session_id: str, facts: Dict[str, str]) -> None:
+    def set_facts(self, session_id: str, facts: Dict[str, Any]) -> None:
         if not session_id or not facts:
             return
         normalized = {str(k): self._serialize_fact_value(v) for k, v in facts.items()}
@@ -679,11 +679,13 @@ class MemoryAdapter:
             self._log_pg_error("Error guardando facts: %s" % e, session_id=session_id, op="facts_write", table="session_facts")
 
     @staticmethod
-    def _serialize_fact_value(value: Any) -> str:
+    def _serialize_fact_value(value: Any) -> Any:
         if value is None:
             return ""
         if isinstance(value, (str, int, float, bool)):
             return str(value)
+        if isinstance(value, (list, dict)):
+            return value
         if isinstance(value, datetime.datetime):
             return value.isoformat()
         try:
@@ -691,7 +693,7 @@ class MemoryAdapter:
         except Exception:
             return str(value)
 
-    def get_facts(self, session_id: str) -> Dict[str, str]:
+    def get_facts(self, session_id: str) -> Dict[str, Any]:
         if not session_id:
             return {}
         if session_id in self._local_facts:

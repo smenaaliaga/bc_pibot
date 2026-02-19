@@ -22,10 +22,21 @@ import os
 import threading
 import logging
 from functools import lru_cache
-from typing import Optional
+from typing import Optional, Any
 
-from models.pibot_intent_router import IntentRouter
-from models.pibot_series_interpreter import SeriesInterpreter
+try:
+    from models.pibot_intent_router import IntentRouter  # type: ignore
+except Exception as exc:
+    IntentRouter = None  # type: ignore
+    logger = logging.getLogger(__name__)
+    logger.warning("IntentRouter import skipped: %s", exc)
+
+try:
+    from models.pibot_series_interpreter import SeriesInterpreter  # type: ignore
+except Exception as exc:
+    SeriesInterpreter = None  # type: ignore
+    logger = logging.getLogger(__name__)
+    logger.warning("SeriesInterpreter import skipped: %s", exc)
 from catalog.catalog_service import CatalogService
 from api.bde_client import BDEClient
 
@@ -43,8 +54,11 @@ def _resolve_path(env_name: str, override: Optional[str], default: str) -> str:
     return default
 
 
-def _load_intent_router(path: str) -> IntentRouter:
+def _load_intent_router(path: str) -> Optional[Any]:
     with _init_lock:
+        if IntentRouter is None:
+            logger.warning("IntentRouter unavailable; returning None")
+            return None
         try:
             return IntentRouter(model_path=path)
         except Exception as e:
@@ -58,8 +72,11 @@ def _load_intent_router(path: str) -> IntentRouter:
             return IntentRouter(model_path=None)
 
 
-def _load_series_interpreter(path: str) -> SeriesInterpreter:
+def _load_series_interpreter(path: str) -> Optional[Any]:
     with _init_lock:
+        if SeriesInterpreter is None:
+            logger.warning("SeriesInterpreter unavailable; returning None")
+            return None
         try:
             return SeriesInterpreter(model_path=path)
         except Exception as e:
@@ -74,14 +91,14 @@ def _load_series_interpreter(path: str) -> SeriesInterpreter:
 
 
 @lru_cache(maxsize=8)
-def get_intent_router(path: Optional[str] = None) -> IntentRouter:
+def get_intent_router(path: Optional[str] = None) -> Optional[Any]:
     """Devuelve un IntentRouter cacheado (clave = ruta resuelta)."""
     resolved = _resolve_path("INTENT_ROUTER_PATH", path, "pibot-intent-router")
     return _load_intent_router(resolved)
 
 
 @lru_cache(maxsize=8)
-def get_series_interpreter(path: Optional[str] = None) -> SeriesInterpreter:
+def get_series_interpreter(path: Optional[str] = None) -> Optional[Any]:
     """Devuelve un SeriesInterpreter cacheado (clave = ruta resuelta)."""
     resolved = _resolve_path("SERIES_INTERPRETER_PATH", path, "pibot-jointbert")
     return _load_series_interpreter(resolved)
@@ -144,8 +161,8 @@ def warmup_models(
     try:
         logger.info(
             "Singletons cargados: router=%s | interpreter=%s | catalog=%s | bde=%s",
-            getattr(router, "model_path", "<desconocido>"),
-            getattr(interpreter, "model_path", "<desconocido>"),
+            getattr(router, "model_path", "<desconocido>") if router else "<none>",
+            getattr(interpreter, "model_path", "<desconocido>") if interpreter else "<none>",
             catalog_path,
             "BDEClient",
         )

@@ -21,6 +21,13 @@ docker compose --env-file ../.env up -d redis
 ```
 Requiere que `REDIS_PASS` esté disponible (el `docker-compose.yml` ya toma `env_file: ../.env`), y persiste datos en `../data/redis`.
 
+## Run Intent API (dummy)
+From `docker/`:
+```bash
+docker compose up -d intent-api
+```
+Endpoint disponible en `http://localhost:8000/intent`.
+
 
 
 ## RAG loading (manual)

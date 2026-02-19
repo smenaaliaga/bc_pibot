@@ -62,27 +62,38 @@ def make_ingest_node(memory_adapter: Any):
     return ingest_node
 
 
-def make_intent_node(memory_adapter: Any, predict_with_router):
+def make_intent_node(memory_adapter: Any, predict_with_router=None):
     def intent_node(state: AgentState) -> AgentState:
         question = state.get("question", "")
         session_id = state.get("session_id", "")
 
-        results = predict_with_router(question)
-        intent_label = (
-            getattr(getattr(results, "intent_cls", None), "label", "")
-            or getattr(getattr(results, "intent", None), "label", "")
-            or ""
-        )
-        context_label = (
-            getattr(getattr(results, "context_cls", None), "label", "")
-            or getattr(getattr(results, "context_mode", None), "label", "")
-            or ""
-        )
-        macro_label = getattr(getattr(results, "macro_cls", None), "label", None)
+        classification = state.get("classification")
+        intent_label = ""
+        context_label = ""
+        macro_label = None
+        if classification is not None:
+            intent_label = (getattr(classification, "intent", None) or "")
+            context_label = (getattr(classification, "context", None) or "")
+            macro_label = getattr(classification, "macro", None)
+        elif callable(predict_with_router):
+            results = predict_with_router(question)
+            intent_label = (
+                getattr(getattr(results, "intent_cls", None), "label", "")
+                or getattr(getattr(results, "intent", None), "label", "")
+                or ""
+            )
+            context_label = (
+                getattr(getattr(results, "context_cls", None), "label", "")
+                or getattr(getattr(results, "context_mode", None), "label", "")
+                or ""
+            )
+            macro_label = getattr(getattr(results, "macro_cls", None), "label", None)
 
         normalized_intent = "method" if intent_label == "methodology" else intent_label
 
-        if normalized_intent == "other" and context_label == "standalone":
+        if macro_label in (0, "0", False):
+            decision = "fallback"
+        elif normalized_intent == "other" and context_label == "standalone":
             decision = "fallback"
         elif normalized_intent == "value":
             decision = "data"

@@ -6,11 +6,30 @@ Este módulo maneja:
 Lo demás (detección de series, entidades, períodos) lo maneja JointBERT + data_node.
 """
 
+import json
 import logging
+import re
 import unicodedata
 from typing import Any, Dict, Iterable, Optional
 
 logger = logging.getLogger(__name__)
+
+GENTLE_NUDGE_MESSAGE = (
+    "Mi base de conocimiento no está diseñada para responder respecto a ese tópico. "
+    "Puedo responder preguntas respecto al PIB e IMACEC."
+)
+
+NAME_PATTERNS = [
+    r"\bmi nombre es\s+(?P<name>[^,.!?]+)",
+    r"\byo soy\s+(?P<name>[^,.!?]+)",
+    r"\bme llaman\s+(?P<name>[^,.!?]+)",
+    r"\bme llamo\s+(?P<name>[^,.!?]+)",
+    r"\bme dicen\s+(?P<name>[^,.!?]+)",
+]
+
+
+def _wrap(text: str) -> Iterable[str]:
+    return [text]
 
 
 def _normalize_text(value: str) -> str:
@@ -19,6 +38,74 @@ def _normalize_text(value: str) -> str:
     normalized = unicodedata.normalize("NFD", value)
     stripped = "".join(ch for ch in normalized if unicodedata.category(ch) != "Mn")
     return stripped.lower()
+
+
+def _coerce_macro(value: Any) -> Optional[int]:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return 1 if value else 0
+    if isinstance(value, (int, float)):
+        return 1 if int(value) != 0 else 0
+    if isinstance(value, str):
+        cleaned = value.strip()
+        if cleaned.isdigit():
+            return 1 if int(cleaned) != 0 else 0
+    return None
+
+
+def _normalize_title_case(value: str) -> str:
+    cleaned = re.sub(r"\s+", " ", value.strip())
+    return cleaned.lower().title()
+
+
+def _extract_user_name(question: str) -> Optional[str]:
+    if not question:
+        return None
+    lowered = _normalize_text(question)
+    for pattern in NAME_PATTERNS:
+        match = re.search(pattern, lowered, flags=re.IGNORECASE)
+        if not match:
+            continue
+        raw = match.group("name") if match.groupdict().get("name") else match.group(1)
+        if not raw:
+            continue
+        name = _normalize_title_case(raw)
+        if name:
+            return name
+    return None
+
+
+def _append_user_name_fact(memory: Optional[Any], session_id: Optional[str], name: str) -> bool:
+    if not memory or not session_id or not name:
+        return False
+    if not hasattr(memory, "get_facts") or not hasattr(memory, "set_facts"):
+        return False
+    try:
+        facts = memory.get_facts(session_id) or {}
+    except Exception:
+        facts = {}
+    existing = facts.get("user_name")
+    names: list[str] = []
+    if isinstance(existing, list):
+        names = [str(item) for item in existing if str(item).strip()]
+    elif isinstance(existing, str) and existing.strip():
+        try:
+            parsed = json.loads(existing)
+            if isinstance(parsed, list):
+                names = [str(item) for item in parsed if str(item).strip()]
+            else:
+                names = [existing]
+        except Exception:
+            names = [existing]
+    if name:
+        names.append(name)
+    try:
+        memory.set_facts(session_id, {"user_name": names})
+        return True
+    except Exception:
+        logger.debug("Failed to persist user_name fact", exc_info=True)
+    return False
 
 
 def _extract_chart_domain_hint(question: str) -> Optional[str]:
@@ -144,6 +231,7 @@ def route_intents(
     TODO lo demás lo maneja JointBERT + data_node.
     """
     try:
+        macro = _coerce_macro(getattr(classification, "macro", None))
         # Extraer indicador desde normalized
         indicator = None
         normalized = getattr(classification, "normalized", None)
@@ -154,8 +242,16 @@ def route_intents(
         
         intent = (getattr(classification, "intent", "") or "").lower()
     except Exception:
+        macro = None
         indicator = None
         intent = ""
+
+    # 0. Macro=0 → no económico: guardar facts si aplica y nudgear
+    if macro == 0:
+        name = _extract_user_name(question)
+        if name:
+            _append_user_name_fact(memory, session_id, name)
+        return _wrap(GENTLE_NUDGE_MESSAGE)
 
     # 1. Chart follow-ups (usa contexto)
     chart_iter = _handle_chart_followup(question, str(indicator or "").upper(), memory, session_id)

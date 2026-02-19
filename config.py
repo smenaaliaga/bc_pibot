@@ -26,6 +26,16 @@ JOINT_BERT_MODEL_DIR: str = os.getenv(
     "models/pibot_series_interpreter/pibot-jointbert",
 )
 
+# Endpoints de clasificación remota
+PREDICT_URL: str = os.getenv(
+    "PREDICT_URL",
+    "http://localhost:8000/predict",
+)
+INTENT_CLASSIFIER_URL: str = os.getenv(
+    "INTENT_CLASSIFIER_URL",
+    "http://localhost:8000/intent",
+)
+
 # Controla si se exponen enlaces de API con credenciales en texto plano en los logs.
 # Por defecto ACTIVADO en este entorno protegido; puedes desactivarlo con LOG_EXPOSE_API_LINKS=0
 LOG_EXPOSE_API_LINKS: bool = os.getenv("LOG_EXPOSE_API_LINKS", "1").lower() in ("1", "true", "yes")
