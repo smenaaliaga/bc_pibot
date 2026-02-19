@@ -13,8 +13,8 @@ compatibilidad, pero el grafo ya no los invoca.
 		moderno no los utiliza.
 	- Integra `langgraph.checkpoint.postgres.PostgresSaver`; si Postgres no está disponible, cae en
 		`MemorySaver` o en el fallback in-process `_InProcessMemoryAdapter`.
-	- Administra los esquemas `session_turns` (historial estructurado) y, para compatibilidad, `session_facts`
-		(JSONB o KV); usa `utils/pg_logging.throttled_pg_log` para controlar el spam de errores.
+	- Administra los esquemas `session_turns` (historial estructurado) y `session_facts` (JSONB); usa
+		`utils/pg_logging.throttled_pg_log` para controlar el spam de errores.
 	- Puede habilitar Response Diversity (cuando `memory_handler.response_diversity` está presente).
 	- `session_turns` guarda rol, contenido, metadata y timestamp para cada turno, y permite recuperar
 		ventanas eficientes para el LLM sin depender únicamente del fallback en memoria.
@@ -35,6 +35,9 @@ compatibilidad, pero el grafo ya no los invoca.
 - `MEMORY_MAX_TURNS_STORE` regula cuántos turnos se conservan en el fallback in-process;
 	`MEMORY_MAX_CHECKPOINTS` delimita los checkpoints retenidos cuando `PostgresSaver` no está disponible.
 - `DIVERSITY_*` (si usas Response Diversity) sigue funcionando igual.
+
+`session_facts` almacena `macro_cls`, `intent_cls`, `context_cls`, entidades normalizadas y
+`session_payload` (suposiciones o preferencias persistidas) por sesión.
 
 Consulta `docs/README_memory.md` para ver el estado de las migraciones (`session_facts` JSONB) y los
 pasos para ejecutar los scripts en `docker/postgres/migrations`.

@@ -18,14 +18,14 @@ interpreter = SeriesInterpreter(model_path="pibot-jointbert")
 
 # Uso
 intent = router.predict("¿Cuál es el último Imacec?")
-# → intent.label="value", context_mode.label="standalone"
+# → intent.intent_cls.label="value", intent.context_cls.label="standalone"
 
 series = interpreter.predict("Imacec mensual desestacionalizado")
-# → indicator.label="imacec", frequency.label="m", seasonality.label="sa"
+# → frequency_cls.label="m", calc_mode_cls.label="original"
 
 # Con modelos ML: también retorna confidence scores
 intent = router.predict("¿Cuál es el último Imacec?")
-print(f"Intent: {intent.intent.label} (confidence: {intent.intent.confidence:.2f})")
+print(f"Intent: {intent.intent_cls.label} (confidence: {intent.intent_cls.confidence:.2f})")
 # → Intent: value (confidence: 0.95)
 
 series = interpreter.predict("Imacec mensual")
@@ -98,21 +98,31 @@ class LabeledScore:
 ```python
 @dataclass
 class IntentRouterOutput:
-  intent: LabeledScore      # label: "value"|"methodology"
-  context_mode: LabeledScore  # label: "standalone"|"followup"
+  macro_cls: LabeledScore     # label: "1"|"0"
+  intent_cls: LabeledScore    # label: "value"|"method"|"other"
+  context_cls: LabeledScore   # label: "standalone"|"followup"
+  # Compatibilidad legacy:
+  intent: LabeledScore
+  context_mode: LabeledScore
 ```
 
 **SeriesInterpreterOutput:**
 ```python
 @dataclass
 class SeriesInterpreterOutput:
-  indicator: LabeledScore     # label: "imacec"|"pib"
-  metric_type: LabeledScore   # label: "index"|"contribution"
-  seasonality: LabeledScore   # label: "sa"|"nsa"
-  activity: LabeledScore      # label: "total"|"imc_*"|"pib_*"
-  frequency: LabeledScore     # label: "m"|"q"|"a"
-  calc_mode: LabeledScore     # label: "none"|"yoy"|"prev_period"
-  req_form: LabeledScore      # label: "latest"|"point"|"range"
+  calc_mode_cls: LabeledScore  # label: "original"|"prev_period"|"yoy"|"contribution"
+  frequency_cls: LabeledScore  # label: "m"|"q"|"a"
+  activity_cls: LabeledScore   # label: "general"|"specific"|"none"
+  region_cls: LabeledScore     # label: "general"|"specific"|"none"
+  req_form_cls: LabeledScore   # label: "general"|"specific"|"none"
+  # Compatibilidad legacy:
+  indicator: LabeledScore
+  metric_type: LabeledScore
+  seasonality: LabeledScore
+  activity: LabeledScore
+  frequency: LabeledScore
+  calc_mode: LabeledScore
+  req_form: LabeledScore
 ```
 
 ## Modelos
@@ -120,11 +130,12 @@ class SeriesInterpreterOutput:
 ### 1. IntentRouter
 
 **Clasifica:** Intención del usuario
-- `intent`: `"value"` (quiere datos) | `"methodology"` (quiere explicación)
-- `context_mode`: `"standalone"` (pregunta nueva) | `"followup"` (continuación)
+- `macro_cls`: `"1"` (in-domain) | `"0"` (out-of-domain)
+- `intent_cls`: `"value"` (quiere datos) | `"method"` (quiere explicación) | `"other"`
+- `context_cls`: `"standalone"` (pregunta nueva) | `"followup"` (continuación)
 
 **Modos:**
-- **Heurístico:** Palabras clave ("metodología", "cómo se calcula" → methodology)
+- **Heurístico:** Palabras clave ("metodología", "cómo se calcula" → method)
 - **ML:** SentenceTransformer + 2 LogisticRegression
 
 **Archivos del modelo:**
@@ -132,8 +143,9 @@ class SeriesInterpreterOutput:
 
 ### 2. SeriesInterpreter
 
-**Clasifica:** Características de la serie (7 dimensiones)
-- `indicator`, `metric_type`, `seasonality`, `activity`, `frequency`, `calc_mode`, `req_form`
+**Clasifica:** Características de la serie (nueva taxonomía)
+- `calc_mode_cls`, `frequency_cls`, `activity_cls`, `region_cls`, `req_form_cls`
+- Legacy disponible: `indicator`, `metric_type`, `seasonality`, `activity`, `frequency`, `calc_mode`, `req_form`
 
 **Modos:**
 - **Heurístico:** Regex y palabras clave

@@ -3,7 +3,7 @@
 Controla la orquestación completa de cada turno. Todos los nodos comparten un `AgentState`
 centralizado y emiten chunks en vivo mediante LangGraph Topics + `StreamWriter`.
 
--## Componentes principales (`agent_graph.py`)
+## Componentes principales (`agent_graph.py`)
 - `AgentState`: `TypedDict` con `question`, `history`, `context`,
   `classification`/`intent_info`, `route_decision`, `output` y
   `stream_chunks: Topic[str]` para
@@ -18,8 +18,8 @@ centralizado y emiten chunks en vivo mediante LangGraph Topics + `StreamWriter`.
 | Nodo | Entrada clave | Salida/efecto |
 | --- | --- | --- |
 | `ingest` | `question`, `history` | Normaliza texto, crea `session_id`, obtiene la ventana reciente desde memoria y arma `context`. |
-| `classify` | Estado previo | Llama a `intents/classifier_agent.classify_question_with_history` que usa `prompts/query_classifier.py` y produce `ClassificationResult` + `history_text`. |
-| `intent` | `classification`, historial de entidades | Invoca el IntentRouter clásico, rellena entidades faltantes y propone `route_decision`. |
+| `classify` | Estado previo | Llama a `classifier_agent.classify_question_with_history` (JointBERT + normalización) y produce `ClassificationResult` + `history_text`. |
+| `intent` | `classification`, historial de entidades | Invoca el IntentRouter (macro/intent/context), rellena entidades faltantes y propone `route_decision`. |
 | `router` | `route_decision` | Fan-out hacia `data`/`rag`/`fallback` y valida follow-ups de gráficos. |
 | `data` / `rag` / `fallback` | Dependiendo de la ruta | Emiten los chunks de cada flujo; `data` y `rag` también adjuntan markers y follow-ups. |
 | `memory` | `output` | Persiste la respuesta y el checkpoint del agente a través de `MemoryAdapter`. |

@@ -11,6 +11,11 @@ from langgraph.types import StreamWriter
 
 
 class IntentEnvelope(TypedDict, total=False):
+    # Nueva taxonomía
+    macro_cls: Optional[str]
+    intent_cls: Optional[str]
+    context_cls: Optional[str]
+    # Compatibilidad legacy
     intent: Optional[str]
     context_mode: Optional[str]
 
@@ -21,8 +26,11 @@ class EntityPayload(TypedDict, total=False):
     indicador: Optional[str]
     indicator: Optional[str]
     activity: Optional[str]
+    activity_cls: Optional[str]
     seasonality: Optional[str]
     region: Optional[str]
+    region_cls: Optional[str]
+    period: Optional[str]
     metric_type_cls: Optional[str]
     calc_mode_cls: Optional[str]
     req_form_cls: Optional[str]

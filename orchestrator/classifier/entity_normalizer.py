@@ -128,6 +128,12 @@ class EntityNormalizer:
             seasonality_result = self._normalize_seasonality(entities['seasonality'])
             if seasonality_result:
                 normalized['seasonality'] = seasonality_result
+
+        # Passthrough de activity/region cuando no hay normalizador específico
+        if 'activity' in entities and entities.get('activity'):
+            normalized.setdefault('activity', {'normalized': entities.get('activity')})
+        if 'region' in entities and entities.get('region'):
+            normalized.setdefault('region', {'normalized': entities.get('region')})
         
         return normalized
     

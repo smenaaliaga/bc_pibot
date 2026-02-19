@@ -4,14 +4,16 @@ Modelo Joint BERT para clasificación multi-cabeza de consultas sobre indicadore
 
 ## Cabezas de Clasificación
 
-El modelo predice simultáneamente 7 atributos:
+El modelo predice simultáneamente 7 atributos (legacy):
 - **indicator**: Indicador económico (ej: imacec, pib)
 - **metric_type**: Tipo de métrica (ej: index, level)
 - **calc_mode**: Modo de cálculo (ej: yoy, mom)
-- **seasonal**: Ajuste estacional (ej: sa, nsa)
+- **seasonality**: Ajuste estacional (ej: sa, nsa)
 - **req_form**: Forma de solicitud (ej: latest, historical)
 - **frequency**: Frecuencia (ej: m, q, a)
 - **activity**: Actividad/Sector (ej: total, agriculture)
+
+El wrapper del proyecto mapea estas salidas a la taxonomía nueva (`*_cls`).
 
 ## Uso
 

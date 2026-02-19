@@ -3,14 +3,15 @@ SeriesInterpreter - pibot-series-interpreter
 
 Clasifica las características de la serie solicitada.
 
-Cabezas del modelo:
-- indicator: "imacec" | "pib"
-- metric_type: "index" | "contribution"
-- seasonality: "sa" | "nsa"
-- activity: "total" | "imc_*" | "pib_*"
+Cabezas del modelo (nueva taxonomía):
+- calc_mode: "original" | "prev_period" | "yoy" | "contribution"
 - frequency: "m" | "q" | "a"
-- calc_mode: "none" | "yoy" | "prev_period"
-- req_form: "latest" | "point" | "range"
+- activity: "general" | "specific" | "none"
+- region: "general" | "specific" | "none"
+- req_form: "general" | "specific" | "none"
+
+Compatibilidad legacy:
+- indicator, metric_type, seasonality, activity (legacy), frequency, calc_mode, req_form
 
 Para usar un modelo real entrenado:
 1. Colocar el modelo en esta carpeta (e.g., checkpoint/, model.safetensors, config.json)
@@ -50,14 +51,8 @@ class SeriesInterpreter(BaseClassifier):
             model_path: Ruta a la carpeta del modelo (absoluta o relativa).
                        Si es relativa, se resuelve desde el directorio de este archivo.
         
-        El modelo tiene 7 clasificadores independientes (no BIO tagging):
-        - IndicatorClassifier
-        - MetricTypeClassifier  
-        - CalcModeClassifier
-        - SeasonalClassifier
-        - ReqFormClassifier
-        - FrequencyClassifier
-        - ActivityClassifier
+        El modelo legacy tiene 7 clasificadores independientes (no BIO tagging)
+        y se mantiene compatibilidad con esos outputs.
         """
         
         # Resolver ruta del modelo
@@ -156,6 +151,7 @@ class SeriesInterpreter(BaseClassifier):
             "frequency": "frequency_label.txt",
             "calc_mode": "calc_mode_label.txt",
             "req_form": "req_form_label.txt",
+            "region": "region_label.txt",
         }
         
         for slot_name, filename in label_files.items():
@@ -274,14 +270,54 @@ class SeriesInterpreter(BaseClassifier):
             frequency = safe_get_label("frequency", frequency_idx)
             activity = safe_get_label("activity", activity_idx)
             
+            def derive_calc_mode_cls(metric_type_val: str, calc_mode_val: str) -> str:
+                if metric_type_val == "contribution":
+                    return "contribution"
+                if calc_mode_val == "yoy":
+                    return "yoy"
+                if calc_mode_val == "prev_period":
+                    return "prev_period"
+                return "original"
+
+            def derive_activity_cls(activity_val: str) -> str:
+                if not activity_val or activity_val in {"unknown", "none"}:
+                    return "none"
+                if activity_val in {"total", "general"}:
+                    return "general"
+                return "specific"
+
+            def derive_req_form_cls(req_form_val: str) -> str:
+                if req_form_val in {"point", "range"}:
+                    return "specific"
+                if req_form_val == "latest":
+                    return "general"
+                return "none"
+
+            def derive_region_cls(text: str) -> str:
+                q_lower = (text or "").lower()
+                if any(t in q_lower for t in ["region", "región", "metropolitana", "rm", "valparaiso", "biobio", "araucania", "los lagos", "magallanes"]):
+                    return "specific"
+                return "none"
+
+            calc_mode_cls = derive_calc_mode_cls(metric_type, calc_mode)
+            activity_cls = derive_activity_cls(activity)
+            req_form_cls = derive_req_form_cls(req_form)
+            region_cls = derive_region_cls(query)
+
             return SeriesInterpreterOutput(
+                calc_mode_cls=LabeledScore(label=calc_mode_cls, confidence=calc_mode_confidence),
+                frequency_cls=LabeledScore(label=frequency, confidence=frequency_confidence),
+                activity_cls=LabeledScore(label=activity_cls, confidence=activity_confidence),
+                region_cls=LabeledScore(label=region_cls, confidence=None),
+                req_form_cls=LabeledScore(label=req_form_cls, confidence=req_form_confidence),
+                calc_mode=LabeledScore(label=calc_mode, confidence=calc_mode_confidence),
+                frequency=LabeledScore(label=frequency, confidence=frequency_confidence),
+                activity=LabeledScore(label=activity, confidence=activity_confidence),
+                region=None,
+                req_form=LabeledScore(label=req_form, confidence=req_form_confidence),
                 indicator=LabeledScore(label=indicator, confidence=indicator_confidence),
                 metric_type=LabeledScore(label=metric_type, confidence=metric_type_confidence),
                 seasonality=LabeledScore(label=seasonality, confidence=seasonal_confidence),
-                activity=LabeledScore(label=activity, confidence=activity_confidence),
-                frequency=LabeledScore(label=frequency, confidence=frequency_confidence),
-                calc_mode=LabeledScore(label=calc_mode, confidence=calc_mode_confidence),
-                req_form=LabeledScore(label=req_form, confidence=req_form_confidence)
             )
         
         except IndexError as e:
@@ -375,12 +411,25 @@ class SeriesInterpreter(BaseClassifier):
                 ]
                 req_form = "point" if any(t in q for t in date_tokens) else "latest"
         
+        calc_mode_cls = "contribution" if metric_type == "contribution" else (
+            "yoy" if calc_mode == "yoy" else "prev_period" if calc_mode == "prev_period" else "original"
+        )
+        activity_cls = "general" if activity in {"total", "general"} else "specific"
+        req_form_cls = "specific" if req_form in {"point", "range"} else "general"
+        region_cls = "specific" if any(t in q for t in ["region", "región", "metropolitana", "rm"]) else "none"
+
         return SeriesInterpreterOutput(
+            calc_mode_cls=LabeledScore(label=calc_mode_cls, confidence=None),
+            frequency_cls=LabeledScore(label=frequency, confidence=None),
+            activity_cls=LabeledScore(label=activity_cls, confidence=None),
+            region_cls=LabeledScore(label=region_cls, confidence=None),
+            req_form_cls=LabeledScore(label=req_form_cls, confidence=None),
+            calc_mode=LabeledScore(label=calc_mode, confidence=None),
+            frequency=LabeledScore(label=frequency, confidence=None),
+            activity=LabeledScore(label=activity, confidence=None),
+            region=None,
+            req_form=LabeledScore(label=req_form, confidence=None),
             indicator=LabeledScore(label=indicator, confidence=None),
             metric_type=LabeledScore(label=metric_type, confidence=None),
             seasonality=LabeledScore(label=seasonality, confidence=None),
-            activity=LabeledScore(label=activity, confidence=None),
-            frequency=LabeledScore(label=frequency, confidence=None),
-            calc_mode=LabeledScore(label=calc_mode, confidence=None),
-            req_form=LabeledScore(label=req_form, confidence=None)
         )

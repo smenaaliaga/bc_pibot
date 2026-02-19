@@ -107,3 +107,13 @@ CREATE TABLE IF NOT EXISTS series_metadata (
 );
 CREATE INDEX IF NOT EXISTS idx_series_freq ON series_metadata(freq);
 CREATE INDEX IF NOT EXISTS idx_series_capitulo ON series_metadata(cod_capitulo);
+
+-- Series embeddings (pgvector)
+CREATE TABLE IF NOT EXISTS series_embeddings (
+    cod_serie   TEXT PRIMARY KEY,
+    nkname_esp  TEXT NOT NULL,
+    embedding   vector(3072)
+);
+CREATE INDEX IF NOT EXISTS series_embeddings_embedding_ivfflat
+    ON series_embeddings USING ivfflat (embedding vector_l2_ops)
+    WITH (lists = 100);

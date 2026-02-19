@@ -43,8 +43,8 @@ flowchart LR
    desde `MemoryAdapter` y arma el `context` base.
 2. **classify** usa `orchestrator/prompts/query_classifier.py` y `classifier_agent.py` para obtener un
    `ClassificationResult` + `history_text` y genera `intent_info` estructurado.
-3. **intent** consulta el `IntentRouter` clásico, rellena entidades con el historial y propone un
-   `route_decision` (`data`, `rag` o `fallback`).
+3. **intent** consulta el `IntentRouter` (macro/intent/context), rellena entidades con el historial y
+   propone un `route_decision` (`data`, `rag` o `fallback`).
 4. **router** valida la decisión (p. ej. follow-ups de gráficos) y fan-out hacia el nodo final.
 5. **data** dispara `data_router.stream_data_flow` → `data/data_flow.py`, que produce la fase
    metodológica, tablas, markers de CSV/gráfico y follow-ups.
@@ -84,6 +84,136 @@ flowchart LR
 - **Memoria**: `PG_DSN`, `REQUIRE_PG_MEMORY`, `LANGGRAPH_CHECKPOINT_NS`, `MEMORY_MAX_TURNS_PROMPT`,
   `MEMORY_MAX_TURNS_STORE`.
 - **Logging**: `RUN_MAIN_LOG`, `LOG_LEVEL`, `LOG_EXPOSE_API_LINKS`, `THROTTLED_PG_LOG_PERIOD`.
+
+## Almacenamiento (Postgres + Redis)
+
+### ER diagram (Postgres)
+```mermaid
+---
+id: 9325cb89-430d-4267-bf7e-42748511f627
+---
+erDiagram
+SESSION_FACTS ||--o{ SESSION_TURNS : "session_id"
+SESSION_FACTS ||--o{ INTENTS : "session_id"
+SESSION_FACTS ||--o{ SHORT_TERM_TURNS : "session_id"
+SESSION_FACTS ||--o{ CHECKPOINTS : "thread_id"
+
+SESSION_FACTS {
+    string session_id PK
+    jsonb facts
+    timestamp updated_at
+}
+
+SESSION_TURNS {
+    int turn_id PK
+    string session_id
+    string role
+    string content
+    jsonb metadata
+    timestamptz ts
+}
+
+SHORT_TERM_TURNS {
+    uuid id PK
+    string session_id
+    string role
+    string content
+    timestamptz ts
+}
+
+INTENTS {
+    uuid id PK
+    string session_id
+    int turn_id
+    string intent
+    float score
+    jsonb spans
+    jsonb entities
+    string model_version
+    timestamptz ts
+}
+
+CHECKPOINTS {
+    string thread_id PK
+    string checkpoint_ns PK
+    string checkpoint_id PK
+    string parent_checkpoint_id
+    string type
+    jsonb checkpoint
+    jsonb metadata
+}
+
+CHECKPOINT_BLOBS {
+    string thread_id PK
+    string checkpoint_ns PK
+    string channel PK
+    string version PK
+    string type
+    bytea blob
+}
+
+CHECKPOINT_WRITES {
+    string thread_id PK
+    string checkpoint_ns PK
+    string checkpoint_id PK
+    string task_id PK
+    string task_path
+    int idx PK
+    string channel
+    string type
+    bytea blob
+}
+
+CHECKPOINT_MIGRATIONS {
+    int v PK
+}
+
+SERIES_METADATA {
+    string cod_serie PK
+    string freq
+    string desc_serie_esp
+    string nkname_esp
+    string cap_esp
+    string cod_capitulo
+    string cod_cuadro
+    string desc_cuad_esp
+    string url
+    string metadata_unidad
+    string metadata_fuente
+    string metadata_rezago
+    string metadata_base
+    string metadata_metodologia
+    string metadata_concep_est
+    string metadata_recom_uso
+    jsonb extra
+}
+
+SERIES_EMBEDDINGS {
+    string cod_serie PK
+    string nkname_esp
+    vector embedding
+}
+```
+
+### Utilidad de tablas (Postgres)
+- **session_facts**: memoria estructurada por sesión. Guarda `macro_cls`, `intent_cls`, `context_cls`,
+   NER (`indicator`, `seasonality`, `activity`, `region`, `period`), y `session_payload` para suposiciones
+   o preferencias del usuario.
+- **session_turns**: historial persistente (role/content/metadata) para ventanas de contexto.
+- **short_term_turns**: almacenamiento rápido de turnos de baja latencia (sidecar) para debugging.
+- **intents**: histórico del IntentStore (intents, score, spans, entities) por sesión/turno.
+- **checkpoints, checkpoint_blobs, checkpoint_writes, checkpoint_migrations**: tablas del
+   checkpointer LangGraph para reanudar el estado del grafo.
+- **series_metadata**: catálogo de series BCCh normalizado (metadata + extra JSON).
+- **series_embeddings**: embeddings pgvector para búsqueda semántica de series (db/pgvector.sql).
+
+### Utilidad de claves (Redis)
+Redis se usa como cache de series BCCh. En orquestación, las claves siguen el formato:
+`bcch:series:{series_id}:{firstdate}:{lastdate}:{frequency}:{agg}`
+para almacenar la respuesta completa de la API (meta + observaciones + variaciones).
+
+### Script de setup
+Todas las tablas se crean desde docker/postgres/init.sql (docker compose o psql -f).
 
 ## Desarrollo y pruebas
 - `tools/debug_graph_stream.py` y `tools/debug_graph_invoke.py`: validan streaming LangGraph (updates vs

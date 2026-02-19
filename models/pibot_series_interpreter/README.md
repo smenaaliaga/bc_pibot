@@ -4,17 +4,17 @@ Modelo JointBERT para clasificación de características de series económicas d
 
 ## Descripción
 
-Este modelo clasifica 7 dimensiones de la consulta:
+Este modelo expone la **nueva taxonomía** y mantiene compatibilidad legacy:
 
-| Cabeza | Valores posibles | Descripción |
+| Cabeza (nueva) | Valores posibles | Descripción |
 |--------|------------------|-------------|
-| `indicator` | `imacec`, `pib` | Indicador económico |
-| `metric_type` | `index`, `contribution` | Tipo de metrica |
-| `seasonality` | `sa`, `nsa` | Ajuste estacional |
-| `activity` | `total`, `imc_*`, `pib_*` | Sector/actividad |
-| `frequency` | `m`, `q`, `a` | Frecuencia temporal |
-| `req_form` | `latest`, `point`, `range` | Forma de la solicitud |
-| `calc_mode` | `none`, `yoy`, `prev_period` | Tipo de variación |
+| `calc_mode_cls` | `original`, `prev_period`, `yoy`, `contribution` | Tipo de variación |
+| `frequency_cls` | `m`, `q`, `a` | Frecuencia temporal |
+| `activity_cls` | `general`, `specific`, `none` | Sector/actividad |
+| `region_cls` | `general`, `specific`, `none` | Región/territorio |
+| `req_form_cls` | `general`, `specific`, `none` | Forma de la solicitud |
+
+Legacy disponible (si el modelo lo entrega): `indicator`, `metric_type`, `seasonality`, `activity`, `frequency`, `calc_mode`, `req_form`.
 
 ## Descargar Modelo (Opcional)
 
@@ -22,7 +22,7 @@ El modelo `pibot-jointbert` (7-head JointBERT) está disponible en HuggingFace. 
 
 ```bash
 hf download smenaaliaga/pibot-jointbert \
-  --local-dir ./src/models/pibot_series_interpreter/pibot-jointbert
+  --local-dir ./models/pibot_series_interpreter/pibot-jointbert
 ```
 
 Esto descarga los **pesos del modelo** a la carpeta `pibot-jointbert/`:
@@ -54,11 +54,10 @@ interpreter = SeriesInterpreter(model_path="pibot-jointbert")
 
 # Predecir
 result = interpreter.predict("Cuanto creció la economia en diciembre 2025?")
-print(result.indicator.label)       # "imacec"
-print(result.frequency.label)       # "m"
-print(result.seasonality.label)     # "sa"
-print(result.req_form.label)        # "point"
-print(result.indicator.confidence)  # 0.95 (ej., None si heuristico)
+print(result.frequency_cls.label)   # "m"
+print(result.calc_mode_cls.label)   # "yoy"
+print(result.req_form_cls.label)    # "specific"
+print(result.frequency_cls.confidence)  # 0.95 (ej., None si heuristico)
 ```
 
 ## Inspeccion del modelo (modo DP)
@@ -94,7 +93,7 @@ model.bert.config.num_attention_heads # 12
 # Clasificadores por cabeza (cada uno es un Linear layer)
 model.indicator_classifier    # Linear(768 -> num_indicator_labels)
 model.metric_type_classifier  # Linear(768 -> num_metric_type_labels)
-# ... y asi para las 7 cabezas
+# ... y asi para las 7 cabezas legacy
 
 # Numero total de parametros
 sum(p.numel() for p in model.parameters())  # ~110M parametros
@@ -109,7 +108,7 @@ sum(p.numel() for p in model.parameters())  # ~110M parametros
 **Ejemplo - analizar predicciones por cabeza:**
 ```python
 result = interpreter.predict("Imacec mensual de diciembre")
-for field in ["indicator", "frequency", "seasonality", "req_form"]:
+for field in ["frequency_cls", "calc_mode_cls", "req_form_cls"]:
     attr = getattr(result, field)
     print(f"{field}: {attr.label} (conf: {attr.confidence:.3f})")
 ```
@@ -123,5 +122,5 @@ sentencepiece
 
 ## Arquitectura (modelo DP - Transformer)
 - Encoder: BERT base (embeddings + self-attention) compartido.
-- Cabezas: 7 clasificadores softmax independientes (indicator, metric_type, seasonality, activity, frequency, req_form, calc_mode).
-- Flujo: texto -> tokenizer -> encoder -> cabezas -> etiquetas + confidencia por cabeza.
+- Cabezas: JointBERT legacy con 7 clasificadores (indicator, metric_type, seasonality, activity, frequency, req_form, calc_mode).
+- El wrapper mapea esas salidas a la taxonomía nueva (`*_cls`).

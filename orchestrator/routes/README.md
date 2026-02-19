@@ -9,7 +9,7 @@ de datos antes de invocar a LangGraph.
 	- `_handle_chart_followup` usa solo metadata de los últimos turnos (sin facts persistidos) para detectar
 		solicitudes como “otro gráfico del PIB”.
 	- `route_intents` mantiene la capa declarativa (`catalog/intents.json`) para herramientas legacy; hoy
-		el grafo principal confía en el IntentRouter ML del nodo `intent`, pero los handlers siguen
+		el grafo principal confía en el IntentRouter ML del nodo `intent` (macro/intent/context), pero los handlers siguen
 		estando disponibles para flujos CLI/tests.
 	- Los helpers de IMACEC/PIB comparten utilidades con `data_router` para no duplicar llamadas al
 		catálogo ni a `_last_data_context`.

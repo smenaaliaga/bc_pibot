@@ -4,18 +4,18 @@ IntentRouter - pibot-intent-router
 Clasifica la intención de la consulta del usuario.
 
 Cabezas del modelo:
-- intent: "value" | "methodology"
-- context_mode: "standalone" | "followup"
+- macro_cls: "1" | "0"
+- intent_cls: "value" | "method" | "other"
+- context_cls: "standalone" | "followup"
 
 Para usar un modelo real entrenado:
 1. Colocar el modelo en esta carpeta (e.g., checkpoint/, model.safetensors, config.json)
 2. Descomentar y adaptar el método load_model()
-3. El modelo debe retornar un dict con keys: "intent" y "context_mode"
+3. El modelo debe retornar un dict con keys: "intent_cls" y "context_cls"
 """
 
 from typing import Optional, Union, Dict, Any
 import os
-import re
 import json
 import joblib
 from ..base import BaseClassifier, IntentRouterOutput, LabeledScore
@@ -46,7 +46,7 @@ class IntentRouter(BaseClassifier):
             model_path: Ruta al modelo (absoluta o relativa al directorio de este archivo)
         
         Artefactos:
-        - intent_clf.joblib: Clasificador de intención (value vs methodology)
+        - intent_clf.joblib: Clasificador intent_cls (value/method/other)
         - context_clf.joblib: Clasificador de contexto (standalone vs followup)
         - label_maps.json: Mapeo de índices a etiquetas para ambos clasificadores
         - thresholds.json: (Opcional) Umbrales de confianza
@@ -111,7 +111,7 @@ class IntentRouter(BaseClassifier):
             query: Consulta del usuario
             
         Returns:
-            IntentRouterOutput con intent y context_mode
+            IntentRouterOutput con macro_cls, intent_cls y context_cls
         """
         if self.model:
             # Si hay modelo real, usarlo
@@ -138,7 +138,7 @@ class IntentRouter(BaseClassifier):
             thresholds = self.model.get("thresholds")
             
             # Validar estructura de label_maps
-            if not label_maps or "intent" not in label_maps or "context_mode" not in label_maps:
+            if not label_maps or "context_mode" not in label_maps:
                 import logging
                 logging.error("[ IntentRouter] label_maps corrupted or missing")
                 return self._predict_heuristic(query)
@@ -165,8 +165,8 @@ class IntentRouter(BaseClassifier):
             intent_idx = int(intent_idx)
             context_idx = int(context_idx)
             
-            intent_dict = label_maps["intent"]
-            context_dict = label_maps["context_mode"]
+            intent_dict = label_maps.get("intent_cls") or label_maps.get("intnet_cls") or label_maps.get("intent") or {}
+            context_dict = label_maps.get("context_cls") or label_maps.get("context_mode") or {}
             
             intent_str = str(intent_idx)
             context_str = str(context_idx)
@@ -191,10 +191,14 @@ class IntentRouter(BaseClassifier):
             # 4. Decodificar usando label_maps (ahora con validación)
             intent_label = intent_dict[intent_str]
             context_label = context_dict[context_str]
+            macro_label = "1" if intent_label in {"value", "method", "methodology"} else "0"
             
             return IntentRouterOutput(
+                macro_cls=LabeledScore(label=macro_label, confidence=None),
+                intent_cls=LabeledScore(label=intent_label, confidence=intent_confidence),
+                context_cls=LabeledScore(label=context_label, confidence=context_confidence),
                 intent=LabeledScore(label=intent_label, confidence=intent_confidence),
-                context_mode=LabeledScore(label=context_label, confidence=context_confidence)
+                context_mode=LabeledScore(label=context_label, confidence=context_confidence),
             )
         
         except IndexError as e:
@@ -227,13 +231,25 @@ class IntentRouter(BaseClassifier):
         intent = "methodology" if any(t in q for t in methodology_tokens) else "value"
         
         # Detectar follow-up
-        followup_patterns = [
-            r"^y ", r"y también", r"además", r"continuando",
-            r"como te decía", r"también"
-        ]
-        context_mode = "followup" if any(re.search(p, q) for p in followup_patterns) else "standalone"
+        followup_tokens = (
+            "y ",
+            "y también",
+            "y tambien",
+            "además",
+            "ademas",
+            "continuando",
+            "como te decía",
+            "como te decia",
+            "también",
+            "tambien",
+        )
+        is_followup = q.startswith("y ") or any(token in q for token in followup_tokens)
+        context_mode = "followup" if is_followup else "standalone"
         
         return IntentRouterOutput(
+            macro_cls=LabeledScore(label="1"),
+            intent_cls=LabeledScore(label=intent),
+            context_cls=LabeledScore(label=context_mode),
             intent=LabeledScore(label=intent, confidence=None),
-            context_mode=LabeledScore(label=context_mode, confidence=None)
+            context_mode=LabeledScore(label=context_mode, confidence=None),
         )

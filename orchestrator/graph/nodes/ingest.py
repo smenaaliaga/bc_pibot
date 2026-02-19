@@ -46,7 +46,13 @@ def make_ingest_node(memory_adapter: Any):
             "conversation_history": conversation_history,
             "context": context,
             "session_id": session_id,
-            "intent": {"intent": None, "context_mode": None},
+            "intent": {
+                "macro_cls": None,
+                "intent_cls": None,
+                "context_cls": None,
+                "intent": None,
+                "context_mode": None,
+            },
             "entities": [],
         }
         if user_turn_id is not None:
@@ -62,23 +68,41 @@ def make_intent_node(memory_adapter: Any, predict_with_router):
         session_id = state.get("session_id", "")
 
         results = predict_with_router(question)
-        intent_label = getattr(getattr(results, "intent", None), "label", "") or ""
+        intent_label = (
+            getattr(getattr(results, "intent_cls", None), "label", "")
+            or getattr(getattr(results, "intent", None), "label", "")
+            or ""
+        )
+        context_label = (
+            getattr(getattr(results, "context_cls", None), "label", "")
+            or getattr(getattr(results, "context_mode", None), "label", "")
+            or ""
+        )
+        macro_label = getattr(getattr(results, "macro_cls", None), "label", None)
 
-        if intent_label == "value":
+        normalized_intent = "method" if intent_label == "methodology" else intent_label
+
+        if normalized_intent == "other" and context_label == "standalone":
+            decision = "fallback"
+        elif normalized_intent == "value":
             decision = "data"
-        elif intent_label == "methodology":
+        elif normalized_intent == "method":
             decision = "rag"
         else:
             decision = "fallback"
 
         logger.info(
-            "[INTENT_NODE] PIBOT_INTENT_ROUTE | intent=%s | decision=%s",
-            intent_label,
+            "[INTENT_NODE] PIBOT_INTENT_ROUTE | intent_cls=%s | context_cls=%s | decision=%s",
+            normalized_intent,
+            context_label,
             decision,
         )
 
         intent_envelope = dict(state.get("intent") or {})
-        intent_envelope["intent"] = intent_label
+        intent_envelope["macro_cls"] = macro_label
+        intent_envelope["intent_cls"] = normalized_intent
+        intent_envelope["context_cls"] = context_label
+        intent_envelope["intent"] = normalized_intent
         intent_envelope["context_mode"] = decision
 
         entities = _clone_entities(state.get("entities"))
@@ -93,10 +117,11 @@ def make_intent_node(memory_adapter: Any, predict_with_router):
                     "activity": prior_entity.get("activity"),
                     "seasonality": prior_entity.get("seasonality"),
                     "region": prior_entity.get("region"),
+                    "period": prior_entity.get("period"),
                 },
             )
 
-        for key in ("indicator", "activity", "seasonality", "region"):
+        for key in ("indicator", "activity", "seasonality", "region", "period"):
             primary_entity.setdefault(key, None)
 
         return {"route_decision": decision, "intent": intent_envelope, "entities": entities}
@@ -117,6 +142,7 @@ def make_router_node():
                 "activity": history_entity.get("activity"),
                 "seasonality": history_entity.get("seasonality"),
                 "region": history_entity.get("region"),
+                "period": history_entity.get("period"),
             }
         _merge_entity_fields(primary_entity, history_payload)
 
