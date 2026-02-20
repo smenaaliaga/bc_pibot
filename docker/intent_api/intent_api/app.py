@@ -10,11 +10,14 @@ from .logic import classify_intent
 class IntentRequest(BaseModel):
     text: str
 
+class LabelConfidence(BaseModel):
+    label: int | str
+    confidence: float
 
 class IntentResponse(BaseModel):
-    macro: int
-    intent: str
-    context: str
+    macro: LabelConfidence
+    intent: LabelConfidence
+    context: LabelConfidence
 
 
 app = FastAPI(title="PIBot Intent API", version="0.1.0")
