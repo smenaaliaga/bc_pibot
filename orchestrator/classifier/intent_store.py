@@ -52,6 +52,8 @@ class IntentStoreBase:
         score: float,
         spans: Optional[List[Dict[str, Any]]] = None,
         entities: Optional[Dict[str, Any]] = None,
+        intent_raw: Optional[Dict[str, Any]] = None,
+        predict_raw: Optional[Dict[str, Any]] = None,
         turn_id: int = 0,
         model_version: Optional[str] = None,
     ) -> IntentRecord:
@@ -164,12 +166,23 @@ class PostgresIntentStore(IntentStoreBase):
                             score DOUBLE PRECISION,
                             spans JSONB,
                             entities JSONB,
+                            intent_raw JSONB,
+                            predict_raw JSONB,
                             model_version TEXT,
                             ts TIMESTAMPTZ DEFAULT NOW()
                         );
                         CREATE INDEX IF NOT EXISTS idx_intents_session_ts ON {self.table}(session_id, ts DESC);
                         """
                     )
+                    try:
+                        cur.execute(
+                            f"ALTER TABLE {self.table} ADD COLUMN IF NOT EXISTS intent_raw JSONB"
+                        )
+                        cur.execute(
+                            f"ALTER TABLE {self.table} ADD COLUMN IF NOT EXISTS predict_raw JSONB"
+                        )
+                    except Exception:
+                        self._log_pg_error("Failed to add raw columns to intents table", op="schema", table=self.table)
                     # optional TTL cleanup if desired on init (lightweight)
                     if self.ttl_days:
                         cur.execute(
@@ -185,6 +198,8 @@ class PostgresIntentStore(IntentStoreBase):
         score: float,
         spans: Optional[List[Dict[str, Any]]] = None,
         entities: Optional[Dict[str, Any]] = None,
+        intent_raw: Optional[Dict[str, Any]] = None,
+        predict_raw: Optional[Dict[str, Any]] = None,
         turn_id: int = 0,
         model_version: Optional[str] = None,
     ) -> IntentRecord:
@@ -193,6 +208,8 @@ class PostgresIntentStore(IntentStoreBase):
             score=float(score or 0.0),
             spans=list(spans or []),
             entities=dict(entities or {}),
+            intent_raw=dict(intent_raw or {}),
+            predict_raw=dict(predict_raw or {}),
             turn_id=turn_id,
         )
         try:
@@ -204,8 +221,8 @@ class PostgresIntentStore(IntentStoreBase):
                     cur.execute(
                         f"""
                         INSERT INTO {self.table}
-                        (id, session_id, turn_id, intent, score, spans, entities, model_version, ts)
-                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,NOW())
+                        (id, session_id, turn_id, intent, score, spans, entities, intent_raw, predict_raw, model_version, ts)
+                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,NOW())
                         """,
                         (
                             uuid.uuid4(),
@@ -215,6 +232,8 @@ class PostgresIntentStore(IntentStoreBase):
                             rec.score,
                             json.dumps(_json_safe(rec.spans)),
                             json.dumps(_json_safe(rec.entities)),
+                            json.dumps(_json_safe(rec.intent_raw)),
+                            json.dumps(_json_safe(rec.predict_raw)),
                             model_version or "",
                         ),
                     )
@@ -230,13 +249,20 @@ class PostgresIntentStore(IntentStoreBase):
         out: List[IntentRecord] = []
         for r in rows or []:
             try:
-                intent, score, spans, entities, turn_id, ts = r
+                intent_raw = {}
+                predict_raw = {}
+                if len(r) >= 8:
+                    intent, score, spans, entities, turn_id, ts, intent_raw, predict_raw = r[:8]
+                else:
+                    intent, score, spans, entities, turn_id, ts = r
                 out.append(
                     IntentRecord(
                         intent=intent or "",
                         score=float(score or 0.0),
                         spans=spans or [],
                         entities=entities or {},
+                        intent_raw=intent_raw or {},
+                        predict_raw=predict_raw or {},
                         turn_id=turn_id or 0,
                         ts=ts.timestamp() if hasattr(ts, "timestamp") else time.time(),
                     )
@@ -254,7 +280,7 @@ class PostgresIntentStore(IntentStoreBase):
                 with conn.cursor() as cur:
                     cur.execute(
                         f"""
-                        SELECT intent, score, spans, entities, turn_id, ts
+                        SELECT intent, score, spans, entities, turn_id, ts, intent_raw, predict_raw
                         FROM {self.table}
                         WHERE session_id=%s
                         ORDER BY ts DESC
@@ -277,7 +303,7 @@ class PostgresIntentStore(IntentStoreBase):
                 with conn.cursor() as cur:
                     cur.execute(
                         f"""
-                        SELECT intent, score, spans, entities, turn_id, ts
+                        SELECT intent, score, spans, entities, turn_id, ts, intent_raw, predict_raw
                         FROM {self.table}
                         WHERE session_id=%s
                         ORDER BY ts DESC
@@ -317,6 +343,8 @@ class RedisIntentStore(IntentStoreBase):
         score: float,
         spans: Optional[List[Dict[str, Any]]] = None,
         entities: Optional[Dict[str, Any]] = None,
+        intent_raw: Optional[Dict[str, Any]] = None,
+        predict_raw: Optional[Dict[str, Any]] = None,
         turn_id: int = 0,
         model_version: Optional[str] = None,
     ) -> IntentRecord:
@@ -325,6 +353,8 @@ class RedisIntentStore(IntentStoreBase):
             score=float(score or 0.0),
             spans=list(spans or []),
             entities=dict(entities or {}),
+            intent_raw=dict(intent_raw or {}),
+            predict_raw=dict(predict_raw or {}),
             turn_id=turn_id,
         )
         try:
@@ -353,6 +383,8 @@ class RedisIntentStore(IntentStoreBase):
                             score=float(obj.get("score", 0.0)),
                             spans=obj.get("spans") or [],
                             entities=obj.get("entities") or {},
+                            intent_raw=obj.get("intent_raw") or {},
+                            predict_raw=obj.get("predict_raw") or {},
                             turn_id=int(obj.get("turn_id", 0)),
                             ts=float(obj.get("ts", time.time())),
                         )

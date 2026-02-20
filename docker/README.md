@@ -26,7 +26,7 @@ From `docker/`:
 ```bash
 docker compose up -d intent-api
 ```
-Endpoint disponible en `http://localhost:8000/intent`.
+Endpoint disponible en `http://localhost:8100/intent`.
 
 
 

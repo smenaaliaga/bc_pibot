@@ -80,6 +80,8 @@ CREATE TABLE IF NOT EXISTS intents (
     score DOUBLE PRECISION,
     spans JSONB,
     entities JSONB,
+    intent_raw JSONB,
+    predict_raw JSONB,
     model_version TEXT,
     ts TIMESTAMPTZ DEFAULT NOW()
 );

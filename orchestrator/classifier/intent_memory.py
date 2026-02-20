@@ -13,6 +13,8 @@ class IntentRecord:
     score: float
     spans: List[Dict[str, Any]] = field(default_factory=list)
     entities: Dict[str, Any] = field(default_factory=dict)
+    intent_raw: Dict[str, Any] = field(default_factory=dict)
+    predict_raw: Dict[str, Any] = field(default_factory=dict)
     turn_id: int = 0
     ts: float = field(default_factory=time.time)
 
@@ -32,6 +34,8 @@ class IntentMemory:
         score: float,
         spans: Optional[List[Dict[str, Any]]] = None,
         entities: Optional[Dict[str, Any]] = None,
+        intent_raw: Optional[Dict[str, Any]] = None,
+        predict_raw: Optional[Dict[str, Any]] = None,
         turn_id: int = 0,
         model_version: Optional[str] = None,
     ) -> IntentRecord:
@@ -40,6 +44,8 @@ class IntentMemory:
             score=float(score or 0.0),
             spans=list(spans or []),
             entities=dict(entities or {}),
+            intent_raw=dict(intent_raw or {}),
+            predict_raw=dict(predict_raw or {}),
             turn_id=turn_id,
         )
         with self._lock:

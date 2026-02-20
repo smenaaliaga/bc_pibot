@@ -39,6 +39,8 @@ class ClassificationResult:
     req_form: Optional[dict] = None
     macro: Optional[int] = None
     context: Optional[str] = None
+    intent_raw: Optional[dict] = None
+    predict_raw: Optional[dict] = None
 
 
 # ============================================================
@@ -163,12 +165,24 @@ def _classify_with_jointbert(question: str) -> ClassificationResult:
     predict_payload = {"text": question}
     predict_result = post_json(PREDICT_URL, predict_payload, timeout=PREDICT_TIMEOUT_SECONDS)
     logger.debug("[PREDICT_API] response=%s", predict_result)
+    predict_result_dict: Dict[str, Any] = predict_result if isinstance(predict_result, dict) else {}
+    interpretation = predict_result_dict.get("interpretation")
+    if isinstance(interpretation, dict):
+        predict_raw = interpretation
+        predict_source = interpretation
+    else:
+        predict_raw = predict_result_dict if isinstance(predict_result, dict) else {"raw": predict_result}
+        predict_source = predict_result_dict
+    predict_result = predict_result_dict
 
     intent_payload = {"text": question}
     intent_result = post_json(INTENT_CLASSIFIER_URL, intent_payload, timeout=PREDICT_TIMEOUT_SECONDS)
     logger.debug("[INTENT_API] response=%s", intent_result)
+    intent_raw: Dict[str, Any] = intent_result if isinstance(intent_result, dict) else {"raw": intent_result}
+    if not isinstance(intent_result, dict):
+        intent_result = {}
 
-    entities_api = predict_result.get("entities", {}) or {}
+    entities_api = predict_source.get("entities", {}) or {}
     entities_flat = _flatten_api_entities(entities_api)
     
     # Aplicar normalización de entidades
@@ -195,23 +209,30 @@ def _classify_with_jointbert(question: str) -> ClassificationResult:
     else:
         indicator = _get_first_entity_value(entities, "indicator").lower()
     
+    text = (
+        interpretation.get("text")
+        if isinstance(interpretation, dict)
+        else None
+    ) or predict_result.get("text") or question
+
     return ClassificationResult(
         intent=intent,
         confidence=confidence,
         entities=entities,
         normalized=normalized,
-        text=predict_result.get("text", question),
-        words=predict_result.get("words") or [],
-        slot_tags=predict_result.get("slot_tags") or predict_result.get("slots") or [],
-        calc_mode=predict_result.get("calc_mode"),
-        activity=predict_result.get("activity"),
-        region=predict_result.get("region"),
-        investment=predict_result.get("investment"),
-        req_form=predict_result.get("req_form"),
+        text=text,
+        words=predict_source.get("words") or [],
+        slot_tags=predict_source.get("slot_tags") or predict_source.get("slots") or [],
+        calc_mode=predict_source.get("calc_mode"),
+        activity=predict_source.get("activity"),
+        region=predict_source.get("region"),
+        investment=predict_source.get("investment"),
+        req_form=predict_source.get("req_form"),
         macro=macro,
         context=context,
+        intent_raw=intent_raw,
+        predict_raw=predict_raw,
     )
-
 
 def classify_question_with_history(
     question: str, history: Optional[List[Dict[str, str]]]
@@ -279,6 +300,8 @@ def build_intent_info(cls: Optional[ClassificationResult]) -> Optional[Dict[str,
             "score": cls.confidence or 0.0,
             "entities": cls.entities or {},
             "normalized": cls.normalized or {},
+            "intent_raw": cls.intent_raw or {},
+            "predict_raw": cls.predict_raw or {},
             "indicator": indicator,
             "spans": [],
             "macro": cls.macro,
