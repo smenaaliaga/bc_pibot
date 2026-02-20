@@ -54,7 +54,19 @@ def test_classify_node_persists_intent_event(monkeypatch):
         def __init__(self):
             self.calls = []
 
-        def record(self, session_id, intent, score, *, spans=None, entities=None, turn_id=0, model_version=None):
+        def record(
+            self,
+            session_id,
+            intent,
+            score,
+            *,
+            spans=None,
+            entities=None,
+            intent_raw=None,
+            predict_raw=None,
+            turn_id=0,
+            model_version=None,
+        ):
             self.calls.append(
                 {
                     "session_id": session_id,

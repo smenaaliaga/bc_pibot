@@ -39,6 +39,8 @@ class ClassificationResult:
     req_form: Optional[dict] = None
     macro: Optional[int] = None
     context: Optional[str] = None
+    intent_raw: Optional[dict] = None
+    predict_raw: Optional[dict] = None
 
 
 # ============================================================
@@ -163,10 +165,16 @@ def _classify_with_jointbert(question: str) -> ClassificationResult:
     predict_payload = {"text": question}
     predict_result = post_json(PREDICT_URL, predict_payload, timeout=PREDICT_TIMEOUT_SECONDS)
     logger.debug("[PREDICT_API] response=%s", predict_result)
+    predict_raw: Dict[str, Any] = predict_result if isinstance(predict_result, dict) else {"raw": predict_result}
+    if not isinstance(predict_result, dict):
+        predict_result = {}
 
     intent_payload = {"text": question}
     intent_result = post_json(INTENT_CLASSIFIER_URL, intent_payload, timeout=PREDICT_TIMEOUT_SECONDS)
     logger.debug("[INTENT_API] response=%s", intent_result)
+    intent_raw: Dict[str, Any] = intent_result if isinstance(intent_result, dict) else {"raw": intent_result}
+    if not isinstance(intent_result, dict):
+        intent_result = {}
 
     entities_api = predict_result.get("entities", {}) or {}
     entities_flat = _flatten_api_entities(entities_api)
@@ -210,6 +218,8 @@ def _classify_with_jointbert(question: str) -> ClassificationResult:
         req_form=predict_result.get("req_form"),
         macro=macro,
         context=context,
+        intent_raw=intent_raw,
+        predict_raw=predict_raw,
     )
 
 
@@ -279,6 +289,8 @@ def build_intent_info(cls: Optional[ClassificationResult]) -> Optional[Dict[str,
             "score": cls.confidence or 0.0,
             "entities": cls.entities or {},
             "normalized": cls.normalized or {},
+            "intent_raw": cls.intent_raw or {},
+            "predict_raw": cls.predict_raw or {},
             "indicator": indicator,
             "spans": [],
             "macro": cls.macro,

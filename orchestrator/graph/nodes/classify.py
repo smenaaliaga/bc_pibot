@@ -51,6 +51,8 @@ def _record_intent_event(
     spans = payload.get("spans") or []
     base_entities = payload.get("entities") or {}
     entities = dict(base_entities) if isinstance(base_entities, dict) else {}
+    intent_raw = payload.get("intent_raw") or {}
+    predict_raw = payload.get("predict_raw") or {}
     extra_jointbert: Dict[str, Any] = {}
     if classification:
         if getattr(classification, "intent", None):
@@ -61,6 +63,10 @@ def _record_intent_event(
             extra_jointbert["entities"] = classification.entities
         if getattr(classification, "normalized", None):
             extra_jointbert["normalized"] = classification.normalized
+        if not intent_raw and getattr(classification, "intent_raw", None):
+            intent_raw = getattr(classification, "intent_raw")
+        if not predict_raw and getattr(classification, "predict_raw", None):
+            predict_raw = getattr(classification, "predict_raw")
     if extra_jointbert:
         entities = dict(entities)
         entities["jointbert"] = extra_jointbert
@@ -72,6 +78,8 @@ def _record_intent_event(
             spans=spans,
             entities=entities,
             turn_id=int(turn_id),
+            intent_raw=intent_raw,
+            predict_raw=predict_raw,
         )
     except Exception:
         logger.debug("[GRAPH] Unable to persist intent event", exc_info=True)
