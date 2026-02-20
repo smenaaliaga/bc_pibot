@@ -74,6 +74,8 @@ def test_classify_node_persists_intent_event(monkeypatch):
                     "score": score,
                     "spans": spans or [],
                     "entities": entities or {},
+                    "intent_raw": intent_raw or {},
+                    "predict_raw": predict_raw or {},
                     "turn_id": turn_id,
                 }
             )
@@ -85,8 +87,14 @@ def test_classify_node_persists_intent_event(monkeypatch):
         return types.SimpleNamespace(query_type="DATA"), "hist"
 
     def fake_build_intent_info(cls):
-        return {"intent": "ask_data", "score": 0.75, "spans": [{"text": "foo", "label": "O", "start": 0, "end": 3}], "entities": {"domain": "IMACEC"}}
-
+        return {
+            "intent": "ask_data",
+            "score": 0.75,
+            "spans": [{"text": "foo", "label": "O", "start": 0, "end": 3}],
+            "entities": {"domain": "IMACEC"},
+            "intent_raw": {"intent": "ask_data", "source": "router"},
+            "predict_raw": {"entities": {"domain": ["IMACEC"]}},
+        }
     monkeypatch.setattr(ag, "classify_question_with_history", fake_classify)
     monkeypatch.setattr(ag, "build_intent_info", fake_build_intent_info)
 
@@ -99,3 +107,5 @@ def test_classify_node_persists_intent_event(monkeypatch):
     assert call["intent"] == "ask_data"
     assert call["turn_id"] == 99
     assert call["entities"] == {"domain": "IMACEC"}
+    assert call["intent_raw"] == {"intent": "ask_data", "source": "router"}
+    assert call["predict_raw"] == {"entities": {"domain": ["IMACEC"]}}
