@@ -52,6 +52,17 @@ Ayudas con consultas sobre indicadores económicos chilenos (IMACEC, PIB).
     return base + "\n\nMODO FALLBACK: Responde basándote en tu conocimiento general sobre economía chilena."
 
 
+def _first_entity_value(entity: Any) -> str:
+    if isinstance(entity, list):
+        for item in entity:
+            if isinstance(item, str) and item.strip():
+                return item
+        return ""
+    if isinstance(entity, str):
+        return entity
+    return ""
+
+
 class LLMAdapter:
     """Chat generation adapter using LangChain (streaming when available)."""
 
@@ -115,16 +126,16 @@ class LLMAdapter:
                     ent = intent_info.get("entities") if intent_info else {}
                 except Exception:
                     ent = {}
-                indicator = str(ent.get("indicator") or "").lower()
+                indicator = _first_entity_value(ent.get("indicator")).lower()
                 if indicator:
                     if "pib" in indicator:
                         meta_filter = {"topic": "pib"}
                     elif "imacec" in indicator:
                         meta_filter = {"topic": "imacec"}
-                sector = str(ent.get("sector") or "").lower()
+                sector = _first_entity_value(ent.get("sector")).lower()
                 if sector and meta_filter.get("topic") == "imacec":
                     meta_filter["sector"] = sector
-                season = str(ent.get("seasonality") or "").lower()
+                season = _first_entity_value(ent.get("seasonality")).lower()
                 if season:
                     meta_filter["seasonality"] = season
 

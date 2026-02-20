@@ -6,13 +6,13 @@ cambios de backend.
 
 ## Archivos
 - `llm_adapter.py`: implementación de `LLMAdapter` con soporte de streaming, inyección de contexto RAG,
-  historial y facts. Se encarga de `_build_messages`, del `ChatOpenAI`/`init_chat_model` y de la lógica
+  historial y metadata conversacional. Se encarga de `_build_messages`, del `ChatOpenAI`/`init_chat_model` y de la lógica
   de `stream()`/`generate()`.
 - `system_prompt.py`: construye el mensaje de sistema común. Define guardrails (tono, transparencia,
   citas), instrucciones adicionales para PIB/IMACEC y toggles para prompts extendidos.
 
 ## Responsabilidades
-- Normalizar contexto: combina `intent_info`, facts (`memory`), clasificación, follow-ups pendientes y
+- Normalizar contexto: combina `intent_info`, metadata almacenada en memoria, clasificación, follow-ups pendientes y
   contexto RAG antes de llamar al modelo.
 - RAG opt-in: cuando se le entrega un retriever, el adapter decide los filtros (`topic`, `sector` o
   `seasonality`) y limita el tamaño del contexto (`RAG_CONTEXT_MAX_CHARS`).

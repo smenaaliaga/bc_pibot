@@ -30,11 +30,7 @@ Validates chunking, logs rejected chunks, and prints per-doc counts without touc
 
 ### Full drop + reload
 ```powershell
-uv run python docker/postgres/load_txt_rag.py `
-  --manifest docker/postgres/docs/manifest.json `
-  --purge-mode drop `
-  --log-file logs/exports/rag_reload.log `
-  --reject-log logs/exports/rag_rejects.jsonl
+uv run python docker/postgres/load_txt_rag.py --manifest docker/postgres/docs/manifest.json --purge-mode drop --log-file logs/exports/rag_reload.log --reject-log logs/exports/rag_rejects.jsonl
 ```
 Steps performed:
 1. Delete the entire `RAG_PGVECTOR_COLLECTION` (via `purge_collection`).
@@ -58,16 +54,7 @@ Ingest an Excel file with columns for question, fact (answer), and topic using `
 
 Append to an existing collection (no drop):
 ```powershell
-uv run python docker/postgres/load_excel_facts.py `
-  --excel docker/postgres/docs/doc_base.xlsx `
-  --collection methodology `
-  --doc-id faq_excel `
-  --version v1 `
-  --tags "faq,excel" `
-  --language es `
-  --question-col 0 `
-  --fact-col 1 `
-  --topic-col 2
+uv run python docker/postgres/load_excel_facts.py --excel docker/postgres/docs/doc_base.xlsx --collection methodology --doc-id faq_excel --version v1 --tags "faq,excel" --language es --question-col 0 --fact-col 1 --topic-col 2
 ```
 
 Drop and reload that collection:

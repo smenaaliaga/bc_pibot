@@ -1,13 +1,12 @@
 # Clasificación de intents
 
-Aquí convergen las dos capas que definen el rumbo inicial de cada pregunta: clasificación LLM y
+Aquí convergen las dos capas que definen el rumbo inicial de cada pregunta: clasificación JointBERT y
 heurísticas deterministas. La salida combinada (`ClassificationResult` + `intent_info`) alimenta los
 nodos `classify` e `intent_shortcuts` del grafo.
 
 ## Archivos
-- `classifier_agent.py`: punto de entrada. Construye el prompt usando
-	`prompts/query_classifier.py`, ejecuta el modelo (por defecto `gpt-4o-mini`) y parsea la función
-	`classify_economic_query`.
+- `classifier_agent.py`: punto de entrada. Ejecuta JointBERT (modelo local) + normalización de entidades y
+	construye `intent_info` para el resto del grafo.
 - `intent_classifier.py`: reglas adicionales (regex, palabras clave) para casos comunes (IMACEC, PIB,
 	frecuencia) antes de llamar al LLM.
 - `joint_intent_classifier.py`: clasificador BIO opcional que detecta entidades (indicador, sector,
@@ -20,8 +19,8 @@ nodos `classify` e `intent_shortcuts` del grafo.
 2. Si aún se necesita LLM, se dispara `LLMAdapter` con el prompt generado por `query_classifier.py`.
 3. Se devuelve `ClassificationResult` (tipado) y `history_text` (un string concatenado para ruteos
 	 posteriores).
-4. `build_intent_info(result)` empaqueta la información para `intent_shortcuts` y para los prompts de
-	 datos/RAG.
+4. `build_intent_info(result)` empaqueta `intent`, `score`, `entities`, `normalized`, `indicator` y
+	`spans` para `intent_shortcuts` y para los prompts de datos/RAG.
 
 ## Buenas prácticas
 - Cuando añadas campos nuevos en `ClassificationResult`, actualiza tanto las dataclasses como el schema

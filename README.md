@@ -54,7 +54,7 @@ Este script comprueba:
 | --- | --- | --- |
 | `OPENAI_API_KEY`, `OPENAI_MODEL` | Modelo y clave usados por `LLMAdapter` | ✓ Sí |
 | `BCCH_USER`, `BCCH_PASS` | Credenciales para `get_series.py` | ✓ Sí |
-| `JOINT_BERT_MODEL_DIR` | Ruta al modelo JointBERT entrenado | No (default: `model/weights/pibot_model_beto`) |
+| `JOINT_BERT_MODEL_DIR` | Ruta al modelo JointBERT entrenado | No (default: `models/pibot_series_interpreter/pibot-jointbert`) |
 | `USE_AGENT_GRAPH=1` | Habilita el grafo LangGraph en `main.py` | No |
 | `PG_DSN`, `REQUIRE_PG_MEMORY` | Configuran memoria conversacional y checkpoints | No |
 | `REDIS_URL`, `USE_REDIS_CACHE` | Cache para consultas BCCh | No |
@@ -62,18 +62,13 @@ Este script comprueba:
 
 ### Clonar modelo clasificador
 
-```
-# 1) Clonar BETO (tokenizer/base) → model/tokenizers/
-hf download 
+```bash
+# 1) Descargar el tokenizer BETO (se guarda en models/tokenizers/)
+hf download dccuchile/bert-base-spanish-wwm-cased --local-dir ./models/tokenizers/dccuchile/bert-base-spanish-wwm-cased
 
-# 2) Clonar un modelo entrenado → model/weights/
-uv run python model/scripts/clone_hf_model.py smenaaliaga/pibot-jointbert weights
-
-# Opción 2 (versión antigua)
+# 2) Descargar el modelo entrenado (JointBERT)
 hf download smenaaliaga/pibot-jointbert \
-  --revision e693d2bb422fa86c1bf2a493eba40b5a6c948020 \
-  --local-dir ./model/out/pibot_model_beto \
-  --local-dir-use-symlinks False
+    --local-dir ./models/pibot_series_interpreter/pibot-jointbert
 ```
 
 ### Ejecuta la aplicación
@@ -145,6 +140,17 @@ docker compose exec postgres psql -U postgres -d pibot -c "CREATE EXTENSION IF N
 ```
 
 Consulta `docker/README.md` para conocer volúmenes, migraciones y reinicios.
+
+## Esquema de almacenamiento (Postgres/Redis)
+- **Postgres**: memoria conversacional (`session_facts`, `session_turns`), checkpoints LangGraph y
+    embeddings (`series_embeddings` en db/pgvector.sql).
+- **Redis**: cache de series BCCh con claves tipo
+    `bcch:series:{series_id}:{firstdate}:{lastdate}:{frequency}:{agg}`.
+
+Para crear tablas de memoria manualmente, aplica el script de esquema:
+`psql -f docker/postgres/init.sql` (o levanta el contenedor Postgres, que lo ejecuta al inicio).
+
+Detalles completos y ER diagram en [orchestrator/README.md](orchestrator/README.md).
 
 ## Flujo de datos + RAG
 1. **Series BCCh**: `get_series.py` usa las credenciales BCCh y opcionalmente Redis; la metadata de

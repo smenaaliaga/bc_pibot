@@ -55,16 +55,14 @@ class MemoryAdapter:
     def __init__(self, pg_dsn: Optional[str] = None):
         self.pg_dsn = pg_dsn or os.getenv("PG_DSN", "postgresql://postgres:postgres@localhost:5432/pibot")
         self._require_pg = os.getenv("REQUIRE_PG_MEMORY", "0").lower() in ("1", "true", "yes", "on")
-        self._cleanup = None
         self._fallback_turns: Dict[str, List[Dict[str, Any]]] = {}
         self._fallback_turn_seq: Dict[str, int] = {}
         self._max_fallback_turns = int(os.getenv("MEMORY_MAX_TURNS_STORE", "200"))
         self._fallback_checkpoints: Dict[str, List[Dict[str, Any]]] = {}
         self._max_fallback_checkpoints = int(os.getenv("MEMORY_MAX_CHECKPOINTS", "10"))
         self._checkpoint_ns = os.getenv("LANGGRAPH_CHECKPOINT_NS", "memory")
-        self._summary_every = int(os.getenv("MEMORY_SUMMARY_EVERY", "5"))
         self._max_turns_prompt = int(os.getenv("MEMORY_MAX_TURNS_PROMPT", "8"))
-        self._local_facts: Dict[str, Dict[str, str]] = {}
+        self._local_facts: Dict[str, Dict[str, Any]] = {}
         self._pool = None
         self._pool_dsn = None
         self._pool_open = False
@@ -73,9 +71,6 @@ class MemoryAdapter:
         self._pg_log_state: Dict[str, Any] = {}
         self._pg_err_period = float(os.getenv("PG_ERROR_LOG_PERIOD", "60"))
         self._auto_setup = os.getenv("LANGGRAPH_AUTO_SETUP", "1").lower() not in ("0", "false", "no")
-        layout_override = os.getenv("MEMORY_FACTS_LAYOUT", "").strip().lower()
-        self._facts_layout_override = layout_override if layout_override in {"json", "kv"} else None
-        self._facts_layout: Optional[str] = None
         # basic gauges/counters
         self._metrics: Dict[str, float] = {
             "memory_fallback_used": 0,
@@ -99,6 +94,8 @@ class MemoryAdapter:
         self._using_pg = bool(PostgresSaver and self.saver and isinstance(self.saver, PostgresSaver))
         if self._require_pg and not self._using_pg:
             raise RuntimeError("REQUIRE_PG_MEMORY habilitado pero PostgresSaver no está disponible o falló la inicialización.")
+        if self._using_pg or (psycopg and self.pg_dsn):
+            self._ensure_memory_tables()
         logger.info(
             "[MEMORY_INIT] saver=%s using_pg=%s require_pg=%s dsn=%s",
             type(self.saver).__name__ if self.saver else "None",
@@ -150,6 +147,13 @@ class MemoryAdapter:
         if MemorySaver:
             return MemorySaver()
         return None
+
+    def _ensure_memory_tables(self) -> None:
+        try:
+            self._ensure_session_facts_table()
+            self._ensure_session_turns_table()
+        except Exception:
+            logger.debug("Memory tables setup failed", exc_info=True)
 
     def _conn_pool(self) -> Optional[Any]:
         if not psycopg or not ConnectionPool:
@@ -219,94 +223,25 @@ class MemoryAdapter:
             period=self._pg_err_period,
         )
 
-    def _ensure_facts_layout(self) -> Optional[str]:
-        if self._facts_layout:
-            return self._facts_layout
-        layout = self._facts_layout_override or self._detect_facts_layout()
-        if layout is None:
-            layout = "json"
-        if self._ensure_session_facts_table(layout):
-            self._facts_layout = layout
-            return layout
-        return None
-
-    def _detect_facts_layout(self) -> Optional[str]:
-        """Backward-compatible shim for legacy callers."""
-        return self._detect_kv_layout()
-
-    def _detect_kv_layout(self) -> Optional[str]:
-        pool = self._conn_pool()
-        if not pool:
-            return None
-        try:
-            with pool.connection(timeout=3) as conn:
-                with conn.cursor() as cur:
-                    cur.execute(
-                        """
-                        SELECT column_name
-                        FROM information_schema.columns
-                        WHERE table_name = 'session_facts'
-                        """
-                    )
-                    columns: set[str] = set()
-                    for row in cur.fetchall():
-                        if not row:
-                            continue
-                        col_name = None
-                        if isinstance(row, dict):
-                            col_name = row.get("column_name")
-                        else:
-                            try:
-                                col_name = row[0]
-                            except Exception:
-                                col_name = None
-                        if col_name:
-                            columns.add(str(col_name).lower())
-            if not columns:
-                return None
-            if "facts" in columns:
-                return "json"
-            if {"fact_key", "fact_value"}.issubset(columns):
-                return "kv"
-        except Exception as e:
-            self._log_pg_error("No se pudo detectar esquema de session_facts: %s" % e, op="detect_schema", table="session_facts")
-        return None
-
-    def _ensure_session_facts_table(self, layout: str) -> bool:
+    def _ensure_session_facts_table(self) -> bool:
         pool = self._conn_pool()
         if not pool:
             return False
         try:
             with pool.connection() as conn:
                 with conn.cursor() as cur:
-                    if layout == "json":
-                        cur.execute(
-                            """
-                            CREATE TABLE IF NOT EXISTS session_facts (
-                                session_id TEXT PRIMARY KEY,
-                                facts JSONB,
-                                updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW()
-                            )
-                            """
+                    cur.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS session_facts (
+                            session_id TEXT PRIMARY KEY,
+                            facts JSONB,
+                            updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW()
                         )
-                        cur.execute(
-                            "CREATE INDEX IF NOT EXISTS idx_session_facts_updated ON session_facts(updated_at DESC)"
-                        )
-                    else:
-                        cur.execute(
-                            """
-                            CREATE TABLE IF NOT EXISTS session_facts (
-                                session_id TEXT NOT NULL,
-                                fact_key TEXT NOT NULL,
-                                fact_value TEXT,
-                                ts TIMESTAMPTZ DEFAULT NOW(),
-                                PRIMARY KEY (session_id, fact_key)
-                            )
-                            """
-                        )
-                        cur.execute(
-                            "CREATE INDEX IF NOT EXISTS idx_session_facts_session ON session_facts(session_id)"
-                        )
+                        """
+                    )
+                    cur.execute(
+                        "CREATE INDEX IF NOT EXISTS idx_session_facts_updated ON session_facts(updated_at DESC)"
+                    )
                 conn.commit()
             return True
         except Exception as e:
@@ -327,23 +262,6 @@ class MemoryAdapter:
                     """,
                     (session_id, payload),
                 )
-            conn.commit()
-
-    def _set_facts_kv(self, pool: Any, session_id: str, facts: Dict[str, str]) -> None:
-        rows = [(session_id, key, str(value)) for key, value in facts.items()]
-        with pool.connection(timeout=3) as conn:
-            with conn.cursor() as cur:
-                if rows:
-                    cur.executemany(
-                        """
-                        INSERT INTO session_facts(session_id, fact_key, fact_value, ts)
-                        VALUES (%s, %s, %s, NOW())
-                        ON CONFLICT (session_id, fact_key) DO UPDATE
-                            SET fact_value = EXCLUDED.fact_value,
-                                ts = NOW()
-                        """,
-                        rows,
-                    )
             conn.commit()
 
     def _read_facts_json(self, pool: Any, session_id: str) -> Dict[str, str]:
@@ -368,18 +286,6 @@ class MemoryAdapter:
                         return dict(parsed) if isinstance(parsed, dict) else {}
                     except Exception:
                         return {}
-        return {}
-
-    def _read_facts_kv(self, pool: Any, session_id: str) -> Dict[str, str]:
-        with pool.connection(timeout=3) as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT fact_key, fact_value FROM session_facts WHERE session_id=%s",
-                    (session_id,),
-                )
-                rows = cur.fetchall()
-                if rows:
-                    return {str(key): ("" if value is None else str(value)) for key, value in rows}
         return {}
 
     def _normalize_metadata(self, metadata: Optional[Dict[str, Any]]) -> Dict[str, Any]:
@@ -639,10 +545,13 @@ class MemoryAdapter:
         if saver and hasattr(saver, "put"):
             config = self._saver_config(session_id)
             payload = {
-                "id": '_'.join([session_id, uuid.uuid4().hex]),
+                "v": 4,
+                "id": uuid.uuid4().hex,
                 "ts": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                "values": checkpoint,
-                "channel_values": {},
+                "channel_values": {"checkpoint": checkpoint},
+                "channel_versions": {},
+                "versions_seen": {},
+                "updated_channels": None,
             }
             try:
                 channel_versions: Dict[str, Any] = {}
@@ -658,12 +567,29 @@ class MemoryAdapter:
         if saver and hasattr(saver, "get"):
             config = self._saver_config(session_id)
             try:
-                data = saver.get(config)  # type: ignore[call-arg]
+                data = None
+                if hasattr(saver, "get_tuple"):
+                    checkpoint_tuple = saver.get_tuple(config)  # type: ignore[call-arg]
+                    if checkpoint_tuple:
+                        data = {"checkpoint": checkpoint_tuple.checkpoint, "metadata": checkpoint_tuple.metadata}
+                if data is None:
+                    data = saver.get(config)  # type: ignore[call-arg]
+            except KeyError:
+                logger.info("load_checkpoint: incompatible checkpoint version; usando fallback")
             except Exception:
                 logger.debug("load_checkpoint saver.get failed", exc_info=True)
             else:
                 if isinstance(data, dict):
                     checkpoint_payload = data.get("checkpoint") or data.get("values") or data
+                    if isinstance(checkpoint_payload, dict):
+                        channel_values = checkpoint_payload.get("channel_values")
+                        if isinstance(channel_values, dict):
+                            if "checkpoint" in channel_values:
+                                checkpoint_payload = channel_values.get("checkpoint")
+                            elif "values" in channel_values:
+                                checkpoint_payload = channel_values.get("values")
+                        elif "values" in checkpoint_payload and isinstance(checkpoint_payload.get("values"), dict):
+                            checkpoint_payload = checkpoint_payload.get("values")
                     metadata = data.get("metadata") or {}
                     return {"checkpoint": checkpoint_payload, "metadata": metadata}
         cache = self._fallback_checkpoints.get(session_id)
@@ -705,14 +631,10 @@ class MemoryAdapter:
             # If no PG, consider local clear successful
             return True
         # Delete facts
-        layout = self._ensure_facts_layout()
         try:
             with pool.connection(timeout=3) as conn:
                 with conn.cursor() as cur:
-                    if layout == "json":
-                        cur.execute("DELETE FROM session_facts WHERE session_id=%s", (session_id,))
-                    else:
-                        cur.execute("DELETE FROM session_facts WHERE session_id=%s", (session_id,))
+                    cur.execute("DELETE FROM session_facts WHERE session_id=%s", (session_id,))
                 conn.commit()
         except Exception as e:
             self._log_pg_error("clear_session: error borrando facts: %s" % e, session_id=session_id, op="facts_clear", table="session_facts")
@@ -741,7 +663,7 @@ class MemoryAdapter:
         return window[-limit:]
 
     # --- Facts API ---------------------------------------------------------
-    def set_facts(self, session_id: str, facts: Dict[str, str]) -> None:
+    def set_facts(self, session_id: str, facts: Dict[str, Any]) -> None:
         if not session_id or not facts:
             return
         normalized = {str(k): self._serialize_fact_value(v) for k, v in facts.items()}
@@ -749,23 +671,21 @@ class MemoryAdapter:
         pool = self._conn_pool()
         if not pool:
             return
-        layout = self._ensure_facts_layout()
-        if not layout:
+        if not self._ensure_session_facts_table():
             return
         try:
-            if layout == "kv":
-                self._set_facts_kv(pool, session_id, normalized)
-            else:
-                self._set_facts_json(pool, session_id, normalized)
+            self._set_facts_json(pool, session_id, normalized)
         except Exception as e:
             self._log_pg_error("Error guardando facts: %s" % e, session_id=session_id, op="facts_write", table="session_facts")
 
     @staticmethod
-    def _serialize_fact_value(value: Any) -> str:
+    def _serialize_fact_value(value: Any) -> Any:
         if value is None:
             return ""
         if isinstance(value, (str, int, float, bool)):
             return str(value)
+        if isinstance(value, (list, dict)):
+            return value
         if isinstance(value, datetime.datetime):
             return value.isoformat()
         try:
@@ -773,7 +693,7 @@ class MemoryAdapter:
         except Exception:
             return str(value)
 
-    def get_facts(self, session_id: str) -> Dict[str, str]:
+    def get_facts(self, session_id: str) -> Dict[str, Any]:
         if not session_id:
             return {}
         if session_id in self._local_facts:
@@ -781,12 +701,9 @@ class MemoryAdapter:
         pool = self._conn_pool()
         if not pool:
             return {}
-        layout = self._ensure_facts_layout()
-        if not layout:
+        if not self._ensure_session_facts_table():
             return {}
         try:
-            if layout == "kv":
-                return self._read_facts_kv(pool, session_id)
             return self._read_facts_json(pool, session_id)
         except Exception as e:
             self._log_pg_error("Error leyendo facts: %s" % e, session_id=session_id, op="facts_read", table="session_facts")

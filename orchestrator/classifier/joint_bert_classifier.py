@@ -3,7 +3,7 @@ Módulo de predicción de intención y entidades usando Joint BERT.
 
 Uso:
     # Inicializar (ruta a pesos entrenados y labels)
-    predictor = PIBotPredictor(model_dir='model/weights/pibot_model_beto')
+    predictor = PIBotPredictor(model_dir='models/pibot_series_interpreter/pibot-jointbert')
 
     # Predecir
     result = predictor.predict("cual fue el imacec de agosto 2024")
@@ -21,8 +21,12 @@ Uso:
 
 import os
 import logging
-import torch
+import sys
+import importlib.util
+from pathlib import Path
 from typing import Dict, Optional, Any
+
+import torch
 from transformers import BertTokenizer, BertConfig
 
 # Opcional: soporte de fallback remoto vía Hugging Face
@@ -33,32 +37,71 @@ except Exception:
 
 logger = logging.getLogger(__name__)
 
-# Importar JointBERT model dinámicamente (src_model → fallback a in)
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+MODELS_ROOT = PROJECT_ROOT / 'models'
+SRC_MODELS_ROOT = PROJECT_ROOT / 'src' / 'models'
+DEFAULT_JOINTBERT_LOCAL_DIR = MODELS_ROOT / 'pibot_series_interpreter' / 'pibot-jointbert'
+DEFAULT_JOINTBERT_REMOTE_REPO = 'smenaaliaga/pibot-jointbert'
+LOCAL_JOINTBERT_MODULE = Path(__file__).with_name('jointbert') / 'model.py'
+
+# Intentar importar primero la implementación local (incluida en el repo)
+JointBERT = None
 try:
-    import sys
-    import importlib.util
-    from pathlib import Path
-    
-    # Cargar el módulo dinámicamente: primero en src_model/, luego fallback a in/
-    base_dir = Path(__file__).parent.parent.parent / 'model'
-    candidate_paths = [
-        base_dir / 'src_model' / 'modeling_jointbert.py',
-        base_dir / 'in' / 'modeling_jointbert.py',
-    ]
-    model_path = next((p for p in candidate_paths if p.is_file()), candidate_paths[0])
-    spec = importlib.util.spec_from_file_location("modeling_jointbert", model_path)
-    if spec and spec.loader:
-        modeling_module = importlib.util.module_from_spec(spec)
-        sys.modules['modeling_jointbert'] = modeling_module
-        spec.loader.exec_module(modeling_module)
-        JointBERT = modeling_module.JointBERT
-        logger.info("✓ JointBERT cargado exitosamente")
-    else:
-        raise ImportError(f"No se pudo cargar spec desde {model_path}")
-except Exception as e:
-    # Fallback si no se encuentra el modelo
-    JointBERT = None
-    logger.warning(f"No se pudo importar JointBERT: {e}")
+    from orchestrator.classifier.jointbert.model import JointBERT as _LocalJointBERT
+
+    JointBERT = _LocalJointBERT
+    logger.info("✓ JointBERT cargado desde orchestrator.classifier.jointbert.model")
+except Exception as local_import_err:
+    logger.debug("JointBERT local no disponible: %s", local_import_err)
+
+
+# Importar JointBERT model dinámicamente desde la jerarquía moderna de models/ (fallback)
+def _find_modeling_jointbert() -> Path:
+    env_model_dir = os.getenv('JOINT_BERT_MODEL_DIR')
+    candidates = []
+    if env_model_dir:
+        env_path = Path(env_model_dir)
+        candidates.append(env_path / 'modeling_jointbert.py' if env_path.is_dir() else env_path)
+    candidates.extend([
+        LOCAL_JOINTBERT_MODULE,
+        DEFAULT_JOINTBERT_LOCAL_DIR / 'modeling_jointbert.py',
+        MODELS_ROOT / 'pibot_series_interpreter' / 'modeling_jointbert.py',
+        SRC_MODELS_ROOT / 'pibot_series_interpreter' / 'pibot-jointbert' / 'modeling_jointbert.py',
+    ])
+    seen = set()
+    for cand in candidates:
+        if not cand:
+            continue
+        try:
+            cand_resolved = Path(cand).resolve()
+        except Exception:
+            continue
+        if cand_resolved in seen or not cand_resolved.is_file():
+            continue
+        seen.add(cand_resolved)
+        return cand_resolved
+    raise FileNotFoundError("No se encontró modeling_jointbert.py en las rutas configuradas.")
+
+
+if JointBERT is None:
+    try:
+        model_path = _find_modeling_jointbert()
+        module_dir = model_path.parent
+        if str(module_dir) not in sys.path:
+            sys.path.insert(0, str(module_dir))
+        spec = importlib.util.spec_from_file_location("modeling_jointbert", model_path)
+        if spec and spec.loader:
+            modeling_module = importlib.util.module_from_spec(spec)
+            sys.modules['modeling_jointbert'] = modeling_module
+            spec.loader.exec_module(modeling_module)
+            JointBERT = modeling_module.JointBERT
+            logger.info("✓ JointBERT cargado exitosamente desde %s", model_path)
+        else:
+            raise ImportError(f"No se pudo cargar spec desde {model_path}")
+    except Exception as e:
+        # Fallback si no se encuentra el modelo
+        JointBERT = None
+        logger.warning(f"No se pudo importar JointBERT: {e}")
 
 # Mapeo de tipos de modelo
 MODEL_CLASSES = {
@@ -110,12 +153,45 @@ class JointBERTPredictor:
         local_only = os.getenv("HF_LOCAL_ONLY", "false").lower() in {"1", "true", "yes", "on"}
         weights_origin = "local"
         args_path = os.path.join(self.model_dir, 'training_args.bin')
+
+        def _resolve_local_model_dir() -> Optional[str]:
+            candidates = []
+            raw = Path(self.model_dir)
+            if raw.is_absolute():
+                candidates.append(raw)
+            else:
+                candidates.append((PROJECT_ROOT / raw).resolve())
+            name = raw.name
+            candidates.extend([
+                DEFAULT_JOINTBERT_LOCAL_DIR,
+                MODELS_ROOT / name if name else None,
+                MODELS_ROOT / 'pibot_series_interpreter' / name if name else None,
+                SRC_MODELS_ROOT / 'pibot_series_interpreter' / 'pibot-jointbert',
+            ])
+            seen = set()
+            for cand in candidates:
+                if not cand:
+                    continue
+                cand = cand.resolve()
+                if cand in seen:
+                    continue
+                seen.add(cand)
+                cand_args = cand / 'training_args.bin'
+                if cand_args.is_file():
+                    return str(cand)
+            return None
+
+        resolved_dir = _resolve_local_model_dir()
+        if resolved_dir:
+            self.model_dir = resolved_dir
+            args_path = os.path.join(self.model_dir, 'training_args.bin')
+
         if not os.path.exists(args_path):
-            # Determinar si podemos intentar remoto
             remote_repo = os.getenv("JOINT_BERT_REMOTE_REPO")
             if not remote_repo and ('/' in self.model_dir) and (not os.path.isdir(self.model_dir)):
-                # Si model_dir luce como repo id (org/name) y no es carpeta local
                 remote_repo = self.model_dir
+            if not remote_repo:
+                remote_repo = DEFAULT_JOINTBERT_REMOTE_REPO
             if local_only:
                 logger.info("HF_LOCAL_ONLY habilitado; no se intentará fallback remoto de pesos.")
             if not local_only and remote_repo:
@@ -123,33 +199,50 @@ class JointBERTPredictor:
                     raise FileNotFoundError(
                         f"No se encuentra {args_path} y huggingface_hub no está disponible para fallback remoto."
                     )
-                try:
-                    from pathlib import Path
-                    project_root = Path(__file__).resolve().parents[2]
-                    dest_root = project_root / 'model' / 'weights'
+                attempted = set()
+
+                def _download_from_repo(repo_id: str) -> str:
+                    dest_root = MODELS_ROOT / 'pibot_series_interpreter'
                     dest_root.mkdir(parents=True, exist_ok=True)
-                    name = remote_repo.split('/')[-1]
+                    name = (repo_id.split('/')[-1] or 'pibot-jointbert').strip()
                     dest_dir = dest_root / name
                     logger.info(
-                        f"Pesos locales no encontrados; intentando fallback remoto desde {remote_repo} → {dest_dir}"
+                        "Pesos locales no encontrados; intentando fallback remoto desde %s → %s", repo_id, dest_dir
                     )
-                    snapshot_download(remote_repo, local_dir=str(dest_dir))
-                    # Reasignar model_dir a la carpeta descargada
-                    self.model_dir = str(dest_dir)
-                    weights_origin = "remote-clone"
-                    args_path = os.path.join(self.model_dir, 'training_args.bin')
-                    if not os.path.exists(args_path):
-                        raise FileNotFoundError(
-                            f"Descarga remota completada pero falta training_args.bin en {self.model_dir}"
-                        )
-                except Exception as e:
-                    raise FileNotFoundError(f"Fallback remoto fallido ({remote_repo}): {e}")
+                    snapshot_download(repo_id, local_dir=str(dest_dir))
+                    return str(dest_dir)
+
+                while remote_repo and remote_repo not in attempted:
+                    attempted.add(remote_repo)
+                    try:
+                        downloaded_dir = _download_from_repo(remote_repo)
+                        self.model_dir = downloaded_dir
+                        weights_origin = "remote-clone"
+                        args_path = os.path.join(self.model_dir, 'training_args.bin')
+                        if not os.path.exists(args_path):
+                            raise FileNotFoundError(
+                                f"Descarga remota completada pero falta training_args.bin en {self.model_dir}"
+                            )
+                        break
+                    except Exception as e:
+                        repo_not_found = "Repository Not Found" in str(e)
+                        if repo_not_found and remote_repo != DEFAULT_JOINTBERT_REMOTE_REPO:
+                            logger.warning(
+                                "Repositorio %s no accesible (%s); reintentando con %s",
+                                remote_repo,
+                                e,
+                                DEFAULT_JOINTBERT_REMOTE_REPO,
+                            )
+                            remote_repo = DEFAULT_JOINTBERT_REMOTE_REPO
+                            continue
+                        raise FileNotFoundError(f"Fallback remoto fallido ({remote_repo}): {e}") from e
+                else:
+                    raise FileNotFoundError(
+                        f"No se pudo descargar pesos de {remote_repo}; define JOINT_BERT_MODEL_DIR con carpeta local válida."
+                    )
             else:
-                if not remote_repo:
-                    logger.info("JOINT_BERT_REMOTE_REPO no definido; sin fallback remoto de pesos.")
                 raise FileNotFoundError(
-                    f"No se encuentra {args_path}. "
-                    f"Configura JOINT_BERT_MODEL_DIR con carpeta local válida o JOINT_BERT_REMOTE_REPO para fallback."
+                    f"No se encuentra {args_path}. Configura JOINT_BERT_MODEL_DIR con carpeta local válida o JOINT_BERT_REMOTE_REPO para fallback."
                 )
         
         self.args = torch.load(args_path, weights_only=False)
@@ -157,6 +250,9 @@ class JointBERTPredictor:
         self.args.max_seq_len = self.max_seq_len  # Override si es necesario
         # Agregar model_dir a args para que get_intent_labels/get_slot_labels lo usen
         self.args.model_dir = self.model_dir
+        # Algunos checkpoints legacy no incluyen ciertos flags; definir defaults
+        if not hasattr(self.args, 'use_crf'):
+            self.args.use_crf = False
         
         # Cargar labels
         self.intent_label_lst = get_intent_labels(self.args)
@@ -165,50 +261,81 @@ class JointBERTPredictor:
 
         # Preferir carga local del tokenizer; si no está, intentar fallback remoto explícito
         model_name = os.getenv("BERT_MODEL_NAME") or "dccuchile/bert-base-spanish-wwm-cased"
-        try:
-            self.tokenizer = BertTokenizer.from_pretrained(model_name, local_files_only=True)
-            logger.info(
-                f"Tokenizador cargado (local): {model_name} | vocab={getattr(self.tokenizer, 'vocab_size', 'N/A')}"
-            )
-        except Exception as _e_tok_local:
-            remote_repo = os.getenv("BERT_REMOTE_REPO")
-            # Si BERT_MODEL_NAME luce como repo id y no es carpeta local, usarlo como remote_repo
+        tokenizer_dirs = []
+        tokenizer_override = os.getenv("JOINT_BERT_TOKENIZER_DIR")
+        if tokenizer_override:
+            tokenizer_dirs.append(Path(tokenizer_override))
+        tokenizer_dirs.extend([
+            Path(self.model_dir),
+            MODELS_ROOT / 'pibot_intent_router' / 'all-MiniLM-L6-v2',
+        ])
+
+        self.tokenizer = None
+        for cand in tokenizer_dirs:
             try:
-                from pathlib import Path
-                if not remote_repo and ('/' in model_name) and (not Path(model_name).is_dir()):
-                    remote_repo = model_name
-            except Exception:
-                pass
-            if not local_only and remote_repo and snapshot_download is not None:
+                if cand and Path(cand).exists():
+                    self.tokenizer = BertTokenizer.from_pretrained(str(cand), local_files_only=True)
+                    logger.info(
+                        "Tokenizador cargado (local path): %s | vocab=%s",
+                        cand,
+                        getattr(self.tokenizer, 'vocab_size', 'N/A'),
+                    )
+                    break
+            except Exception as tok_err:
+                logger.debug("No se pudo cargar tokenizer desde %s: %s", cand, tok_err)
+
+        if self.tokenizer is None:
+            try:
+                self.tokenizer = BertTokenizer.from_pretrained(model_name, local_files_only=True)
+                logger.info(
+                    "Tokenizador cargado (local cache by name): %s | vocab=%s",
+                    model_name,
+                    getattr(self.tokenizer, 'vocab_size', 'N/A'),
+                )
+            except Exception as _e_tok_local:
+                remote_repo = os.getenv("BERT_REMOTE_REPO")
+                # Si BERT_MODEL_NAME luce como repo id y no es carpeta local, usarlo como remote_repo
                 try:
-                    from pathlib import Path
-                    project_root = Path(__file__).resolve().parents[2]
-                    dest_root = project_root / 'model' / 'tokenizers'
-                    dest_root.mkdir(parents=True, exist_ok=True)
-                    name = remote_repo.split('/')[-1]
-                    dest_dir = dest_root / name
-                    logger.info(
-                        f"Tokenizador local no encontrado; fallback remoto desde {remote_repo} → {dest_dir}"
-                    )
-                    snapshot_download(remote_repo, local_dir=str(dest_dir))
-                    # Cargar nuevamente desde la carpeta descargada, en modo local-only
-                    self.tokenizer = BertTokenizer.from_pretrained(str(dest_dir), local_files_only=True)
-                    logger.info(
-                        f"Tokenizador descargado y cargado (local-clone): {dest_dir} | vocab={getattr(self.tokenizer, 'vocab_size', 'N/A')}"
-                    )
-                except Exception as e:
-                    logger.warning(f"Fallback remoto de tokenizador fallido ({remote_repo}): {e}")
-                    # Último recurso: carga remota directa (transformers gestionará cache)
+                    if not remote_repo and ('/' in model_name) and (not Path(model_name).is_dir()):
+                        remote_repo = model_name
+                except Exception:
+                    pass
+                if not local_only and remote_repo and snapshot_download is not None:
+                    try:
+                        dest_root = MODELS_ROOT / 'tokenizers'
+                        dest_root.mkdir(parents=True, exist_ok=True)
+                        name = remote_repo.split('/')[-1]
+                        dest_dir = dest_root / name
+                        logger.info(
+                            "Tokenizador local no encontrado; fallback remoto desde %s → %s",
+                            remote_repo,
+                            dest_dir,
+                        )
+                        snapshot_download(remote_repo, local_dir=str(dest_dir))
+                        # Cargar nuevamente desde la carpeta descargada, en modo local-only
+                        self.tokenizer = BertTokenizer.from_pretrained(str(dest_dir), local_files_only=True)
+                        logger.info(
+                            "Tokenizador descargado y cargado (local-clone): %s | vocab=%s",
+                            dest_dir,
+                            getattr(self.tokenizer, 'vocab_size', 'N/A'),
+                        )
+                    except Exception as e:
+                        logger.warning(f"Fallback remoto de tokenizador fallido ({remote_repo}): {e}")
+                        # Último recurso: carga remota directa (transformers gestionará cache)
+                        self.tokenizer = BertTokenizer.from_pretrained(model_name)
+                        logger.info(
+                            "Tokenizador cargado (remoto directo): %s | vocab=%s",
+                            model_name,
+                            getattr(self.tokenizer, 'vocab_size', 'N/A'),
+                        )
+                else:
+                    # Remote deshabilitado o no configurado: intenta remota directa
                     self.tokenizer = BertTokenizer.from_pretrained(model_name)
                     logger.info(
-                        f"Tokenizador cargado (remoto directo): {model_name} | vocab={getattr(self.tokenizer, 'vocab_size', 'N/A')}"
+                        "Tokenizador cargado (remoto): %s | vocab=%s",
+                        model_name,
+                        getattr(self.tokenizer, 'vocab_size', 'N/A'),
                     )
-            else:
-                # Remote deshabilitado o no configurado: intenta remota directa
-                self.tokenizer = BertTokenizer.from_pretrained(model_name)
-                logger.info(
-                    f"Tokenizador cargado (remoto): {model_name} | vocab={getattr(self.tokenizer, 'vocab_size', 'N/A')}"
-                )
         
         # Cargar config alineada con el tokenizer para evitar desajustes de vocabulario
         try:
@@ -231,7 +358,7 @@ class JointBERTPredictor:
         model_class = MODEL_CLASSES[self.args.model_type][1]
         if model_class is None:
             raise ImportError(
-                "JointBERT no disponible. Verifica que 'model/src_model/modeling_jointbert.py' exista y se haya importado."
+                "JointBERT no disponible. Verifica que 'models/pibot_series_interpreter/pibot-jointbert/modeling_jointbert.py' exista y se haya importado."
             )
         load_kwargs = {
             "args": self.args,
@@ -497,7 +624,7 @@ def get_predictor(model_dir: Optional[str] = None, **kwargs) -> JointBERTPredict
     global _global_predictor
 
     if _global_predictor is None:
-        model_dir_env = os.getenv('JOINT_BERT_MODEL_DIR', 'model/weights/pibot_model_beto')
+        model_dir_env = os.getenv('JOINT_BERT_MODEL_DIR', 'models/pibot_series_interpreter/pibot-jointbert')
         # logger.info(f"[SINGLETON] Cargando JointBERT predictor desde {model_dir_env}")
         _global_predictor = JointBERTPredictor(model_dir_env, **kwargs)
 
@@ -522,14 +649,14 @@ def get_slot_labels(args):
         label_file = os.path.join(model_dir, 'slot_label.txt')
         if os.path.exists(label_file):
             return [label.strip() for label in open(label_file, 'r', encoding='utf-8')]
-    # Fallback: 10 labels para coincidir con el modelo del commit e693d2b
+    # Fallback: etiquetas NER para el esquema nuevo
     return [
         'O',
         'B-indicator', 'I-indicator',
-        'B-frequency', 'I-frequency',
+        'B-seasonality', 'I-seasonality',
+        'B-activity', 'I-activity',
+        'B-region', 'I-region',
         'B-period', 'I-period',
-        'B-component', 'I-component',
-        'B-seasonality',
     ]
 
 

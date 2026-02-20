@@ -179,7 +179,7 @@ def run_app(
         # Reconstruir el path completo si el usuario lo cambia
         if joint_bert_model_dir_name_new != joint_bert_model_dir_name and joint_bert_model_dir_name_new:
             # Mantener el directorio padre original si existe, si no, usar el valor nuevo tal cual
-            parent_dir = os.path.dirname(joint_bert_model_dir_full) if joint_bert_model_dir_full else "model/weights"
+            parent_dir = os.path.dirname(joint_bert_model_dir_full) if joint_bert_model_dir_full else "models/pibot_series_interpreter"
             joint_bert_model_dir = os.path.join(parent_dir, joint_bert_model_dir_name_new)
         else:
             joint_bert_model_dir = joint_bert_model_dir_full

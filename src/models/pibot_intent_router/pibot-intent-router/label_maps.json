@@ -1,0 +1,10 @@
+{
+  "intent": {
+    "0": "methodology",
+    "1": "value"
+  },
+  "context_mode": {
+    "0": "followup",
+    "1": "standalone"
+  }
+}
