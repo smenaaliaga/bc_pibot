@@ -30,6 +30,20 @@ def _coerce_indicator_value(value: Any) -> Optional[str]:
     return None
 
 
+def _coerce_intent_label(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        text = value.strip()
+        return text.lower() or None
+    if isinstance(value, dict):
+        label = value.get("label")
+        if isinstance(label, str):
+            text = label.strip()
+            return text.lower() or None
+    return None
+
+
 def _extract_indicator_context_from_entities(entities: Optional[Dict[str, Any]]) -> Optional[Dict[str, str]]:
     if not isinstance(entities, dict):
         return None
@@ -114,7 +128,7 @@ def generate_suggested_questions(state: AgentState, intent_store: Optional[Inten
         component = primary_entity.get("activity") or primary_entity.get("component")
         seasonality = primary_entity.get("seasonality")
     classification = state.get("classification")
-    intent = getattr(classification, "intent", "") if classification else ""
+    intent = _coerce_intent_label(getattr(classification, "intent", None) if classification else None)
 
     if not indicator:
         last_ctx = _get_last_indicator_context(intent_store, session_id)
@@ -157,7 +171,7 @@ def generate_suggested_questions(state: AgentState, intent_store: Optional[Inten
         if period:
             suggestions.append(f"¿Cómo ha evolucionado el {indicator} en los últimos años?")
 
-        if intent and intent.lower() in ("methodology", "definition"):
+        if intent in ("methodology", "definition"):
             suggestions.insert(0, f"¿Cuál es el último valor del {indicator}?")
 
     seen = set()
