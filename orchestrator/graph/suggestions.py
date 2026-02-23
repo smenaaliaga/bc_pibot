@@ -22,6 +22,11 @@ def _coerce_indicator_value(value: Any) -> Optional[str]:
     if isinstance(value, str):
         text = value.strip()
         return text or None
+    if isinstance(value, list):
+        for item in value:
+            if isinstance(item, str) and item.strip():
+                return item.strip()
+        return None
     if isinstance(value, dict):
         for key in ("standard_name", "normalized", "original", "text_normalized", "label"):
             candidate = value.get(key)
@@ -124,9 +129,9 @@ def generate_suggested_questions(state: AgentState, intent_store: Optional[Inten
     seasonality = None
     period: Optional[str] = None
     if primary_entity:
-        indicator = primary_entity.get("indicator") or primary_entity.get("indicador")
-        component = primary_entity.get("activity") or primary_entity.get("component")
-        seasonality = primary_entity.get("seasonality")
+        indicator = _coerce_indicator_value(primary_entity.get("indicator") or primary_entity.get("indicador"))
+        component = _coerce_indicator_value(primary_entity.get("activity") or primary_entity.get("component"))
+        seasonality = _coerce_indicator_value(primary_entity.get("seasonality"))
     classification = state.get("classification")
     intent = _coerce_intent_label(getattr(classification, "intent", None) if classification else None)
 
