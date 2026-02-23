@@ -197,4 +197,4 @@ def test_followup_other_macro_zero_recovers_previous_method_and_indicator():
 
     assert result["route_decision"] == "rag"
     assert result["intent"]["intent_cls"] == "method"
-    assert result["entities"][0]["indicator"] == "pib"
+    assert result["entities"][0]["indicator"] == ["imacec"]

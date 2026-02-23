@@ -132,7 +132,7 @@ def _first_value(value: Any) -> str:
 
 
 def _has_explicit_indicator_signal(predict_payload: Dict[str, Any]) -> bool:
-    entities = _get_nested(predict_payload, "entities")
+    entities = _get_nested(predict_payload, "entities_normalized")
     if isinstance(entities, dict) and _has_value(entities.get("indicator")):
         return True
 
