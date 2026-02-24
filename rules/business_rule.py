@@ -378,4 +378,92 @@ def apply_latest_update_period(
         end = f"{year:04d}-{month:02d}-{day:02d}"
         return [start, end]
 
+    if frequency == "a":
+        complete_year = year if (month == 12 and day >= 31) else (year - 1)
+        if complete_year < 1900:
+            return None
+        return [f"{complete_year:04d}-01-01", f"{complete_year:04d}-12-31"]
+
     return None
+
+
+def resolve_pib_annual_validity(
+    data_params: Dict[str, Any],
+    metadata_response: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Validate if requested PIB annual year is available given latest_update.
+
+    Returns a dict with:
+      - applies: bool
+      - is_valid: bool
+      - requested_year: Optional[int]
+      - max_valid_year: Optional[int]
+      - resolved_period: Optional[List[str]]
+      - message: Optional[str]
+    """
+
+    indicator = str(data_params.get("indicator") or "").strip().lower()
+    frequency = str(data_params.get("frequency") or "").strip().lower()
+    req_form = str(data_params.get("req_form_cls") or "").strip().lower()
+
+    applies = indicator == "pib" and frequency == "a" and req_form in {"latest", "point"}
+    base = {
+        "applies": applies,
+        "is_valid": True,
+        "requested_year": None,
+        "max_valid_year": None,
+        "resolved_period": None,
+        "message": None,
+    }
+    if not applies:
+        return base
+
+    latest_update = str(metadata_response.get("latest_update") or "").strip()
+    if not latest_update or latest_update.lower() == "none":
+        return base
+
+    try:
+        year, month, day = [int(part) for part in latest_update.split("-")[:3]]
+    except Exception:
+        return base
+
+    max_valid_year = year if (month == 12 and day >= 31) else (year - 1)
+    if max_valid_year < 1900:
+        return base
+
+    period = data_params.get("period")
+    requested_year: Optional[int] = None
+    if isinstance(period, list) and period:
+        first = str(period[0])
+        if len(first) >= 4 and first[:4].isdigit():
+            requested_year = int(first[:4])
+
+    if req_form == "latest":
+        return {
+            **base,
+            "requested_year": max_valid_year,
+            "max_valid_year": max_valid_year,
+            "resolved_period": [f"{max_valid_year:04d}-01-01", f"{max_valid_year:04d}-12-31"],
+        }
+
+    if requested_year is None:
+        return {
+            **base,
+            "max_valid_year": max_valid_year,
+        }
+
+    if requested_year > max_valid_year:
+        return {
+            **base,
+            "is_valid": False,
+            "requested_year": requested_year,
+            "max_valid_year": max_valid_year,
+            "message": f"El pib para el año {requested_year} no esta disponible aun",
+        }
+
+    return {
+        **base,
+        "requested_year": requested_year,
+        "max_valid_year": max_valid_year,
+        "resolved_period": [f"{requested_year:04d}-01-01", f"{requested_year:04d}-12-31"],
+    }

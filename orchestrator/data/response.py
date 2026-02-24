@@ -89,6 +89,8 @@ def format_period_labels(date_str: Optional[str], freq: str) -> list[str]:
             long_label = f"el {ordinal} trimestre del {y}"
             short_label = f"{q}T {y}"
             return [long_label, short_label]
+        if str(freq or "").upper() == "A":
+            return [str(y), str(y)]
         meses_es = [
             "", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
             "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
@@ -347,14 +349,17 @@ def _metadata_block(series_id: Optional[str], series_title: Optional[str] = None
     description = str(series_title or "").strip()
     if description and description.lower() != "none":
         return (
-            f"**Código de serie:** {series_code}\n",
+            f"**Código de serie:** {series_code}\n\n",
             f"**Descripción de la serie:** {description}\n\n",
         )
     return (f"**Código de serie:** {series_code}\n\n",)
 
 
 def _general_references(source_urls: List[str]) -> Iterable[str]:
-    bde_urls = source_urls or ["https://si3.bcentral.cl/siete"]
+    if source_urls:
+        return
+
+    bde_urls = ["https://si3.bcentral.cl/siete"]
     if len(bde_urls) == 1:
         yield f"\n**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)]({bde_urls[0]}) del Banco Central de Chile."
     else:
@@ -385,6 +390,15 @@ def _specific_intro(
     is_specific_activity: bool,
     all_series_data: Optional[List[Dict[str, Any]]],
 ) -> Iterable[str]:
+    if not is_contribution:
+        yield from _deterministic_variation_intro(
+            req_form=req_form,
+            obs_to_show=obs_to_show,
+            freq=freq,
+            indicator_context_val=indicator_context_val,
+        )
+        return
+
     llm_prompt = _build_specific_prompt(
         req_form=req_form,
         obs_to_show=obs_to_show,
@@ -410,6 +424,58 @@ def _specific_intro(
         display_period_label=display_period_label,
         obs_to_show=obs_to_show,
     )
+
+
+def _deterministic_variation_intro(
+    *,
+    req_form: str,
+    obs_to_show: List[Dict[str, Any]],
+    freq: str,
+    indicator_context_val: Optional[str],
+) -> Iterable[str]:
+    if not obs_to_show:
+        yield "La variacion no esta disponible aun.\n\n"
+        return
+
+    req_form_value = str(req_form or "").strip().lower()
+    indicator_value = str(indicator_context_val or "").strip().lower()
+    if req_form_value == "range" and indicator_value == "pib":
+        first_row = obs_to_show[0] if obs_to_show else {}
+        last_row = obs_to_show[-1] if obs_to_show else {}
+        first_label = format_period_labels(first_row.get("date"), freq)[0]
+        last_label = format_period_labels(last_row.get("date"), freq)[0]
+        yield f"A continuación te muestro los valores del PIB entre {first_label} y {last_label}.\n\n"
+        return
+
+    row = obs_to_show[-1]
+    if row.get("yoy") is not None:
+        var_value = row.get("yoy")
+    elif row.get("prev_period") is not None:
+        var_value = row.get("prev_period")
+    else:
+        var_value = None
+
+    freq_norm = str(freq or row.get("frequency") or row.get("freq") or "").strip().lower()
+    if freq_norm == "a":
+        frecuencia = "anual"
+    elif freq_norm == "q":
+        frecuencia = "trimestral"
+    elif freq_norm == "m":
+        frecuencia = "mensual"
+    else:
+        frecuencia = ""
+
+    if var_value is None:
+        if frecuencia:
+            yield f"La variacion {frecuencia} con respecto al año anterior no esta disponible aun.\n\n"
+        else:
+            yield "La variacion con respecto al año anterior no esta disponible aun.\n\n"
+        return
+
+    if frecuencia:
+        yield f"La variacion {frecuencia} con respecto al año anterior es {format_percentage(var_value)}.\n\n"
+    else:
+        yield f"La variacion con respecto al año anterior es {format_percentage(var_value)}.\n\n"
 
 
 def _build_specific_prompt(
@@ -540,6 +606,8 @@ def _build_latest_prompt(
                 return "variación interanual trimestral (a/a)"
             if freq_norm == "m":
                 return "variación interanual mensual (a/a)"
+            if freq_norm == "a":
+                return "variación anual con respecto al año anterior"
             return "variación interanual (a/a)"
         if var_key == "prev_period":
             if freq_norm == "q":
@@ -658,6 +726,8 @@ def _build_latest_prompt(
             llm_prompt_parts.append("IMPORTANTE: NO menciones el valor absoluto de la serie; reporta solo la variación")
             llm_prompt_parts.append("IMPORTANTE: redacta en forma directa, por ejemplo: 'La variación ... fue de X%.'")
             llm_prompt_parts.append("IMPORTANTE: NO agregues frases meta como 'no se proporciona el valor absoluto'")
+            if freq_raw == "a":
+                llm_prompt_parts.append("IMPORTANTE: para frecuencia anual, inicia con: 'La variación anual con respecto al año anterior es ...'")
         else:
             llm_prompt_parts.append("IMPORTANTE: si no hay variación disponible, indícalo explícitamente sin inventar cifras")
 

@@ -2633,7 +2633,7 @@
       "title_serie_default": "PIB Región de los Ríos",
       "series": {},
       "sources_url": {
-        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL"
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
       },
       "latest_update": "2025-10-01"
     },
@@ -3328,8 +3328,8 @@
       },
       "key": "none::a::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
       "label": "pib_general",
-      "serie_default": "F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
-      "title_serie_default": "PIB a precios corrientes",
+      "serie_default": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "title_serie_default": "PIB volumen a precios del año anterior encadenado",
       "series": {
         "serie_1": {
           "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
@@ -3402,8 +3402,8 @@
       },
       "key": "none::q::yoy::none::none::range::none::none::none::none::pib::nsa::none::co::2018",
       "label": "pib_general",
-      "serie_default": "F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
-      "title_serie_default": "PIB a precios corrientes",
+      "serie_default": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "title_serie_default": "PIB volumen a precios del año anterior encadenado",
       "series": {
         "serie_1": {
           "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",

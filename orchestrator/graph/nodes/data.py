@@ -125,7 +125,11 @@ def make_data_node(memory_adapter: Any):
                 data_params[key] = business_headers.get(key)
         data_params = {key: _empty_to_none(value) for key, value in data_params.items()}
 
-        from rules.business_rule import build_metadata_response, apply_latest_update_period
+        from rules.business_rule import (
+            build_metadata_response,
+            apply_latest_update_period,
+            resolve_pib_annual_validity,
+        )
 
         metadata_response = build_metadata_response(data_params)
         metadata_key = metadata_response.get("key") if isinstance(metadata_response, dict) else None
@@ -134,16 +138,67 @@ def make_data_node(memory_adapter: Any):
         if period_override:
             data_params["period"] = period_override
 
-        data_params_status = {
-            key: "PRESENT" if value not in (None, "", [], {}) else "MISSING"
-            for key, value in data_params.items()
-        }
+        annual_validation = resolve_pib_annual_validity(data_params, metadata_response)
+        resolved_period = annual_validation.get("resolved_period") if isinstance(annual_validation, dict) else None
+        if isinstance(resolved_period, list) and resolved_period:
+            data_params["period"] = resolved_period
 
         source_url: Optional[Any] = None
         if isinstance(metadata_response, dict):
             sources_url = metadata_response.get("sources_url")
             if sources_url:
                 source_url = sources_url
+
+        data_params_status = {
+            key: "PRESENT" if value not in (None, "", [], {}) else "MISSING"
+            for key, value in data_params.items()
+        }
+
+        if isinstance(annual_validation, dict) and annual_validation.get("applies") and not annual_validation.get("is_valid"):
+            requested_year = annual_validation.get("requested_year")
+            max_valid_year = annual_validation.get("max_valid_year")
+            max_valid_year_text = str(max_valid_year) if max_valid_year not in (None, "", "none") else "no disponible"
+
+            if requested_year:
+                base_text = (
+                    f"El PIB anual correspondiente al año {requested_year} aún no se encuentra publicado. "
+                    f"El último dato disponible con frecuencia anual corresponde al año {max_valid_year_text}"
+                )
+            else:
+                base_text = (
+                    "El PIB anual consultado aún no se encuentra publicado. "
+                    f"El último dato disponible con frecuencia anual corresponde al año {max_valid_year_text}"
+                )
+            source_ref = None
+            if isinstance(source_url, dict):
+                source_ref = next(
+                    (str(v).strip() for v in source_url.values() if v and str(v).strip().lower() != "none"),
+                    None,
+                )
+            elif isinstance(source_url, list):
+                source_ref = next(
+                    (str(v).strip() for v in source_url if v and str(v).strip().lower() != "none"),
+                    None,
+                )
+            elif isinstance(source_url, str) and source_url.strip() and source_url.strip().lower() != "none":
+                source_ref = source_url.strip()
+
+            if source_ref:
+                text = f"{base_text} y puede consultarse en el siguiente enlace: {source_ref}"
+            else:
+                text = base_text
+            _emit_stream_chunk(text, writer)
+            return {
+                "output": text,
+                "entities": entities,
+                "data_params": data_params,
+                "data_params_status": data_params_status,
+                "metadata_response": metadata_response,
+                "metadata_key": metadata_key,
+                "series_fetch_args": None,
+                "series_fetch_result": None,
+                "annual_validation": annual_validation,
+            }
 
         def _infer_frequency_from_series_id(series_id: Optional[str]) -> Optional[str]:
             if not series_id:
@@ -165,8 +220,13 @@ def make_data_node(memory_adapter: Any):
             firstdate: Optional[str],
             lastdate: Optional[str],
             target_frequency: Optional[str],
+            req_form: Optional[str],
         ) -> Tuple[Optional[str], Optional[str]]:
             if target_frequency != "a":
+                return firstdate, lastdate
+
+            req_form_value = str(req_form or "").strip().lower()
+            if req_form_value == "range":
                 return firstdate, lastdate
 
             reference = str(lastdate or firstdate or "").strip()
@@ -197,7 +257,7 @@ def make_data_node(memory_adapter: Any):
                 req_form_value = str(data_params.get("req_form_cls") or "").lower()
                 target_frequency = str(data_params.get("frequency") or "").lower() or None
                 series_native_frequency = _infer_frequency_from_series_id(str(serie_default))
-                if series_native_frequency and (
+                if series_native_frequency and target_frequency != "a" and (
                     req_form_value in {"point", "range"}
                     or target_frequency != series_native_frequency
                 ):
@@ -207,6 +267,7 @@ def make_data_node(memory_adapter: Any):
                     firstdate,
                     lastdate,
                     target_frequency,
+                    req_form_value,
                 )
                 series_fetch_args = {
                     "series_id": serie_default,
@@ -401,6 +462,7 @@ def make_data_node(memory_adapter: Any):
                     "metadata_key": metadata_key,
                     "series_fetch_args": series_fetch_args,
                     "series_fetch_result": series_fetch_result,
+                    "annual_validation": annual_validation,
                 }
                 return {"output": "".join(collected), "entities": entities, **trace_info}
 
@@ -416,6 +478,7 @@ def make_data_node(memory_adapter: Any):
                 "metadata_key": metadata_key,
                 "series_fetch_args": series_fetch_args,
                 "series_fetch_result": series_fetch_result,
+                "annual_validation": annual_validation,
             }
 
         legacy_indicator = getattr(getattr(result, "indicator", None), "label", None)
@@ -722,6 +785,7 @@ def make_data_node(memory_adapter: Any):
             "metadata_key": metadata_key,
             "series_fetch_args": series_fetch_args,
             "series_fetch_result": series_fetch_result,
+            "annual_validation": annual_validation,
         }
 
         try:
