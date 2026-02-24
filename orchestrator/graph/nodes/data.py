@@ -59,19 +59,6 @@ def make_data_node(memory_adapter: Any):
                 return "none"
             return value
 
-        def _normalize_calc_mode(
-            value: Any,
-            indicator: Any,
-            req_form: Any = None,
-            region_cls: Any = None,
-            activity_cls: Any = None,
-            investment_cls: Any = None,
-        ) -> Any:
-            raw_value = str(value or "").strip().lower()
-            if raw_value != "original":
-                return value
-            return "yoy"
-
         from rules.business_rule import resolve_region_value
 
         region_candidate = (
@@ -117,13 +104,14 @@ def make_data_node(memory_adapter: Any):
             "price": None,
             "history": None,
         }
-        data_params["calc_mode_cls"] = _normalize_calc_mode(
-            data_params.get("calc_mode_cls"),
-            data_params.get("indicator"),
-            data_params.get("req_form_cls"),
-            data_params.get("region_cls"),
-            data_params.get("activity_cls"),
-            data_params.get("investment_cls"),
+        from rules.business_rule import resolve_calc_mode_cls
+
+        data_params["calc_mode_cls"] = resolve_calc_mode_cls(
+            question=question,
+            calc_mode_cls=data_params.get("calc_mode_cls"),
+            intent_cls=data_params.get("intent_cls"),
+            req_form_cls=data_params.get("req_form_cls"),
+            frequency=data_params.get("frequency"),
         )
         from rules.business_rule import classify_headers
         ## se aplican las reglas de negocio
@@ -304,14 +292,12 @@ def make_data_node(memory_adapter: Any):
                 period = data_params.get("period")
                 parsed_point = None
                 parsed_range = None
-                if req_form_value in {"range", "point"} and isinstance(period, list) and period:
+                if req_form_value == "range" and isinstance(period, list) and period:
                     parsed_range = (str(period[0]), str(period[-1]))
                 if req_form_value == "point" and isinstance(period, list) and period:
-                    parsed_point = str(period[0])
+                    parsed_point = str(period[-1])
 
                 effective_req_form = req_form_value
-                if req_form_value == "point" and parsed_range:
-                    effective_req_form = "specific_point"
 
                 output_dict: Dict[str, Any] = {
                     "date": None,
@@ -339,7 +325,7 @@ def make_data_node(memory_adapter: Any):
                         elif latest_obs.get("pct") is not None:
                             output_dict["prev_period"] = latest_obs.get("pct")
 
-                if has_specific_series and effective_req_form in {"range", "specific_point"}:
+                if has_specific_series and effective_req_form == "range":
                     for obs in series_fetch_observations:
                         if not isinstance(obs, dict):
                             continue
@@ -381,9 +367,10 @@ def make_data_node(memory_adapter: Any):
                         "history": data_params.get("history"),
                     },
                     "series": serie_default,
-                    "parsed_point": parsed_point if effective_req_form not in {"range", "specific_point"} else None,
+                    "series_title": metadata_response.get("title_serie_default") if isinstance(metadata_response, dict) else None,
+                    "parsed_point": parsed_point if effective_req_form != "range" else None,
                     "parsed_range": parsed_range,
-                    "result": range_rows if effective_req_form in {"range", "specific_point"} else output_dict,
+                    "result": range_rows if effective_req_form == "range" else output_dict,
                     "source_url": source_url,
                 }
 

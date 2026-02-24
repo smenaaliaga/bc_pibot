@@ -179,6 +179,7 @@ def general_response(source_urls: List[str], *, series_id: Optional[str] = None)
 def specific_response(
     *,
     series_id: str,
+    series_title: Optional[str] = None,
     req_form: str,
     obs_to_show: List[Dict[str, Any]],
     parsed_point: Optional[str],
@@ -215,7 +216,7 @@ def specific_response(
             is_specific_activity=is_specific_activity,
             all_series_data=all_series_data,
         ),
-        metadata=_metadata_block(series_id),
+        metadata=_metadata_block(series_id, series_title),
         table=_specific_table(
             req_form=req_form,
             obs_to_show=obs_to_show,
@@ -254,6 +255,7 @@ def specific_response(
 def specific_point_response(
     *,
     series_id: str,
+    series_title: Optional[str] = None,
     req_form: str,
     obs_to_show: List[Dict[str, Any]],
     parsed_point: Optional[str],
@@ -290,7 +292,7 @@ def specific_point_response(
             is_specific_activity=is_specific_activity,
             all_series_data=all_series_data,
         ),
-        metadata=_metadata_block(series_id),
+        metadata=_metadata_block(series_id, series_title),
         table=_specific_table(
             req_form="specific_point",
             obs_to_show=obs_to_show,
@@ -338,10 +340,16 @@ def _general_intro(source_urls: List[str]) -> Iterable[str]:
         yield "- No hay cuadros disponibles para esta combinación de filtros.\n"
 
 
-def _metadata_block(series_id: Optional[str]) -> Iterable[str]:
+def _metadata_block(series_id: Optional[str], series_title: Optional[str] = None) -> Iterable[str]:
     series_code = str(series_id or "").strip()
     if not series_code or series_code.lower() == "none":
         return ()
+    description = str(series_title or "").strip()
+    if description and description.lower() != "none":
+        return (
+            f"**Código de serie:** {series_code}\n",
+            f"**Descripción de la serie:** {description}\n\n",
+        )
     return (f"**Código de serie:** {series_code}\n\n",)
 
 
@@ -525,6 +533,24 @@ def _build_latest_prompt(
     is_specific_activity: bool,
     all_series_data: Optional[List[Dict[str, Any]]],
 ) -> str:
+    def _variation_label(var_key: Optional[str], freq_value: str) -> str:
+        freq_norm = str(freq_value or "").strip().lower()
+        if var_key == "yoy":
+            if freq_norm == "q":
+                return "variación interanual trimestral (a/a)"
+            if freq_norm == "m":
+                return "variación interanual mensual (a/a)"
+            return "variación interanual (a/a)"
+        if var_key == "prev_period":
+            if freq_norm == "q":
+                return "variación trimestral respecto al período anterior (t/t)"
+            if freq_norm == "m":
+                return "variación mensual respecto al período anterior (m/m)"
+            if freq_norm == "a":
+                return "variación anual respecto al período anterior"
+            return "variación respecto al período anterior"
+        return "variación"
+
     llm_prompt_parts: List[str] = []
     if is_contribution:
         row = obs_to_show[0]
@@ -611,27 +637,29 @@ def _build_latest_prompt(
             )
     else:
         row = obs_to_show[0]
-        var_value = row.get("yoy") if "yoy" in row else row.get("prev_period")
-        freq_raw = str(freq or row.get("frequency") or row.get("freq") or "").strip().lower()
-
         if "yoy" in row:
-            if freq_raw == "q":
-                var_label = "Variación interanual trimestral (a/a)"
-            elif freq_raw == "m":
-                var_label = "Variación interanual mensual (a/a)"
-            else:
-                var_label = "Variación interanual (a/a)"
+            var_key = "yoy"
+            var_value = row.get("yoy")
+        elif "prev_period" in row:
+            var_key = "prev_period"
+            var_value = row.get("prev_period")
         else:
-            var_label = "Variación período anterior"
+            var_key = None
+            var_value = None
+        freq_raw = str(freq or row.get("frequency") or row.get("freq") or "").strip().lower()
+        var_label = _variation_label(var_key, freq_raw)
 
         llm_prompt_parts.append("SITUACIÓN: El usuario preguntó por un dato económico específico.")
-        llm_prompt_parts.append("Reporta solo el hecho (máximo 2 oraciones) informando:")
+        llm_prompt_parts.append("Reporta solo la variación (máximo 2 oraciones) informando:")
         llm_prompt_parts.append(f"- Indicador: {final_indicator_name}")
         llm_prompt_parts.append(f"- Período: {display_period_label}")
-        llm_prompt_parts.append(f"- {var_label}: {format_percentage(var_value)}")
-        llm_prompt_parts.append(
-            f"IMPORTANTE: {format_percentage(var_value)} es la VARIACIÓN PORCENTUAL, NO menciones el valor absoluto del índice"
-        )
+        if var_value is not None:
+            llm_prompt_parts.append(f"- {var_label}: {format_percentage(var_value)}")
+            llm_prompt_parts.append("IMPORTANTE: NO menciones el valor absoluto de la serie; reporta solo la variación")
+            llm_prompt_parts.append("IMPORTANTE: redacta en forma directa, por ejemplo: 'La variación ... fue de X%.'")
+            llm_prompt_parts.append("IMPORTANTE: NO agregues frases meta como 'no se proporciona el valor absoluto'")
+        else:
+            llm_prompt_parts.append("IMPORTANTE: si no hay variación disponible, indícalo explícitamente sin inventar cifras")
 
         llm_prompt_parts.append("\nREQUISITOS DE ESTILO:")
         llm_prompt_parts.append("- Usa un tono neutral y factual")
@@ -673,7 +701,21 @@ def _stream_llm_or_fallback(
         if req_form in {"range", "specific_point"}:
             yield f"{final_indicator_name} ({date_range_label}): {len(obs_to_show)} observaciones"
         else:
-            yield f"{final_indicator_name} en {display_period_label}: {format_value(obs_to_show[0].get('value'))}"
+            row = obs_to_show[0] if obs_to_show else {}
+            if "yoy" in row and row.get("yoy") is not None:
+                var_label = "variación interanual"
+                var_value = row.get("yoy")
+            elif "prev_period" in row and row.get("prev_period") is not None:
+                var_label = "variación respecto al período anterior"
+                var_value = row.get("prev_period")
+            else:
+                var_label = "variación"
+                var_value = None
+
+            if var_value is None:
+                yield f"{final_indicator_name} en {display_period_label}: no hay variación disponible"
+            else:
+                yield f"{final_indicator_name} en {display_period_label}: {var_label} de {format_percentage(var_value)}"
         yield "\n\n"
 
 

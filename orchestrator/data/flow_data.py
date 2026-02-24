@@ -43,6 +43,7 @@ def stream_data_flow(
     parsed_range = payload.get("parsed_range")  # Tupla (DD-MM-YYYY, DD-MM-YYYY) o None
     all_series_data = payload.get("all_series_data")  # Lista con todas las series (para contribución con activity=none)
     source_url = payload.get("source_url")  # URL de la fuente
+    series_title = payload.get("series_title")
     source_urls = normalize_sources(source_url)
 
     if not series_id or str(series_id).lower() == "none":
@@ -152,6 +153,7 @@ def stream_data_flow(
     response_stream = (
         specific_point_response(
             series_id=series_id,
+            series_title=series_title,
             req_form=req_form,
             obs_to_show=obs_to_show,
             parsed_point=parsed_point,
@@ -173,6 +175,7 @@ def stream_data_flow(
         if req_form == "specific_point"
         else specific_response(
             series_id=series_id,
+            series_title=series_title,
             req_form=req_form,
             obs_to_show=obs_to_show,
             parsed_point=parsed_point,

@@ -11,6 +11,7 @@ import argparse
 import json
 import logging
 import os
+import re
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -42,14 +43,19 @@ NODE_DESCRIPTIONS = {
 }
 
 
-def _setup_logger() -> logging.Logger:
+def _setup_logger(*, mode: str = "w", echo_to_console: bool = False) -> logging.Logger:
     logger = logging.getLogger("qa_trace")
     logger.setLevel(logging.INFO)
-    handler = logging.FileHandler(LOG_PATH, mode="w", encoding="utf-8")
+    logger.propagate = False
+    logger.handlers.clear()
+    handler = logging.FileHandler(LOG_PATH, mode=mode, encoding="utf-8")
     formatter = logging.Formatter("%(asctime)s | %(message)s")
     handler.setFormatter(formatter)
-    if not logger.handlers:
-        logger.addHandler(handler)
+    logger.addHandler(handler)
+    if echo_to_console:
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
     return logger
 
 
@@ -93,12 +99,47 @@ def _format_params_table(values: Dict[str, Any], statuses: Dict[str, str]) -> st
     return "\n".join(rows)
 
 
-def run_trace(question: str) -> None:
+def _format_final_response(output: Any) -> str:
+    if output is None:
+        return ""
+    text = str(output)
+    text = text.replace("\\*", "*")
+    text = re.sub(r"##CSV_DOWNLOAD_START.*?##CSV_DOWNLOAD_END", "", text, flags=re.DOTALL)
+    followup_match = re.search(r"##FOLLOWUP_START(.*?)##FOLLOWUP_END", text, flags=re.DOTALL)
+    if followup_match:
+        block = followup_match.group(1)
+        suggestions = []
+        for row in block.splitlines():
+            row = row.strip()
+            if row.startswith("suggestion_") and "=" in row:
+                _, val = row.split("=", 1)
+                if val.strip():
+                    suggestions.append(val.strip())
+        replacement = ""
+        if suggestions:
+            replacement = "\n\nSugerencias:\n" + "\n".join(f"- {s}" for s in suggestions) + "\n"
+        text = re.sub(r"##FOLLOWUP_START.*?##FOLLOWUP_END", replacement, text, flags=re.DOTALL)
+    text = re.sub(r"([^\n])(\* _Miles de millones de pesos_)", r"\1\n\2", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
+
+
+def run_trace(
+    question: str,
+    *,
+    log_mode: str = "w",
+    echo_logs: bool = False,
+    print_node_io: bool = True,
+) -> str:
     os.environ["USE_JOINTBERT_CLASSIFIER"] = "false"
     from orchestrator.graph.agent_graph import build_graph  # noqa: E402
 
-    logger = _setup_logger()
+    logger = _setup_logger(mode=log_mode, echo_to_console=echo_logs)
     graph = build_graph()
+
+    if log_mode == "a":
+        logger.info("%s", "=" * 120)
+        logger.info("TRACE_INTERACTIVE_START")
 
     state: Dict[str, Any] = {
         "question": question,
@@ -109,9 +150,10 @@ def run_trace(question: str) -> None:
         "configurable": {"thread_id": state["context"]["session_id"], "checkpoint_ns": "memory"},
     }
 
-    print(f"Grafo: {GRAPH_NAME}")
-    print(f"Pregunta: {question}")
-    print(API_CALL_NOTE)
+    if print_node_io:
+        print(f"Grafo: {GRAPH_NAME}")
+        print(f"Pregunta: {question}")
+        print(API_CALL_NOTE)
     logger.info("Grafo: %s", GRAPH_NAME)
     logger.info("Pregunta: %s", question)
     logger.info("%s", API_CALL_NOTE)
@@ -125,9 +167,10 @@ def run_trace(question: str) -> None:
             description = NODE_DESCRIPTIONS.get(node_name, "Nodo del grafo")
             input_snapshot = dict(current_state)
 
-            print(f"\n[NODO] {node_name} :: {description}")
-            print("INPUT:", _safe_json(input_snapshot))
-            print("OUTPUT:", _safe_json(delta))
+            if print_node_io:
+                print(f"\n[NODO] {node_name} :: {description}")
+                print("INPUT:", _safe_json(input_snapshot))
+                print("OUTPUT:", _safe_json(delta))
 
             logger.info("NODO=%s | %s", node_name, description)
             logger.info("INPUT=%s", _safe_json(input_snapshot))
@@ -141,7 +184,8 @@ def run_trace(question: str) -> None:
                     decision = current_state.get("route_decision")
                 logger.info("DECISION: decide la ruta de clasificacion")
                 logger.info("ROUTE_DECISION (intent)=%s", decision)
-                print("ROUTE_DECISION (intent):", decision)
+                if print_node_io:
+                    print("ROUTE_DECISION (intent):", decision)
 
             if node_name == "router":
                 decision = None
@@ -151,10 +195,12 @@ def run_trace(question: str) -> None:
                     decision = current_state.get("route_decision")
                 logger.info("DECISION: confirma ruta del grafo")
                 logger.info("ROUTE_DECISION (router)=%s", decision)
-                print("ROUTE_DECISION (router):", decision)
+                if print_node_io:
+                    print("ROUTE_DECISION (router):", decision)
                 next_step = decision if decision in {"data", "rag", "fallback"} else "fallback"
                 logger.info("NEXT_NODE=%s", next_step)
-                print("NEXT_NODE:", next_step)
+                if print_node_io:
+                    print("NEXT_NODE:", next_step)
 
             if node_name == "memory":
                 final_output = None
@@ -240,7 +286,8 @@ def run_trace(question: str) -> None:
                 else:
                     response_type_log = "GENERAL_RESPONSE"
                 logger.info("TYPE_RESPONSE: %s", response_type_log)
-                print("TYPE_RESPONSE:", response_type_log)
+                if print_node_io:
+                    print("TYPE_RESPONSE:", response_type_log)
                 logger.info(
                     "DATA_PARSED_PARAMS=%s",
                     _safe_json(
@@ -255,25 +302,37 @@ def run_trace(question: str) -> None:
                 if metadata_response is not None:
                     if metadata_key:
                         logger.info("METADATA_KEY=%s", metadata_key)
-                        print("METADATA_KEY:", metadata_key)
+                        if print_node_io:
+                            print("METADATA_KEY:", metadata_key)
                     logger.info("METADATA_RESPONSE=%s", _safe_json(metadata_response))
-                    print("METADATA_RESPONSE:", _safe_json(metadata_response))
+                    if print_node_io:
+                        print("METADATA_RESPONSE:", _safe_json(metadata_response))
                 if series_fetch_args is not None:
                     logger.info("SERIES_FETCH_ARGS=%s", _safe_json(series_fetch_args))
-                    print("SERIES_FETCH_ARGS:", _safe_json(series_fetch_args))
+                    if print_node_io:
+                        print("SERIES_FETCH_ARGS:", _safe_json(series_fetch_args))
                 if series_fetch_result is not None:
                     logger.info("SERIES_FETCH_RESULT=%s", _safe_json(series_fetch_result))
-                    print("SERIES_FETCH_RESULT:", _safe_json(series_fetch_result))
+                    if print_node_io:
+                        print("SERIES_FETCH_RESULT:", _safe_json(series_fetch_result))
                 if isinstance(data_params, dict) and isinstance(data_params_status, dict):
                     table = _format_params_table(data_params, data_params_status)
                     logger.info("DATA_PARAMS_TABLE=\n%s", table)
-                    print("DATA_PARAMS_TABLE:\n" + table)
+                    if print_node_io:
+                        print("DATA_PARAMS_TABLE:\n" + table)
 
             if isinstance(delta, dict):
                 current_state.update(delta)
 
-    print(f"\nLog generado en: {LOG_PATH}")
+    final_output = current_state.get("output")
+    formatted_output = _format_final_response(final_output)
+    if print_node_io:
+        print(f"\nLog generado en: {LOG_PATH}")
     logger.info("Log generado en: %s", LOG_PATH)
+    logger.info("RESPUESTA_FINAL_FORMATTED=\n%s", formatted_output)
+    if log_mode == "a":
+        logger.info("TRACE_INTERACTIVE_END")
+    return formatted_output
 
 
 def parse_args() -> argparse.Namespace:

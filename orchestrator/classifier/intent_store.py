@@ -80,6 +80,7 @@ class PostgresIntentStore(IntentStoreBase):
         self.table = table
         self.ttl_days = ttl_days
         self._pool = None
+        self._pool_tag = "direct"
         self._pg_log_state: Dict[str, Any] = {}
         self._pg_err_period = float(os.getenv("PG_ERROR_LOG_PERIOD", "60"))
         if ConnectionPool is not None:
@@ -89,11 +90,13 @@ class PostgresIntentStore(IntentStoreBase):
                     max_size=int(os.getenv("PG_POOL_SIZE", "5")),
                     open=False,
                 )
+                self._pool_tag = "pool"
                 try:
                     self._pool.open()
                 except Exception:
                     self._log_pg_error("Failed to open psycopg pool for intents; using direct connects", op="pool_open")
                     self._pool = None
+                    self._pool_tag = "direct"
             except Exception:
                 self._log_pg_error("Could not create psycopg pool for PostgresIntentStore; using direct connects")
         self._ensure_table()
@@ -126,6 +129,7 @@ class PostgresIntentStore(IntentStoreBase):
                     except Exception:
                         self._log_pg_error("Pool was closed; reopening failed", op="pool_reopen")
                         self._pool = None
+                        self._pool_tag = "direct"
                         return None
                 import time as _t
 
@@ -141,6 +145,7 @@ class PostgresIntentStore(IntentStoreBase):
                 except Exception:
                     pass
                 self._pool = None
+                self._pool_tag = "direct"
         for _ in range(2):
             try:
                 return psycopg.connect(self.dsn)

@@ -2245,8 +2245,8 @@
       },
       "key": "none::q::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
       "label": "pib_default",
-      "serie_default": "F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
-      "title_serie_default": "PIB a precios corrientes",
+      "serie_default": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "title_serie_default": "PIB volumen a precios del año anterior encadenado",
       "series": {
         "serie_1": {
           "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",

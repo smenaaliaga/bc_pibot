@@ -35,6 +35,15 @@ HISTORY_RULES = {
 
 YEAR_PATTERN = re.compile(r"\b(19\d{2}|20\d{2})\b")
 
+CALC_MODE_INTERANUAL_PATTERN = re.compile(
+    r"\b(interanual|a/a|anual\s+anterior|mismo\s+periodo\s+del\s+ano\s+anterior|mismo\s+per[ií]odo\s+del\s+a[nñ]o\s+anterior)\b",
+    re.IGNORECASE,
+)
+CALC_MODE_PREV_PATTERN = re.compile(
+    r"\b(periodo\s+anterior|per[ií]odo\s+anterior|trimestre\s+anterior|mes\s+anterior|qoq|mom|t/t|m/m|c/r\s+al\s+periodo\s+anterior|c/r\s+al\s+per[ií]odo\s+anterior)\b",
+    re.IGNORECASE,
+)
+
 
 def _first_or_none(value: Any) -> Any:
     if isinstance(value, list):
@@ -111,6 +120,66 @@ def classify_by_regex(question: str, indicator: Optional[str]) -> Dict[str, Opti
         "price": classify_price(question),
         "history": classify_history(question, indicator),
     }
+
+
+def resolve_calc_mode_cls(
+    *,
+    question: str,
+    calc_mode_cls: Any,
+    intent_cls: Any,
+    req_form_cls: Any,
+    frequency: Any,
+) -> str:
+    """Normalize calc_mode to align business rules and response generation.
+
+    Priority:
+    1) Explicit calc_mode from classifier (normalized aliases).
+    2) Strong textual clues in user question.
+    3) Business defaults for value/latest queries.
+    """
+
+    raw_mode = str(calc_mode_cls or "").strip().lower()
+    intent = str(intent_cls or "").strip().lower()
+    req_form = str(req_form_cls or "").strip().lower()
+    freq = str(frequency or "").strip().lower()
+    question_text = str(question or "")
+
+    def _normalize_alias(mode: str) -> Optional[str]:
+        if not mode or mode in {"none", "null", "nan"}:
+            return None
+        if mode in {"yoy", "ypct", "interanual", "annual", "anual"}:
+            return "yoy"
+        if mode in {"prev_period", "pct", "mom", "qoq", "period_previous", "periodo_anterior"}:
+            return "prev_period"
+        if mode in {"original", "value", "level", "valor"}:
+            return "original"
+        return mode
+
+    normalized_explicit = _normalize_alias(raw_mode)
+    if normalized_explicit:
+        if (
+            normalized_explicit == "original"
+            and intent == "value"
+            and req_form in {"latest", "point", "specific_point", "range"}
+            and freq in {"q", "m", "a"}
+        ):
+            return "yoy"
+        return normalized_explicit
+
+    if CALC_MODE_INTERANUAL_PATTERN.search(question_text):
+        return "yoy"
+    if CALC_MODE_PREV_PATTERN.search(question_text):
+        return "prev_period"
+
+    if intent == "value" and req_form in {"latest", "point", "specific_point", "range"}:
+        if freq in {"q", "m", "a"}:
+            return "yoy"
+        return "original"
+
+    if req_form in {"latest", "point", "specific_point", "range"}:
+        return "yoy"
+
+    return "yoy"
 
 
 def classify_headers(
@@ -235,8 +304,9 @@ def build_metadata_response(data_params: Dict[str, Any]) -> Dict[str, Any]:
 
     if not entry:
         req_form = str(data_params.get("req_form_cls") or "").lower()
-        if req_form == "point":
-            for fallback_req_form in ("latest", "range"):
+        if req_form in {"point", "range"}:
+            fallback_order = ("latest", "range") if req_form == "point" else ("range", "latest")
+            for fallback_req_form in fallback_order:
                 params_fallback = dict(data_params)
                 params_fallback["req_form_cls"] = fallback_req_form
                 candidate_key = build_metadata_key(params_fallback)
