@@ -53,6 +53,16 @@ class AgentState(TypedDict, total=False):
     route_decision: str
     output: str
     stream_chunks: Annotated[List[str], Topic(str, accumulate=True)]
+    parsed_point: Optional[str]
+    parsed_range: Optional[Tuple[str, str]]
+    series: Optional[str]
+    data_classification: Dict[str, Any]
+    data_params: Dict[str, Any]
+    data_params_status: Dict[str, str]
+    metadata_response: Dict[str, Any]
+    metadata_key: Optional[str]
+    series_fetch_args: Dict[str, Any]
+    series_fetch_result: Dict[str, Any]
 
 
 def _emit_stream_chunk(chunk_text: str, writer: Optional[StreamWriter]) -> None:

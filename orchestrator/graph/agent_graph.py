@@ -69,7 +69,7 @@ def classify_node(state: AgentState) -> AgentState:
 
 
 def intent_node(state: AgentState) -> AgentState:
-    node_fn = make_intent_node(_MEMORY, _INTENT_STORE)
+    node_fn = make_intent_node(_MEMORY)
     return node_fn(state)
 
 
@@ -115,7 +115,7 @@ def build_graph():
         classify_question_with_history,
         build_intent_info,
     )
-    intent = make_intent_node(_MEMORY, _INTENT_STORE)
+    intent = make_intent_node(_MEMORY)
     router = make_router_node()
     data = make_data_node(_MEMORY)
     rag = make_rag_node(_RAG_LLM)
@@ -131,15 +131,20 @@ def build_graph():
     builder.add_node("fallback", fallback)
     builder.add_node("memory", memory)
 
+    # --- DEBUG: forzar ruta directa a DATA ---
+    # (Descomentar el bloque original para restaurar el enrutamiento correcto)
     builder.add_edge(START, "ingest")
     builder.add_edge("ingest", "classify")
-    builder.add_edge("classify", "intent")
-    builder.add_edge("intent", "router")
-    builder.add_conditional_edges(
-        "router",
-        _route_from_router,
-        {"data": "data", "rag": "rag", "fallback": "fallback"},
-    )
+    # --- DEBUG: forzar ruta directa a DATA desde classify ---
+    # (Descomentar el bloque original para restaurar el enrutamiento correcto)
+    builder.add_edge("classify", "data")
+    # builder.add_edge("classify", "intent")
+    # builder.add_edge("intent", "router")
+    # builder.add_conditional_edges(
+    #     "router",
+    #     _route_from_router,
+    #     {"data": "data", "rag": "rag", "fallback": "fallback"},
+    # )
     builder.add_edge("data", "memory")
     builder.add_edge("rag", "memory")
     builder.add_edge("fallback", "memory")

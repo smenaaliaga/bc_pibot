@@ -1,0 +1,1234 @@
+{
+  "metadata": {
+    "description": "metadatos de las series del pib e imacec",
+    "indicators": [
+      "pib",
+      "imacec"
+    ],
+    "classification_fields": [
+      "activity_cls",
+      "frequency",
+      "calc_mode_cls",
+      "region_cls",
+      "investment_cls",
+      "req_form_cls"
+    ],
+    "postprocess": [
+      "indicator",
+      "seasonality",
+      "activity_value",
+      "sub_activity_value",
+      "region_value",
+      "gasto_value",
+      "price",
+      "history"
+    ]
+  },
+  "data": [
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "m",
+        "calc_mode_cls": "contribution",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::m::contribution::none::none::latest::none::none::none::none::imacec::nsa::none::co::2018",
+      "label": "imacec_contribution",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {
+        "serie_1": {
+          "id": "F032.IMC.V12.Z.Z.2018.PB.Z.0.M",
+          "title": "Producción de bienes"
+        },
+        "serie_2": {
+          "id": "F032.IMC.V12.Z.Z.2018.03.Z.0.M",
+          "title": "Minería"
+        },
+        "serie_3": {
+          "id": "F032.IMC.V12.Z.Z.2018.04.Z.0.M",
+          "title": "Industria"
+        },
+        "serie_4": {
+          "id": "F032.IMC.V12.Z.Z.2018.RB.Z.0.M",
+          "title": "Resto de bienes"
+        },
+        "serie_5": {
+          "id": "F032.IMC.V12.Z.Z.2018.COM.Z.0.M",
+          "title": "Comercio"
+        },
+        "serie_6": {
+          "id": "F032.IMC.V12.Z.Z.2018.SERV.Z.0.M",
+          "title": "Servicios"
+        },
+        "serie_7": {
+          "id": "F032.IMC.V12.Z.Z.2018.IMP.Z.0.M",
+          "title": "Impuestos sobre los productos"
+        },
+        "serie_8": {
+          "id": "F032.IMC.V12.Z.Z.2018.N03.Z.0.M",
+          "title": "Imacec no minero"
+        },
+        "serie_9": {
+          "id": "F032.IMC.V12.Z.Z.2018.Z.Z.0.M",
+          "title": "Imacec"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_02_B/638131830958936551"
+      }
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "m",
+        "calc_mode_cls": "contribution",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "sa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::m::contribution::none::none::latest::none::none::none::none::imacec::sa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      }
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_default",
+      "serie_default": "F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
+      "title_serie_default": "PIB a precios corrientes",
+      "series": {
+        "serie_1": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+          "title": "PIB volumen a precios del año anterior encadenado"
+        },
+        "serie_2": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.1.T",
+          "title": "PIB volumen a precios del año anterior encadenado (desestacionalizado)"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2/CCNN2018_P0_V(2)"
+      }
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_default",
+      "serie_default": "F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
+      "title_serie_default": "PIB a precios corrientes",
+      "series": {
+        "serie_1": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+          "title": "PIB volumen a precios del año anterior encadenado"
+        },
+        "serie_2": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.1.T",
+          "title": "PIB volumen a precios del año anterior encadenado (desestacionalizado)"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2/CCNN2018_P0_V(2)"
+      }
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_default",
+      "serie_default": "F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
+      "title_serie_default": "PIB a precios corrientes",
+      "series": {
+        "serie_1": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+          "title": "PIB volumen a precios del año anterior encadenado"
+        },
+        "serie_2": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.1.T",
+          "title": "PIB volumen a precios del año anterior encadenado (desestacionalizado)"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2/CCNN2018_P0_V(2)"
+      }
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_specific",
+      "serie_default": "F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
+      "title_serie_default": "PIB a precios corrientes",
+      "series": {
+        "serie_1": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+          "title": "PIB volumen a precios del año anterior encadenado"
+        },
+        "serie_2": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.1.T",
+          "title": "PIB volumen a precios del año anterior encadenado (desestacionalizado)"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2/CCNN2018_P0_V(2)"
+      }
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_general",
+      "serie_default": "F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
+      "title_serie_default": "PIB a precios corrientes",
+      "series": {
+        "serie_1": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+          "title": "PIB volumen a precios del año anterior encadenado"
+        },
+        "serie_2": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.1.T",
+          "title": "PIB volumen a precios del año anterior encadenado (desestacionalizado)"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2/CCNN2018_P0_V(2)"
+      }
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "rios",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::q::yoy::specific::none::latest::none::none::rios::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_X_ACT_T/637801742959936001"
+      }
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_general",
+      "serie_default": "F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
+      "title_serie_default": "PIB a precios corrientes",
+      "series": {
+        "serie_1": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+          "title": "PIB volumen a precios del año anterior encadenado"
+        },
+        "serie_2": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.1.T",
+          "title": "PIB volumen a precios del año anterior encadenado (desestacionalizado)"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2/CCNN2018_P0_V(2)"
+      }
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_general",
+      "serie_default": "F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
+      "title_serie_default": "PIB a precios corrientes",
+      "series": {
+        "serie_1": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+          "title": "PIB volumen a precios del año anterior encadenado"
+        },
+        "serie_2": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.1.T",
+          "title": "PIB volumen a precios del año anterior encadenado (desestacionalizado)"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2/CCNN2018_P0_V(2)"
+      }
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_general",
+      "serie_default": "F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
+      "title_serie_default": "PIB a precios corrientes",
+      "series": {
+        "serie_1": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+          "title": "PIB volumen a precios del año anterior encadenado"
+        },
+        "serie_2": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.1.T",
+          "title": "PIB volumen a precios del año anterior encadenado (desestacionalizado)"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2/CCNN2018_P0_V(2)"
+      }
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_general",
+      "serie_default": "F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
+      "title_serie_default": "PIB a precios corrientes",
+      "series": {
+        "serie_1": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+          "title": "PIB volumen a precios del año anterior encadenado"
+        },
+        "serie_2": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.1.T",
+          "title": "PIB volumen a precios del año anterior encadenado (desestacionalizado)"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2/CCNN2018_P0_V(2)"
+      }
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "prev_period",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::prev_period::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_general",
+      "serie_default": "F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
+      "title_serie_default": "PIB a precios corrientes",
+      "series": {
+        "serie_1": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+          "title": "PIB volumen a precios del año anterior encadenado"
+        },
+        "serie_2": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.1.T",
+          "title": "PIB volumen a precios del año anterior encadenado (desestacionalizado)"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2/CCNN2018_P0_V(2)"
+      }
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "prev_period",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::prev_period::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_general",
+      "serie_default": "F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
+      "title_serie_default": "PIB a precios corrientes",
+      "series": {
+        "serie_1": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+          "title": "PIB volumen a precios del año anterior encadenado"
+        },
+        "serie_2": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.1.T",
+          "title": "PIB volumen a precios del año anterior encadenado (desestacionalizado)"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2/CCNN2018_P0_V(2)"
+      }
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_general",
+      "serie_default": "F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
+      "title_serie_default": "PIB a precios corrientes",
+      "series": {
+        "serie_1": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+          "title": "PIB volumen a precios del año anterior encadenado"
+        },
+        "serie_2": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.1.T",
+          "title": "PIB volumen a precios del año anterior encadenado (desestacionalizado)"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2/CCNN2018_P0_V(2)"
+      }
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_general",
+      "serie_default": "F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
+      "title_serie_default": "PIB a precios corrientes",
+      "series": {
+        "serie_1": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+          "title": "PIB volumen a precios del año anterior encadenado"
+        },
+        "serie_2": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.1.T",
+          "title": "PIB volumen a precios del año anterior encadenado (desestacionalizado)"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2/CCNN2018_P0_V(2)"
+      }
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "range",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::none::range::none::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_general",
+      "serie_default": "F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
+      "title_serie_default": "PIB a precios corrientes",
+      "series": {
+        "serie_1": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+          "title": "PIB volumen a precios del año anterior encadenado"
+        },
+        "serie_2": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.1.T",
+          "title": "PIB volumen a precios del año anterior encadenado (desestacionalizado)"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2/CCNN2018_P0_V(2)"
+      }
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "range",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::none::range::none::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_general",
+      "serie_default": "F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
+      "title_serie_default": "PIB a precios corrientes",
+      "series": {
+        "serie_1": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+          "title": "PIB volumen a precios del año anterior encadenado"
+        },
+        "serie_2": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.1.T",
+          "title": "PIB volumen a precios del año anterior encadenado (desestacionalizado)"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2/CCNN2018_P0_V(2)"
+      }
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "a",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::a::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_general",
+      "serie_default": "F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
+      "title_serie_default": "PIB a precios corrientes",
+      "series": {
+        "serie_1": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+          "title": "PIB volumen a precios del año anterior encadenado"
+        },
+        "serie_2": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.1.T",
+          "title": "PIB volumen a precios del año anterior encadenado (desestacionalizado)"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2/CCNN2018_P0_V(2)"
+      }
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "range",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::none::range::none::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_general",
+      "serie_default": "F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
+      "title_serie_default": "PIB a precios corrientes",
+      "series": {
+        "serie_1": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+          "title": "PIB volumen a precios del año anterior encadenado"
+        },
+        "serie_2": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.1.T",
+          "title": "PIB volumen a precios del año anterior encadenado (desestacionalizado)"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2/CCNN2018_P0_V(2)"
+      }
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "q",
+        "calc_mode_cls": "contribution",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::q::contribution::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_contribution",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN_EP18_05_ratio/637801088750197615"
+      }
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "general",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::general::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL"
+      }
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_general",
+      "serie_default": "F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
+      "title_serie_default": "PIB a precios corrientes",
+      "series": {
+        "serie_1": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+          "title": "PIB volumen a precios del año anterior encadenado"
+        },
+        "serie_2": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.1.T",
+          "title": "PIB volumen a precios del año anterior encadenado (desestacionalizado)"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2/CCNN2018_P0_V(2)"
+      }
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "general",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::general::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL"
+      }
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "minero",
+        "sub_activity_value": "none",
+        "region_value": "lagos",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::q::yoy::specific::none::latest::minero::none::lagos::none::pib::nsa::none::co::2018",
+      "label": "pib_contribution",
+      "serie_default": "F032.PIB.RPA.N.Z.EP18.03.Z.0.A",
+      "title_serie_default": "PIB Minero",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN_EP18_05_ratio/637801088750197615"
+      }
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "pesca",
+        "sub_activity_value": "none",
+        "region_value": "lagos",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::q::yoy::specific::none::latest::pesca::none::lagos::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_X_ACT_T/637801742959936001"
+      }
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::q::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_contribution",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN_EP18_05_ratio/637801088750197615"
+      }
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "a",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::a::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_general",
+      "serie_default": "F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
+      "title_serie_default": "PIB a precios corrientes",
+      "series": {
+        "serie_1": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+          "title": "PIB volumen a precios del año anterior encadenado"
+        },
+        "serie_2": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.1.T",
+          "title": "PIB volumen a precios del año anterior encadenado (desestacionalizado)"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2/CCNN2018_P0_V(2)"
+      }
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "general",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "investment",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::general::latest::none::none::none::investment::pib::nsa::none::co::2018",
+      "label": "pib_gasto",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_G1/637801108004606163"
+      }
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "general",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "investment",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::general::latest::none::none::none::investment::pib::nsa::none::co::2018",
+      "label": "pib_gasto",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_G1/637801108004606163"
+      }
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "general",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "investment",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::general::latest::none::none::none::investment::pib::nsa::none::co::2018",
+      "label": "pib_gasto",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_G1/637801108004606163"
+      }
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "general",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "consumo",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::general::latest::none::none::none::consumo::pib::nsa::none::co::2018",
+      "label": "pib_gasto",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_G1/637801108004606163"
+      }
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "general",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "investment",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::general::latest::none::none::none::investment::pib::nsa::none::co::2018",
+      "label": "pib_gasto",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_G1/637801108004606163"
+      }
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "general",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "investment",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::general::latest::none::none::none::investment::pib::nsa::none::co::2018",
+      "label": "pib_gasto",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_G1/637801108004606163"
+      }
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "specific",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "hogares",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::specific::latest::none::none::none::hogares::pib::nsa::none::co::2018",
+      "label": "pib_gasto",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_G1/637801108004606163"
+      }
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "specific",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "exportacion_bienes_servicios",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::specific::latest::none::none::none::exportacion_bienes_servicios::pib::nsa::none::co::2018",
+      "label": "pib_gasto",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_G1/637801108004606163"
+      }
+    }
+  ],
+  "counts": {
+    "rows": 169,
+    "records": 36,
+    "duplicate_keys_unique": 16
+  },
+  "qa": {
+    "duplicate_keys_unique_sample": [
+      "general::m::contribution::none::none::latest::none::none::none::none::imacec::nsa::none::co::2018",
+      "general::m::contribution::none::none::latest::none::none::none::none::imacec::sa::none::co::2018",
+      "none::q::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "general::q::yoy::specific::none::latest::none::none::rios::none::pib::nsa::none::co::2018",
+      "none::q::prev_period::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "none::q::yoy::none::none::range::none::none::none::none::pib::nsa::none::co::2018",
+      "none::a::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "general::q::contribution::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "none::q::yoy::general::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "specific::q::yoy::specific::none::latest::minero::none::lagos::none::pib::nsa::none::co::2018",
+      "specific::q::yoy::specific::none::latest::pesca::none::lagos::none::pib::nsa::none::co::2018",
+      "general::q::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "none::q::yoy::none::general::latest::none::none::none::investment::pib::nsa::none::co::2018",
+      "none::q::yoy::none::general::latest::none::none::none::consumo::pib::nsa::none::co::2018",
+      "none::q::yoy::none::specific::latest::none::none::none::hogares::pib::nsa::none::co::2018",
+      "none::q::yoy::none::specific::latest::none::none::none::exportacion_bienes_servicios::pib::nsa::none::co::2018"
+    ]
+  }
+}

@@ -1,0 +1,170 @@
+question,indicator,pred_seasonality,exp_seasonality,pred_price,exp_price,pred_history,exp_history,latency_ms,key
+cual es el ultimo imacec,imacec,sa,nsa,none,co,none,2018,0.23,sa::none::none
+dame la ultima cifra de la mineria,imacec,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cuales son los valores del imacec por actividad economica,imacec,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cuanto acelero la economia sin ajuste estacional,imacec,nsa,nsa,none,co,none,2018,0.01,nsa::none::none
+dame el cambio en el margen el sector no minero no ajustado por estacionalidad,imacec,nsa,nsa,none,co,none,2018,0.01,nsa::none::none
+cuanto variaron todas las actividades economicas respecto al periodo anterior de la serie original,imacec,nsa,nsa,none,co,none,2018,0.02,nsa::none::none
+en cuanto vario la economia recientemente,imacec,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cuanto crecio la industria en el ultimo periodo disponible,imacec,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual fue el desempeño de los sectores economicos recientemente,imacec,sa,nsa,none,co,none,2018,0.01,sa::none::none
+NO SE PUEDE HABLAR DE CONTRIBUCION SIN HABLAR DE LAS ACTIVIDADES ECONOMICAS,imacec,sa,nsa,none,co,none,2018,0.02,sa::none::none
+cuanto contribuyo el sector comercial en la economia en la ultima publicacion,imacec,sa,nsa,none,co,none,2018,0.01,sa::none::none
+que actividad impulso el crecimiento economico,imacec,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cuanto contribuyeron cada actividad al crecimiento economico,imacec,sa,nsa,none,co,none,2018,0.01,sa::none::none
+dame la ultima cifra del imacec en frecuencia trimestral,imacec,sa,nsa,none,co,none,2018,0.01,sa::none::none
+entregame la cifra trimestral mas reciente del imacec del sector no minero,imacec,sa,nsa,none,co,none,2018,0.01,sa::none::none
+dame los datos mas reciente del indice trimestral de la actividad economica por sector economico,imacec,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual fue el dinamismo del imacec trimestral del ultimo dato publicado para la serie bruta,imacec,nsa,nsa,none,co,none,2018,0.01,nsa::none::none
+como acelero la mineria en frecuencia trimestral del imacec con estacionalidad,imacec,sa,nsa,none,co,none,2018,0.01,sa::none::none
+en cuanto vario en el corto plazo las actividades economicas del imacec en frecuencia trimestral sin ajuste estacional,imacec,nsa,nsa,none,co,none,2018,0.01,nsa::none::none
+en cuanto se expandio el imacec trimestral en el ultimo periodo,imacec,sa,nsa,none,co,none,2018,0.01,sa::none::none
+como se desempeño en frecuencia trimestral la mineria para el imacec,imacec,sa,nsa,none,co,none,2018,0.01,sa::none::none
+dame las variaciones de los sectores economicos del imacec en frecuencia trimestral,imacec,sa,nsa,none,co,none,2018,0.01,sa::none::none
+NO EXISTE CONTRIBUCION DEL IMACEC EN FRECUENCIA TRIMESTRAL,imacec,sa,nsa,none,co,none,2018,0.01,sa::none::none
+dame la cifra mas reciente del imacec anual,imacec,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual fue la cifra del sector de servicios del imacec en frecuencia anual,imacec,sa,nsa,none,co,none,2018,0.01,sa::none::none
+muestrame los valores del imacec anual por actividad economica ,imacec,sa,nsa,none,co,none,2018,0.01,sa::none::none
+dame la aceleracion de imacec en frecuencia anual en su serie original,imacec,nsa,nsa,none,co,none,2018,0.01,nsa::none::none
+no ajustado por estacionalidad en cuanto vario en el margen el imacec minero en su frecuencia anual,imacec,nsa,nsa,none,co,none,2018,0.01,nsa::none::none
+dame todas las variaciones respecto al periodo anterior de los sectores del imacec anual no desestacionalizada,imacec,sa,nsa,none,co,none,2018,0.01,sa::none::none
+en cuanto vario en 12 meses el imacec en frecuencia anual,imacec,sa,nsa,none,co,none,2018,0.01,sa::none::none
+quiero el cambio del imacec en frecuencia anual respecto al miso perido del año anterior del sector de industria,imacec,sa,nsa,none,co,none,2018,0.01,sa::none::none
+dame la variacion de t vs t-12 de los sectores economicos del imacec en frecuencia anual,imacec,sa,nsa,none,co,none,2018,0.01,sa::none::none
+NO EXISTE CONTRIBUCION DEL IMACEC EN FRECUENCIA TRIMESTRAL,imacec,sa,nsa,none,co,none,2018,0.01,sa::none::none
+dame el valor mas reciente del imacec desestacionalizado,imacec,sa,sa,none,co,none,2018,0.00,sa::none::none
+cual fue el valor del imacec no minero aplicando ajuste estacional,imacec,sa,sa,none,co,none,2018,0.01,sa::none::none
+que sectores impulsaron el crecimiento ajustando la cifra por estacionalidad,imacec,sa,sa,none,co,none,2018,0.01,sa::none::none
+en cuanto acelero la economia,imacec,sa,sa,none,co,none,2018,0.01,sa::none::none
+por cuanto vario en el margen el imacec en produccion de bienes,imacec,sa,sa,none,co,none,2018,0.01,sa::none::none
+entregame las variaciones en el margen de los sectores economicos,imacec,sa,sa,none,co,none,2018,0.01,sa::none::none
+en cuanto vario la economia con ajuste estacional en la ultima publicacion,imacec,sa,sa,none,co,none,2018,0.01,sa::none::none
+cual fue el cambio de la economia eliminando el componente estacional,imacec,sa,sa,none,co,none,2018,0.01,sa::none::none
+cuales fueron las variaciones de las actividades economicas con correciones de efectos estacionales,imacec,sa,sa,none,co,none,2018,0.01,sa::none::none
+NO SE PUEDE HABLAR DE CONTRIBUCION SIN HABLAR DE LAS ACTIVIDADES ECONOMICAS,imacec,sa,sa,none,co,none,2018,0.01,sa::none::none
+cuanto aporto el sector de servicios a la variacion mensual de la economia,imacec,sa,sa,none,co,none,2018,0.01,sa::none::none
+cual actividad impulso la variacion mes a mes de la economia el ultimo periodo disponible,imacec,sa,sa,none,co,none,2018,0.01,sa::none::none
+que actividades incidieron en el crecimiento mensual de la economia ajustado por estacionalidad,imacec,sa,sa,none,co,none,2018,0.01,sa::none::none
+dame el ultimo imacec en frecuencia trimestral y ajustado por estacionalidad,imacec,sa,sa,none,co,none,2018,0.01,sa::none::none
+cual es el ultimo valor desestacionalizado del imacec para la mineria en frecuencia trimestral ,imacec,sa,sa,none,co,none,2018,0.00,sa::none::none
+cuales fueron los valores de las actividades economicas del imacec ajustado por estacionalidad,imacec,sa,sa,none,co,none,2018,0.01,sa::none::none
+como se comporto el imacec en el margen usando frecuencia trimestral,imacec,sa,sa,none,co,none,2018,0.01,sa::none::none
+como evoluciono la mineria en t vs t-1 para el imacec trimestral del ultimo periodo,imacec,sa,sa,none,co,none,2018,0.01,sa::none::none
+cuanto crecio respecto al periodo anterior las actividades del imacec dada la frecuencia en trimestre,imacec,sa,sa,none,co,none,2018,0.01,sa::none::none
+como acelero el imacec con frecuencia por trimestre ,imacec,sa,sa,none,co,none,2018,0.01,sa::none::none
+cuanto vario en el margen el imacec para el sector de produccion de bienes en frecuencia trimestral,imacec,sa,sa,none,co,none,2018,0.01,sa::none::none
+entregame en frecuencia trimestral las aceleraciones de los sectores del imacec,imacec,sa,sa,none,co,none,2018,0.01,sa::none::none
+NO SE PUEDE HABLAR DE CONTRIBUCION SIN HABLAR DE LAS ACTIVIDADES ECONOMICAS,imacec,sa,sa,none,co,none,2018,0.01,sa::none::none
+dame el ultimo indice del imacec con frecuencia anual ajustandolo por estacionalidad,imacec,sa,sa,none,co,none,2018,0.01,sa::none::none
+para el sector minero y con ajuste estacional dame la ultima cifra del imacec usando frecuencia por año,imacec,sa,sa,none,co,none,2018,0.01,sa::none::none
+quiero todas las cifras de las actividades del imacec en medicion anual,imacec,sa,sa,none,co,none,2018,0.01,sa::none::none
+en cuanto vario respecto al periodo anterior el imacec usando frecuencia anual,imacec,sa,sa,none,co,none,2018,0.01,sa::none::none
+cual fue el crecimiento en el margen del imacec minero con periodicidad anual,imacec,sa,sa,none,co,none,2018,0.01,sa::none::none
+usando frecuencia anual cuanto acelero los sectores economicas del imacec,imacec,sa,sa,none,co,none,2018,0.01,sa::none::none
+cuanto vario el imacec con frecuencia anual desestacionalizado,imacec,sa,sa,none,co,none,2018,0.00,sa::none::none
+en cuanto se expandio con ajuste estacional y frecuencia anual el resto de bienes del imacec ,imacec,sa,sa,none,co,none,2018,0.01,sa::none::none
+quiero saber la variacion de todos los sectores economicos en frecuencia anual y desestacionalizado,imacec,sa,sa,none,co,none,2018,0.01,sa::none::none
+NO SE PUEDE HABLAR DE CONTRIBUCION SIN HABLAR DE LAS ACTIVIDADES ECONOMICAS,imacec,sa,sa,none,co,none,2018,0.01,sa::none::none
+cual fue ultimo interno bruto o PIB,pib,nsa,nsa,none,co,none,2018,0.11,nsa::none::none
+cual es el valor del PIB,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+Cual es el valor del producto interno bruto,pib,nsa,nsa,none,co,none,2018,0.01,nsa::none::none
+como ha cambiado el producto interno burto  en el tiempo,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+Cual es el pib a precios corrientes,pib,sa,nsa,co,co,none,2018,0.01,sa::co::none
+Cual es el pib de la region de arica,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual es el pib de la región de tarapacá,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual es el pib de la región de antofagasta,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual es el pib de la región de atacama,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual es el pib de la región de coquimbo,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+ cual es el pib de la región de valparaiso,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual es el pib de la región metropolitana,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual es el pib de la región de ohhiggins,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual es el pib de la región del maule,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+ cual es el pib de la región del ñuble,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual es el pib de la región del bio bio,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual es el pib de la región de la araucanía,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual es el pib de la región de los ríos,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual es el pib de la región de los lagos,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual es el pib de la región de aysén,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual es el pib de la región de magallanes,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+Cual es el valor del pib regional,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+Como ha cambiado el producto interno bruto ,pib,nsa,nsa,none,co,none,2018,0.01,nsa::none::none
+cuales son los valores del pib por actividad economica ,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cuales son los valores del pib regional por actividad economica trimestral de la region de arica,pib,sa,nsa,none,co,none,2018,0.02,sa::none::none
+cuales son los valores del pib regional por actividad economica trimestral de la region de tarapaca,pib,sa,nsa,none,co,none,2018,0.02,sa::none::none
+cuales son los valores del pib regional por actividad economica trimestral de la region de antofagasta,pib,sa,nsa,none,co,none,2018,0.02,sa::none::none
+cuales son los valores del pib regional por actividad economica trimestral de la region de atacama,pib,sa,nsa,none,co,none,2018,0.02,sa::none::none
+cuales son los valores del pib regional por actividad economica trimestral de coquimbo,pib,sa,nsa,none,co,none,2018,0.02,sa::none::none
+cuales son los valores del pib regional por actividad economica trimestral de valparaiso,pib,sa,nsa,none,co,none,2018,0.02,sa::none::none
+cuales son los valores del pib regional por actividad economica trimestral de la region metropolitana,pib,sa,nsa,none,co,none,2018,0.02,sa::none::none
+cuales son los valores del pib regional por actividad economica trimestral de la region de ohhigins,pib,sa,nsa,none,co,none,2018,0.02,sa::none::none
+cuales son los valores del pib regional por actividad economica trimestral de la region del maule,pib,sa,nsa,none,co,none,2018,0.02,sa::none::none
+cuales son los valores del pib regional por actividad economica trimestral de la region de ñuble,pib,sa,nsa,none,co,none,2018,0.02,sa::none::none
+cuales son los valores del pib regional por actividad economica trimestral de la region del bio bio,pib,sa,nsa,none,co,none,2018,0.02,sa::none::none
+cuales son los valores del pib regional por actividad economica trimestral de la region de araucania,pib,sa,nsa,none,co,none,2018,0.02,sa::none::none
+cuales son los valores del pib regional por actividad economica trimestral de la region de los rios,pib,sa,nsa,none,co,none,2018,0.02,sa::none::none
+cuales son los valores del pib regional por actividad economica trimestral de la region de los lagos,pib,sa,nsa,none,co,none,2018,0.02,sa::none::none
+cuales son los valores del pib regional por actividad economica trimestral de la region de aysen,pib,sa,nsa,none,co,none,2018,0.02,sa::none::none
+cuales son los valores del pib regional por actividad economica trimestral de la region de magallanes,pib,sa,nsa,none,co,none,2018,0.02,sa::none::none
+dame el pib minero,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual fue la cifra del pib para la region metropolitana,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+dame la pib de la mineria para la region de los lagos,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+dame el ultimo indicie del pib,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual fue el imacec del ultimo año,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cuanto vario la economia de acuerdo al pib,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cuanto crecio el pib ,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+dame la variacion del pib desestacionalizado,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cuanto acelero la economia de acuerdo al pib,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cuanto crecio en el margen el pib,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+dame la variacion en el margen de la economia sin desestacionalizar,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual fue el pib del ultimo trimestre,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual fue el pib durante el ultimo trimestre,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cuanto marco el pib del ultimo año,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+dame las cifras del pib durante el ultimo año,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+dame los valores del pib trimestral durante el ultimo año,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+dame la cifra del pib del ultimo año,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual fue la cifra del pib durante el 2023,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+que actividad impulso el crecimiento de la economia en el pib,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+que sectores contribuyeron al pib,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual sector contribuyo al pib el ultimo año,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cuanto aporto la mineria al pib,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cuanto contribuyo el sector de servicios al pib,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cuanto crecio la economia por sector economico en el pib,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+dame el pib por region,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+dame la ultima cifra del pib,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+dame los valores por region del pib,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+en cuanto se ubico la cifra del pib para la industria manufacturera,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual es la partición del pib en el sector agropecuario,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual es la partición del pib en el sector de mineria,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual es la participación del pib en la pesca,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+para el pib de la region de los lagos cuanto marco la cifra el sector de pesca,pib,sa,nsa,none,co,none,2018,0.02,sa::none::none
+dame la cifra para cada actividad del pib ,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+como se ubico el ultimo pib anual,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+entregame el valor del pib para el sector de transporte en frecuencia anual,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual fue los recientes valores por sector economico del pib anual,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+Cuanto alcanzo la inversión del chile ,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+Cual es la inversion,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+Que es la inversion,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+Inversion en chile,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual es la inversion en chile el 2024,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+donde puedo ver la demandao el consumo total y la inversion,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual es el vaor de la demanda internacional,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual esl el valor del consumo ,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual fue el valor del consumo entre 2022 y el 2024,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual es el valor de la inversion,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cuanto es la variacion de la inversión en Chile,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual es fue la inversion en el 2023 en chile,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+Cual es el consumo de hogares ,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+Cual es el consumo de gobierno,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual es la inversion del tercer trimestre del 2025 ,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+Cual es el gasto de exportacion de bienes y servicios,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+Cual es el gasto de exportación en mineria,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual es la participion del consumo en el pib,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual es la inversion en vivienda,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual es el gasto de importacion en mineria ,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual es el gasto de demanda interna,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual es el gasto de hogares,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual es el gasto de consumo gobierno,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual es el valor de la formacion bruta de capital,pib,nsa,nsa,none,co,none,2018,0.01,nsa::none::none
+cual es el valor de la formación bruta de capital fijo,pib,nsa,nsa,none,co,none,2018,0.01,nsa::none::none
+cual es el gasto de la variacion de existencias,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none
+cual es el gasto del gasto de exportación de bienes y servicios,pib,sa,nsa,none,co,none,2018,0.01,sa::none::none

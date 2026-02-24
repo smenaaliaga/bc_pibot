@@ -11,20 +11,17 @@ Ejecutar con:
     streamlit run main.py
 """
 
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 import uuid
 import os
 import logging
 import datetime
+import json
 
 import streamlit as st
 from dotenv import load_dotenv
 
 from config import get_settings
-try:
-    from orchestrator.graph.agent_graph import build_graph  # type: ignore
-except Exception:
-    build_graph = None  # type: ignore
 # from orchestrator.classifier.joint_bert_classifier import get_predictor
 from registry import warmup_models
 import app
@@ -34,6 +31,15 @@ def main() -> None:
     """Punto de entrada principal."""
     # Cargar variables de entorno desde .env
     load_dotenv()
+
+    # Mantener paridad con qa/qa.py (flujo validado): usar clasificación remota
+    # salvo que se fuerce explícitamente desde entorno para Streamlit.
+    os.environ["USE_JOINTBERT_CLASSIFIER"] = os.getenv("USE_JOINTBERT_CLASSIFIER_STREAMLIT", "false")
+
+    try:
+        from orchestrator.graph.agent_graph import build_graph  # type: ignore
+    except Exception:
+        build_graph = None  # type: ignore
     
     # Usar st.session_state para rastrear si ya se inicializó
     if "app_initialized" in st.session_state:
@@ -151,6 +157,42 @@ def main() -> None:
                 "checkpoint_ns": checkpoint_ns,
             },
         }
+        current_state: Dict[str, Any] = dict(state)
+
+        def _safe_json(data: Any) -> str:
+            try:
+                return json.dumps(data, ensure_ascii=False, default=str)
+            except Exception:
+                return str(data)
+
+        def _log_qa_trace(update_payload: Dict[str, Any]) -> None:
+            if not isinstance(update_payload, dict):
+                return
+            for node_name, delta in update_payload.items():
+                input_snapshot = dict(current_state)
+                logger.info("[QA_TRACE] NODO=%s", node_name)
+                logger.info("[QA_TRACE] INPUT=%s", _safe_json(input_snapshot))
+                logger.info("[QA_TRACE] OUTPUT=%s", _safe_json(delta))
+
+                if node_name in {"intent", "router"}:
+                    decision = None
+                    if isinstance(delta, dict):
+                        decision = delta.get("route_decision")
+                    if decision is None:
+                        decision = current_state.get("route_decision")
+                    logger.info("[QA_TRACE] ROUTE_DECISION (%s)=%s", node_name, decision)
+
+                if node_name == "memory":
+                    final_output = None
+                    if isinstance(delta, dict):
+                        final_output = delta.get("output")
+                    if final_output is None:
+                        final_output = current_state.get("output")
+                    logger.info("[QA_TRACE] RESPUESTA_FINAL=%s", _safe_json(final_output))
+
+                if isinstance(delta, dict):
+                    current_state.update(delta)
+
         # Usar graph.stream para propagar actualizaciones incrementales
         got_any = False
 
@@ -194,6 +236,9 @@ def main() -> None:
                 stream_mode=["updates", "custom"],
             ):
                 mode, payload = _split_event(event)
+
+                if mode in (None, "updates", "values") and isinstance(payload, dict):
+                    _log_qa_trace(payload)
 
                 for chunk_payload in _extract_field(payload, "stream_chunks"):
                     payload_items = chunk_payload

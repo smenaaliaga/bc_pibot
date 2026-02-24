@@ -544,7 +544,9 @@ def run_app(
             time.sleep(wait_for)
 
     # Historial previo (antes de agregar el mensaje actual)
-    history: List[Dict[str, str]] = list(st.session_state.messages)
+    # Paridad con qa/qa.py: por defecto no enviar historial al clasificador/grafo.
+    use_history = os.getenv("STREAMLIT_PASS_HISTORY_TO_GRAPH", "0").lower() in {"1", "true", "yes", "on"}
+    history: List[Dict[str, str]] = list(st.session_state.messages) if use_history else []
 
     assistant_box = st.chat_message("assistant")
     status_placeholder = assistant_box.empty()
@@ -775,7 +777,8 @@ def run_app(
                     cmd = f"usar serie {code}"
                     with st.chat_message("user"):
                         st.markdown(cmd)
-                    hist2: List[Dict[str, str]] = list(st.session_state.messages)
+                    use_history2 = os.getenv("STREAMLIT_PASS_HISTORY_TO_GRAPH", "0").lower() in {"1", "true", "yes", "on"}
+                    hist2: List[Dict[str, str]] = list(st.session_state.messages) if use_history2 else []
                     with st.chat_message("assistant"):
                         with st.spinner("Procesando los datos solicitados..."):
                             response_chunks = stream_fn(cmd, history=hist2, session_id=st.session_state.session_id)
