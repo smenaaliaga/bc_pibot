@@ -24,23 +24,35 @@ import logging
 from functools import lru_cache
 from typing import Optional, Any
 
+logger = logging.getLogger(__name__)
+
 try:
     from models.pibot_intent_router import IntentRouter  # type: ignore
+except ModuleNotFoundError as exc:
+    IntentRouter = None  # type: ignore
+    # Esperado en despliegues donde no existe el paquete legacy `models`.
+    if exc.name == "models":
+        logger.debug("IntentRouter import skipped (optional legacy dependency missing): %s", exc)
+    else:
+        logger.warning("IntentRouter import skipped: %s", exc)
 except Exception as exc:
     IntentRouter = None  # type: ignore
-    logger = logging.getLogger(__name__)
     logger.warning("IntentRouter import skipped: %s", exc)
 
 try:
     from models.pibot_series_interpreter import SeriesInterpreter  # type: ignore
+except ModuleNotFoundError as exc:
+    SeriesInterpreter = None  # type: ignore
+    # Esperado en despliegues donde no existe el paquete legacy `models`.
+    if exc.name == "models":
+        logger.debug("SeriesInterpreter import skipped (optional legacy dependency missing): %s", exc)
+    else:
+        logger.warning("SeriesInterpreter import skipped: %s", exc)
 except Exception as exc:
     SeriesInterpreter = None  # type: ignore
-    logger = logging.getLogger(__name__)
     logger.warning("SeriesInterpreter import skipped: %s", exc)
 from catalog.catalog_service import CatalogService
 from api.bde_client import BDEClient
-
-logger = logging.getLogger(__name__)
 
 _init_lock = threading.Lock()
 
@@ -57,7 +69,7 @@ def _resolve_path(env_name: str, override: Optional[str], default: str) -> str:
 def _load_intent_router(path: str) -> Optional[Any]:
     with _init_lock:
         if IntentRouter is None:
-            logger.warning("IntentRouter unavailable; returning None")
+            logger.debug("IntentRouter unavailable; returning None")
             return None
         try:
             return IntentRouter(model_path=path)
@@ -75,7 +87,7 @@ def _load_intent_router(path: str) -> Optional[Any]:
 def _load_series_interpreter(path: str) -> Optional[Any]:
     with _init_lock:
         if SeriesInterpreter is None:
-            logger.warning("SeriesInterpreter unavailable; returning None")
+            logger.debug("SeriesInterpreter unavailable; returning None")
             return None
         try:
             return SeriesInterpreter(model_path=path)

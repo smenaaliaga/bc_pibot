@@ -82,7 +82,7 @@ def predict_with_router(query: str) -> Any:
     """
     router = load_intent_router()
     if router is None:
-        logger.warning("IntentRouter unavailable; returning None")
+        logger.debug("IntentRouter unavailable; returning None")
         return None
     return router.predict(query)
 
@@ -99,7 +99,7 @@ def predict_with_interpreter(query: str) -> Any:
     """
     interpreter = load_series_interpreter()
     if interpreter is None:
-        logger.warning("SeriesInterpreter unavailable; returning None")
+        logger.debug("SeriesInterpreter unavailable; returning None")
         return None
     return interpreter.predict(query)
 
@@ -250,8 +250,8 @@ def _classify_with_jointbert(question: str) -> ClassificationResult:
 
     # Mostrar predicción completa
     logger.info("[CLASSIFIER_API] intent=%s confidence=%s macro=%s context=%s", intent, confidence, macro, context)
-    logger.info("[CLASSIFIER_API] Raw entities: %s", entities)
-    logger.info("[CLASSIFIER_API] Normalized entities: %s", normalized)
+    logger.debug("[CLASSIFIER_API] Raw entities: %s", entities)
+    logger.debug("[CLASSIFIER_API] Normalized entities: %s", normalized)
     
     text = (
         interpretation.get("text")

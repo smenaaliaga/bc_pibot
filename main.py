@@ -157,6 +157,7 @@ def main() -> None:
                 "checkpoint_ns": checkpoint_ns,
             },
         }
+        qa_trace_enabled = os.getenv("QA_TRACE_LOGS", "0").lower() in {"1", "true", "yes", "on"}
         current_state: Dict[str, Any] = dict(state)
 
         def _safe_json(data: Any) -> str:
@@ -165,16 +166,89 @@ def main() -> None:
             except Exception:
                 return str(data)
 
+        def _preview_text(value: Any, limit: int = 220) -> str:
+            text = str(value)
+            if len(text) <= limit:
+                return text
+            return f"{text[:limit]}…(+{len(text) - limit} chars)"
+
+        def _summarize_entities(entities: Any) -> Any:
+            if not isinstance(entities, list):
+                return entities
+            if not entities:
+                return []
+            first = entities[0] if isinstance(entities[0], dict) else {}
+            if not isinstance(first, dict):
+                return [type(entities[0]).__name__]
+            return {
+                "count": len(entities),
+                "first_keys": sorted(list(first.keys())),
+                "first_indicator": first.get("indicator") or first.get("indicador"),
+                "first_region": first.get("region"),
+                "first_frequency": first.get("frequency"),
+            }
+
+        def _summarize_state_snapshot(snapshot: Dict[str, Any]) -> Dict[str, Any]:
+            intent = snapshot.get("intent") if isinstance(snapshot.get("intent"), dict) else {}
+            return {
+                "question": snapshot.get("question"),
+                "session_id": snapshot.get("session_id") or (snapshot.get("context") or {}).get("session_id"),
+                "intent": {
+                    "macro_cls": intent.get("macro_cls"),
+                    "intent_cls": intent.get("intent_cls"),
+                    "context_cls": intent.get("context_cls"),
+                },
+                "entities": _summarize_entities(snapshot.get("entities")),
+                "has_classification": snapshot.get("classification") is not None,
+                "has_output": snapshot.get("output") is not None,
+            }
+
+        def _summarize_delta(delta: Any) -> Any:
+            if not isinstance(delta, dict):
+                return _preview_text(delta)
+            summary: Dict[str, Any] = {
+                "keys": sorted(list(delta.keys())),
+            }
+            if "route_decision" in delta:
+                summary["route_decision"] = delta.get("route_decision")
+            if "intent" in delta and isinstance(delta.get("intent"), dict):
+                intent_delta = delta.get("intent") or {}
+                summary["intent"] = {
+                    "macro_cls": intent_delta.get("macro_cls"),
+                    "intent_cls": intent_delta.get("intent_cls"),
+                    "context_cls": intent_delta.get("context_cls"),
+                }
+            if "entities" in delta:
+                summary["entities"] = _summarize_entities(delta.get("entities"))
+            if "classification" in delta:
+                summary["classification"] = "present"
+            if "data_params" in delta and isinstance(delta.get("data_params"), dict):
+                data_params = delta.get("data_params") or {}
+                summary["data_params"] = {
+                    "indicator": data_params.get("indicator"),
+                    "frequency": data_params.get("frequency"),
+                    "req_form_cls": data_params.get("req_form_cls"),
+                    "calc_mode_cls": data_params.get("calc_mode_cls"),
+                }
+            if "output" in delta:
+                output_text = delta.get("output")
+                summary["output_len"] = len(output_text) if isinstance(output_text, str) else None
+                summary["output_preview"] = _preview_text(output_text)
+            return summary
+
         def _log_qa_trace(update_payload: Dict[str, Any]) -> None:
+            if not qa_trace_enabled:
+                return
             if not isinstance(update_payload, dict):
                 return
             for node_name, delta in update_payload.items():
                 input_snapshot = dict(current_state)
                 logger.info("[QA_TRACE] NODO=%s", node_name)
-                logger.info("[QA_TRACE] INPUT=%s", _safe_json(input_snapshot))
-                logger.info("[QA_TRACE] OUTPUT=%s", _safe_json(delta))
+                logger.debug("[QA_TRACE] INPUT=%s", _safe_json(_summarize_state_snapshot(input_snapshot)))
+                if node_name != "memory":
+                    logger.info("[QA_TRACE] OUTPUT=%s", _safe_json(_summarize_delta(delta)))
 
-                if node_name in {"intent", "router"}:
+                if node_name == "router":
                     decision = None
                     if isinstance(delta, dict):
                         decision = delta.get("route_decision")
@@ -188,7 +262,15 @@ def main() -> None:
                         final_output = delta.get("output")
                     if final_output is None:
                         final_output = current_state.get("output")
-                    logger.info("[QA_TRACE] RESPUESTA_FINAL=%s", _safe_json(final_output))
+                    logger.info(
+                        "[QA_TRACE] RESPUESTA_FINAL=%s",
+                        _safe_json(
+                            {
+                                "output_len": len(final_output) if isinstance(final_output, str) else None,
+                                "output_preview": _preview_text(final_output),
+                            }
+                        ),
+                    )
 
                 if isinstance(delta, dict):
                     current_state.update(delta)
@@ -237,7 +319,7 @@ def main() -> None:
             ):
                 mode, payload = _split_event(event)
 
-                if mode in (None, "updates", "values") and isinstance(payload, dict):
+                if qa_trace_enabled and mode in (None, "updates", "values") and isinstance(payload, dict):
                     _log_qa_trace(payload)
 
                 for chunk_payload in _extract_field(payload, "stream_chunks"):
