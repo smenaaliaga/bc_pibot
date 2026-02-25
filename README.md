@@ -55,6 +55,7 @@ Este script comprueba:
 | `OPENAI_API_KEY`, `OPENAI_MODEL` | Modelo y clave usados por `LLMAdapter` | ✓ Sí |
 | `BCCH_USER`, `BCCH_PASS` | Credenciales para `get_series.py` | ✓ Sí |
 | `JOINT_BERT_MODEL_DIR` | Ruta al modelo JointBERT entrenado | No (default: `models/pibot_series_interpreter/pibot-jointbert`) |
+| `INTENT_API_BASE_URL`, `INTENT_CLASSIFIER_URL` | Endpoint para clasificación `/intent` (Docker expone intent-api en `http://localhost:8100`) | No |
 | `USE_AGENT_GRAPH=1` | Habilita el grafo LangGraph en `main.py` | No |
 | `PG_DSN`, `REQUIRE_PG_MEMORY` | Configuran memoria conversacional y checkpoints | No |
 | `REDIS_URL`, `USE_REDIS_CACHE` | Cache para consultas BCCh | No |

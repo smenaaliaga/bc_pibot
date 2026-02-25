@@ -73,11 +73,6 @@ def _extract_indicator_context_from_entities(entities: Optional[Dict[str, Any]])
         elif component:
             context["component"] = component
         return context
-    raw_entities = jointbert.get("entities")
-    if isinstance(raw_entities, dict):
-        indicator = _coerce_indicator_value(raw_entities.get("indicator"))
-        if indicator:
-            return {"indicator": indicator}
     return None
 
 
@@ -138,8 +133,8 @@ def generate_suggested_questions(state: AgentState, intent_store: Optional[Inten
     if not indicator:
         last_ctx = _get_last_indicator_context(intent_store, session_id)
         if last_ctx:
-            indicator = last_ctx.get("indicator") or indicator
-            component = component or last_ctx.get("component") or last_ctx.get("sector")
+            indicator = _coerce_indicator_value(last_ctx.get("indicator")) or indicator
+            component = component or _coerce_indicator_value(last_ctx.get("component") or last_ctx.get("sector"))
 
     if not indicator:
         suggestions.extend(

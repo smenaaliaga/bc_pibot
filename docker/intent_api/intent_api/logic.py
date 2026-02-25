@@ -1,11 +1,22 @@
 """Heuristics for macro/intent/context classification."""
 from __future__ import annotations
 
+import unicodedata
 from typing import Dict
 
 
-_MACRO_TERMS = ("pib", "imacec")
-_METHOD_TERMS = ("metodolog", "metodología", "metodologia", "definicion", "definición")
+_MACRO_TERMS = ("pib", "imacec","economia", "actividad", "actividad económica", "actividad economica")
+_METHOD_TERMS = (
+    "metodolog",
+    "metodología",
+    "metodologia",
+    "definicion",
+    "definición",
+    "explicame",
+    "explica",
+    "detalles",
+    "detalle",
+)
 _VALUE_TERMS = (
     "valor",
     "ultimo",
@@ -21,8 +32,14 @@ _VALUE_TERMS = (
 _FOLLOWUP_TERMS = ("eso", "lo mismo", "esa", "ese", "anterior", "otra vez", "siguiente", "igual")
 
 
+def _normalize_text(text: str) -> str:
+    lowered = (text or "").strip().lower()
+    decomposed = unicodedata.normalize("NFD", lowered)
+    return "".join(ch for ch in decomposed if unicodedata.category(ch) != "Mn")
+
+
 def classify_intent(text: str) -> Dict[str, Dict[str, object]]:
-    normalized = (text or "").strip().lower()
+    normalized = _normalize_text(text)
     macro = 1 if any(term in normalized for term in _MACRO_TERMS) else 0
 
     intent = "other"

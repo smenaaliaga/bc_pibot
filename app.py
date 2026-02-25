@@ -508,29 +508,30 @@ def run_app(
     with st.chat_message("user"):
         st.markdown(user_message)
 
-    # Registrar turno de usuario en memoria
-    try:
-        _mem_adapter = st.session_state.get("_mem_adapter") or MemoryAdapter(pg_dsn=os.getenv("PG_DSN", "postgresql://postgres:postgres@localhost:5432/pibot"))
-        st.session_state._mem_adapter = _mem_adapter
-        _mem_adapter.on_user_turn(
-            st.session_state.session_id,
-            user_message,
-            metadata={
-                "source": "ui",
-                "model": os.getenv("OPENAI_MODEL", "gpt-3.5-turbo"),
-                "temperature": os.getenv("OPENAI_TEMPERATURE", "0"),
-            },
-        )
-        # Refrescar panel de memoria tras turno de usuario
+    # Registrar turno de usuario en memoria (opt-in para evitar duplicados con el grafo)
+    ui_memory_writes_enabled = os.getenv("STREAMLIT_UI_MEMORY_WRITES", "0").lower() in {"1", "true", "yes", "on"}
+    if ui_memory_writes_enabled:
         try:
-            _ph = st.session_state.get("_mem_debug_placeholder")
-            if _ph:
-                _ph.empty()
-                _render_memory_debug(_ph.container())
+            _mem_adapter = st.session_state.get("_mem_adapter") or MemoryAdapter(pg_dsn=os.getenv("PG_DSN", "postgresql://postgres:postgres@localhost:5432/pibot"))
+            st.session_state._mem_adapter = _mem_adapter
+            _mem_adapter.on_user_turn(
+                st.session_state.session_id,
+                user_message,
+                metadata={
+                    "source": "ui",
+                    "model": os.getenv("OPENAI_MODEL", "gpt-3.5-turbo"),
+                    "temperature": os.getenv("OPENAI_TEMPERATURE", "0"),
+                },
+            )
+            try:
+                _ph = st.session_state.get("_mem_debug_placeholder")
+                if _ph:
+                    _ph.empty()
+                    _render_memory_debug(_ph.container())
+            except Exception:
+                pass
         except Exception:
             pass
-    except Exception:
-        pass
 
     # Rate limiting simple
     now = datetime.datetime.now()
@@ -544,7 +545,9 @@ def run_app(
             time.sleep(wait_for)
 
     # Historial previo (antes de agregar el mensaje actual)
-    history: List[Dict[str, str]] = list(st.session_state.messages)
+    # Paridad con qa/qa.py: por defecto no enviar historial al clasificador/grafo.
+    use_history = os.getenv("STREAMLIT_PASS_HISTORY_TO_GRAPH", "0").lower() in {"1", "true", "yes", "on"}
+    history: List[Dict[str, str]] = list(st.session_state.messages) if use_history else []
 
     assistant_box = st.chat_message("assistant")
     status_placeholder = assistant_box.empty()
@@ -696,29 +699,29 @@ def run_app(
     st.session_state.chart_markers = markers_chart
     st.session_state.followup_markers = markers_followup
 
-    # Registrar turno del asistente en memoria
-    try:
-        _mem_adapter = st.session_state.get("_mem_adapter") or MemoryAdapter(pg_dsn=os.getenv("PG_DSN", "postgresql://postgres:postgres@localhost:5432/pibot"))
-        st.session_state._mem_adapter = _mem_adapter
-        _mem_adapter.on_assistant_turn(
-            st.session_state.session_id,
-            response_text,
-            metadata={
-                "source": "ui",
-                "model": os.getenv("OPENAI_MODEL", "gpt-3.5-turbo"),
-                "temperature": os.getenv("OPENAI_TEMPERATURE", "0"),
-            },
-        )
-        # Refrescar panel de memoria tras turno del asistente
+    # Registrar turno del asistente en memoria (opt-in para evitar duplicados con el grafo)
+    if ui_memory_writes_enabled:
         try:
-            _ph = st.session_state.get("_mem_debug_placeholder")
-            if _ph:
-                _ph.empty()
-                _render_memory_debug(_ph.container())
+            _mem_adapter = st.session_state.get("_mem_adapter") or MemoryAdapter(pg_dsn=os.getenv("PG_DSN", "postgresql://postgres:postgres@localhost:5432/pibot"))
+            st.session_state._mem_adapter = _mem_adapter
+            _mem_adapter.on_assistant_turn(
+                st.session_state.session_id,
+                response_text,
+                metadata={
+                    "source": "ui",
+                    "model": os.getenv("OPENAI_MODEL", "gpt-3.5-turbo"),
+                    "temperature": os.getenv("OPENAI_TEMPERATURE", "0"),
+                },
+            )
+            try:
+                _ph = st.session_state.get("_mem_debug_placeholder")
+                if _ph:
+                    _ph.empty()
+                    _render_memory_debug(_ph.container())
+            except Exception:
+                pass
         except Exception:
             pass
-    except Exception:
-        pass
 
     # Guardar respuesta en historial (chat principal sin markers)
     st.session_state.messages.append({"role": "user", "content": user_message})
@@ -775,7 +778,8 @@ def run_app(
                     cmd = f"usar serie {code}"
                     with st.chat_message("user"):
                         st.markdown(cmd)
-                    hist2: List[Dict[str, str]] = list(st.session_state.messages)
+                    use_history2 = os.getenv("STREAMLIT_PASS_HISTORY_TO_GRAPH", "0").lower() in {"1", "true", "yes", "on"}
+                    hist2: List[Dict[str, str]] = list(st.session_state.messages) if use_history2 else []
                     with st.chat_message("assistant"):
                         with st.spinner("Procesando los datos solicitados..."):
                             response_chunks = stream_fn(cmd, history=hist2, session_id=st.session_state.session_id)

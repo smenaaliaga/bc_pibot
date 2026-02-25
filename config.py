@@ -31,9 +31,11 @@ PREDICT_URL: str = os.getenv(
     "PREDICT_URL",
     "http://localhost:8000/predict",
 )
+INTENT_API_BASE_URL: str = os.getenv(
+    "INTENT_API_BASE_URL"
+)
 INTENT_CLASSIFIER_URL: str = os.getenv(
     "INTENT_CLASSIFIER_URL",
-    "http://localhost:8000/intent",
 )
 
 # Controla si se exponen enlaces de API con credenciales en texto plano en los logs.
