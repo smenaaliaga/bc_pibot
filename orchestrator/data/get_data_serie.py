@@ -11,7 +11,11 @@ Funciones principales
    - get_series_api_rest_bcch(...)
    - Llama a la API REST del BCCh (SieteRestWS).
    - Normaliza las observaciones (fecha, valor, status).
-   - Opcionalmente remuestrea a otra frecuencia (D/M/Q/A) con agregación (avg/sum/first/last).
+     - Opcionalmente remuestrea a otra frecuencia (d/m/q/a).
+         Regla vigente:
+             * Si cambia la frecuencia, la agregación efectiva es siempre "sum".
+             * Solo se permite ir a una frecuencia más agregada (ej.: M->Q, Q->A).
+             * No se permite "downgrade" (ej.: Q->M); en ese caso se conserva la serie original.
    - Calcula:
        * pct     → variación % respecto del período anterior.
        * yoy_pct → variación % respecto del mismo período del año anterior.
@@ -228,7 +232,7 @@ def _make_cache_key(
     firstdate: Optional[str],
     lastdate: Optional[str],
     target_frequency: Optional[str],
-    agg: str,
+    agg: Optional[str],
 ) -> str:
     """
     Construye la clave de Redis para una combinación (serie + fechas + frecuencia + agg).
@@ -236,7 +240,7 @@ def _make_cache_key(
     fdate = firstdate or "auto"
     ldate = lastdate or "auto"
     freq = (target_frequency or "orig").upper()
-    agg = (agg or "avg").lower()
+    agg = (agg or "auto").lower()
     return f"bcch:series:{series_id}:{fdate}:{ldate}:{freq}:{agg}"
 
 
@@ -324,10 +328,45 @@ def _caller_info_for_log(skip_filename_suffix: str = "get_series.py") -> Dict[st
 
 
 def _infer_freq_from_code(series_id: str) -> str:
+    """Infere frecuencia base desde el sufijo del código BCCh.
+
+    Mapea valores esperados a:
+    - D (diaria)
+    - M (mensual)
+    - Q (trimestral)
+    - A (anual)
+
+    Nota: los códigos BCCh trimestrales suelen terminar en "T", por eso se
+    normalizan a "Q".
+    """
     if not series_id:
         return "U"
     last = series_id.strip().split(".")[-1].upper()
+    if last == "T":
+        return "Q"
     return last if last in {"D", "M", "Q", "A"} else "U"
+
+
+def _resolve_effective_agg(target_freq: Optional[str], original_freq: str, agg: Optional[str]) -> str:
+    """Define agregación efectiva para remuestreo.
+
+    Regla de negocio actual:
+    - Si hay cambio real de frecuencia, usar siempre "sum".
+    - Si no hay cambio de frecuencia, usar "avg" como default interno
+      (no fuerza al caller a enviar agg).
+    """
+    target = (target_freq or "").upper()
+    source = (original_freq or "").upper()
+    if target and source and target != source:
+        # Regla de negocio: al cambiar de frecuencia, siempre sumar.
+        return "sum"
+    return "avg"
+
+
+def _freq_rank(freq: Optional[str]) -> int:
+    f = (freq or "U").upper()
+    order = {"D": 1, "M": 2, "Q": 3, "A": 4}
+    return order.get(f, 0)
 
 
 def _parse_index_date(s: str) -> datetime.date:
@@ -345,6 +384,15 @@ def _resample(
     agg: str,
     original_freq: str,
 ) -> pd.DataFrame:
+    """Remuestrea observaciones a frecuencia objetivo cuando corresponde.
+
+    Comportamiento:
+    - Si target es vacío/igual a la frecuencia original, retorna sin cambios.
+    - Solo acepta frecuencias D/M/Q/A.
+    - Bloquea cambios hacia una frecuencia más fina (downgrade).
+    - Aplica agregación efectiva definida por _resolve_effective_agg.
+    """
+    effective_agg = _resolve_effective_agg(target_freq, original_freq, agg)
     if not target_freq or target_freq.upper() in {"", original_freq.upper()}:
         return df
 
@@ -352,23 +400,57 @@ def _resample(
     if target not in {"D", "M", "Q", "A"}:
         return df
 
+    # Solo permitir remuestreo hacia una frecuencia más agregada (subir frecuencia).
+    # Ejemplo: M -> Q/A, Q -> A. No permitir Q -> M.
+    if _freq_rank(original_freq) and _freq_rank(target) and _freq_rank(target) < _freq_rank(original_freq):
+        logger.warning(
+            "[SERIES_RESAMPLE_SKIPPED_DOWNGRADE] "
+            f"original_freq={original_freq} target_freq={target} action=keep_original"
+        )
+        return df
+
     # Use 'ME' for month-end to avoid pandas deprecation warning
-    rule_map = {"D": "D", "M": "ME", "Q": "Q-DEC", "A": "A-DEC"}
+    rule_map = {"D": "D", "M": "ME", "Q": "Q-DEC", "A": "YE-DEC"}
     rule = rule_map[target]
 
     if not isinstance(df.index, pd.DatetimeIndex):
         df = df.set_index("date")
 
-    if agg == "sum":
+    if effective_agg == "sum":
         grouped = df.resample(rule).sum(numeric_only=True)
-    elif agg == "last":
+    elif effective_agg == "last":
         grouped = df.resample(rule).last()
-    elif agg == "first":
+    elif effective_agg == "first":
         grouped = df.resample(rule).first()
     else:
         grouped = df.resample(rule).mean(numeric_only=True)
 
     grouped = grouped.dropna(how="all").reset_index()
+
+    # Si hubo cambio de frecuencia, descartar períodos incompletos.
+    # Ej.: M->Q requiere 3 meses, M->A requiere 12 meses, Q->A requiere 4 trimestres.
+    expected_source_periods = {
+        ("M", "Q"): 3,
+        ("M", "A"): 12,
+        ("Q", "A"): 4,
+    }
+    source_freq = (original_freq or "").upper()
+    expected_n = expected_source_periods.get((source_freq, target))
+
+    if expected_n:
+        source_period_alias = {"M": "M", "Q": "Q-DEC"}.get(source_freq)
+        target_period_alias = {"Q": "Q-DEC", "A": "Y-DEC"}.get(target)
+
+        if source_period_alias and target_period_alias:
+            coverage_df = pd.DataFrame(index=df.index.copy())
+            coverage_df["source_period"] = coverage_df.index.to_period(source_period_alias)
+            coverage_df["target_period"] = coverage_df.index.to_period(target_period_alias)
+
+            counts_by_target = coverage_df.groupby("target_period")["source_period"].nunique()
+            complete_targets = counts_by_target[counts_by_target == expected_n].index
+
+            grouped["target_period"] = pd.to_datetime(grouped["date"]).dt.to_period(target_period_alias)
+            grouped = grouped[grouped["target_period"].isin(complete_targets)].drop(columns=["target_period"])
 
     # Para frecuencia trimestral Q: asegurar que periodo anterior (mismo trimestre año previo) exista
     # Esto se maneja luego en cálculo yoy, pero verificamos aquí que las fechas sean fin de período
@@ -476,7 +558,7 @@ def get_series_api_rest_bcch(
     series_id: str,
     target_date: Optional[str] = None,
     target_frequency: Optional[str] = None,
-    agg: str = "avg",
+    agg: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Llama a la API REST del BCCh, calcula variaciones y almacena el resultado en Redis.
@@ -490,9 +572,10 @@ def get_series_api_rest_bcch(
     target_date : str, opcional
         Fecha de referencia (YYYY-MM-DD) para calcular flags de posición; la serie se trae completa.
     target_frequency : str, opcional
-        Frecuencia objetivo: "D", "M", "Q" o "A". Si None, se mantiene la original.
-    agg : str
-        Tipo de agregación en caso de remuestreo: "avg", "sum", "first", "last".
+        Frecuencia objetivo: "d", "m", "q" o "a". Si None, se mantiene la original.
+    agg : str, opcional
+        Parámetro opcional para mantener compatibilidad. La regla actual usa
+        "sum" cuando hay cambio de frecuencia y "avg" cuando no lo hay.
 
     Devuelve
     --------
@@ -603,6 +686,13 @@ def get_series_api_rest_bcch(
 
         df = _normalize_observations(obs)
         original_freq = _infer_freq_from_code(series_id)
+        effective_agg = _resolve_effective_agg(target_frequency, original_freq, agg)
+        if effective_agg != (agg or "avg").lower():
+            logger.info(
+                "[SERIES_AGG_OVERRIDE] "
+                f"series_id={series_id} target_frequency={target_frequency} "
+                f"original_frequency={original_freq} requested_agg={agg} effective_agg={effective_agg}"
+            )
 
         with Phase(
             logger,
@@ -641,6 +731,7 @@ def get_series_api_rest_bcch(
             "target_frequency": target_frequency or original_freq,
             "freq_effective": effective_freq,
             "agg": agg,
+            "agg_effective": effective_agg,
             "firstdate": "primer dato disponible",
             "lastdate": target_date or "último dato disponible",
             "target_date": target_date or "auto",
@@ -727,8 +818,8 @@ def get_series_api_rest_bcch(
             f"first_available={first_available_str} last_available={last_available_str} "
             f"requested={target_date or 'auto'} position={lastdate_position}"
         )
-    except Exception as _e_lastchk:
-        logger.debug(f"[get_series_api_rest_bcch] No se pudo verificar lastdate vs último dato: {_e_lastchk}")
+    except Exception:
+        pass
 
     # --- Log de salida a test/log.text ---
     try:
@@ -781,41 +872,90 @@ def get_series_from_redis(
     firstdate: Optional[str] = None,
     lastdate: Optional[str] = None,
     target_frequency: Optional[str] = None,
-    agg: str = "avg",
+    agg: Optional[str] = None,
+    req_form: Optional[str] = None,
     use_fallback: bool = True,
 ) -> Optional[Dict[str, Any]]:
-    """
-    Recupera la serie desde Redis (ya enriquecida con pct y yoy_pct) y filtra
-    por rango de fechas.
+    """Recupera serie desde Redis/API y aplica salida final por req_form/rango."""
 
-    Parámetros
-    ----------
-    series_id : str
-        Id de la serie BCCh.
-    firstdate : str, opcional
-        Fecha inicial (YYYY-MM-DD). Si None, no se aplica filtro inferior.
-    lastdate : str, opcional
-        Fecha final (YYYY-MM-DD). Si None, no se aplica filtro superior.
-    target_frequency : str, opcional
-        Frecuencia objetivo usada cuando se cacheó.
-    agg : str
-        Tipo de agregación usado cuando se cacheó.
-    use_fallback : bool
-        Si True y la clave no existe en Redis, se llama a get_series_api_rest_bcch
-        para poblarla y se devuelve el resultado (ya filtrado).
-        Si False y la clave no existe, devuelve None.
+    def _apply_filters(payload: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        if not isinstance(payload, dict):
+            return payload
 
-    Devuelve
-    --------
-    dict o None
-        Mismo formato que get_series_api_rest_bcch, pero con "observations"
-        filtradas al período solicitado.
-    """
+        observations = payload.get("observations") or []
+        observations = [o for o in observations if isinstance(o, dict)]
+
+        if req_form_norm == "latest":
+            latest_candidates = [o for o in observations if isinstance(o.get("date"), str) and o.get("date")]
+            if latest_candidates:
+                latest_obs = max(latest_candidates, key=lambda o: str(o.get("date") or ""))
+                payload["observations"] = [latest_obs]
+                latest_date = latest_obs.get("date")
+                meta_payload = payload.get("meta", {})
+                meta_payload["firstdate"] = latest_date
+                meta_payload["lastdate"] = latest_date
+                payload["meta"] = meta_payload
+            else:
+                payload["observations"] = []
+            return payload
+
+        if not fd and not ld:
+            payload["observations"] = observations
+            if req_form_norm == "point":
+                point_candidates = [o for o in observations if isinstance(o.get("date"), str) and o.get("date")]
+                if point_candidates:
+                    latest_point = max(point_candidates, key=lambda o: str(o.get("date") or ""))
+                    payload["observations"] = [latest_point]
+                    latest_date = latest_point.get("date")
+                    meta_payload = payload.get("meta", {})
+                    meta_payload["firstdate"] = latest_date
+                    meta_payload["lastdate"] = latest_date
+                    payload["meta"] = meta_payload
+                else:
+                    payload["observations"] = []
+            return payload
+
+        filtered = []
+        for o in observations:
+            obs_date = str(o.get("date") or "")
+            if not obs_date:
+                continue
+            if fd and obs_date < str(fd):
+                continue
+            if ld and obs_date > str(ld):
+                continue
+            filtered.append(o)
+
+        payload["observations"] = filtered
+        meta_payload = payload.get("meta", {})
+        if fd:
+            meta_payload["firstdate"] = fd
+        if ld:
+            meta_payload["lastdate"] = ld
+
+        if req_form_norm == "point":
+            point_candidates = [o for o in filtered if isinstance(o.get("date"), str) and o.get("date")]
+            if point_candidates:
+                latest_point = max(point_candidates, key=lambda o: str(o.get("date") or ""))
+                payload["observations"] = [latest_point]
+                latest_date = latest_point.get("date")
+                meta_payload["firstdate"] = latest_date
+                meta_payload["lastdate"] = latest_date
+            else:
+                payload["observations"] = []
+
+        payload["meta"] = meta_payload
+        return payload
+
     global _redis_client
+    req_form_norm = str(req_form or "").strip().lower()
     fd = None if firstdate in (None, "", "auto") else firstdate
     ld = None if lastdate in (None, "", "auto") else lastdate
 
-    # Cache siempre con fechas auto (serie completa); fd/ld solo para filtro posterior
+    if req_form_norm == "latest":
+        fd = None
+        ld = None
+
     cache_key = _make_cache_key(series_id, None, None, target_frequency, agg)
     logger.info(
         f"[get_series_from_redis] Intentando recuperar serie desde Redis | "
@@ -824,49 +964,43 @@ def get_series_from_redis(
 
     client = _ensure_redis_client()
     if client is None:
-        logger.warning(
-            "[get_series_from_redis] Redis no disponible; "
-            "usando fallback a get_series_api_rest_bcch."
+        logger.warning("[get_series_from_redis] Redis no disponible; usando fallback a get_series_api_rest_bcch.")
+        if not use_fallback:
+            return None
+        result = get_series_api_rest_bcch(
+            series_id=series_id,
+            target_date=ld,
+            target_frequency=target_frequency,
+            agg=agg,
         )
-        return (
-            get_series_api_rest_bcch(
-                series_id=series_id,
-                target_date=ld,
-                target_frequency=target_frequency,
-                agg=agg,
-            )
-            if use_fallback
-            else None
-        )
+        return _apply_filters(result)
 
     try:
         raw = client.get(cache_key)
     except Exception as e:
-        logger.error(
-            f"[get_series_from_redis] Error obteniendo clave '{cache_key}' desde Redis: {e}"
-        )
-        _redis_client = None  # forzar reintento en próximas peticiones
+        logger.error(f"[get_series_from_redis] Error obteniendo clave '{cache_key}' desde Redis: {e}")
+        _redis_client = None
         if not use_fallback:
             return None
-        return get_series_api_rest_bcch(
+        result = get_series_api_rest_bcch(
             series_id=series_id,
             target_date=ld,
             target_frequency=target_frequency,
             agg=agg,
         )
+        return _apply_filters(result)
+
     if raw is None:
-        logger.info(
-            f"[get_series_from_redis] Clave no encontrada en Redis | key='{cache_key}'"
-        )
+        logger.info(f"[get_series_from_redis] Clave no encontrada en Redis | key='{cache_key}'")
         if not use_fallback:
             return None
-        # Poblar Redis llamando a la API
-        return get_series_api_rest_bcch(
+        result = get_series_api_rest_bcch(
             series_id=series_id,
             target_date=ld,
             target_frequency=target_frequency,
             agg=agg,
         )
+        return _apply_filters(result)
 
     try:
         data = json.loads(raw)
@@ -874,21 +1008,18 @@ def get_series_from_redis(
             f"[get_series_from_redis] Cache hit | key='{cache_key}' | rows={len((data or {}).get('observations', []) or [])}"
         )
     except Exception as e:
-        logger.error(
-            f"[get_series_from_redis] Error parseando JSON desde Redis | key='{cache_key}' | error={e}"
-        )
+        logger.error(f"[get_series_from_redis] Error parseando JSON desde Redis | key='{cache_key}' | error={e}")
         if not use_fallback:
             return None
-        return get_series_api_rest_bcch(
+        result = get_series_api_rest_bcch(
             series_id=series_id,
             target_date=ld,
             target_frequency=target_frequency,
             agg=agg,
         )
+        return _apply_filters(result)
 
     obs = data.get("observations", [])
-
-    # Recalcular flags de posición según el target_date (ld)
     try:
         first_available_str = None
         last_available_str = None
@@ -923,57 +1054,13 @@ def get_series_from_redis(
             meta_ref["target_date"] = ld
     except Exception:
         pass
-    if not fd and not ld:
-        # Log simple de lectura completa
-        try:
-            sample_redis_all = ", ".join(
-                f"{r['date']}={r['value']}" for r in obs[:5]
-            )
-            _append_test_log(
-                (
-                    f"source=redis | serie={series_id} | rango=cache | "
-                    f"freq={data.get('meta', {}).get('freq_effective', '')} | agg={agg} | "
-                    f"rows={len(obs)} | sample=[{sample_redis_all}]"
-                )
-            )
-        except Exception as _e:
-            logger.error(f"Fallo escribiendo log de test para Redis(all): {_e}")
-        return data
 
-    # Filtrado por rango de fechas
-    def _parse_date_str(s: str) -> datetime.date:
-        return datetime.date.fromisoformat(s)
+    data = _apply_filters(data)
+    filtered_obs = data.get("observations", []) if isinstance(data, dict) else []
+    logger.info(f"[get_series_from_redis] Observaciones devueltas tras filtro: {len(filtered_obs)}")
 
-    fd_date = _parse_date_str(fd) if fd else None
-    ld_date = _parse_date_str(ld) if ld else None
-
-    filtered_obs = []
-    for o in obs:
-        d = _parse_date_str(o["date"])
-        if fd_date and d < fd_date:
-            continue
-        if ld_date and d > ld_date:
-            continue
-        filtered_obs.append(o)
-
-    data["observations"] = filtered_obs
-    # Actualizar meta para reflejar el nuevo rango
-    meta = data.get("meta", {})
-    if fd:
-        meta["firstdate"] = fd
-    if ld:
-        meta["lastdate"] = ld
-    data["meta"] = meta
-
-    logger.info(
-        f"[get_series_from_redis] Observaciones devueltas tras filtro: {len(filtered_obs)}"
-    )
-
-    # Log de lectura filtrada
     try:
-        sample_redis = ", ".join(
-            f"{r['date']}={r['value']}" for r in filtered_obs[:5]
-        )
+        sample_redis = ", ".join(f"{r['date']}={r['value']}" for r in filtered_obs[:5])
         _append_test_log(
             (
                 f"source=redis | serie={series_id} | rango={fd or 'auto'}→{ld or 'auto'} | "
@@ -1008,7 +1095,7 @@ def fetch_series_with_calc(
     lastdate: Optional[str] = None,
     frequency: Optional[str] = None,
     calc_type: str = "original",
-    agg: str = "avg",
+    agg: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Obtiene una serie del BCCh y devuelve la salida según el tipo de cálculo solicitado.
@@ -1016,7 +1103,7 @@ def fetch_series_with_calc(
     Parámetros:
       - series_id: código BCCh de la serie.
       - firstdate / lastdate: rango YYYY-MM-DD (o None/"auto").
-      - frequency: "M" (mensual), "Q" (trimestral), "A" (anual) o "D".
+    - frequency: "m" (mensual), "q" (trimestral), "a" (anual) o "d".
       - calc_type: "original" (valor), "yoy"/"YPCT" (variación interanual), "mom"/"PCT" (variación periodo a periodo).
       - agg: agregación para remuestreo (default "avg").
 
@@ -1150,14 +1237,14 @@ def get_series(
     firstdate: Optional[str] = None,
     lastdate: Optional[str] = None,
     target_frequency: Optional[str] = None,
-    agg: str = "avg",
+    agg: Optional[str] = None,
     calc_type: str = "ORIGINAL",
 ) -> Dict[str, Any]:
     """
     API de alto nivel para obtener series con el tipo de cálculo deseado.
 
     calc_type admite: "ORIGINAL", "YPCT" (interanual), "PCT" (mes a mes).
-    target_frequency admite: D/M/Q/A.
+    target_frequency admite: d/m/q/a.
     """
     # Reusar la implementación existente aceptando alias en español/inglés
     # Detect if PIB and force quarterly frequency for correct YoY/periods
@@ -1301,7 +1388,7 @@ def get_series_for_api(
     firstdate: Optional[str] = None,
     lastdate: Optional[str] = None,
     target_frequency: Optional[str] = None,
-    agg: str = "avg",
+    agg: Optional[str] = None,
     calc_type: str = "ORIGINAL",
 ) -> Dict[str, Any]:
     """

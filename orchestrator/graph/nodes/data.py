@@ -80,11 +80,11 @@ def _metadata_key_from_params(data_params: Dict[str, Any]) -> str:
     # Orden estable de campos para construir la key de lookup en metadata_q.json.
     order = [
         "activity_cls",
-        "frequency",
-        "calc_mode_cls",
+        "frequency", # frequency no define a una serie especifica
+        "calc_mode_cls", # no deberia identificar una serie específica
         "region_cls",
         "investment_cls",
-        "req_form_cls",
+        "req_form_cls", # no deberia identificar una serie específica
         "activity_value",
         "sub_activity_value",
         "region_value",
@@ -196,10 +196,11 @@ def make_data_node(memory_adapter: Any):
             _first_or_none(entities_normalized.get("region"))
             or primary_entity.get("region")
         )
-        period_candidate = (
-            _first_or_none(entities_normalized.get("period"))
-            or primary_entity.get("period")
-        )
+        period_norm = entities_normalized.get("period")
+        if isinstance(period_norm, list) and period_norm:
+            period_candidate = period_norm
+        else:
+            period_candidate = primary_entity.get("period")
         
 
         data_params = {
@@ -259,7 +260,6 @@ def make_data_node(memory_adapter: Any):
             if sources_url:
                 source_url = sources_url
 
-        series_fetch_args = None
         series_fetch_result = None
         series_fetch_observations: List[Dict[str, Any]] = []
         serie_default = metadata_response.get("serie_default") if isinstance(metadata_response, dict) else None
@@ -269,89 +269,51 @@ def make_data_node(memory_adapter: Any):
             try:
                 from orchestrator.data.get_data_serie import get_series_from_redis
 
-                period = data_params.get("period")
+                period = period_candidate if isinstance(period_candidate, list) and period_candidate else data_params.get("period")
                 if isinstance(period, list) and period:
-                    lastdate = period[-1]
-                    firstdate = period[0]
+                    if len(period) >= 2:
+                        firstdate = str(period[0])
+                        lastdate = str(period[-1])
+                    else:
+                        firstdate = str(period[0])
+                        lastdate = str(period[0])
                 else:
                     lastdate = None
                     firstdate = None
 
                 req_form_value = str(data_params.get("req_form_cls") or "").lower()
                 target_frequency = str(data_params.get("frequency") or "").lower() or None
-                raw_series_id = str(serie_default or "").strip().upper()
-                series_native_frequency = None
-                if raw_series_id:
-                    token = raw_series_id.split(".")[-1]
-                    series_native_frequency = {
-                        "M": "m",
-                        "T": "q",
-                        "Q": "q",
-                        "A": "a",
-                        "D": "d",
-                    }.get(token)
-                if series_native_frequency and (
-                    req_form_value in {"point", "range"}
-                    or target_frequency != series_native_frequency
-                ):
-                    target_frequency = series_native_frequency
-
-                if target_frequency == "a":
-                    reference = str(lastdate or firstdate or "").strip()
-                    if len(reference) >= 4 and reference[:4].isdigit():
-                        year = reference[:4]
-                        firstdate, lastdate = f"{year}-01-01", f"{year}-12-31"
-                series_fetch_args = {
-                    "series_id": serie_default,
-                    "firstdate": firstdate,
-                    "lastdate": lastdate,
-                    "target_frequency": target_frequency,
-                    "agg": "avg",
-                }
+                logger.info(
+                    "[DATA_NODE] series_fetch_args req_form=%s firstdate=%s lastdate=%s target_frequency=%s",
+                    req_form_value,
+                    firstdate,
+                    lastdate,
+                    target_frequency,
+                )
+                
+                # Obtener valores de la serie
                 series_data = get_series_from_redis(
                     series_id=serie_default,
                     firstdate=firstdate,
                     lastdate=lastdate,
                     target_frequency=target_frequency,
-                    agg="avg",
+                    req_form=req_form_value,
                     use_fallback=True,
                 )
-                observations = (series_data or {}).get("observations") or []
-                if (firstdate or lastdate) and observations:
-                    filtered_observations: List[Dict[str, Any]] = []
-                    for obs in observations:
-                        if not isinstance(obs, dict):
-                            continue
-                        obs_date = str(obs.get("date") or "")
-                        if not obs_date:
-                            continue
-                        if firstdate and obs_date < str(firstdate):
-                            continue
-                        if lastdate and obs_date > str(lastdate):
-                            continue
-                        filtered_observations.append(obs)
-                    observations = filtered_observations
 
-                if req_form_value == "latest" and not observations:
-                    # Fallback: para latest, si no hay observaciones acotadas,
-                    # consulta sin rango y usa el último dato disponible.
-                    fallback_data = get_series_from_redis(
-                        series_id=serie_default,
-                        firstdate=None,
-                        lastdate=None,
-                        target_frequency=target_frequency,
-                        agg="avg",
-                        use_fallback=True,
-                    )
-                    fallback_obs = (fallback_data or {}).get("observations") or []
-                    observations = [obs for obs in fallback_obs if isinstance(obs, dict)]
-                    if isinstance(series_fetch_args, dict):
-                        series_fetch_args["firstdate"] = None
-                        series_fetch_args["lastdate"] = None
-                        series_fetch_args["fallback_unbounded"] = True
+                observations_log = (series_data or {}).get("observations") or []
+                logger.info(
+                    "[DATA_NODE] series_data_observations rows=%s values=%s",
+                    len(observations_log),
+                    observations_log,
+                )
+                
+                # Obtener valores
+                observations = (series_data or {}).get("observations") or []
 
                 series_fetch_observations = observations
                 latest_obs = observations[-1] if observations else None
+                
                 series_fetch_result = {
                     "rows": len(observations),
                     "latest": latest_obs,
@@ -386,7 +348,6 @@ def make_data_node(memory_adapter: Any):
                 "data_params_status": data_params_status,
                 "metadata_response": metadata_response,
                 "metadata_key": metadata_key,
-                "series_fetch_args": series_fetch_args,
                 "series_fetch_result": series_fetch_result,
             }
 
@@ -416,10 +377,6 @@ def make_data_node(memory_adapter: Any):
                 }
                 calc_mode_value = str(data_params.get("calc_mode_cls") or "").lower()
                 effective_frequency = str(data_params.get("frequency") or "").lower() or None
-                if isinstance(series_fetch_args, dict):
-                    args_frequency = series_fetch_args.get("target_frequency")
-                    if args_frequency:
-                        effective_frequency = str(args_frequency).lower()
                 range_rows: List[Dict[str, Any]] = []
                 if has_specific_series and isinstance(latest_obs, dict):
                     output_dict["date"] = latest_obs.get("date")
@@ -513,7 +470,6 @@ def make_data_node(memory_adapter: Any):
                 "data_params_status": data_params_status,
                 "metadata_response": metadata_response,
                 "metadata_key": metadata_key,
-                "series_fetch_args": series_fetch_args,
                 "series_fetch_result": series_fetch_result,
             }
 
