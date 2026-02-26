@@ -2258,17 +2258,539 @@
         }
       },
       "sources_url": {
-        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2/CCNN2018_P0_V(2)",
-        "source_2": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_G1?id5=SI&idSerie=F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
-        "source_3": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_ESTADIST_MACRO/MN_EST_MACRO_IV/PEM_ACTyDDA_IndMacT_2_2018?id5=SI&idSerie=F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
-        "source_4": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P1?id5=SI&idSerie=F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
-        "source_5": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_N?id5=SI&idSerie=F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
-        "source_6": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_ESTADIST_REGIONAL/MN_REGIONAL1/CCNN2018_PIB_REGIONAL_N?id5=SI&idSerie=F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
-        "source_7": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_IND_VIVIENDA/MN_IND_VIVIENDA/CCNN2018_P0_V2?id5=SI&idSerie=F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
-        "source_8": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_M3?id5=SI&idSerie=F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T"
-
-
-        
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2/CCNN2018_P0_V(2)"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "ohiggins",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::ohiggins::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.06.0.T",
+      "title_serie_default": "PIB Región del Libertador General Bernardo OHiggins",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "arica",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::arica::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.15.0.T",
+      "title_serie_default": "PIB Región de Arica y Parinacota",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "arica_parinacota",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::arica_parinacota::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.15.0.T",
+      "title_serie_default": "PIB Región de Arica y Parinacota",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "tarapaca",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::tarapaca::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.01.0.T",
+      "title_serie_default": "PIB Región de Tarapacá",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "antofagasta",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::antofagasta::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.02.0.T",
+      "title_serie_default": "PIB Región de Antofagasta",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "atacama",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::atacama::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.03.0.T",
+      "title_serie_default": "PIB Región de Atacama",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "coquimbo",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::coquimbo::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.04.0.T",
+      "title_serie_default": "PIB Región de Coquimbo",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "valparaiso",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::valparaiso::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.05.0.T",
+      "title_serie_default": "PIB Región de Valparaíso",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "ohhiggins",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::ohhiggins::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.06.0.T",
+      "title_serie_default": "PIB Región del Libertador General Bernardo OHiggins",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "maule",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::maule::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.07.0.T",
+      "title_serie_default": "PIB Región del Maule",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "nuble",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::nuble::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.16.0.T",
+      "title_serie_default": "PIB Región de Ñuble",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "bio_bio",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::bio_bio::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.08.0.T",
+      "title_serie_default": "PIB Región del Biobío",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "biobio",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::biobio::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.08.0.T",
+      "title_serie_default": "PIB Región del Biobío",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "araucania",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::araucania::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.09.0.T",
+      "title_serie_default": "PIB Región de La Araucanía",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "los_rios",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::los_rios::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.14.0.T",
+      "title_serie_default": "PIB Región de los Ríos",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "lagos",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::lagos::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.10.0.T",
+      "title_serie_default": "PIB Región de Los Lagos",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "los_lagos",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::los_lagos::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.10.0.T",
+      "title_serie_default": "PIB Región de Los Lagos",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "aysen",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::aysen::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.11.0.T",
+      "title_serie_default": "PIB Región de Aysén del General Carlos Ibáñez del Campo",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "magallanes",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::magallanes::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.12.0.T",
+      "title_serie_default": "PIB Región de Magallanes y de la Antártica Chilena",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
       },
       "latest_update": "2025-10-01"
     },
@@ -3253,21 +3775,12 @@
         "history": "2018"
       },
       "key": "none::q::yoy::specific::none::latest::none::none::metropolitana::none::pib::nsa::none::co::2018",
-      "label": "pib_general",
-      "serie_default": "F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
-      "title_serie_default": "PIB a precios corrientes",
-      "series": {
-        "serie_1": {
-          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
-          "title": "PIB volumen a precios del año anterior encadenado"
-        },
-        "serie_2": {
-          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.1.T",
-          "title": "PIB volumen a precios del año anterior encadenado (desestacionalizado)"
-        }
-      },
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.13.0.T",
+      "title_serie_default": "PIB Región Metropolitana de Santiago",
+      "series": {},
       "sources_url": {
-        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2/CCNN2018_P0_V(2)"
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
       },
       "latest_update": "2025-10-01"
     },
@@ -3472,6 +3985,143 @@
       "series": {},
       "sources_url": {
         "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN_EP18_05_ratio/637801088750197615"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "q",
+        "calc_mode_cls": "contribution",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "mineria",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::q::contribution::none::none::latest::mineria::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_contribution",
+      "serie_default": "F032.PIB.V12.R.Z.2018.03.Z.0.T",
+      "title_serie_default": "Minería",
+      "series": {
+        "serie_1": {
+          "id": "F032.PIB.V12.R.Z.2018.01.Z.0.T",
+          "title": "Agropecuario-silvícola"
+        },
+        "serie_2": {
+          "id": "F032.PIB.V12.R.Z.2018.02.04.0.T",
+          "title": "Pesca"
+        },
+        "serie_3": {
+          "id": "F032.PIB.V12.R.Z.2018.03.Z.0.T",
+          "title": "Minería"
+        },
+        "serie_4": {
+          "id": "F032.PIB.V12.R.Z.2018.03.05.0.T",
+          "title": "Minería del cobre"
+        },
+        "serie_5": {
+          "id": "F032.PIB.V12.R.Z.2018.03.06.0.T",
+          "title": "Otras actividades mineras"
+        },
+        "serie_6": {
+          "id": "F032.PIB.V12.R.Z.2018.04.Z.0.T",
+          "title": "Industria Manufacturera"
+        },
+        "serie_7": {
+          "id": "F032.PIB.V12.R.Z.2018.04.28.0.T",
+          "title": "Alimentos"
+        },
+        "serie_8": {
+          "id": "F032.PIB.V12.R.Z.2018.04.29.0.T",
+          "title": "Bebidas y tabaco"
+        },
+        "serie_9": {
+          "id": "F032.PIB.V12.R.Z.2018.04.08.0.T",
+          "title": "Textil, prendas de vestir, cuero y calzado"
+        },
+        "serie_10": {
+          "id": "F032.PIB.V12.R.Z.2018.04.09.0.T",
+          "title": "Maderas y muebles"
+        },
+        "serie_11": {
+          "id": "F032.PIB.V12.R.Z.2018.04.10.0.T",
+          "title": "Celulosa, papel e imprentas"
+        },
+        "serie_12": {
+          "id": "F032.PIB.V12.R.Z.EP18.04.11.0.T",
+          "title": "Química, petróleo, caucho y plástico"
+        },
+        "serie_13": {
+          "id": "F032.PIB.V12.R.Z.2018.04.12.0.T",
+          "title": "Minerales no metálicos y metálica básica"
+        },
+        "serie_14": {
+          "id": "F032.PIB.V12.R.Z.2018.04.14.0.T",
+          "title": "Productos metálicos, maquinaria, equipos y otros"
+        },
+        "serie_15": {
+          "id": "F032.PIB.V12.R.Z.2018.05.Z.0.T",
+          "title": "Electricidad, gas, agua y gestión de desechos"
+        },
+        "serie_16": {
+          "id": "F032.PIB.V12.R.Z.2018.06.Z.0.T",
+          "title": "Construcción"
+        },
+        "serie_17": {
+          "id": "F032.PIB.V12.R.Z.2018.07.32.0.T",
+          "title": "Comercio"
+        },
+        "serie_18": {
+          "id": "F032.PIB.V12.R.Z.2018.07.33.0.T",
+          "title": "Restaurantes y hoteles"
+        },
+        "serie_19": {
+          "id": "F032.PIB.V12.R.Z.2018.08.19.0.T",
+          "title": "Transporte"
+        },
+        "serie_20": {
+          "id": "F032.PIB.V12.R.Z.2018.08.20.0.T",
+          "title": "Comunicaciones y servicios de información"
+        },
+        "serie_21": {
+          "id": "F032.PIB.V12.R.Z.2018.09.34.0.T",
+          "title": "Servicios financieros"
+        },
+        "serie_22": {
+          "id": "F032.PIB.V12.R.Z.2018.09.35.0.T",
+          "title": "Servicios empresariales"
+        },
+        "serie_23": {
+          "id": "F032.PIB.V12.R.Z.2018.10.Z.0.T",
+          "title": "Servicios de vivienda e inmobiliarios"
+        },
+        "serie_24": {
+          "id": "F032.PIB.V12.R.Z.2018.11.Z.0.T",
+          "title": "Servicios personales"
+        },
+        "serie_25": {
+          "id": "F032.PIB.V12.R.Z.2018.12.Z.0.T",
+          "title": "Administración pública"
+        },
+        "serie_26": {
+          "id": "F032.PIB.V12.R.Z.2018.1415.Z.0.T",
+          "title": "Impuestos sobre los productos"
+        },
+        "serie_27": {
+          "id": "F032.PIB.V12.R.Z.2018.Z.Z.0.T",
+          "title": "PIB"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P2V/637801091782285000"
       },
       "latest_update": "2025-10-01"
     },

@@ -52,6 +52,187 @@ StreamFn = Callable[[str, Optional[List[Dict[str, str]]], Optional[str]], Iterab
 InvokeFn = Callable[[str, Optional[List[Dict[str, str]]]], str]
 
 
+def _extract_memory_series_chart(response_text: str) -> Optional[Dict[str, object]]:
+    if not response_text:
+        return None
+
+    def _parse_numeric(cell: str) -> Optional[float]:
+        raw = str(cell or "").strip()
+        if not raw:
+            return None
+        raw = raw.replace("%", "").replace(" ", "")
+        try:
+            return float(raw.replace(".", "").replace(",", "."))
+        except Exception:
+            return None
+
+    lines = [ln.rstrip("\n") for ln in str(response_text).splitlines()]
+    for idx, line in enumerate(lines):
+        if "|" not in line:
+            continue
+        headers = [h.strip().lower() for h in line.split("|") if h.strip()]
+        if not headers or "periodo" not in headers:
+            continue
+        if idx + 1 >= len(lines) or "|" not in lines[idx + 1]:
+            continue
+
+        period_idx = headers.index("periodo")
+        value_idx = headers.index("valor") if "valor" in headers else -1
+        variation_idx = headers.index("variación") if "variación" in headers else -1
+        if value_idx < 0 and variation_idx < 0:
+            continue
+
+        periods: List[str] = []
+        values: List[Optional[float]] = []
+        variations: List[Optional[float]] = []
+
+        row_idx = idx + 2
+        while row_idx < len(lines):
+            row_line = lines[row_idx].strip()
+            if not row_line or "|" not in row_line:
+                break
+            if set(row_line.replace("|", "").strip()) <= {"-", ":"}:
+                row_idx += 1
+                continue
+
+            cols = [c.strip() for c in row_line.split("|")]
+            if cols and cols[0] == "":
+                cols = cols[1:]
+            if cols and cols[-1] == "":
+                cols = cols[:-1]
+            if period_idx >= len(cols):
+                break
+
+            period_val = cols[period_idx]
+            if not period_val:
+                row_idx += 1
+                continue
+
+            periods.append(period_val)
+            if value_idx >= 0 and value_idx < len(cols):
+                values.append(_parse_numeric(cols[value_idx]))
+            if variation_idx >= 0 and variation_idx < len(cols):
+                variations.append(_parse_numeric(cols[variation_idx]))
+
+            row_idx += 1
+
+        if not periods:
+            continue
+
+        try:
+            import pandas as _pd  # type: ignore
+
+            df_plot = _pd.DataFrame({"period": periods})
+            y_cols: List[str] = []
+            if values and any(v is not None for v in values):
+                df_plot["valor"] = values
+                y_cols.append("valor")
+            if variations and any(v is not None for v in variations):
+                df_plot["variacion"] = variations
+                y_cols.append("variacion")
+
+            if not y_cols:
+                return None
+
+            return {
+                "title": "Gráfico construido desde la tabla de la respuesta",
+                "x": "period",
+                "y": y_cols,
+                "data": df_plot,
+            }
+        except Exception:
+            return None
+
+    return None
+
+
+def _user_requested_chart(text: str) -> bool:
+    query = str(text or "").strip().lower()
+    if not query:
+        return False
+    query = (
+        query.replace("á", "a")
+        .replace("é", "e")
+        .replace("í", "i")
+        .replace("ó", "o")
+        .replace("ú", "u")
+    )
+    chart_terms = (
+        "grafico",
+        "grafica",
+        "graficar",
+        "chart",
+        "plot",
+        "linea",
+    )
+    return any(term in query for term in chart_terms)
+
+
+def _detect_requested_chart_type(text: str) -> str:
+    query = str(text or "").strip().lower()
+    query = (
+        query.replace("á", "a")
+        .replace("é", "e")
+        .replace("í", "i")
+        .replace("ó", "o")
+        .replace("ú", "u")
+    )
+    if any(term in query for term in ("barra", "barras", "bar")):
+        return "bar"
+    if any(term in query for term in ("area", "área")):
+        return "area"
+    return "line"
+
+
+def _build_chart_intro_from_history(
+    user_message: str,
+    history_messages: List[Dict[str, str]],
+    chart_type: str,
+) -> str:
+    chart_label = {
+        "line": "de líneas",
+        "bar": "de barras",
+        "area": "de área",
+    }.get(str(chart_type or "line").lower(), "de líneas")
+
+    previous_user_query = ""
+    for msg in reversed(history_messages or []):
+        if msg.get("role") == "user" and str(msg.get("content") or "").strip():
+            previous_user_query = str(msg.get("content") or "").strip()
+            break
+
+    if previous_user_query:
+        if len(previous_user_query) > 120:
+            previous_user_query = previous_user_query[:117].rstrip() + "..."
+        return (
+            f"Tomando como contexto tu consulta anterior ({previous_user_query}), "
+            f"a continuación se muestra un gráfico {chart_label} de la serie consultada."
+        )
+    return f"A continuación se muestra un gráfico {chart_label} de la serie consultada."
+
+
+def _extract_intro_for_chart_mode(response_text: str) -> str:
+    text = str(response_text or "").strip()
+    if not text:
+        return ""
+
+    clean_lines: List[str] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("##CSV_DOWNLOAD_") or stripped.startswith("##CHART_") or stripped.startswith("##FOLLOWUP_"):
+            continue
+        clean_lines.append(line)
+
+    cleaned = "\n".join(clean_lines).strip()
+    if not cleaned:
+        return ""
+
+    for separator in ("\n\n", "\nPeriodo |", "\nActividad |", "\n**Código de serie:**"):
+        if separator in cleaned:
+            return cleaned.split(separator, 1)[0].strip()
+    return cleaned
+
+
 def _init_session_state(settings: Settings) -> None:
     if "messages" not in st.session_state:
         st.session_state.messages = []  # type: ignore[assignment]
@@ -89,6 +270,10 @@ def _clear_conversation() -> None:
     st.session_state.welcome_emitted = False
     if "orch" in st.session_state:
         st.session_state.pop("orch")
+    st.session_state.pop("chart_markers", None)
+    st.session_state.pop("memory_series_chart", None)
+    st.session_state.pop("last_response_chart_requested", None)
+    st.session_state.pop("last_response_chart_only", None)
     # Forzar nuevo session_id para una conversación limpia
     st.session_state.session_id = f"st-{uuid.uuid4().hex}"
 
@@ -365,18 +550,18 @@ def run_app(
     def _render_post_response_blocks(scope: str = "post") -> None:
         """Renderiza descargas, gráficos y preguntas sugeridas actuales."""
         import hashlib
+        chart_only_mode = bool(st.session_state.get("last_response_chart_only", False))
 
         # Descargas CSV
         csv_markers_now = st.session_state.get("csv_markers") or []
-        if csv_markers_now:
+        if csv_markers_now and not chart_only_mode:
             with st.chat_message("assistant"):
-                st.markdown("### 💾 Descargas de datos")
                 for i, b in enumerate(csv_markers_now, start=1):
                     path = b.get("path")
                     if not path:
                         continue
                     filename = b.get("filename") or f"datos_{i}.csv"
-                    label = b.get("label") or "💾 Descargar CSV"
+                    label = b.get("label") or "Descargar CSV"
                     mimetype = b.get("mimetype") or "text/csv"
                     try:
                         import pandas as _pd  # type: ignore
@@ -396,8 +581,10 @@ def run_app(
                     )
 
         # Gráficos
-        chart_markers_now = st.session_state.get("chart_markers") or []
-        if chart_markers_now:
+        charts_enabled = bool(st.session_state.get("last_response_chart_requested", False))
+        chart_markers_now = (st.session_state.get("chart_markers") or []) if charts_enabled else []
+        memory_series_chart = st.session_state.get("memory_series_chart") if charts_enabled else None
+        if chart_markers_now or memory_series_chart:
             with st.chat_message("assistant"):
                 st.markdown("### Gráficos de la serie")
                 for i, b in enumerate(chart_markers_now, start=1):
@@ -460,6 +647,43 @@ def run_app(
                     else:
                         st.caption("Datos no disponibles para el gráfico.")
 
+                if memory_series_chart:
+                    try:
+                        df_mem = memory_series_chart.get("data")
+                        x_col = memory_series_chart.get("x", "period")
+                        y_cols = memory_series_chart.get("y")
+                        chart_type_mem = str(memory_series_chart.get("chart_type", "line")).lower()
+                        if chart_type_mem == "bar":
+                            st.bar_chart(
+                                data=df_mem,
+                                x=x_col,
+                                y=y_cols,
+                                width="stretch",
+                                height=320,
+                            )
+                        elif chart_type_mem == "area":
+                            st.area_chart(
+                                data=df_mem,
+                                x=x_col,
+                                y=y_cols,
+                                width="stretch",
+                                height=320,
+                            )
+                        else:
+                            st.line_chart(
+                                data=df_mem,
+                                x=x_col,
+                                y=y_cols,
+                                x_label="Período",
+                                y_label="Serie",
+                                width="stretch",
+                                height=320,
+                            )
+                    except Exception as _e_mem_chart:
+                        if _orch and hasattr(_orch, "logger"):
+                            _orch.logger.error(f"[UI_MEMORY_CHART_ERROR] {_e_mem_chart}")
+                        st.caption("No se pudo renderizar el gráfico en memoria.")
+
         # Preguntas sugeridas (usar fallback si no hay markers)
         followup_blocks_now = st.session_state.get("followup_markers") or _build_ui_followups_from_facts()
         if followup_blocks_now:
@@ -501,6 +725,9 @@ def run_app(
 
     if not user_message:
         return
+
+    charts_requested_for_turn = _user_requested_chart(user_message)
+    requested_chart_type = _detect_requested_chart_type(user_message) if charts_requested_for_turn else "line"
 
     # Nota: no limpiar followups aquí; se reemplazan cuando llega la nueva respuesta
 
@@ -560,12 +787,38 @@ def run_app(
     buffer_csv: List[str] = []
     buffer_chart: List[str] = []
     buffer_followup: List[str] = []
+    raw_text_accum = ""
     text_accum = ""
     placeholder = assistant_box.empty()
     _debug_chunk_idx = 0
+    first_stream_piece_rendered = False
+    stream_cursor_enabled = os.getenv("STREAMLIT_STREAM_CURSOR", "1").lower() in {"1", "true", "yes", "on"}
+    try:
+        stream_delay_ms = float(os.getenv("STREAMLIT_STREAM_DELAY_MS", "50") or 50)
+    except Exception:
+        stream_delay_ms = 50.0
+
+    def _iter_ui_stream_segments(text: str):
+        if not text:
+            return
+        total_len = len(text)
+        if total_len <= 120:
+            step = 4
+        elif total_len <= 400:
+            step = 8
+        else:
+            step = 16
+        for i in range(0, total_len, step):
+            yield text[i : i + step]
+
+    def _render_streaming_text(content: str, *, final: bool = False) -> None:
+        if final or not stream_cursor_enabled:
+            placeholder.markdown(content or "\u200B")
+        else:
+            placeholder.markdown((content or "\u200B") + "▌")
 
     def handle_chunk(chunk: str) -> None:
-        nonlocal collecting_csv, collecting_chart, collecting_followup, buffer_csv, buffer_chart, buffer_followup, text_accum, _debug_chunk_idx
+        nonlocal collecting_csv, collecting_chart, collecting_followup, buffer_csv, buffer_chart, buffer_followup, raw_text_accum, text_accum, _debug_chunk_idx, first_stream_piece_rendered
         text = str(chunk)
         _debug_chunk_idx += 1
         try:
@@ -643,17 +896,47 @@ def run_app(
                 continue
             out_lines.append(line)
         filtered = "".join(out_lines)
+        if filtered:
+            raw_text_accum += filtered
         if filtered or not text_accum:
-            text_accum += filtered
-            placeholder.markdown(text_accum or "\u200B")
+            if charts_requested_for_turn:
+                return
+            for piece in _iter_ui_stream_segments(filtered):
+                if first_stream_piece_rendered and stream_delay_ms > 0:
+                    time.sleep(stream_delay_ms / 1000.0)
+                text_accum += piece
+                _render_streaming_text(text_accum, final=False)
+                first_stream_piece_rendered = True
+            if not filtered and not text_accum:
+                _render_streaming_text(text_accum, final=False)
 
     raw_chunks = stream_fn(user_message, history=history, session_id=st.session_state.session_id)
     for _chunk in raw_chunks:
         handle_chunk(_chunk)
-    response_text = _decorate_links(text_accum)
+    raw_response_text = _decorate_links(raw_text_accum)
+    response_text = raw_response_text
+    if charts_requested_for_turn:
+        response_text = _build_chart_intro_from_history(
+            user_message=user_message,
+            history_messages=st.session_state.messages,
+            chart_type=requested_chart_type,
+        )
+    _render_streaming_text(response_text, final=True)
+
+    # Construir gráfico de series desde datos tabulares de la respuesta en memoria
+    if charts_requested_for_turn:
+        memory_chart_payload = _extract_memory_series_chart(raw_response_text)
+    else:
+        memory_chart_payload = None
+
+    if charts_requested_for_turn and memory_chart_payload:
+        memory_chart_payload["chart_type"] = requested_chart_type
+        st.session_state.memory_series_chart = memory_chart_payload
+    else:
+        st.session_state.pop("memory_series_chart", None)
 
     # Fallback: extraer y limpiar marcadores de followup por si algún chunk los mostró como texto
-    if "##FOLLOWUP_START" in response_text:
+    if (not charts_requested_for_turn) and "##FOLLOWUP_START" in response_text:
         import re as _re
 
         def _extract_followups_from_text(text: str) -> tuple[str, List[Dict[str, str]]]:
@@ -680,7 +963,7 @@ def run_app(
         if parsed_followups:
             markers_followup.extend(parsed_followups)
             # Re-render sin los marcadores para evitar que queden visibles
-            placeholder.markdown(response_text or "\u200B")
+            _render_streaming_text(response_text, final=True)
 
     try:
         if os.getenv("STREAM_CHUNK_LOGS", "0").lower() in {"1", "true", "yes", "on"}:
@@ -695,7 +978,9 @@ def run_app(
 
     # Almacenar markers en session_state (sin limpiar)
     st.session_state.csv_markers = markers_csv
-    st.session_state.chart_markers = markers_chart
+    st.session_state.chart_markers = markers_chart if charts_requested_for_turn else []
+    st.session_state.last_response_chart_requested = charts_requested_for_turn
+    st.session_state.last_response_chart_only = charts_requested_for_turn
     st.session_state.followup_markers = markers_followup
 
     # Registrar turno del asistente en memoria

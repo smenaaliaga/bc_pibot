@@ -41,10 +41,16 @@ def stream_data_flow(
     req_form = classification_dict.get("req_form", "latest")
     parsed_point = payload.get("parsed_point")  # DD-MM-YYYY o None
     parsed_range = payload.get("parsed_range")  # Tupla (DD-MM-YYYY, DD-MM-YYYY) o None
+    reference_period = payload.get("reference_period")
     all_series_data = payload.get("all_series_data")  # Lista con todas las series (para contribución con activity=none)
     source_url = payload.get("source_url")  # URL de la fuente
     series_title = payload.get("series_title")
     source_urls = normalize_sources(source_url)
+    intro_llm_temperature = payload.get("intro_llm_temperature", 0.7)
+    try:
+        intro_llm_temperature_value = float(intro_llm_temperature)
+    except (TypeError, ValueError):
+        intro_llm_temperature_value = 0.7
 
     if not series_id or str(series_id).lower() == "none":
         for chunk in general_response(source_urls, series_id=series_id):
@@ -120,6 +126,15 @@ def stream_data_flow(
         and isinstance(indicator_context_val, str)
         and indicator_context_val.strip()
     )
+
+    if not reference_period and isinstance(all_series_data, list) and all_series_data:
+        date_candidates = [
+            str(item.get("date"))
+            for item in all_series_data
+            if isinstance(item, dict) and item.get("date")
+        ]
+        if date_candidates:
+            reference_period = max(date_candidates)
     
     # Para range/specific_point: mostrar rango de fechas usando parsed_range si está disponible; para latest/point: usar parsed_point o fecha de observación
     if req_form in {"range", "specific_point"}:
@@ -141,6 +156,10 @@ def stream_data_flow(
             period_labels = format_period_labels(parsed_point, freq)
             date_range_label = period_labels[0]
             logger.info("[STREAM_DATA_FLOW] Renderizando (parsed_point) | date=%s", parsed_point)
+        elif req_form == "latest" and is_contribution and reference_period:
+            period_labels = format_period_labels(str(reference_period), freq)
+            date_range_label = period_labels[0]
+            logger.info("[STREAM_DATA_FLOW] Renderizando (reference_period) | date=%s", reference_period)
         else:
             date_raw = obs_to_show[0].get("date", "") if obs_to_show else ""
             period_labels = format_period_labels(date_raw, freq)
@@ -148,7 +167,10 @@ def stream_data_flow(
             logger.info("[STREAM_DATA_FLOW] Renderizando (observación) | date=%s", date_raw)
 
     # Etiqueta para mostrar en prompts: para latest usar texto genérico
-    display_period_label = "el último período disponible" if req_form == "latest" else date_range_label
+    if req_form == "latest":
+        display_period_label = date_range_label if (is_contribution and date_range_label != "--") else "el último período disponible"
+    else:
+        display_period_label = date_range_label
 
     response_stream = (
         specific_point_response(
@@ -163,14 +185,17 @@ def stream_data_flow(
             component_context_val=component_context_val,
             seasonality_context_val=seasonality_context_val,
             metric_type_val=metric_type_val,
+            calc_mode_cls=classification_dict.get("calc_mode_cls"),
             intent_cls=intent,
             freq=freq,
             display_period_label=display_period_label,
             date_range_label=date_range_label,
+            reference_period=str(reference_period) if reference_period else None,
             is_contribution=is_contribution,
             is_specific_activity=is_specific_activity,
             all_series_data=all_series_data,
             source_urls=source_urls,
+            intro_llm_temperature=intro_llm_temperature_value,
         )
         if req_form == "specific_point"
         else specific_response(
@@ -185,14 +210,17 @@ def stream_data_flow(
             component_context_val=component_context_val,
             seasonality_context_val=seasonality_context_val,
             metric_type_val=metric_type_val,
+            calc_mode_cls=classification_dict.get("calc_mode_cls"),
             intent_cls=intent,
             freq=freq,
             display_period_label=display_period_label,
             date_range_label=date_range_label,
+            reference_period=str(reference_period) if reference_period else None,
             is_contribution=is_contribution,
             is_specific_activity=is_specific_activity,
             all_series_data=all_series_data,
             source_urls=source_urls,
+            intro_llm_temperature=intro_llm_temperature_value,
         )
     )
 

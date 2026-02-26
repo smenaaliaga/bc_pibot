@@ -319,6 +319,19 @@ def build_metadata_response(data_params: Dict[str, Any]) -> Dict[str, Any]:
     if not entry:
         return {"key": key, "match": None}
 
+    calc_mode = str(data_params.get("calc_mode_cls") or "").lower()
+    entry_series = entry.get("series") if isinstance(entry, dict) else None
+    if calc_mode == "contribution" and (not isinstance(entry_series, dict) or not entry_series):
+        params_contrib = dict(data_params)
+        params_contrib["activity_cls"] = "general"
+        params_contrib["activity_value"] = "none"
+        contrib_key = build_metadata_key(params_contrib)
+        contrib_entry = lookup.get(contrib_key)
+        contrib_series = contrib_entry.get("series") if isinstance(contrib_entry, dict) else None
+        if isinstance(contrib_series, dict) and contrib_series:
+            entry = contrib_entry
+            resolved_key = contrib_key
+
     classification = entry.get("classification") or {}
     indicator = str(classification.get("indicator") or "").lower()
     req_form = str(classification.get("req_form_cls") or "").lower()
@@ -337,6 +350,7 @@ def build_metadata_response(data_params: Dict[str, Any]) -> Dict[str, Any]:
         "label": entry.get("label"),
         "serie_default": entry.get("serie_default"),
         "title_serie_default": entry.get("title_serie_default"),
+        "series": entry.get("series"),
         "sources_url": entry.get("sources_url"),
         "latest_update": latest_update,
     }
