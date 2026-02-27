@@ -24,6 +24,25 @@ cd "/Users/hernanfernandez/Documents/01 Workspace/Notebooks/pibot/qa"
 "/Users/hernanfernandez/Documents/01 Workspace/Notebooks/pibot/.venv/bin/python" qa_interactive.py
 ```
 
+<<<<<<< HEAD
+=======
+## Ejecutar `qa_batch.py` (todas las preguntas a `response.txt`)
+
+Lee preguntas desde `questions.txt` (o `question.txt`) y ejecuta cada una por el mismo flujo del chatbot,
+guardando solo pares pregunta-respuesta en `response.txt`.
+
+```bash
+cd "/Users/hernanfernandez/Documents/01 Workspace/Notebooks/pibot/qa"
+"/Users/hernanfernandez/Documents/01 Workspace/Notebooks/pibot/.venv/bin/python" qa_batch.py
+```
+
+Opcionalmente puedes definir input/output:
+
+```bash
+"/Users/hernanfernandez/Documents/01 Workspace/Notebooks/pibot/.venv/bin/python" qa_batch.py --input questions.txt --output response.txt
+```
+
+>>>>>>> feature/response
 ## Solución permanente conflicto Postgres local vs Docker (puerto 5432)
 
 Si `qa.py` falla con `database "pibot" does not exist`, normalmente `Postgres.app` local está tomando `localhost:5432`.

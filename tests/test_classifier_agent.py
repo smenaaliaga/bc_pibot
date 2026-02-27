@@ -13,15 +13,10 @@ def test_predict_raw_uses_interpretation(monkeypatch):
             "entities": {"indicator": ["imacec"]},
         },
     }
-    intent_response = {"intent": "value", "macro": 1, "context": "standalone", "confidence": 0.94}
-
     def fake_post_json(url, payload, timeout=None):
-        if url == "predict-url":
-            return predict_response
-        return intent_response
+        return predict_response
 
     monkeypatch.setattr(ca, "PREDICT_URL", "predict-url")
-    monkeypatch.setattr(ca, "INTENT_CLASSIFIER_URL", "intent-url")
     monkeypatch.setattr(ca, "post_json", fake_post_json)
 
     result = ca._classify_with_jointbert("q")
@@ -46,25 +41,16 @@ def test_macro_zero_from_intent_api_is_not_overwritten_by_routing(monkeypatch):
             "context": {"label": "standalone", "confidence": 0.9},
         },
     }
-    intent_response = {
-        "macro": {"label": 0, "confidence": 0.97},
-        "intent": {"label": "other", "confidence": 0.94},
-        "context": {"label": "standalone", "confidence": 0.89},
-    }
-
     def fake_post_json(url, payload, timeout=None):
-        if url == "predict-url":
-            return predict_response
-        return intent_response
+        return predict_response
 
     monkeypatch.setattr(ca, "PREDICT_URL", "predict-url")
-    monkeypatch.setattr(ca, "INTENT_CLASSIFIER_URL", "intent-url")
     monkeypatch.setattr(ca, "post_json", fake_post_json)
 
     result = ca._classify_with_jointbert("q")
 
-    assert result.macro == 0
-    assert result.intent == "other"
+    assert result.macro == 1
+    assert result.intent == "value"
 
 
 def test_keeps_other_when_intent_api_says_other_even_with_predict_value(monkeypatch):
@@ -87,24 +73,15 @@ def test_keeps_other_when_intent_api_says_other_even_with_predict_value(monkeypa
             },
         },
     }
-    intent_response = {
-        "macro": {"label": 0, "confidence": 0.97},
-        "intent": {"label": "other", "confidence": 0.94},
-        "context": {"label": "standalone", "confidence": 0.89},
-    }
-
     def fake_post_json(url, payload, timeout=None):
-        if url == "predict-url":
-            return predict_response
-        return intent_response
+        return predict_response
 
     monkeypatch.setattr(ca, "PREDICT_URL", "predict-url")
-    monkeypatch.setattr(ca, "INTENT_CLASSIFIER_URL", "intent-url")
     monkeypatch.setattr(ca, "post_json", fake_post_json)
 
     result = ca._classify_with_jointbert("q")
 
-    assert result.intent == "other"
-    assert result.macro == 0
+    assert result.intent == "value"
+    assert result.macro == 1
     assert result.req_form == "latest"
     assert result.calc_mode == "prev_period"

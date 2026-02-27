@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 from orchestrator.utils.http_client import post_json
-from config import PREDICT_URL, INTENT_CLASSIFIER_URL
+from config import PREDICT_URL
 from registry import get_intent_router, get_series_interpreter
 
 logger = logging.getLogger(__name__)
@@ -187,6 +187,7 @@ def _intent_label_from_interpretation(predict_source: Dict[str, Any], key: str) 
 def _classify_with_jointbert(question: str) -> ClassificationResult:
     """
     Clasificación usando APIs remotas (o modelo local si está habilitado).
+    Clasificación usando APIs remotas (o modelo local si está habilitado).
     """
     if _use_local_jointbert():
         logger.warning("USE_JOINTBERT_CLASSIFIER enabled but local classifier is unavailable; using API flow")
@@ -210,43 +211,25 @@ def _classify_with_jointbert(question: str) -> ClassificationResult:
         }
     predict_result = predict_result_dict
 
-    intent_payload = {"text": question}
-    intent_result: Dict[str, Any]
-    intent_raw: Dict[str, Any]
-    try:
-        intent_result = post_json(INTENT_CLASSIFIER_URL, intent_payload, timeout=PREDICT_TIMEOUT_SECONDS)
-        logger.debug("[INTENT_API] response=%s", intent_result)
-        intent_raw = intent_result if isinstance(intent_result, dict) else {"raw": intent_result}
-        if not isinstance(intent_result, dict):
-            intent_result = {}
-    except Exception as exc:
-        logger.warning("[INTENT_API] fallback to routing data | error=%s", exc)
-        intent_result = {}
-        intent_raw = {"error": str(exc)}
-
     entities_api = predict_source.get("entities", {}) or {}
     normalized_api = predict_source.get("entities_normalized")
     if not isinstance(normalized_api, dict):
         normalized_api = predict_result_dict.get("entities_normalized")
     normalized = normalized_api if isinstance(normalized_api, dict) else {}
-    routing_payload = predict_source.get("routing")
+    routing_payload = predict_result_dict.get("routing")
     if not isinstance(routing_payload, dict):
-        routing_payload = predict_result_dict.get("routing")
+        routing_payload = predict_source.get("routing")
     routing_payload = routing_payload if isinstance(routing_payload, dict) else {}
     routing_intent = routing_payload.get("intent") if isinstance(routing_payload.get("intent"), dict) else {}
     routing_macro = routing_payload.get("macro") if isinstance(routing_payload.get("macro"), dict) else {}
     routing_context = routing_payload.get("context") if isinstance(routing_payload.get("context"), dict) else {}
      
-    # Extraer intentención y entidades
-    intent = _coalesce_defined(_extract_label(intent_result.get("intent")), routing_intent.get("label"))
+    # Extraer intención y entidades desde el payload unificado de PREDICT_URL
+    intent = _extract_label(routing_intent)
     entities = entities_api
-    macro = _coalesce_defined(_extract_label(intent_result.get("macro")), routing_macro.get("label"))
-    context = _coalesce_defined(_extract_label(intent_result.get("context")), routing_context.get("label"))
-    confidence = _extract_confidence(intent_result.get("intent"))
-    if confidence is None:
-        confidence = _extract_confidence(intent_result.get("confidence"))
-    if confidence is None:
-        confidence = routing_intent.get("confidence")
+    macro = _extract_label(routing_macro)
+    context = _extract_label(routing_context)
+    confidence = _extract_confidence(routing_intent)
 
     # Mostrar predicción completa
     logger.info("[CLASSIFIER_API] intent=%s confidence=%s macro=%s context=%s", intent, confidence, macro, context)
@@ -257,7 +240,7 @@ def _classify_with_jointbert(question: str) -> ClassificationResult:
         interpretation.get("text")
         if isinstance(interpretation, dict)
         else None
-    ) or predict_result.get("text") or question
+    ) or predict_result_dict.get("text") or question
 
     return ClassificationResult(
         intent=intent,
@@ -274,7 +257,7 @@ def _classify_with_jointbert(question: str) -> ClassificationResult:
         req_form=_intent_label_from_interpretation(predict_source, "req_form"),
         macro=macro,
         context=context,
-        intent_raw=intent_raw,
+        intent_raw={"routing": routing_payload},
         predict_raw=predict_raw_for_state,
     )
 
@@ -359,6 +342,15 @@ def classify_question_with_history(
                 "[CLASSIFIER_FILE] intent=%s confidence=%.3f indicator=%s\n"
                 % (classification.intent, classification.confidence or 0.0, indicator)
             )
+            f.write("[CLASSIFIER_FILE] PREDICT_RAW=%s\n" % (predict_raw,))
+            f.write("[CLASSIFIER_FILE] MAPPED_PARAMS=\n")
+            f.write("Key                                  | Status     | Value\n")
+            f.write("-------------------------------------+------------+--------------------------\n")
+            for key in sorted(mapped.keys()):
+                status = statuses.get(key, "MISSING")
+                raw_value = mapped.get(key)
+                value = "(empty)" if raw_value in (None, "", [], {}) else str(raw_value)
+                f.write(f"{key:<37} | {status:<10} | {value}\n")
             f.write("[CLASSIFIER_FILE] PREDICT_RAW=%s\n" % (predict_raw,))
             f.write("[CLASSIFIER_FILE] MAPPED_PARAMS=\n")
             f.write("Key                                  | Status     | Value\n")

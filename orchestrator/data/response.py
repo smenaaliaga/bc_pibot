@@ -89,6 +89,8 @@ def format_period_labels(date_str: Optional[str], freq: str) -> list[str]:
             long_label = f"el {ordinal} trimestre del {y}"
             short_label = f"{q}T {y}"
             return [long_label, short_label]
+        if str(freq or "").upper() == "A":
+            return [str(y), str(y)]
         meses_es = [
             "", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
             "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
@@ -189,14 +191,17 @@ def specific_response(
     component_context_val: Optional[str],
     seasonality_context_val: Optional[str],
     metric_type_val: Optional[str],
+    calc_mode_cls: Optional[str],
     intent_cls: Optional[str],
     display_period_label: str,
     freq: str,
     date_range_label: str,
+    reference_period: Optional[str],
     is_contribution: bool,
     is_specific_activity: bool,
     all_series_data: Optional[List[Dict[str, Any]]],
     source_urls: List[str],
+    intro_llm_temperature: float = 0.7,
 ) -> Iterable[str]:
     sections = ResponseSections(
         introduction=_specific_intro(
@@ -209,12 +214,16 @@ def specific_response(
             component_context_val=component_context_val,
             seasonality_context_val=seasonality_context_val,
             metric_type_val=metric_type_val,
+            calc_mode_cls=calc_mode_cls,
+            series_title=series_title,
             freq=freq,
             display_period_label=display_period_label,
             date_range_label=date_range_label,
+            reference_period=reference_period,
             is_contribution=is_contribution,
             is_specific_activity=is_specific_activity,
             all_series_data=all_series_data,
+            intro_llm_temperature=intro_llm_temperature,
         ),
         metadata=_metadata_block(series_id, series_title),
         table=_specific_table(
@@ -265,14 +274,17 @@ def specific_point_response(
     component_context_val: Optional[str],
     seasonality_context_val: Optional[str],
     metric_type_val: Optional[str],
+    calc_mode_cls: Optional[str],
     intent_cls: Optional[str],
     display_period_label: str,
     freq: str,
     date_range_label: str,
+    reference_period: Optional[str],
     is_contribution: bool,
     is_specific_activity: bool,
     all_series_data: Optional[List[Dict[str, Any]]],
     source_urls: List[str],
+    intro_llm_temperature: float = 0.7,
 ) -> Iterable[str]:
     sections = ResponseSections(
         introduction=_specific_intro(
@@ -285,12 +297,16 @@ def specific_point_response(
             component_context_val=component_context_val,
             seasonality_context_val=seasonality_context_val,
             metric_type_val=metric_type_val,
+            calc_mode_cls=calc_mode_cls,
+            series_title=series_title,
             freq=freq,
             display_period_label=display_period_label,
             date_range_label=date_range_label,
+            reference_period=reference_period,
             is_contribution=is_contribution,
             is_specific_activity=is_specific_activity,
             all_series_data=all_series_data,
+            intro_llm_temperature=intro_llm_temperature,
         ),
         metadata=_metadata_block(series_id, series_title),
         table=_specific_table(
@@ -347,14 +363,17 @@ def _metadata_block(series_id: Optional[str], series_title: Optional[str] = None
     description = str(series_title or "").strip()
     if description and description.lower() != "none":
         return (
-            f"**Código de serie:** {series_code}\n",
+            f"**Código de serie:** {series_code}\n\n",
             f"**Descripción de la serie:** {description}\n\n",
         )
     return (f"**Código de serie:** {series_code}\n\n",)
 
 
 def _general_references(source_urls: List[str]) -> Iterable[str]:
-    bde_urls = source_urls or ["https://si3.bcentral.cl/siete"]
+    if source_urls:
+        return
+
+    bde_urls = ["https://si3.bcentral.cl/siete"]
     if len(bde_urls) == 1:
         yield f"\n**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)]({bde_urls[0]}) del Banco Central de Chile."
     else:
@@ -378,13 +397,54 @@ def _specific_intro(
     component_context_val: Optional[str],
     seasonality_context_val: Optional[str],
     metric_type_val: Optional[str],
+    calc_mode_cls: Optional[str],
+    series_title: Optional[str],
     freq: str,
     display_period_label: str,
     date_range_label: str,
+    reference_period: Optional[str],
     is_contribution: bool,
     is_specific_activity: bool,
     all_series_data: Optional[List[Dict[str, Any]]],
+    intro_llm_temperature: float = 0.7,
 ) -> Iterable[str]:
+    def _clean_text(value: Any) -> str:
+        text = str(value or "").strip()
+        if text.lower() in {"", "none", "null", "nan"}:
+            return ""
+        return text
+
+    def _percentage_es(value: Any) -> str:
+        formatted = format_percentage(value)
+        return formatted.replace(".", ",") if formatted != "--" else formatted
+
+    def _comparison_label(var_key: Optional[str], freq_value: str) -> str:
+        freq_norm = str(freq_value or "").strip().lower()
+        if var_key == "yoy":
+            if freq_norm == "m":
+                return "en comparación con el mismo período del año anterior"
+            if freq_norm == "q":
+                return "en comparación con el mismo trimestre del año anterior"
+            if freq_norm == "a":
+                return "en comparación con el año anterior"
+            return "en comparación con el mismo período del año anterior"
+        if var_key == "prev_period":
+            return "en comparación con el período anterior"
+        return ""
+
+    fallback_intro = None
+    if req_form == "latest" and obs_to_show:
+        fallback_intro = _build_latest_intro_fallback(
+            obs_to_show=obs_to_show,
+            freq=freq,
+            indicator_context_val=indicator_context_val,
+            final_indicator_name=final_indicator_name,
+            series_title=series_title,
+            display_period_label=display_period_label,
+            is_contribution=is_contribution,
+            all_series_data=all_series_data,
+        )
+
     llm_prompt = _build_specific_prompt(
         req_form=req_form,
         obs_to_show=obs_to_show,
@@ -395,21 +455,178 @@ def _specific_intro(
         component_context_val=component_context_val,
         seasonality_context_val=seasonality_context_val,
         metric_type_val=metric_type_val,
+        calc_mode_cls=calc_mode_cls,
+        series_title=series_title,
         freq=freq,
         display_period_label=display_period_label,
         date_range_label=date_range_label,
+        reference_period=reference_period,
         is_contribution=is_contribution,
         is_specific_activity=is_specific_activity,
         all_series_data=all_series_data,
     )
     yield from _stream_llm_or_fallback(
         llm_prompt=llm_prompt,
+        llm_temperature=intro_llm_temperature,
         req_form=req_form,
         final_indicator_name=final_indicator_name,
         date_range_label=date_range_label,
         display_period_label=display_period_label,
         obs_to_show=obs_to_show,
+        is_contribution=is_contribution,
+        fallback_text=fallback_intro,
     )
+
+
+def _build_latest_intro_fallback(
+    *,
+    obs_to_show: List[Dict[str, Any]],
+    freq: str,
+    indicator_context_val: Optional[str],
+    final_indicator_name: str,
+    series_title: Optional[str],
+    display_period_label: str,
+    is_contribution: bool,
+    all_series_data: Optional[List[Dict[str, Any]]],
+) -> str:
+    def _clean_text(value: Any) -> str:
+        text = str(value or "").strip()
+        if text.lower() in {"", "none", "null", "nan"}:
+            return ""
+        return text
+
+    def _percentage_es(value: Any) -> str:
+        formatted = format_percentage(value)
+        return formatted.replace(".", ",") if formatted != "--" else formatted
+
+    def _comparison_label(var_key: Optional[str], freq_value: str) -> str:
+        freq_norm = str(freq_value or "").strip().lower()
+        if var_key == "yoy":
+            if freq_norm == "m":
+                return "en comparación con el mismo período del año anterior"
+            if freq_norm == "q":
+                return "en comparación con el mismo trimestre del año anterior"
+            if freq_norm == "a":
+                return "en comparación con el año anterior"
+            return "en comparación con el mismo período del año anterior"
+        if var_key == "prev_period":
+            return "en comparación con el período anterior"
+        return ""
+
+    row = obs_to_show[0] if obs_to_show else {}
+    freq_norm = str(freq or row.get("frequency") or row.get("freq") or "").strip().lower()
+    indicator_norm = _clean_text(indicator_context_val).lower()
+    if indicator_norm == "pib":
+        generic_indicator = "PIB"
+    elif indicator_norm == "imacec":
+        generic_indicator = "IMACEC"
+    else:
+        generic_indicator = _clean_text(final_indicator_name) or "indicador"
+
+    if is_contribution:
+        contrib_value = row.get("value")
+        if contrib_value is None and all_series_data:
+            total_row = next(
+                (
+                    s
+                    for s in all_series_data
+                    if isinstance(s, dict)
+                    and str(s.get("activity") or "").strip().lower() == "total"
+                ),
+                None,
+            )
+            if total_row is not None:
+                contrib_value = total_row.get("value")
+
+        period_label = _clean_text(display_period_label) or "el último período disponible"
+        return (
+            f"La contribución de {generic_indicator} en {period_label} fue de {_percentage_es(contrib_value)}, "
+            "según datos de la BDE."
+        )
+
+    if row.get("yoy") is not None:
+        var_key = "yoy"
+        var_value = row.get("yoy")
+    elif row.get("prev_period") is not None:
+        var_key = "prev_period"
+        var_value = row.get("prev_period")
+    else:
+        var_key = None
+        var_value = None
+
+    series_desc = _clean_text(series_title) or _clean_text(final_indicator_name)
+    if not series_desc:
+        series_desc = generic_indicator
+    series_desc_lower = series_desc.lower()
+    comparison_text = _comparison_label(var_key, freq_norm)
+    freq_label = {
+        "a": "anual",
+        "q": "trimestral",
+        "m": "mensual",
+    }.get(freq_norm, "periódica")
+
+    if "variación" in series_desc_lower:
+        intro_base = f"El dato de la serie {series_desc}"
+    else:
+        intro_base = f"La variación {freq_label} de la serie {series_desc}"
+
+    if var_value is None:
+        return f"{intro_base}, según datos de la BDE, no está disponible."
+    if comparison_text:
+        return f"{intro_base}, {comparison_text}, fue de {_percentage_es(var_value)}, según datos de la BDE."
+    return f"{intro_base} fue de {_percentage_es(var_value)}, según datos de la BDE."
+
+
+def _deterministic_variation_intro(
+    *,
+    req_form: str,
+    obs_to_show: List[Dict[str, Any]],
+    freq: str,
+    indicator_context_val: Optional[str],
+) -> Iterable[str]:
+    if not obs_to_show:
+        yield "La variacion no esta disponible aun.\n\n"
+        return
+
+    req_form_value = str(req_form or "").strip().lower()
+    indicator_value = str(indicator_context_val or "").strip().lower()
+    if req_form_value == "range" and indicator_value == "pib":
+        first_row = obs_to_show[0] if obs_to_show else {}
+        last_row = obs_to_show[-1] if obs_to_show else {}
+        first_label = format_period_labels(first_row.get("date"), freq)[0]
+        last_label = format_period_labels(last_row.get("date"), freq)[0]
+        yield f"A continuación te muestro los valores del PIB entre {first_label} y {last_label}.\n\n"
+        return
+
+    row = obs_to_show[-1]
+    if row.get("yoy") is not None:
+        var_value = row.get("yoy")
+    elif row.get("prev_period") is not None:
+        var_value = row.get("prev_period")
+    else:
+        var_value = None
+
+    freq_norm = str(freq or row.get("frequency") or row.get("freq") or "").strip().lower()
+    if freq_norm == "a":
+        frecuencia = "anual"
+    elif freq_norm == "q":
+        frecuencia = "trimestral"
+    elif freq_norm == "m":
+        frecuencia = "mensual"
+    else:
+        frecuencia = ""
+
+    if var_value is None:
+        if frecuencia:
+            yield f"La variacion {frecuencia} con respecto al año anterior no esta disponible aun.\n\n"
+        else:
+            yield "La variacion con respecto al año anterior no esta disponible aun.\n\n"
+        return
+
+    if frecuencia:
+        yield f"La variacion {frecuencia} con respecto al año anterior es {format_percentage(var_value)}.\n\n"
+    else:
+        yield f"La variacion con respecto al año anterior es {format_percentage(var_value)}.\n\n"
 
 
 def _build_specific_prompt(
@@ -423,9 +640,12 @@ def _build_specific_prompt(
     component_context_val: Optional[str],
     seasonality_context_val: Optional[str],
     metric_type_val: Optional[str],
+    calc_mode_cls: Optional[str],
+    series_title: Optional[str],
     freq: str,
     display_period_label: str,
     date_range_label: str,
+    reference_period: Optional[str],
     is_contribution: bool,
     is_specific_activity: bool,
     all_series_data: Optional[List[Dict[str, Any]]],
@@ -434,6 +654,8 @@ def _build_specific_prompt(
         return _build_range_prompt(
             obs_to_show=obs_to_show,
             final_indicator_name=final_indicator_name,
+            calc_mode_cls=calc_mode_cls,
+            series_title=series_title,
             seasonality_context_val=seasonality_context_val,
             freq=freq,
             display_period_label=display_period_label,
@@ -442,11 +664,14 @@ def _build_specific_prompt(
     return _build_latest_prompt(
         obs_to_show=obs_to_show,
         final_indicator_name=final_indicator_name,
+        calc_mode_cls=calc_mode_cls,
+        series_title=series_title,
         indicator_context_val=indicator_context_val,
         component_context_val=component_context_val,
         seasonality_context_val=seasonality_context_val,
         freq=freq,
         display_period_label=display_period_label,
+        reference_period=reference_period,
         is_contribution=is_contribution,
         is_specific_activity=is_specific_activity,
         all_series_data=all_series_data,
@@ -457,12 +682,42 @@ def _build_range_prompt(
     *,
     obs_to_show: List[Dict[str, Any]],
     final_indicator_name: str,
+    calc_mode_cls: Optional[str],
+    series_title: Optional[str],
     seasonality_context_val: Optional[str],
     freq: str,
     display_period_label: str,
     is_contribution: bool,
 ) -> str:
+    freq_label = {
+        "a": "anual",
+        "q": "trimestral",
+        "m": "mensual",
+    }.get(str(freq or "").strip().lower(), "periódica")
+    calc_mode_value = str(calc_mode_cls or "").strip().lower()
+    if calc_mode_value == "yoy":
+        comparison_text = "con respecto al año anterior"
+    elif calc_mode_value == "prev_period":
+        comparison_text = f"con respecto al período anterior ({display_period_label})"
+    else:
+        comparison_text = "con respecto al período de referencia"
+    series_title_clean = str(series_title or "").strip()
+    if series_title_clean.lower() in {"", "none", "null", "nan"}:
+        series_title_clean = ""
+    series_desc = str(series_title_clean or final_indicator_name or "serie consultada").strip()
+
     llm_prompt_parts: List[str] = []
+    llm_prompt_parts.append("INSTRUCCIÓN DE INTRODUCCIÓN (OBLIGATORIA):")
+    llm_prompt_parts.append(
+        "La primera oración debe seguir esta estructura y el LLM puede complementar el cierre: "
+        f"'La variación {freq_label} de la {series_desc} {comparison_text}, según los datos de la BDE, es ...'."
+    )
+    llm_prompt_parts.append("NO uses la palabra 'interanual'.")
+    llm_prompt_parts.append(
+        "Mantén tono factual, sin markdown, sin viñetas, sin referencias a que eres un modelo."
+    )
+    llm_prompt_parts.append("")
+
     if obs_to_show:
         last_row = obs_to_show[-1]
         last_date_str = last_row.get("date", "")
@@ -524,11 +779,14 @@ def _build_latest_prompt(
     *,
     obs_to_show: List[Dict[str, Any]],
     final_indicator_name: str,
+    calc_mode_cls: Optional[str],
+    series_title: Optional[str],
     indicator_context_val: Optional[str],
     component_context_val: Optional[str],
     seasonality_context_val: Optional[str],
     freq: str,
     display_period_label: str,
+    reference_period: Optional[str],
     is_contribution: bool,
     is_specific_activity: bool,
     all_series_data: Optional[List[Dict[str, Any]]],
@@ -540,6 +798,8 @@ def _build_latest_prompt(
                 return "variación interanual trimestral (a/a)"
             if freq_norm == "m":
                 return "variación interanual mensual (a/a)"
+            if freq_norm == "a":
+                return "variación anual con respecto al año anterior"
             return "variación interanual (a/a)"
         if var_key == "prev_period":
             if freq_norm == "q":
@@ -552,12 +812,49 @@ def _build_latest_prompt(
         return "variación"
 
     llm_prompt_parts: List[str] = []
+    freq_label = {
+        "a": "anual",
+        "q": "trimestral",
+        "m": "mensual",
+    }.get(str(freq or "").strip().lower(), "periódica")
+    calc_mode_value = str(calc_mode_cls or "").strip().lower()
+    if calc_mode_value == "yoy":
+        comparison_text = "con respecto al año anterior"
+    elif calc_mode_value == "prev_period":
+        comparison_text = f"con respecto al período anterior ({display_period_label})"
+    else:
+        comparison_text = "con respecto al período de referencia"
+    series_desc = str(series_title or final_indicator_name or "serie consultada").strip()
+
+    llm_prompt_parts.append("INSTRUCCIÓN DE INTRODUCCIÓN (OBLIGATORIA):")
+    llm_prompt_parts.append(
+        "La primera oración debe seguir esta estructura y el LLM puede complementar el cierre: "
+        f"'La variación {freq_label} de la {series_desc} {comparison_text}, según los datos de la BDE, es ...'."
+    )
+    llm_prompt_parts.append("NO uses la palabra 'interanual'.")
+    llm_prompt_parts.append(
+        "Mantén tono factual, sin markdown, sin viñetas, sin referencias a que eres un modelo."
+    )
+    llm_prompt_parts.append("")
+
     if is_contribution:
         row = obs_to_show[0]
         seasonality_lower = (seasonality_context_val or "").lower()
         prefer_yoy = seasonality_lower == "nsa"
         contrib_label = "contribución interanual" if prefer_yoy else "contribución vs período anterior"
         contrib_value = row.get("value")
+        if contrib_value is None and all_series_data:
+            total_row = next(
+                (
+                    s
+                    for s in all_series_data
+                    if isinstance(s, dict)
+                    and str(s.get("activity") or "").strip().lower() == "total"
+                ),
+                None,
+            )
+            if total_row is not None:
+                contrib_value = total_row.get("value")
 
         if is_specific_activity and all_series_data:
             imacec_total_value = None
@@ -565,6 +862,12 @@ def _build_latest_prompt(
                 if s.get("activity", "").lower() == "total":
                     imacec_total_value = s.get("value")
                     break
+
+            period_comparison = {
+                "q": "igual trimestre del año anterior",
+                "m": "igual mes del año anterior",
+                "a": "igual año anterior",
+            }.get(str(freq or "").strip().lower(), "igual período del año anterior")
 
             activity_name_raw = component_context_val.strip().replace("_", " ") if component_context_val else ""
             activity_name_mapping = {
@@ -582,9 +885,8 @@ def _build_latest_prompt(
             llm_prompt_parts.append("CONTEXTO:")
             llm_prompt_parts.append(f"- Indicador: {indicator_context_val.upper()}")
             llm_prompt_parts.append(f"- Período: {display_period_label}")
-            llm_prompt_parts.append(
-                f"- Variación total: {format_percentage(imacec_total_value) if imacec_total_value else 'N/A'}"
-            )
+            if imacec_total_value is not None:
+                llm_prompt_parts.append(f"- Variación total: {format_percentage(imacec_total_value)}")
             llm_prompt_parts.append(f"- Actividad con mayor contribución: {activity_name}")
             llm_prompt_parts.append(f"- Valor de contribución: {format_percentage(contrib_value)}")
             llm_prompt_parts.append("")
@@ -592,9 +894,14 @@ def _build_latest_prompt(
             llm_prompt_parts.append("Redacta 2 oraciones siguiendo esta estructura (sin usar comillas):")
             llm_prompt_parts.append("")
             llm_prompt_parts.append("Primera oración:")
-            llm_prompt_parts.append(
-                f"- Inicia con: De acuerdo con la BDE, el {indicator_context_val.upper()} de [período] creció [variación] en comparación con igual mes del año anterior (ver tabla)."
-            )
+            if imacec_total_value is not None:
+                llm_prompt_parts.append(
+                    f"- Inicia con: De acuerdo con la BDE, el {indicator_context_val.upper()} de [período] creció [variación] en comparación con {period_comparison} (ver tabla)."
+                )
+            else:
+                llm_prompt_parts.append(
+                    f"- Inicia con: De acuerdo con la BDE, en [período] la actividad [nombre actividad] aportó [valor] al crecimiento del {indicator_context_val.upper()} (ver tabla)."
+                )
             llm_prompt_parts.append("")
             llm_prompt_parts.append("Segunda oración:")
             llm_prompt_parts.append(
@@ -631,6 +938,10 @@ def _build_latest_prompt(
             llm_prompt_parts.append(
                 f"Cierre: {contrib_label} de {format_percentage(contrib_value)} (1 decimal)."
             )
+            if reference_period:
+                llm_prompt_parts.append(
+                    f"PERÍODO OBLIGATORIO: usa exactamente el período {display_period_label} (referencia técnica: {reference_period}) y NO menciones ninguna otra fecha."
+                )
             llm_prompt_parts.append("")
             llm_prompt_parts.append(
                 "TAREA: Reporta solo la contribución (porcentaje, 1 decimal). No menciones el valor absoluto del índice. Máximo 2 oraciones. Neutral y factual."
@@ -658,6 +969,8 @@ def _build_latest_prompt(
             llm_prompt_parts.append("IMPORTANTE: NO menciones el valor absoluto de la serie; reporta solo la variación")
             llm_prompt_parts.append("IMPORTANTE: redacta en forma directa, por ejemplo: 'La variación ... fue de X%.'")
             llm_prompt_parts.append("IMPORTANTE: NO agregues frases meta como 'no se proporciona el valor absoluto'")
+            if freq_raw == "a":
+                llm_prompt_parts.append("IMPORTANTE: para frecuencia anual, inicia con: 'La variación anual con respecto al año anterior es ...'")
         else:
             llm_prompt_parts.append("IMPORTANTE: si no hay variación disponible, indícalo explícitamente sin inventar cifras")
 
@@ -672,32 +985,64 @@ def _build_latest_prompt(
 def _stream_llm_or_fallback(
     *,
     llm_prompt: str,
+    llm_temperature: float,
     req_form: str,
     final_indicator_name: str,
     date_range_label: str,
     display_period_label: str,
     obs_to_show: List[Dict[str, Any]],
+    is_contribution: bool,
+    fallback_text: Optional[str] = None,
 ) -> Iterable[str]:
+    def _sanitize_generated_text(text: str) -> str:
+        clean_text = str(text or "").strip()
+        if not clean_text:
+            return ""
+        lowered = clean_text.lower()
+        if any(token in lowered for token in ["none", "null", "nan"]):
+            return ""
+        return clean_text
+
     try:
-        llm = build_llm(streaming=True, temperature=0.7, mode="fallback")
+        llm = build_llm(streaming=True, temperature=llm_temperature, mode="fallback")
         chunks: List[str] = []
         for chunk in llm.stream(llm_prompt, history=[], intent_info=None):
             text = str(chunk)
             if text:
                 chunks.append(text)
 
-        generated_text = "".join(chunks).strip()
+        generated_text = _sanitize_generated_text("".join(chunks))
         if not generated_text or generated_text.lower().startswith("(error generando)"):
             raise RuntimeError("llm_generation_failed")
 
-        for chunk in chunks:
-            yield chunk
+        final_text = generated_text
+        if req_form == "latest" and is_contribution:
+            period_label = str(display_period_label or "").strip()
+            if period_label and period_label != "--":
+                if period_label.lower() not in generated_text.lower():
+                    row = obs_to_show[0] if obs_to_show else {}
+                    contrib_value = row.get("value") if isinstance(row, dict) else None
+                    if contrib_value is not None:
+                        enforced = (
+                            f"La contribución de {final_indicator_name} en {period_label} fue {format_percentage(contrib_value)}."
+                        )
+                    else:
+                        enforced = (
+                            f"La contribución de {final_indicator_name} para {period_label} se presenta en la siguiente tabla."
+                        )
+                    final_text = f"{enforced} {generated_text}".strip()
+
+        yield final_text
         yield "\n\n"
 
 
     # === Secciones específicas: tabla, referencias, sugerencias, adjuntos ===
     except Exception as exc:
         logger.warning("Error generando con LLM: %s", exc)
+        if fallback_text:
+            yield fallback_text
+            yield "\n\n"
+            return
         if req_form in {"range", "specific_point"}:
             yield f"{final_indicator_name} ({date_range_label}): {len(obs_to_show)} observaciones"
         else:
@@ -748,27 +1093,50 @@ def _specific_table(
             "comercio", "servicios", "impuestos sobre los productos", "no_minero",
         ]
 
-        series_by_activity = {s["activity"]: s for s in all_series_data}
+        valid_series = [s for s in all_series_data if isinstance(s, dict)]
+        series_by_activity = {
+            str(s.get("activity") or "").strip().lower(): s
+            for s in valid_series
+            if str(s.get("activity") or "").strip()
+        }
+        has_imacec_breakdown = "total" in series_by_activity
 
         max_activity = None
         max_value = float("-inf")
-        for s in all_series_data:
-            activity = s.get("activity", "")
-            value = s.get("value", 0)
-            if activity and activity.lower() != "total" and value > max_value:
-                max_value = value
-                max_activity = activity
+        if has_imacec_breakdown:
+            for s in valid_series:
+                activity = str(s.get("activity") or "").strip().lower()
+                value = s.get("value", 0)
+                if activity and activity != "total" and value > max_value:
+                    max_value = value
+                    max_activity = activity
 
-        for activity_key in activity_order:
-            if activity_key in series_by_activity:
-                series_info = series_by_activity[activity_key]
-                display_name = activity_display_names.get(activity_key, activity_key)
-                value = series_info.get("value", 0)
+            for activity_key in activity_order:
+                if activity_key in series_by_activity:
+                    series_info = series_by_activity[activity_key]
+                    display_name = activity_display_names.get(activity_key, activity_key)
+                    value = series_info.get("value", 0)
 
-                if activity_key == max_activity:
-                    yield f"**{display_name}** | **{format_percentage(value)}**\n"
+                    if activity_key == max_activity:
+                        yield f"**{display_name}** | **{format_percentage(value)}**\n"
+                    else:
+                        yield f"{display_name} | {format_percentage(value)}\n"
+        else:
+            max_title = None
+            for s in valid_series:
+                title = str(s.get("title") or s.get("activity") or "").strip() or "Actividad"
+                value = s.get("value", 0)
+                if value > max_value:
+                    max_value = value
+                    max_title = title
+
+            for s in valid_series:
+                title = str(s.get("title") or s.get("activity") or "").strip() or "Actividad"
+                value = s.get("value")
+                if title == max_title:
+                    yield f"**{title}** | **{format_percentage(value)}**\n"
                 else:
-                    yield f"{display_name} | {format_percentage(value)}\n"
+                    yield f"{title} | {format_percentage(value)}\n"
 
         yield "\n"
         yield "_Tasa de variación porcentual_\n"
