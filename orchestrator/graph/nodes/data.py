@@ -327,7 +327,7 @@ def make_data_node(memory_adapter: Any):
                 "intent": data_params.get("intent_cls") or "value",
                 "classification": {
                     "indicator": indicator_candidate,
-                    "metric_type": calc_mode_cls or "original",
+                    "metric_type": calc_mode_cls,
                     "seasonality": seasonality_candidate,
                     "activity": activity_candidate,
                     "frequency": frequency_candidate,
