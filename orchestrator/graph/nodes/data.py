@@ -8,6 +8,7 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from langchain_openai import data
 from langgraph.types import StreamWriter
 
 from orchestrator.data import flow_data
@@ -119,19 +120,166 @@ def _load_metadata_lookup() -> Dict[str, Dict[str, Any]]:
 
 
 def _build_metadata_response(data_params: Dict[str, Any]) -> Dict[str, Any]:
-    # Convierte data_params en una respuesta de metadata compacta para trazas/payload.
+    metadata = _load_metadata_lookup()
+    if "__error__" in metadata:
+        return {"error": metadata["__error__"]}
     key = _metadata_key_from_params(data_params)
-    entry = _load_metadata_lookup().get(key)
-    if not isinstance(entry, dict):
+    data = metadata.get("data") or []
+    if not isinstance(data, list):
         return {"key": key, "match": None}
+    lookup = {
+        entry.get("key"): entry
+        for entry in data
+        if isinstance(entry, dict) and entry.get("key")
+    }
+    entry = lookup.get(key)
+    resolved_key = key
+    
+    if not entry:
+        req_form = str(data_params.get("req_form_cls") or "").lower()
+        if req_form in {"point", "range"}:
+            fallback_order = ("latest", "range") if req_form == "point" else ("range", "latest")
+            for fallback_req_form in fallback_order:
+                params_fallback = dict(data_params)
+                params_fallback["req_form_cls"] = fallback_req_form
+                candidate_key = _metadata_key_from_params(params_fallback)
+                candidate_entry = lookup.get(candidate_key)
+                if candidate_entry:
+                    entry = candidate_entry
+                    resolved_key = candidate_key
+                    break
+
+    if not entry:
+        return {"key": key, "match": None}
+    
+    calc_mode = str(data_params.get("calc_mode_cls") or "").lower()
+    entry_series = entry.get("series") if isinstance(entry, dict) else None
+    if calc_mode == "contribution" and (not isinstance(entry_series, dict) or not entry_series):
+        params_contrib = dict(data_params)
+        params_contrib["activity_cls"] = "general"
+        params_contrib["activity_value"] = "none"
+        contrib_key = build_metadata_key(params_contrib)
+        contrib_entry = lookup.get(contrib_key)
+        contrib_series = contrib_entry.get("series") if isinstance(contrib_entry, dict) else None
+        if isinstance(contrib_series, dict) and contrib_series:
+            entry = contrib_entry
+            resolved_key = contrib_key
+
+    classification = entry.get("classification") or {}
+    indicator = str(classification.get("indicator") or "").lower()
+    req_form = str(classification.get("req_form_cls") or "").lower()
+
+    latest_update = entry.get("latest_update")
+    if not latest_update:
+        latest_update = "none"
+        if req_form == "latest":
+            if indicator == "imacec":
+                latest_update = "2025-12-01"
+            elif indicator == "pib":
+                latest_update = "2025-10-01"
+                
     return {
-        "key": key,
+        "key": resolved_key,
         "label": entry.get("label"),
         "serie_default": entry.get("serie_default"),
         "title_serie_default": entry.get("title_serie_default"),
+        "series": entry.get("series"),
         "sources_url": entry.get("sources_url"),
-        "latest_update": entry.get("latest_update"),
+        "latest_update": latest_update,
     }
+
+def _build_all_series_data(
+    *,
+    metadata_series: Any,
+    period: Any,
+    target_frequency: Optional[str],
+    calc_mode_value: str,
+    req_form_value: str,
+) -> List[Dict[str, Any]]:
+    if not isinstance(metadata_series, dict) or not metadata_series:
+        return []
+
+    from orchestrator.data.get_data_serie import get_series_from_redis
+
+    firstdate: Optional[str] = None
+    lastdate: Optional[str] = None
+    if isinstance(period, list) and period:
+        firstdate = str(period[0])
+        lastdate = str(period[-1])
+
+    rows: List[Dict[str, Any]] = []
+    for serie_info in metadata_series.values():
+        if not isinstance(serie_info, dict):
+            continue
+        serie_id = str(serie_info.get("id") or "").strip()
+        if not serie_id or serie_id.lower() == "none":
+            continue
+        serie_title = str(serie_info.get("title") or serie_id).strip()
+
+        agg_mode = "avg"
+        if str(target_frequency or "").lower() == "a" and ".FLU." in serie_id.upper():
+            agg_mode = "sum"
+
+        try:
+            series_data = get_series_from_redis(
+                series_id=serie_id,
+                firstdate=firstdate,
+                lastdate=lastdate,
+                target_frequency=target_frequency,
+                agg=agg_mode,
+                use_fallback=True,
+            )
+            observations = (series_data or {}).get("observations") or []
+
+            if req_form_value == "latest" and not observations:
+                fallback_data = get_series_from_redis(
+                    series_id=serie_id,
+                    firstdate=None,
+                    lastdate=None,
+                    target_frequency=target_frequency,
+                    agg=agg_mode,
+                    use_fallback=True,
+                )
+                observations = (fallback_data or {}).get("observations") or []
+
+            observations = [obs for obs in observations if isinstance(obs, dict)]
+            if not observations:
+                continue
+
+            chosen_obs = observations[-1]
+
+            calc_mode_norm = str(calc_mode_value or "").strip().lower()
+            if calc_mode_norm == "contribution":
+                metric_value = chosen_obs.get("value")
+            elif calc_mode_norm == "prev_period":
+                metric_value = chosen_obs.get("pct")
+                if metric_value is None:
+                    metric_value = chosen_obs.get("yoy_pct")
+                if metric_value is None:
+                    metric_value = chosen_obs.get("value")
+            else:
+                metric_value = chosen_obs.get("yoy_pct")
+                if metric_value is None:
+                    metric_value = chosen_obs.get("pct")
+                if metric_value is None:
+                    metric_value = chosen_obs.get("value")
+
+            rows.append(
+                {
+                    "series_id": serie_id,
+                    "title": serie_title,
+                    "activity": "",
+                    "date": chosen_obs.get("date"),
+                    "value": metric_value,
+                }
+            )
+        except Exception:
+            logger.exception(
+                "[=====DATA_NODE=====] Error obteniendo serie de contribución | serie_id=%s",
+                serie_id,
+            )
+
+    return rows
 
 
 def make_data_node(memory_adapter: Any):
@@ -240,6 +388,9 @@ def make_data_node(memory_adapter: Any):
 
         series_fetch_result = None
         serie_default = metadata_response.get("serie_default") if isinstance(metadata_response, dict) else None
+        payload_series = serie_default
+        reference_period: Optional[str] = None
+        all_series_data: List[Dict[str, Any]] = []
         has_metadata_series = serie_default is not None and str(serie_default).strip() != ""
         has_specific_series = has_metadata_series and str(serie_default).strip().lower() != "none"
         
@@ -249,11 +400,32 @@ def make_data_node(memory_adapter: Any):
                 from orchestrator.data.get_data_serie import get_series_from_redis
 
                 period = data_params.get("period")
-                firstdate = str(period[0])
-                lastdate = str(period[-1])
+                if isinstance(period, list) and period:
+                    firstdate = str(period[0])
+                    lastdate = str(period[-1])
+                    reference_period = str(period[-1] or period[0])
+                else:
+                    firstdate = None
+                    lastdate = None
 
                 req_form_value = str(data_params.get("req_form_cls") or "").lower()
                 target_frequency = str(data_params.get("frequency") or "").lower() or None
+                
+                metadata_series = metadata_response.get("series") if isinstance(metadata_response, dict) else None
+                if calc_mode_cls == "contribution" and isinstance(metadata_series, dict) and metadata_series:
+                    all_series_data = _build_all_series_data(
+                        metadata_series=metadata_series,
+                        period=period,
+                        target_frequency=target_frequency,
+                        calc_mode_value=calc_mode_cls,
+                        req_form_value=str(req_form_value or "").lower(),
+                    )
+
+                if (
+                    (not payload_series or str(payload_series).strip().lower() == "none")
+                    and all_series_data
+                ):
+                    payload_series = all_series_data[0].get("series_id")
                 
                 # Obtener valores de la serie
                 series_data = get_series_from_redis(
@@ -335,11 +507,13 @@ def make_data_node(memory_adapter: Any):
                     "price": data_params.get("price"),
                     "history": data_params.get("history"),
                 },
-                "series": serie_default,
+                "series": payload_series,
                 "series_title": metadata_response.get("title_serie_default") if isinstance(metadata_response, dict) else None,
                 "parsed_point": period_list[-1] if period_list else None,
                 "parsed_range": period_list if period_list else None,
+                "reference_period": reference_period,
                 "result": output_dict,
+                "all_series_data": all_series_data or None,
                 "source_url": source_url,
             }
 
