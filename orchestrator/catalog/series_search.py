@@ -107,6 +107,7 @@ def find_family_by_classification(
     investment_value: Any = None,
     calc_mode: Any = None,
     seasonality: Any = None,
+    frequency: Any = None,
 ) -> Optional[Dict[str, Any]]:
     payload = _read_catalog_payload(catalog_path)
     if not payload:
@@ -121,6 +122,7 @@ def find_family_by_classification(
     requested_has_investment = 0 if _is_empty(investment_value) else 1
     requested_calc_mode = str(calc_mode).strip().lower() if calc_mode not in (None, "") else None
     requested_seasonality = str(seasonality).strip().lower() if seasonality not in (None, "") else None
+    requested_frequency = str(frequency).strip().lower() if frequency not in (None, "") else None
 
     candidates: List[Dict[str, Any]] = []
     for family_name, family_payload in payload.items():
@@ -157,10 +159,17 @@ def find_family_by_classification(
             if str(family_seasonality).strip().lower() != requested_seasonality:
                 continue
 
+        family_frequency = family_classification.get("frequency")
+        if requested_frequency is not None and family_frequency not in (None, ""):
+            if str(family_frequency).strip().lower() != requested_frequency:
+                continue
+
         score = 0
         if family_calc_mode not in (None, ""):
             score += 1
         if family_seasonality not in (None, ""):
+            score += 1
+        if family_frequency not in (None, ""):
             score += 1
 
         candidates.append(
