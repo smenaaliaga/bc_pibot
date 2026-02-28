@@ -225,8 +225,6 @@ def make_intent_node(memory_adapter: Any, intent_store: Any = None, predict_with
         intent_label: Any = ""
         context_label: Any = ""
         macro_label = None
-        intent_raw: Dict[str, Any] = {}
-        predict_raw: Dict[str, Any] = {}
         if classification is not None:
             intent_label = (getattr(classification, "intent", None) or "")
             context_label = (getattr(classification, "context", None) or "")

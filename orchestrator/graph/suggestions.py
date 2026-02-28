@@ -19,19 +19,21 @@ _CHART_BLOCK_PATTERN = re.compile(r"##CHART_START(?P<body>.*?)##CHART_END", re.D
 def _coerce_indicator_value(value: Any) -> Optional[str]:
     if value is None:
         return None
+    if isinstance(value, list):
+        for item in value:
+            resolved = _coerce_indicator_value(item)
+            if resolved:
+                return resolved
+        return None
     if isinstance(value, str):
         text = value.strip()
         return text or None
-    if isinstance(value, list):
-        for item in value:
-            if isinstance(item, str) and item.strip():
-                return item.strip()
-        return None
     if isinstance(value, dict):
         for key in ("standard_name", "normalized", "original", "text_normalized", "label"):
             candidate = value.get(key)
-            if isinstance(candidate, str) and candidate.strip():
-                return candidate.strip()
+            resolved = _coerce_indicator_value(candidate)
+            if resolved:
+                return resolved
     return None
 
 
@@ -124,9 +126,12 @@ def generate_suggested_questions(state: AgentState, intent_store: Optional[Inten
     seasonality = None
     period: Optional[str] = None
     if primary_entity:
-        indicator = _coerce_indicator_value(primary_entity.get("indicator") or primary_entity.get("indicador"))
-        component = _coerce_indicator_value(primary_entity.get("activity") or primary_entity.get("component"))
-        seasonality = _coerce_indicator_value(primary_entity.get("seasonality"))
+        indicator = primary_entity.get("indicator") or primary_entity.get("indicador")
+        component = primary_entity.get("activity") or primary_entity.get("component")
+        seasonality = primary_entity.get("seasonality")
+    indicator = _coerce_indicator_value(indicator)
+    component = _coerce_indicator_value(component)
+    seasonality = _coerce_indicator_value(seasonality)
     classification = state.get("classification")
     intent = _coerce_intent_label(getattr(classification, "intent", None) if classification else None)
 

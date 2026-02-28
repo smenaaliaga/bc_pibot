@@ -1,1 +1,1 @@
-"""Legacy rules namespace (currently unused)."""
+"""Business rules package."""
