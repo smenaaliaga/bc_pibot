@@ -7,6 +7,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
+from orchestrator.normalizer.normalizer import normalize_entities
 from orchestrator.utils.http_client import post_json
 from config import PREDICT_URL
 from registry import get_intent_router, get_series_interpreter
@@ -184,6 +185,34 @@ def _intent_label_from_interpretation(predict_source: Dict[str, Any], key: str) 
     return _extract_label(payload)
 
 
+def _coerce_entities_payload(entities_payload: Any) -> Dict[str, List[str]]:
+    if not isinstance(entities_payload, dict):
+        return {}
+
+    coerced: Dict[str, List[str]] = {}
+    for key, value in entities_payload.items():
+        key_text = str(key).strip()
+        if not key_text:
+            continue
+
+        values: List[str] = []
+        if isinstance(value, list):
+            for item in value:
+                if item is None:
+                    continue
+                item_text = str(item).strip()
+                if item_text:
+                    values.append(item_text)
+        elif value is not None:
+            value_text = str(value).strip()
+            if value_text:
+                values.append(value_text)
+
+        coerced[key_text] = values
+
+    return coerced
+
+
 def _classify_with_jointbert(question: str) -> ClassificationResult:
     """
     Clasificación usando APIs remotas (o modelo local si está habilitado).
@@ -211,11 +240,11 @@ def _classify_with_jointbert(question: str) -> ClassificationResult:
         }
     predict_result = predict_result_dict
 
-    entities_api = predict_source.get("entities", {}) or {}
-    normalized_api = predict_source.get("entities_normalized")
-    if not isinstance(normalized_api, dict):
-        normalized_api = predict_result_dict.get("entities_normalized")
-    normalized = normalized_api if isinstance(normalized_api, dict) else {}
+    entities_api_raw = predict_source.get("entities")
+    if entities_api_raw is None and isinstance(predict_result_dict.get("entities"), dict):
+        entities_api_raw = predict_result_dict.get("entities")
+    entities_api = _coerce_entities_payload(entities_api_raw)
+
     routing_payload = predict_result_dict.get("routing")
     if not isinstance(routing_payload, dict):
         routing_payload = predict_source.get("routing")
@@ -223,12 +252,37 @@ def _classify_with_jointbert(question: str) -> ClassificationResult:
     routing_intent = routing_payload.get("intent") if isinstance(routing_payload.get("intent"), dict) else {}
     routing_macro = routing_payload.get("macro") if isinstance(routing_payload.get("macro"), dict) else {}
     routing_context = routing_payload.get("context") if isinstance(routing_payload.get("context"), dict) else {}
-     
+    routing_intent_label = _extract_label(routing_intent)
+    routing_context_label = _extract_label(routing_context)
+
+    calc_mode_label = _intent_label_from_interpretation(predict_source, "calc_mode")
+    req_form_label = _intent_label_from_interpretation(predict_source, "req_form")
+    try:
+        normalized = normalize_entities(
+            entities=entities_api,
+            calc_mode=calc_mode_label,
+            req_form=req_form_label,
+            intent_label=routing_intent_label,
+            context_label=routing_context_label,
+        )
+    except Exception as exc:
+        logger.exception("[CLASSIFIER_API] Failed to recompute entities_normalized")
+        raise RuntimeError("Failed to recompute entities_normalized from /predict response") from exc
+
+    interpretation_state = predict_raw_for_state.get("interpretation")
+    if isinstance(interpretation_state, dict):
+        interpretation_state = dict(interpretation_state)
+    else:
+        interpretation_state = {}
+    interpretation_state["entities"] = entities_api
+    interpretation_state["entities_normalized"] = normalized
+    predict_raw_for_state["interpretation"] = interpretation_state
+
     # Extraer intención y entidades desde el payload unificado de PREDICT_URL
-    intent = _extract_label(routing_intent)
+    intent = routing_intent_label
     entities = entities_api
     macro = _extract_label(routing_macro)
-    context = _extract_label(routing_context)
+    context = routing_context_label
     confidence = _extract_confidence(routing_intent)
 
     # Mostrar predicción completa
@@ -250,11 +304,11 @@ def _classify_with_jointbert(question: str) -> ClassificationResult:
         text=text,
         words=predict_source.get("words") or [],
         slot_tags=predict_source.get("slot_tags") or predict_source.get("slots") or [],
-        calc_mode=_intent_label_from_interpretation(predict_source, "calc_mode"),
+        calc_mode=calc_mode_label,
         activity=_intent_label_from_interpretation(predict_source, "activity"),
         region=_intent_label_from_interpretation(predict_source, "region"),
         investment=_intent_label_from_interpretation(predict_source, "investment"),
-        req_form=_intent_label_from_interpretation(predict_source, "req_form"),
+        req_form=req_form_label,
         macro=macro,
         context=context,
         intent_raw={"routing": routing_payload},

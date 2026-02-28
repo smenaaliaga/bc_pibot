@@ -1,6 +1,7 @@
 import types
 
 from orchestrator.graph import agent_graph as ag
+from orchestrator.classifier.intent_memory import IntentRecord
 
 
 class DummyChunk:
@@ -109,3 +110,72 @@ def test_classify_node_persists_intent_event(monkeypatch):
     assert call["entities"] == {"domain": "IMACEC"}
     assert call["intent_raw"] == {"intent": "ask_data", "source": "router"}
     assert call["predict_raw"] == {"entities": {"domain": ["IMACEC"]}}
+
+
+def test_intent_node_uses_store_for_followup_inheritance(monkeypatch):
+    class StubStore:
+        def history(self, session_id, k=10):
+            return [
+                IntentRecord(
+                    intent="method",
+                    score=0.9,
+                    intent_raw={
+                        "routing": {
+                            "intent": {"label": "methodology"},
+                            "macro": {"label": 1},
+                            "context": {"label": "standalone"},
+                        }
+                    },
+                    predict_raw={
+                        "interpretation": {
+                            "entities_normalized": {
+                                "indicator": ["pib"],
+                                "seasonality": ["nsa"],
+                                "frequency": ["q"],
+                                "period": ["2025-10-01", "2025-12-31"],
+                            }
+                        }
+                    },
+                    turn_id=3,
+                )
+            ]
+
+    monkeypatch.setattr(ag, "_MEMORY", object(), raising=False)
+    monkeypatch.setattr(ag, "_INTENT_STORE", StubStore(), raising=False)
+
+    classification = types.SimpleNamespace(
+        intent="value",
+        context="followup",
+        macro=0,
+        intent_raw={"routing": {"macro": {"label": 0}, "intent": {"label": "value"}, "context": {"label": "followup"}}},
+        predict_raw={
+            "interpretation": {
+                "entities": {},
+                "slot_tags": ["O", "O", "O", "O"],
+                "entities_normalized": {
+                    "indicator": ["imacec"],
+                    "seasonality": ["nsa"],
+                    "frequency": ["m"],
+                    "activity": [],
+                    "region": [],
+                    "investment": [],
+                    "period": ["2026-01-01", "2026-01-31"],
+                },
+            }
+        },
+    )
+
+    result = ag.intent_node(
+        {
+            "question": "puedes darme mas detalles",
+            "session_id": "sess-followup",
+            "user_turn_id": 5,
+            "classification": classification,
+            "entities": [],
+        }
+    )
+
+    assert result["route_decision"] == "rag"
+    assert result["intent"]["intent_cls"] == "method"
+    assert result["intent"]["macro_cls"] == 1
+    assert result["entities"][0]["indicator"] == "pib"

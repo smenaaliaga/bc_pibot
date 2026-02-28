@@ -69,6 +69,19 @@ def _label(value: Any) -> Any:
     return value
 
 
+def _routing_label(payload: Dict[str, Any], key: str) -> Any:
+    if not isinstance(payload, dict):
+        return None
+    direct = payload.get(key)
+    if not _is_empty_value(direct):
+        return _label(_as_dict(direct).get("label") if isinstance(direct, dict) else direct)
+    routing = _as_dict(payload.get("routing"))
+    nested = routing.get(key)
+    if _is_empty_value(nested):
+        return None
+    return _label(_as_dict(nested).get("label") if isinstance(nested, dict) else nested)
+
+
 def _is_empty_value(value: Any) -> bool:
     if value in (None, "", "none", "None", "null", "NULL"):
         return True
@@ -158,8 +171,7 @@ def _build_intent_info_from_state(
 ) -> Dict[str, Any]:
     base = state.get("intent_info") if isinstance(state.get("intent_info"), dict) else {}
     intent_info = dict(base)
-    if "intent" not in intent_info:
-        intent_info["intent"] = normalized_intent or getattr(classification, "intent", None) or "unknown"
+    intent_info["intent"] = normalized_intent or getattr(classification, "intent", None) or "unknown"
     if "score" not in intent_info:
         intent_info["score"] = getattr(classification, "confidence", 0.0) or 0.0
     intent_info["intent_raw"] = intent_raw
@@ -252,9 +264,9 @@ def make_intent_node(memory_adapter: Any, intent_store: Any = None, predict_with
             current_intent_info = state.get("intent_info") if isinstance(state.get("intent_info"), dict) else {}
             predict_raw = _as_dict(current_intent_info.get("predict_raw"))
 
-        intent_raw_context_label = _label(_as_dict(intent_raw.get("context")).get("label") if isinstance(intent_raw.get("context"), dict) else intent_raw.get("context"))
-        intent_raw_intent_label = _label(_as_dict(intent_raw.get("intent")).get("label") if isinstance(intent_raw.get("intent"), dict) else intent_raw.get("intent"))
-        intent_raw_macro_label = _label(_as_dict(intent_raw.get("macro")).get("label") if isinstance(intent_raw.get("macro"), dict) else intent_raw.get("macro"))
+        intent_raw_context_label = _routing_label(intent_raw, "context")
+        intent_raw_intent_label = _routing_label(intent_raw, "intent")
+        intent_raw_macro_label = _routing_label(intent_raw, "macro")
 
         if _is_empty_value(context_label):
             context_label = intent_raw_context_label
@@ -279,12 +291,13 @@ def make_intent_node(memory_adapter: Any, intent_store: Any = None, predict_with
             if is_first_turn or (not prev_intent_raw and not prev_predict_raw):
                 decision = "fallback"
             else:
-                if macro_label in (0, "0") or normalized_intent in {"", "none", "other"}:
-                    prev_macro = _label(_as_dict(prev_intent_raw.get("macro")).get("label") if isinstance(prev_intent_raw.get("macro"), dict) else prev_intent_raw.get("macro"))
-                    prev_intent = _label(_as_dict(prev_intent_raw.get("intent")).get("label") if isinstance(prev_intent_raw.get("intent"), dict) else prev_intent_raw.get("intent"))
-                    if macro_label in (0, "0") and prev_macro is not None:
+                macro_from_api_is_zero = macro_label in (0, "0")
+                if macro_from_api_is_zero or normalized_intent in {"", "none", "other"}:
+                    prev_macro = _routing_label(prev_intent_raw, "macro")
+                    prev_intent = _routing_label(prev_intent_raw, "intent")
+                    if macro_from_api_is_zero and prev_macro is not None:
                         macro_label = prev_macro
-                    if normalized_intent in {"", "none", "other"} and not _is_empty_value(prev_intent):
+                    if (macro_from_api_is_zero or normalized_intent in {"", "none", "other"}) and not _is_empty_value(prev_intent):
                         normalized_intent = _normalize_intent_label(prev_intent)
 
                 indicator_missing = _is_empty_value(current_norm.get("indicator"))

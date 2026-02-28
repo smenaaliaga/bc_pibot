@@ -131,6 +131,101 @@ def test_followup_macro_zero_and_other_recovers_previous_method_intent():
     assert result["entities"][0]["indicator"] == "pib"
 
 
+def test_followup_macro_zero_and_value_recovers_previous_method_intent_when_generic():
+    prev_record = _build_prev_record(intent="method", macro=1, indicator="pib", turn_id=7)
+    classification = _make_classification(
+        intent="value",
+        context="followup",
+        macro=0,
+        intent_raw={
+            "context": {"label": "followup"},
+            "intent": {"label": "value"},
+            "macro": {"label": 0},
+        },
+        predict_raw={
+            "entities": {},
+            "slot_tags": ["O", "O", "O"],
+            "entities_normalized": {"indicator": ["imacec"]},
+        },
+    )
+    node = make_intent_node(None, StubIntentStore([prev_record]))
+
+    result = node(
+        {
+            "question": "dame más detalles",
+            "session_id": "s2c",
+            "user_turn_id": 8,
+            "classification": classification,
+            "entities": [],
+        }
+    )
+
+    assert result["route_decision"] == "rag"
+    assert result["intent"]["intent_cls"] == "method"
+    assert result["intent"]["macro_cls"] == 1
+    assert result["entities"][0]["indicator"] == "pib"
+
+
+def test_followup_macro_zero_recovers_previous_method_with_nested_routing_payload():
+    prev_record = IntentRecord(
+        intent="method",
+        score=0.9,
+        intent_raw={
+            "routing": {
+                "intent": {"label": "methodology"},
+                "macro": {"label": 1},
+                "context": {"label": "standalone"},
+            }
+        },
+        predict_raw={
+            "interpretation": {
+                "entities_normalized": {
+                    "indicator": ["pib"],
+                    "period": "2023",
+                    "frequency": "q",
+                    "seasonality": "nsa",
+                }
+            }
+        },
+        turn_id=9,
+    )
+    classification = _make_classification(
+        intent="value",
+        context="followup",
+        macro=0,
+        intent_raw={
+            "routing": {
+                "intent": {"label": "value"},
+                "macro": {"label": 0},
+                "context": {"label": "followup"},
+            }
+        },
+        predict_raw={
+            "interpretation": {
+                "entities": {},
+                "slot_tags": ["O", "O", "O"],
+                "entities_normalized": {"indicator": ["imacec"]},
+            }
+        },
+    )
+    node = make_intent_node(None, StubIntentStore([prev_record]))
+
+    result = node(
+        {
+            "question": "dame más detalles",
+            "session_id": "s2d",
+            "user_turn_id": 10,
+            "classification": classification,
+            "entities": [],
+        }
+    )
+
+    assert result["route_decision"] == "rag"
+    assert result["intent"]["intent_cls"] == "method"
+    assert result["intent"]["macro_cls"] == 1
+    assert result["entities"][0]["indicator"] == "pib"
+
+
 def test_followup_value_region_specific_backfills_indicator_and_time_fields():
     prev_record = _build_prev_record(intent="value", macro=1, indicator="imacec")
     classification = _make_classification(
