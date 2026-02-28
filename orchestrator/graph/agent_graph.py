@@ -69,7 +69,7 @@ def classify_node(state: AgentState) -> AgentState:
 
 
 def intent_node(state: AgentState) -> AgentState:
-    node_fn = make_intent_node(_MEMORY)
+    node_fn = make_intent_node(_MEMORY, _INTENT_STORE)
     return node_fn(state)
 
 
@@ -115,7 +115,7 @@ def build_graph():
         classify_question_with_history,
         build_intent_info,
     )
-    intent = make_intent_node(_MEMORY)
+    intent = make_intent_node(_MEMORY, _INTENT_STORE)
     router = make_router_node()
     data = make_data_node(_MEMORY)
     rag = make_rag_node(_RAG_LLM)
