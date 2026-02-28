@@ -1,0 +1,106 @@
+{
+  "IMACEC, volumen a precios del año anterior encadenado, series empalmadas (promedio 2018=100)": {
+    "classification": {
+      "indicator": "imacec",
+      "calc_mode": "original",
+      "seasonality": "nsa",
+      "has_activity": 1,
+      "has_region": 0,
+      "has_investment": 0
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A",
+    "series": [
+      {"id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M", "title": "Imacec", "classification": {"activity": "imacec"}},
+      {"id": "F032.IMC.IND.Z.Z.EP18.PB.Z.0.M", "title": "Producción de bienes", "classification": {"activity": "bienes"}},
+      {"id": "F032.IMC.IND.Z.Z.EP18.03.Z.0.M", "title": "Minería", "classification": {"activity": "mineria"}},
+      {"id": "F032.IMC.IND.Z.Z.EP18.04.Z.0.M", "title": "Industria", "classification": {"activity": "industria"}},
+      {"id": "F032.IMC.IND.Z.Z.EP18.RB.Z.0.M", "title": "Resto de bienes", "classification": {"activity": "resto_bienes"}},
+      {"id": "F032.IMC.IND.Z.Z.EP18.COM.Z.0.M", "title": "Comercio", "classification": {"activity": "comercio"}},
+      {"id": "F032.IMC.IND.Z.Z.EP18.SERV.Z.0.M", "title": "Servicios", "classification": {"activity": "servicios"}},
+      {"id": "F032.ICF.IND.Z.Z.EP18.Z.Z.0.M", "title": "A costo de factores", "classification": {"activity": "costo_factores"}},
+      {"id": "F032.IMC.IND.Z.Z.EP18.IMP.Z.0.M", "title": "Impuestos sobre los productos", "classification": {"activity": "impuestos"}},
+      {"id": "F032.IMC.IND.Z.Z.EP18.N03.Z.0.M", "title": "No minero", "classification": {"activity": "no_mineria"}}
+    ]
+  },
+  "IMACEC, contribución porcentual respecto de igual periodo del año anterior, referencia 2018": {
+    "classification": {
+      "indicator": "imacec",
+      "calc_mode": "contribution",
+      "seasonality": "nsa",
+      "has_activity": 1,
+      "has_region": 0,
+      "has_investment": 0
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_02_B",
+    "series": [
+      {"id": "F032.IMC.V12.Z.Z.2018.Z.Z.0.M", "title": "Imacec", "classification": {"activity": "total"}},
+      {"id": "F032.IMC.V12.Z.Z.2018.PB.Z.0.M", "title": "Producción de bienes", "classification": {"activity": "bienes"}},
+      {"id": "F032.IMC.V12.Z.Z.2018.04.Z.0.M", "title": "Industria", "classification": {"activity": "industria"}},
+      {"id": "F032.IMC.V12.Z.Z.2018.RB.Z.0.M", "title": "Resto de bienes", "classification": {"activity": "resto_bienes"}},
+      {"id": "F032.IMC.V12.Z.Z.2018.COM.Z.0.M", "title": "Comercio", "classification": {"activity": "comercio"}},
+      {"id": "F032.IMC.V12.Z.Z.2018.SERV.Z.0.M", "title": "Servicios", "classification": {"activity": "servicios"}},
+      {"id": "F032.IMC.V12.Z.Z.2018.IMP.Z.0.M", "title": "Impuestos sobre los productos", "classification": {"activity": "impuestos"}},
+      {"id": "F032.IMC.V12.Z.Z.2018.03.Z.0.M", "title": "Minería", "classification": {"activity": "mineria"}},
+      {"id": "F032.IMC.V12.Z.Z.2018.N03.Z.0.M", "title": "No minero", "classification": {"activity": "no_mineria"}}
+    ]
+  },
+  "IMACEC, volumen a precios del año anterior encadenado, desestacionalizado, series empalmadas (promedio 2018=100)": {
+    "classification": {
+      "indicator": "imacec",
+      "calc_mode": "original",
+      "seasonality": "sa",
+      "has_activity": 1,
+      "has_region": 0,
+      "has_investment": 0
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_03_A",
+    "series": [
+      {"id": "F032.IMC.IND.Z.Z.EP18.Z.Z.1.M", "title": "Imacec", "classification": {"activity": "imacec"}},
+      {"id": "F032.IMC.IND.Z.Z.EP18.PB.Z.1.M", "title": "Producción de bienes", "classification": {"activity": "bienes"}},
+      {"id": "F032.IMC.IND.Z.Z.EP18.03.Z.1.M", "title": "Minería", "classification": {"activity": "mineria"}},
+      {"id": "F032.IMC.IND.Z.Z.EP18.04.Z.1.M", "title": "Industria", "classification": {"activity": "industria"}},
+      {"id": "F032.IMC.IND.Z.Z.EP18.RB.Z.1.M", "title": "Resto de bienes", "classification": {"activity": "resto_bienes"}},
+      {"id": "F032.IMC.IND.Z.Z.EP18.COM.Z.1.M", "title": "Comercio", "classification": {"activity": "comercio"}},
+      {"id": "F032.IMC.IND.Z.Z.EP18.SERV.Z.1.M", "title": "Servicios", "classification": {"activity": "servicios"}},
+      {"id": "F032.ICF.IND.Z.Z.EP18.Z.Z.1.M", "title": "Costo de factores", "classification": {"activity": "costo_factores"}},
+      {"id": "F032.IMC.IND.Z.Z.EP18.IMP.Z.1.M", "title": "Impuestos sobre los productos", "classification": {"activity": "impuestos"}},
+      {"id": "F032.IMC.IND.Z.Z.EP18.N03.Z.1.M", "title": "Imacec no minero", "classification": {"activity": "no_mineria"}}
+    ]
+  },
+  "IMACEC, contribución porcentual respecto al periodo anterior, desestacionalizado, referencia 2018": {
+    "classification": {
+      "indicator": "imacec",
+      "calc_mode": "contribution",
+      "seasonality": "sa",
+      "has_activity": 1,
+      "has_region": 0,
+      "has_investment": 0
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_04_A",
+    "series": [
+      {"id": "F032.IMC.VAR.Z.Z.2018.Z.Z.3.M", "title": "Imacec", "classification": {"activity": "imacec"}},
+      {"id": "F032.IMC.VAR.Z.Z.2018.PB.Z.3.M", "title": "Producción de bienes", "classification": {"activity": "bienes"}},
+      {"id": "F032.IMC.VAR.Z.Z.2018.03.Z.3.M", "title": "Minería", "classification": {"activity": "mineria"}},
+      {"id": "F032.IMC.VAR.Z.Z.2018.04.Z.3.M", "title": "Industria", "classification": {"activity": "industria"}},
+      {"id": "F032.IMC.VAR.Z.Z.2018.RB.Z.3.M", "title": "Resto de bienes", "classification": {"activity": "resto_bienes"}},
+      {"id": "F032.IMC.VAR.Z.Z.2018.COM.Z.3.M", "title": "Comercio", "classification": {"activity": "comercio"}},
+      {"id": "F032.IMC.VAR.Z.Z.2018.SERV.Z.3.M", "title": "Servicios", "classification": {"activity": "servicios"}},
+      {"id": "F032.IMC.VAR.Z.Z.2018.IMP.Z.3.M", "title": "Impuestos sobre los productos", "classification": {"activity": "impuestos"}},
+      {"id": "F032.IMC.VAR.Z.Z.2018.N03.Z.3.M", "title": "Imacec no minero", "classification": {"activity": "no_mineria"}}
+    ]
+  },
+  "PIB, referencia 2018 (miles de millones de pesos)": {
+    "classification": {
+      "indicator": "pib",
+      "has_region": 0,
+      "has_investment": 0,
+      "has_price": 0
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2",
+    "series": [
+      {"id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T", "title": "PIB volumen a precios del año anterior encadenado", "classification": {"seasonality": "nsa", "price": "enc"}},
+      {"id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.1.T", "title": "PIB volumen a precios del año anterior encadenado (desestacionalizado)", "classification": {"seasonality": "sa", "price": "enc"}},
+      {"id": "F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T", "title": "PIB a precios corrientes", "classification": {"seasonality": "nsa", "price": "co"}}
+    ]
+  }
+}
