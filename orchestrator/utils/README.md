@@ -17,7 +17,7 @@ Helpers pequeños reutilizados en varias capas del orquestador.
 - Si agregas nuevas claves al contexto, actualiza los tests y la documentación en este archivo.
 
 ## Validación
-- `pytest tests/test_utils_followups.py` (si existe) o añade casos en `tests/test_data_flow_fetch.py`.
+- `pytest tests/test_followup_routing.py` o añade casos dedicados para utilidades.
 
 ## Documentación relacionada
 - [README del orquestador](../README.md)

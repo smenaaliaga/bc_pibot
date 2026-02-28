@@ -1,0 +1,4961 @@
+{
+  "metadata": {
+    "description": "metadatos de las series del pib e imacec",
+    "indicators": [
+      "pib",
+      "imacec"
+    ],
+    "classification_fields": [
+      "activity_cls",
+      "frequency",
+      "calc_mode_cls",
+      "region_cls",
+      "investment_cls",
+      "req_form_cls"
+    ],
+    "postprocess": [
+      "indicator",
+      "seasonality",
+      "activity_value",
+      "sub_activity_value",
+      "region_value",
+      "gasto_value",
+      "price",
+      "history"
+    ]
+  },
+  "data": [
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "m",
+        "calc_mode_cls": "original",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::m::original::none::none::latest::none::none::none::none::imacec::nsa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "m",
+        "calc_mode_cls": "original",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "nsa",
+        "activity_value": "minero",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::m::original::none::none::latest::minero::none::none::none::imacec::nsa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.V12.Z.Z.2018.03.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "m",
+        "calc_mode_cls": "original",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::m::original::none::none::latest::none::none::none::none::imacec::nsa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "m",
+        "calc_mode_cls": "prev_period",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::m::prev_period::none::none::latest::none::none::none::none::imacec::nsa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "m",
+        "calc_mode_cls": "prev_period",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "nsa",
+        "activity_value": "no_minero",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::m::prev_period::none::none::latest::no_minero::none::none::none::imacec::nsa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.N03.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "m",
+        "calc_mode_cls": "prev_period",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::m::prev_period::none::none::latest::none::none::none::none::imacec::nsa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "m",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::m::yoy::none::none::latest::none::none::none::none::imacec::nsa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "title_serie_default": "Imacec empalmado, serie original (índice 2018=100)",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693",
+        "source_2": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_ESTADIST_MACRO/MN_EST_MACRO_IV/PEM_ACTyDDA_IMACEC_2_2018?id5=SI&idSerie=F032.IMC.IND.Z.Z.EP18.Z.Z.0.M"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "m",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "nsa",
+        "activity_value": "industria",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::m::yoy::none::none::latest::industria::none::none::none::imacec::nsa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.V12.Z.Z.2018.04.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "m",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::m::yoy::none::none::latest::none::none::none::none::imacec::nsa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "m",
+        "calc_mode_cls": "contribution",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::m::contribution::none::none::latest::none::none::none::none::imacec::nsa::none::co::2018",
+      "label": "none",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "none"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "m",
+        "calc_mode_cls": "contribution",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "nsa",
+        "activity_value": "comercial",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::m::contribution::none::none::latest::comercial::none::none::none::imacec::nsa::none::co::2018",
+      "label": "imacec_contribution",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {
+        "serie_1": {
+          "id": "F032.IMC.V12.Z.Z.2018.PB.Z.0.M",
+          "title": "Producción de bienes"
+        },
+        "serie_2": {
+          "id": "F032.IMC.V12.Z.Z.2018.03.Z.0.M",
+          "title": "Minería"
+        },
+        "serie_3": {
+          "id": "F032.IMC.V12.Z.Z.2018.04.Z.0.M",
+          "title": "Industria"
+        },
+        "serie_4": {
+          "id": "F032.IMC.V12.Z.Z.2018.RB.Z.0.M",
+          "title": "Resto de bienes"
+        },
+        "serie_5": {
+          "id": "F032.IMC.V12.Z.Z.2018.COM.Z.0.M",
+          "title": "Comercio"
+        },
+        "serie_6": {
+          "id": "F032.IMC.V12.Z.Z.2018.SERV.Z.0.M",
+          "title": "Servicios"
+        },
+        "serie_7": {
+          "id": "F032.IMC.V12.Z.Z.2018.IMP.Z.0.M",
+          "title": "Impuestos sobre los productos"
+        },
+        "serie_8": {
+          "id": "F032.IMC.V12.Z.Z.2018.N03.Z.0.M",
+          "title": "Imacec no minero"
+        },
+        "serie_9": {
+          "id": "F032.IMC.V12.Z.Z.2018.Z.Z.0.M",
+          "title": "Imacec"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_02_B/638131830958936551"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "m",
+        "calc_mode_cls": "contribution",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::m::contribution::none::none::latest::none::none::none::none::imacec::nsa::none::co::2018",
+      "label": "imacec_contribution",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {
+        "serie_1": {
+          "id": "F032.IMC.V12.Z.Z.2018.PB.Z.0.M",
+          "title": "Producción de bienes"
+        },
+        "serie_2": {
+          "id": "F032.IMC.V12.Z.Z.2018.03.Z.0.M",
+          "title": "Minería"
+        },
+        "serie_3": {
+          "id": "F032.IMC.V12.Z.Z.2018.04.Z.0.M",
+          "title": "Industria"
+        },
+        "serie_4": {
+          "id": "F032.IMC.V12.Z.Z.2018.RB.Z.0.M",
+          "title": "Resto de bienes"
+        },
+        "serie_5": {
+          "id": "F032.IMC.V12.Z.Z.2018.COM.Z.0.M",
+          "title": "Comercio"
+        },
+        "serie_6": {
+          "id": "F032.IMC.V12.Z.Z.2018.SERV.Z.0.M",
+          "title": "Servicios"
+        },
+        "serie_7": {
+          "id": "F032.IMC.V12.Z.Z.2018.IMP.Z.0.M",
+          "title": "Impuestos sobre los productos"
+        },
+        "serie_8": {
+          "id": "F032.IMC.V12.Z.Z.2018.N03.Z.0.M",
+          "title": "Imacec no minero"
+        },
+        "serie_9": {
+          "id": "F032.IMC.V12.Z.Z.2018.Z.Z.0.M",
+          "title": "Imacec"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_02_B/638131830958936551"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "original",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::original::none::none::latest::none::none::none::none::imacec::nsa::none::co::2018",
+      "label": "imacec_contribution",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {
+        "serie_1": {
+          "id": "F032.IMC.V12.Z.Z.2018.PB.Z.0.M",
+          "title": "Producción de bienes"
+        },
+        "serie_2": {
+          "id": "F032.IMC.V12.Z.Z.2018.03.Z.0.M",
+          "title": "Minería"
+        },
+        "serie_3": {
+          "id": "F032.IMC.V12.Z.Z.2018.04.Z.0.M",
+          "title": "Industria"
+        },
+        "serie_4": {
+          "id": "F032.IMC.V12.Z.Z.2018.RB.Z.0.M",
+          "title": "Resto de bienes"
+        },
+        "serie_5": {
+          "id": "F032.IMC.V12.Z.Z.2018.COM.Z.0.M",
+          "title": "Comercio"
+        },
+        "serie_6": {
+          "id": "F032.IMC.V12.Z.Z.2018.SERV.Z.0.M",
+          "title": "Servicios"
+        },
+        "serie_7": {
+          "id": "F032.IMC.V12.Z.Z.2018.IMP.Z.0.M",
+          "title": "Impuestos sobre los productos"
+        },
+        "serie_8": {
+          "id": "F032.IMC.V12.Z.Z.2018.N03.Z.0.M",
+          "title": "Imacec no minero"
+        },
+        "serie_9": {
+          "id": "F032.IMC.V12.Z.Z.2018.Z.Z.0.M",
+          "title": "Imacec"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_02_B/638131830958936551"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "q",
+        "calc_mode_cls": "original",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "nsa",
+        "activity_value": "minero",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::q::original::none::none::latest::minero::none::none::none::imacec::nsa::none::co::2018",
+      "label": "imacec_contribution",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {
+        "serie_1": {
+          "id": "F032.IMC.V12.Z.Z.2018.PB.Z.0.M",
+          "title": "Producción de bienes"
+        },
+        "serie_2": {
+          "id": "F032.IMC.V12.Z.Z.2018.03.Z.0.M",
+          "title": "Minería"
+        },
+        "serie_3": {
+          "id": "F032.IMC.V12.Z.Z.2018.04.Z.0.M",
+          "title": "Industria"
+        },
+        "serie_4": {
+          "id": "F032.IMC.V12.Z.Z.2018.RB.Z.0.M",
+          "title": "Resto de bienes"
+        },
+        "serie_5": {
+          "id": "F032.IMC.V12.Z.Z.2018.COM.Z.0.M",
+          "title": "Comercio"
+        },
+        "serie_6": {
+          "id": "F032.IMC.V12.Z.Z.2018.SERV.Z.0.M",
+          "title": "Servicios"
+        },
+        "serie_7": {
+          "id": "F032.IMC.V12.Z.Z.2018.IMP.Z.0.M",
+          "title": "Impuestos sobre los productos"
+        },
+        "serie_8": {
+          "id": "F032.IMC.V12.Z.Z.2018.N03.Z.0.M",
+          "title": "Imacec no minero"
+        },
+        "serie_9": {
+          "id": "F032.IMC.V12.Z.Z.2018.Z.Z.0.M",
+          "title": "Imacec"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_02_B/638131830958936551"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "q",
+        "calc_mode_cls": "original",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::q::original::none::none::latest::none::none::none::none::imacec::nsa::none::co::2018",
+      "label": "imacec_contribution",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {
+        "serie_1": {
+          "id": "F032.IMC.V12.Z.Z.2018.PB.Z.0.M",
+          "title": "Producción de bienes"
+        },
+        "serie_2": {
+          "id": "F032.IMC.V12.Z.Z.2018.03.Z.0.M",
+          "title": "Minería"
+        },
+        "serie_3": {
+          "id": "F032.IMC.V12.Z.Z.2018.04.Z.0.M",
+          "title": "Industria"
+        },
+        "serie_4": {
+          "id": "F032.IMC.V12.Z.Z.2018.RB.Z.0.M",
+          "title": "Resto de bienes"
+        },
+        "serie_5": {
+          "id": "F032.IMC.V12.Z.Z.2018.COM.Z.0.M",
+          "title": "Comercio"
+        },
+        "serie_6": {
+          "id": "F032.IMC.V12.Z.Z.2018.SERV.Z.0.M",
+          "title": "Servicios"
+        },
+        "serie_7": {
+          "id": "F032.IMC.V12.Z.Z.2018.IMP.Z.0.M",
+          "title": "Impuestos sobre los productos"
+        },
+        "serie_8": {
+          "id": "F032.IMC.V12.Z.Z.2018.N03.Z.0.M",
+          "title": "Imacec no minero"
+        },
+        "serie_9": {
+          "id": "F032.IMC.V12.Z.Z.2018.Z.Z.0.M",
+          "title": "Imacec"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_02_B/638131830958936551"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "prev_period",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::prev_period::none::none::latest::none::none::none::none::imacec::nsa::none::co::2018",
+      "label": "imacec_contribution",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {
+        "serie_1": {
+          "id": "F032.IMC.V12.Z.Z.2018.PB.Z.0.M",
+          "title": "Producción de bienes"
+        },
+        "serie_2": {
+          "id": "F032.IMC.V12.Z.Z.2018.03.Z.0.M",
+          "title": "Minería"
+        },
+        "serie_3": {
+          "id": "F032.IMC.V12.Z.Z.2018.04.Z.0.M",
+          "title": "Industria"
+        },
+        "serie_4": {
+          "id": "F032.IMC.V12.Z.Z.2018.RB.Z.0.M",
+          "title": "Resto de bienes"
+        },
+        "serie_5": {
+          "id": "F032.IMC.V12.Z.Z.2018.COM.Z.0.M",
+          "title": "Comercio"
+        },
+        "serie_6": {
+          "id": "F032.IMC.V12.Z.Z.2018.SERV.Z.0.M",
+          "title": "Servicios"
+        },
+        "serie_7": {
+          "id": "F032.IMC.V12.Z.Z.2018.IMP.Z.0.M",
+          "title": "Impuestos sobre los productos"
+        },
+        "serie_8": {
+          "id": "F032.IMC.V12.Z.Z.2018.N03.Z.0.M",
+          "title": "Imacec no minero"
+        },
+        "serie_9": {
+          "id": "F032.IMC.V12.Z.Z.2018.Z.Z.0.M",
+          "title": "Imacec"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_02_B/638131830958936551"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "q",
+        "calc_mode_cls": "prev_period",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "nsa",
+        "activity_value": "minero",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::q::prev_period::none::none::latest::minero::none::none::none::imacec::nsa::none::co::2018",
+      "label": "imacec_contribution",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {
+        "serie_1": {
+          "id": "F032.IMC.V12.Z.Z.2018.PB.Z.0.M",
+          "title": "Producción de bienes"
+        },
+        "serie_2": {
+          "id": "F032.IMC.V12.Z.Z.2018.03.Z.0.M",
+          "title": "Minería"
+        },
+        "serie_3": {
+          "id": "F032.IMC.V12.Z.Z.2018.04.Z.0.M",
+          "title": "Industria"
+        },
+        "serie_4": {
+          "id": "F032.IMC.V12.Z.Z.2018.RB.Z.0.M",
+          "title": "Resto de bienes"
+        },
+        "serie_5": {
+          "id": "F032.IMC.V12.Z.Z.2018.COM.Z.0.M",
+          "title": "Comercio"
+        },
+        "serie_6": {
+          "id": "F032.IMC.V12.Z.Z.2018.SERV.Z.0.M",
+          "title": "Servicios"
+        },
+        "serie_7": {
+          "id": "F032.IMC.V12.Z.Z.2018.IMP.Z.0.M",
+          "title": "Impuestos sobre los productos"
+        },
+        "serie_8": {
+          "id": "F032.IMC.V12.Z.Z.2018.N03.Z.0.M",
+          "title": "Imacec no minero"
+        },
+        "serie_9": {
+          "id": "F032.IMC.V12.Z.Z.2018.Z.Z.0.M",
+          "title": "Imacec"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_02_B/638131830958936551"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "q",
+        "calc_mode_cls": "prev_period",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::q::prev_period::none::none::latest::none::none::none::none::imacec::nsa::none::co::2018",
+      "label": "imacec_contribution",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {
+        "serie_1": {
+          "id": "F032.IMC.V12.Z.Z.2018.PB.Z.0.M",
+          "title": "Producción de bienes"
+        },
+        "serie_2": {
+          "id": "F032.IMC.V12.Z.Z.2018.03.Z.0.M",
+          "title": "Minería"
+        },
+        "serie_3": {
+          "id": "F032.IMC.V12.Z.Z.2018.04.Z.0.M",
+          "title": "Industria"
+        },
+        "serie_4": {
+          "id": "F032.IMC.V12.Z.Z.2018.RB.Z.0.M",
+          "title": "Resto de bienes"
+        },
+        "serie_5": {
+          "id": "F032.IMC.V12.Z.Z.2018.COM.Z.0.M",
+          "title": "Comercio"
+        },
+        "serie_6": {
+          "id": "F032.IMC.V12.Z.Z.2018.SERV.Z.0.M",
+          "title": "Servicios"
+        },
+        "serie_7": {
+          "id": "F032.IMC.V12.Z.Z.2018.IMP.Z.0.M",
+          "title": "Impuestos sobre los productos"
+        },
+        "serie_8": {
+          "id": "F032.IMC.V12.Z.Z.2018.N03.Z.0.M",
+          "title": "Imacec no minero"
+        },
+        "serie_9": {
+          "id": "F032.IMC.V12.Z.Z.2018.Z.Z.0.M",
+          "title": "Imacec"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_02_B/638131830958936551"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::none::latest::none::none::none::none::imacec::nsa::none::co::2018",
+      "label": "imacec_contribution",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {
+        "serie_1": {
+          "id": "F032.IMC.V12.Z.Z.2018.PB.Z.0.M",
+          "title": "Producción de bienes"
+        },
+        "serie_2": {
+          "id": "F032.IMC.V12.Z.Z.2018.03.Z.0.M",
+          "title": "Minería"
+        },
+        "serie_3": {
+          "id": "F032.IMC.V12.Z.Z.2018.04.Z.0.M",
+          "title": "Industria"
+        },
+        "serie_4": {
+          "id": "F032.IMC.V12.Z.Z.2018.RB.Z.0.M",
+          "title": "Resto de bienes"
+        },
+        "serie_5": {
+          "id": "F032.IMC.V12.Z.Z.2018.COM.Z.0.M",
+          "title": "Comercio"
+        },
+        "serie_6": {
+          "id": "F032.IMC.V12.Z.Z.2018.SERV.Z.0.M",
+          "title": "Servicios"
+        },
+        "serie_7": {
+          "id": "F032.IMC.V12.Z.Z.2018.IMP.Z.0.M",
+          "title": "Impuestos sobre los productos"
+        },
+        "serie_8": {
+          "id": "F032.IMC.V12.Z.Z.2018.N03.Z.0.M",
+          "title": "Imacec no minero"
+        },
+        "serie_9": {
+          "id": "F032.IMC.V12.Z.Z.2018.Z.Z.0.M",
+          "title": "Imacec"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_02_B/638131830958936551"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "nsa",
+        "activity_value": "minero",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::q::yoy::none::none::latest::minero::none::none::none::imacec::nsa::none::co::2018",
+      "label": "imacec_contribution",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {
+        "serie_1": {
+          "id": "F032.IMC.V12.Z.Z.2018.PB.Z.0.M",
+          "title": "Producción de bienes"
+        },
+        "serie_2": {
+          "id": "F032.IMC.V12.Z.Z.2018.03.Z.0.M",
+          "title": "Minería"
+        },
+        "serie_3": {
+          "id": "F032.IMC.V12.Z.Z.2018.04.Z.0.M",
+          "title": "Industria"
+        },
+        "serie_4": {
+          "id": "F032.IMC.V12.Z.Z.2018.RB.Z.0.M",
+          "title": "Resto de bienes"
+        },
+        "serie_5": {
+          "id": "F032.IMC.V12.Z.Z.2018.COM.Z.0.M",
+          "title": "Comercio"
+        },
+        "serie_6": {
+          "id": "F032.IMC.V12.Z.Z.2018.SERV.Z.0.M",
+          "title": "Servicios"
+        },
+        "serie_7": {
+          "id": "F032.IMC.V12.Z.Z.2018.IMP.Z.0.M",
+          "title": "Impuestos sobre los productos"
+        },
+        "serie_8": {
+          "id": "F032.IMC.V12.Z.Z.2018.N03.Z.0.M",
+          "title": "Imacec no minero"
+        },
+        "serie_9": {
+          "id": "F032.IMC.V12.Z.Z.2018.Z.Z.0.M",
+          "title": "Imacec"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_02_B/638131830958936551"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::q::yoy::none::none::latest::none::none::none::none::imacec::nsa::none::co::2018",
+      "label": "imacec_contribution",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {
+        "serie_1": {
+          "id": "F032.IMC.V12.Z.Z.2018.PB.Z.0.M",
+          "title": "Producción de bienes"
+        },
+        "serie_2": {
+          "id": "F032.IMC.V12.Z.Z.2018.03.Z.0.M",
+          "title": "Minería"
+        },
+        "serie_3": {
+          "id": "F032.IMC.V12.Z.Z.2018.04.Z.0.M",
+          "title": "Industria"
+        },
+        "serie_4": {
+          "id": "F032.IMC.V12.Z.Z.2018.RB.Z.0.M",
+          "title": "Resto de bienes"
+        },
+        "serie_5": {
+          "id": "F032.IMC.V12.Z.Z.2018.COM.Z.0.M",
+          "title": "Comercio"
+        },
+        "serie_6": {
+          "id": "F032.IMC.V12.Z.Z.2018.SERV.Z.0.M",
+          "title": "Servicios"
+        },
+        "serie_7": {
+          "id": "F032.IMC.V12.Z.Z.2018.IMP.Z.0.M",
+          "title": "Impuestos sobre los productos"
+        },
+        "serie_8": {
+          "id": "F032.IMC.V12.Z.Z.2018.N03.Z.0.M",
+          "title": "Imacec no minero"
+        },
+        "serie_9": {
+          "id": "F032.IMC.V12.Z.Z.2018.Z.Z.0.M",
+          "title": "Imacec"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_02_B/638131830958936551"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "contribution",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::contribution::none::none::latest::none::none::none::none::imacec::nsa::none::co::2018",
+      "label": "none",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "none"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "a",
+        "calc_mode_cls": "original",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::a::original::none::none::latest::none::none::none::none::imacec::nsa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "a",
+        "calc_mode_cls": "original",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "nsa",
+        "activity_value": "servicios",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::a::original::none::none::latest::servicios::none::none::none::imacec::nsa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.SERV.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "a",
+        "calc_mode_cls": "original",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::a::original::none::none::latest::none::none::none::none::imacec::nsa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "a",
+        "calc_mode_cls": "prev_period",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::a::prev_period::none::none::latest::none::none::none::none::imacec::nsa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "a",
+        "calc_mode_cls": "prev_period",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "nsa",
+        "activity_value": "minero",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::a::prev_period::none::none::latest::minero::none::none::none::imacec::nsa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.V12.Z.Z.2018.03.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "a",
+        "calc_mode_cls": "prev_period",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::a::prev_period::none::none::latest::none::none::none::none::imacec::nsa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "a",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::a::yoy::none::none::latest::none::none::none::none::imacec::nsa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "a",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "nsa",
+        "activity_value": "industria",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::a::yoy::none::none::latest::industria::none::none::none::imacec::nsa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.V12.Z.Z.2018.04.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "a",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::a::yoy::none::none::latest::none::none::none::none::imacec::nsa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "a",
+        "calc_mode_cls": "contribution",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::a::contribution::none::none::latest::none::none::none::none::imacec::nsa::none::co::2018",
+      "label": "none",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "none"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "m",
+        "calc_mode_cls": "original",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "sa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::m::original::none::none::latest::none::none::none::none::imacec::sa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "m",
+        "calc_mode_cls": "original",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "sa",
+        "activity_value": "minero",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::m::original::none::none::latest::minero::none::none::none::imacec::sa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.V12.Z.Z.2018.03.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "m",
+        "calc_mode_cls": "original",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "sa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::m::original::none::none::latest::none::none::none::none::imacec::sa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "m",
+        "calc_mode_cls": "prev_period",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "sa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::m::prev_period::none::none::latest::none::none::none::none::imacec::sa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "m",
+        "calc_mode_cls": "prev_period",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "sa",
+        "activity_value": "produccion_bienes",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::m::prev_period::none::none::latest::produccion_bienes::none::none::none::imacec::sa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.PB.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "m",
+        "calc_mode_cls": "prev_period",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "sa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::m::prev_period::none::none::latest::none::none::none::none::imacec::sa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "m",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "sa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::m::yoy::none::none::latest::none::none::none::none::imacec::sa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "m",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "sa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::m::yoy::none::none::latest::none::none::none::none::imacec::sa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "m",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "sa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::m::yoy::none::none::latest::none::none::none::none::imacec::sa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "m",
+        "calc_mode_cls": "contribution",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "sa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::m::contribution::none::none::latest::none::none::none::none::imacec::sa::none::co::2018",
+      "label": "none",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "none"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "m",
+        "calc_mode_cls": "contribution",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "sa",
+        "activity_value": "servicios",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::m::contribution::none::none::latest::servicios::none::none::none::imacec::sa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.SERV.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "m",
+        "calc_mode_cls": "contribution",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "sa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::m::contribution::none::none::latest::none::none::none::none::imacec::sa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "original",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "sa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::original::none::none::latest::none::none::none::none::imacec::sa::none::co::2018",
+      "label": "imacec_general",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "q",
+        "calc_mode_cls": "original",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "sa",
+        "activity_value": "minero",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::q::original::none::none::latest::minero::none::none::none::imacec::sa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.V12.Z.Z.2018.03.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "q",
+        "calc_mode_cls": "original",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "sa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::q::original::none::none::latest::none::none::none::none::imacec::sa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "prev_period",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "sa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::prev_period::none::none::latest::none::none::none::none::imacec::sa::none::co::2018",
+      "label": "imacec_general",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "q",
+        "calc_mode_cls": "prev_period",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "sa",
+        "activity_value": "minero",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::q::prev_period::none::none::latest::minero::none::none::none::imacec::sa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.V12.Z.Z.2018.03.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "q",
+        "calc_mode_cls": "prev_period",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "sa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::q::prev_period::none::none::latest::none::none::none::none::imacec::sa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "sa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::none::latest::none::none::none::none::imacec::sa::none::co::2018",
+      "label": "imacec_general",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "sa",
+        "activity_value": "produccion_bienes",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::q::yoy::none::none::latest::produccion_bienes::none::none::none::imacec::sa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.PB.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "sa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::q::yoy::none::none::latest::none::none::none::none::imacec::sa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "contribution",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "sa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::contribution::none::none::latest::none::none::none::none::imacec::sa::none::co::2018",
+      "label": "none",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "none"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "a",
+        "calc_mode_cls": "original",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "sa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::a::original::none::none::latest::none::none::none::none::imacec::sa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "a",
+        "calc_mode_cls": "original",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "sa",
+        "activity_value": "minero",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::a::original::none::none::latest::minero::none::none::none::imacec::sa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.V12.Z.Z.2018.03.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "a",
+        "calc_mode_cls": "original",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "sa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::a::original::none::none::latest::none::none::none::none::imacec::sa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "a",
+        "calc_mode_cls": "prev_period",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "sa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::a::prev_period::none::none::latest::none::none::none::none::imacec::sa::none::co::2018",
+      "label": "imacec_general",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "a",
+        "calc_mode_cls": "prev_period",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "sa",
+        "activity_value": "minero",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::a::prev_period::none::none::latest::minero::none::none::none::imacec::sa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.V12.Z.Z.2018.03.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "a",
+        "calc_mode_cls": "prev_period",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "sa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::a::prev_period::none::none::latest::none::none::none::none::imacec::sa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "a",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "sa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::a::yoy::none::none::latest::none::none::none::none::imacec::sa::none::co::2018",
+      "label": "imacec_general",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "a",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "sa",
+        "activity_value": "resto_bienes",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::a::yoy::none::none::latest::resto_bienes::none::none::none::imacec::sa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.RB.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "a",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "sa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::a::yoy::none::none::latest::none::none::none::none::imacec::sa::none::co::2018",
+      "label": "imacec_default",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "title_serie_default": "Imacec",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A/638131830306828693"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "a",
+        "calc_mode_cls": "contribution",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "imacec",
+        "seasonality": "sa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::a::contribution::none::none::latest::none::none::none::none::imacec::sa::none::co::2018",
+      "label": "none",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "none"
+      },
+      "latest_update": "2025-12-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_default",
+      "serie_default": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "title_serie_default": "PIB volumen a precios del año anterior encadenado",
+      "series": {
+        "serie_1": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+          "title": "PIB volumen a precios del año anterior encadenado"
+        },
+        "serie_2": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.1.T",
+          "title": "PIB volumen a precios del año anterior encadenado (desestacionalizado)"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2/CCNN2018_P0_V(2)"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "ohiggins",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::ohiggins::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.06.0.T",
+      "title_serie_default": "PIB Región del Libertador General Bernardo OHiggins",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "arica",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::arica::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.15.0.T",
+      "title_serie_default": "PIB Región de Arica y Parinacota",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "arica_parinacota",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::arica_parinacota::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.15.0.T",
+      "title_serie_default": "PIB Región de Arica y Parinacota",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "tarapaca",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::tarapaca::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.01.0.T",
+      "title_serie_default": "PIB Región de Tarapacá",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "antofagasta",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::antofagasta::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.02.0.T",
+      "title_serie_default": "PIB Región de Antofagasta",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "atacama",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::atacama::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.03.0.T",
+      "title_serie_default": "PIB Región de Atacama",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "coquimbo",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::coquimbo::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.04.0.T",
+      "title_serie_default": "PIB Región de Coquimbo",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "valparaiso",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::valparaiso::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.05.0.T",
+      "title_serie_default": "PIB Región de Valparaíso",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "ohhiggins",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::ohhiggins::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.06.0.T",
+      "title_serie_default": "PIB Región del Libertador General Bernardo OHiggins",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "maule",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::maule::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.07.0.T",
+      "title_serie_default": "PIB Región del Maule",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "nuble",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::nuble::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.16.0.T",
+      "title_serie_default": "PIB Región de Ñuble",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "bio_bio",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::bio_bio::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.08.0.T",
+      "title_serie_default": "PIB Región del Biobío",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "biobio",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::biobio::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.08.0.T",
+      "title_serie_default": "PIB Región del Biobío",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "araucania",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::araucania::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.09.0.T",
+      "title_serie_default": "PIB Región de La Araucanía",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "los_rios",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::los_rios::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.14.0.T",
+      "title_serie_default": "PIB Región de los Ríos",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "lagos",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::lagos::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.10.0.T",
+      "title_serie_default": "PIB Región de Los Lagos",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "los_lagos",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::los_lagos::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.10.0.T",
+      "title_serie_default": "PIB Región de Los Lagos",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "aysen",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::aysen::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.11.0.T",
+      "title_serie_default": "PIB Región de Aysén del General Carlos Ibáñez del Campo",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "magallanes",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::magallanes::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.12.0.T",
+      "title_serie_default": "PIB Región de Magallanes y de la Antártica Chilena",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "arica",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::q::yoy::specific::none::latest::none::none::arica::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.15.0.T",
+      "title_serie_default": "PIB Región de Arica y Parinacota",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "tarapaca",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::q::yoy::specific::none::latest::none::none::tarapaca::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.01.0.T",
+      "title_serie_default": "PIB Región de Tarapacá",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "antofagasta",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::q::yoy::specific::none::latest::none::none::antofagasta::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.02.0.T",
+      "title_serie_default": "PIB Región de Antofagasta",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "atacama",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::q::yoy::specific::none::latest::none::none::atacama::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.03.0.T",
+      "title_serie_default": "PIB Región de Atacama",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "coquimbo",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::q::yoy::specific::none::latest::none::none::coquimbo::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.04.0.T",
+      "title_serie_default": "PIB Región de Coquimbo",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "valparaiso",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::q::yoy::specific::none::latest::none::none::valparaiso::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.05.0.T",
+      "title_serie_default": "PIB Región de Valparaíso",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "metropolitana",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::q::yoy::specific::none::latest::none::none::metropolitana::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.13.0.T",
+      "title_serie_default": "PIB Región Metropolitana de Santiago",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "ohhiggins",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::q::yoy::specific::none::latest::none::none::ohhiggins::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.06.0.T",
+      "title_serie_default": "PIB Región del Libertador General Bernardo OHiggins",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "maule",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::q::yoy::specific::none::latest::none::none::maule::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.07.0.T",
+      "title_serie_default": "PIB Región del Maule",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "nuble",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::q::yoy::specific::none::latest::none::none::nuble::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.16.0.T",
+      "title_serie_default": "PIB Región de Ñuble",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "bio_bio",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::q::yoy::specific::none::latest::none::none::bio_bio::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.08.0.T",
+      "title_serie_default": "PIB Región del Biobío",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "araucania",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::q::yoy::specific::none::latest::none::none::araucania::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.09.0.T",
+      "title_serie_default": "PIB Región de La Araucanía",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "rios",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::rios::none::pib::nsa::none::co::2018",
+              
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.14.0.T",
+      "title_serie_default": "PIB Región de los Ríos",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "lagos",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::q::yoy::specific::none::latest::none::none::lagos::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.10.0.T",
+      "title_serie_default": "PIB Región de Los Lagos",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "aysen",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::q::yoy::specific::none::latest::none::none::aysen::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.11.0.T",
+      "title_serie_default": "PIB Región de Aysén del General Carlos Ibáñez del Campo",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "magallanes",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::q::yoy::specific::none::latest::none::none::magallanes::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.12.0.T",
+      "title_serie_default": "PIB Región de Magallanes y de la Antártica Chilena",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "general",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::general::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::q::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_default",
+      "serie_default": "F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
+      "title_serie_default": "PIB a precios corrientes",
+      "series": {
+        "serie_1": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+          "title": "PIB volumen a precios del año anterior encadenado"
+        },
+        "serie_2": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.1.T",
+          "title": "PIB volumen a precios del año anterior encadenado (desestacionalizado)"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2/CCNN2018_P0_V(2)"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "rios",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::q::yoy::specific::none::latest::none::none::rios::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_XV_ACT_T/637801733265508830"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "arica",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::q::yoy::specific::none::latest::none::none::arica::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_I_ACT_T/637801733964475298"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "tarapaca",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::q::yoy::specific::none::latest::none::none::tarapaca::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_II_ACT_T/637801735531183626"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "antofagasta",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::q::yoy::specific::none::latest::none::none::antofagasta::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_III_ACT_T/637801736193316285"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "atacama",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::q::yoy::specific::none::latest::none::none::atacama::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_IV_ACT_T/637801736745283219"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "coquimbo",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::q::yoy::specific::none::latest::none::none::coquimbo::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_V_ACT_T/637801737440186066"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "valparaiso",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::q::yoy::specific::none::latest::none::none::valparaiso::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_XIII_ACT_T/637801738240186152"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "metropolitana",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::q::yoy::specific::none::latest::none::none::metropolitana::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_VI_ACT_T/637801739124793224"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "ohhiggins",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::q::yoy::specific::none::latest::none::none::ohhiggins::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_VII_ACT_T/637801739948134898"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "maule",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::q::yoy::specific::none::latest::none::none::maule::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_XVI_ACT_T/637811453163256950"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "nuble",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::q::yoy::specific::none::latest::none::none::nuble::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_VIII_ACT_T/637801740741875412"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "bio_bio",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::q::yoy::specific::none::latest::none::none::bio_bio::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_IX_ACT_T/637801741549457946"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "araucania",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::q::yoy::specific::none::latest::none::none::araucania::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_XIV_ACT_T/637801742211285376"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "lagos",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::q::yoy::specific::none::latest::none::none::lagos::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_XI_ACT_T/637801744732037380"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "aysen",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::q::yoy::specific::none::latest::none::none::aysen::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_XII_ACT_T/637801745965731834"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "mineria",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::q::yoy::none::none::latest::mineria::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_contribution",
+      "serie_default": "F032.IMC.IND.Z.Z.EP18.03.Z.0.M",
+      "title_serie_default": "PIB Minería",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN_EP18_05_ratio/637801088750197615"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "metropolitana",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::specific::none::latest::none::none::metropolitana::none::pib::nsa::none::co::2018",
+      "label": "pib_regional",
+      "serie_default": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.13.0.T",
+      "title_serie_default": "PIB Región Metropolitana de Santiago",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "minero",
+        "sub_activity_value": "none",
+        "region_value": "lagos",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::q::yoy::specific::none::latest::minero::none::lagos::none::pib::nsa::none::co::2018",
+      "label": "pib_general",
+      "serie_default": "F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
+      "title_serie_default": "PIB a precios corrientes",
+      "series": {
+        "serie_1": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+          "title": "PIB volumen a precios del año anterior encadenado"
+        },
+        "serie_2": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.1.T",
+          "title": "PIB volumen a precios del año anterior encadenado (desestacionalizado)"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2/CCNN2018_P0_V(2)"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "a",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::a::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_general",
+      "serie_default": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "title_serie_default": "PIB volumen a precios del año anterior encadenado",
+      "series": {
+        "serie_1": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+          "title": "PIB volumen a precios del año anterior encadenado"
+        },
+        "serie_2": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.1.T",
+          "title": "PIB volumen a precios del año anterior encadenado (desestacionalizado)"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2/CCNN2018_P0_V(2)"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "prev_period",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::prev_period::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_general",
+      "serie_default": "F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
+      "title_serie_default": "PIB a precios corrientes",
+      "series": {
+        "serie_1": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+          "title": "PIB volumen a precios del año anterior encadenado"
+        },
+        "serie_2": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.1.T",
+          "title": "PIB volumen a precios del año anterior encadenado (desestacionalizado)"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2/CCNN2018_P0_V(2)"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "range",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::none::range::none::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_general",
+      "serie_default": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "title_serie_default": "PIB volumen a precios del año anterior encadenado",
+      "series": {
+        "serie_1": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+          "title": "PIB volumen a precios del año anterior encadenado"
+        },
+        "serie_2": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.1.T",
+          "title": "PIB volumen a precios del año anterior encadenado (desestacionalizado)"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2/CCNN2018_P0_V(2)"
+      },
+      "latest_update": "none"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "q",
+        "calc_mode_cls": "contribution",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::q::contribution::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_contribution",
+      "serie_default": "F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
+      "title_serie_default": "PIB a precios corrientes",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2/CCNN2018_P0_V(2)"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "a",
+        "calc_mode_cls": "contribution",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::a::contribution::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_contribution",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN_EP18_05_ratio/637801088750197615"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "q",
+        "calc_mode_cls": "contribution",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "mineria",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::q::contribution::none::none::latest::mineria::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_contribution",
+      "serie_default": "F032.PIB.V12.R.Z.2018.03.Z.0.T",
+      "title_serie_default": "Minería",
+      "series": {
+        "serie_1": {
+          "id": "F032.PIB.V12.R.Z.2018.01.Z.0.T",
+          "title": "Agropecuario-silvícola"
+        },
+        "serie_2": {
+          "id": "F032.PIB.V12.R.Z.2018.02.04.0.T",
+          "title": "Pesca"
+        },
+        "serie_3": {
+          "id": "F032.PIB.V12.R.Z.2018.03.Z.0.T",
+          "title": "Minería"
+        },
+        "serie_4": {
+          "id": "F032.PIB.V12.R.Z.2018.03.05.0.T",
+          "title": "Minería del cobre"
+        },
+        "serie_5": {
+          "id": "F032.PIB.V12.R.Z.2018.03.06.0.T",
+          "title": "Otras actividades mineras"
+        },
+        "serie_6": {
+          "id": "F032.PIB.V12.R.Z.2018.04.Z.0.T",
+          "title": "Industria Manufacturera"
+        },
+        "serie_7": {
+          "id": "F032.PIB.V12.R.Z.2018.04.28.0.T",
+          "title": "Alimentos"
+        },
+        "serie_8": {
+          "id": "F032.PIB.V12.R.Z.2018.04.29.0.T",
+          "title": "Bebidas y tabaco"
+        },
+        "serie_9": {
+          "id": "F032.PIB.V12.R.Z.2018.04.08.0.T",
+          "title": "Textil, prendas de vestir, cuero y calzado"
+        },
+        "serie_10": {
+          "id": "F032.PIB.V12.R.Z.2018.04.09.0.T",
+          "title": "Maderas y muebles"
+        },
+        "serie_11": {
+          "id": "F032.PIB.V12.R.Z.2018.04.10.0.T",
+          "title": "Celulosa, papel e imprentas"
+        },
+        "serie_12": {
+          "id": "F032.PIB.V12.R.Z.EP18.04.11.0.T",
+          "title": "Química, petróleo, caucho y plástico"
+        },
+        "serie_13": {
+          "id": "F032.PIB.V12.R.Z.2018.04.12.0.T",
+          "title": "Minerales no metálicos y metálica básica"
+        },
+        "serie_14": {
+          "id": "F032.PIB.V12.R.Z.2018.04.14.0.T",
+          "title": "Productos metálicos, maquinaria, equipos y otros"
+        },
+        "serie_15": {
+          "id": "F032.PIB.V12.R.Z.2018.05.Z.0.T",
+          "title": "Electricidad, gas, agua y gestión de desechos"
+        },
+        "serie_16": {
+          "id": "F032.PIB.V12.R.Z.2018.06.Z.0.T",
+          "title": "Construcción"
+        },
+        "serie_17": {
+          "id": "F032.PIB.V12.R.Z.2018.07.32.0.T",
+          "title": "Comercio"
+        },
+        "serie_18": {
+          "id": "F032.PIB.V12.R.Z.2018.07.33.0.T",
+          "title": "Restaurantes y hoteles"
+        },
+        "serie_19": {
+          "id": "F032.PIB.V12.R.Z.2018.08.19.0.T",
+          "title": "Transporte"
+        },
+        "serie_20": {
+          "id": "F032.PIB.V12.R.Z.2018.08.20.0.T",
+          "title": "Comunicaciones y servicios de información"
+        },
+        "serie_21": {
+          "id": "F032.PIB.V12.R.Z.2018.09.34.0.T",
+          "title": "Servicios financieros"
+        },
+        "serie_22": {
+          "id": "F032.PIB.V12.R.Z.2018.09.35.0.T",
+          "title": "Servicios empresariales"
+        },
+        "serie_23": {
+          "id": "F032.PIB.V12.R.Z.2018.10.Z.0.T",
+          "title": "Servicios de vivienda e inmobiliarios"
+        },
+        "serie_24": {
+          "id": "F032.PIB.V12.R.Z.2018.11.Z.0.T",
+          "title": "Servicios personales"
+        },
+        "serie_25": {
+          "id": "F032.PIB.V12.R.Z.2018.12.Z.0.T",
+          "title": "Administración pública"
+        },
+        "serie_26": {
+          "id": "F032.PIB.V12.R.Z.2018.1415.Z.0.T",
+          "title": "Impuestos sobre los productos"
+        },
+        "serie_27": {
+          "id": "F032.PIB.V12.R.Z.2018.Z.Z.0.T",
+          "title": "PIB"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P2V/637801091782285000"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "q",
+        "calc_mode_cls": "contribution",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "minero",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::q::contribution::none::none::latest::minero::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_contribution",
+      "serie_default": "F032.PIB.RPA.N.Z.EP18.03.Z.0.A",
+      "title_serie_default": "PIB Minero",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN_EP18_05_ratio/637801088750197615"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "q",
+        "calc_mode_cls": "contribution",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "servicios_financieros_empresariales",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::q::contribution::none::none::latest::servicios_financieros_empresariales::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_contribution",
+      "serie_default": "F032.PIB.RPA.N.Z.EP18.09.21.0.A",
+      "title_serie_default": "PIB servicios financieros y empresariales",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN_EP18_05_ratio/637801088750197615"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "m",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::m::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_contribution",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_XV_ACT_T/637801733265508830"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "manufacturera",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::q::yoy::none::none::latest::manufacturera::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_contribution",
+      "serie_default": "F032.PIB.RPA.N.Z.EP18.04.Z.0.A",
+      "title_serie_default": "PIB Manufactura",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN_EP18_05_ratio/637801088750197615"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "agropecuario",
+        "sub_activity_value": "none",
+        "region_value": "lagos",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::q::yoy::specific::none::latest::agropecuario::none::lagos::none::pib::nsa::none::co::2018",
+      "label": "pib_contribution",
+      "serie_default": "F032.PIBRPA.N.Z.EP18.01.Z.0.A",
+      "title_serie_default": "PIB Agropecuario - silvícola",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN_EP18_05_ratio/637801088750197615"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "specific",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "pesca",
+        "sub_activity_value": "none",
+        "region_value": "lagos",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::q::yoy::specific::none::latest::pesca::none::lagos::none::pib::nsa::none::co::2018",
+      "label": "pib_contribution",
+      "serie_default": "F032.PIB.RPA.N.Z.EP.18.02.04.0A",
+      "title_serie_default": "PIB Pesca",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN_EP18_05_ratio/637801088750197615"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "specific",
+        "frequency": "a",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "transporte",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "specific::a::yoy::none::none::latest::transporte::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_contribution",
+      "serie_default": "F032.PIB.RPA.N.Z.EP18.08.19.0.A",
+      "title_serie_default": "PIB Transporte",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN_EP18_05_ratio/637801088750197615"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "general",
+        "frequency": "a",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "none",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "none",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "general::a::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "label": "pib_default",
+      "serie_default": "F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
+      "title_serie_default": "PIB a precios corrientes",
+      "series": {
+        "serie_1": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+          "title": "PIB volumen a precios del año anterior encadenado"
+        },
+        "serie_2": {
+          "id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.1.T",
+          "title": "PIB volumen a precios del año anterior encadenado (desestacionalizado)"
+        }
+      },
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2/CCNN2018_P0_V(2)"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "general",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "investment",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::general::latest::none::none::none::investment::pib::nsa::none::co::2018",
+      "label": "pib_gasto",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_G1/637801108004606163"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "general",
+        "req_form_cls": "point",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "demanda",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::general::point::none::none::none::demanda::pib::nsa::none::co::2018",
+      "label": "pib_gasto",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_G1/637801108004606163"
+      },
+      "latest_update": "none"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "general",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "demanda",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::general::latest::none::none::none::demanda::pib::nsa::none::co::2018",
+      "label": "pib_gasto",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_G1/637801108004606163"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "general",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "consumo",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::general::latest::none::none::none::consumo::pib::nsa::none::co::2018",
+      "label": "pib_gasto",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_G1/637801108004606163"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "general",
+        "req_form_cls": "range",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "consumo",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::general::range::none::none::none::consumo::pib::nsa::none::co::2018",
+      "label": "pib_gasto",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_G1/637801108004606163"
+      },
+      "latest_update": "none"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "general",
+        "req_form_cls": "point",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "investment",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::general::point::none::none::none::investment::pib::nsa::none::co::2018",
+      "label": "pib_gasto",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_G1/637801108004606163"
+      },
+      "latest_update": "none"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "specific",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "hogares",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::specific::latest::none::none::none::hogares::pib::nsa::none::co::2018",
+      "label": "pib_gasto",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_G1/637801108004606163"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "specific",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "gobierno",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::specific::latest::none::none::none::gobierno::pib::nsa::none::co::2018",
+      "label": "pib_gasto",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_G1/637801108004606163"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "specific",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "investment",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::specific::latest::none::none::none::investment::pib::nsa::none::co::2018",
+      "label": "pib_gasto",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_G1/637801108004606163"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "specific",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "exportacion_bienes_servicios",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::specific::latest::none::none::none::exportacion_bienes_servicios::pib::nsa::none::co::2018",
+      "label": "pib_gasto",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_G1/637801108004606163"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "specific",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "exportacion_mineria",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::specific::latest::none::none::none::exportacion_mineria::pib::nsa::none::co::2018",
+      "label": "pib_gasto",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_G1/637801108004606163"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "specific",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "consumo",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::specific::latest::none::none::none::consumo::pib::nsa::none::co::2018",
+      "label": "pib_gasto",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_G1/637801108004606163"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "specific",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "vivienda",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::specific::latest::none::none::none::vivienda::pib::nsa::none::co::2018",
+      "label": "pib_gasto",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_G1/637801108004606163"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "specific",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "minero",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::specific::latest::none::none::none::minero::pib::nsa::none::co::2018",
+      "label": "pib_gasto",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_G1/637801108004606163"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "specific",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "demanda_interna",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::specific::latest::none::none::none::demanda_interna::pib::nsa::none::co::2018",
+      "label": "pib_gasto",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_G1/637801108004606163"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "specific",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "comsuno_gobierno",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::specific::latest::none::none::none::comsuno_gobierno::pib::nsa::none::co::2018",
+      "label": "pib_gasto",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_G1/637801108004606163"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "specific",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "formacion_bruta_capital",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::specific::latest::none::none::none::formacion_bruta_capital::pib::nsa::none::co::2018",
+      "label": "pib_gasto",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_G1/637801108004606163"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "specific",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "formacion_bruta_capital_fijo",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::specific::latest::none::none::none::formacion_bruta_capital_fijo::pib::nsa::none::co::2018",
+      "label": "pib_gasto",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_G1/637801108004606163"
+      },
+      "latest_update": "2025-10-01"
+    },
+    {
+      "classification": {
+        "activity_cls": "none",
+        "frequency": "q",
+        "calc_mode_cls": "yoy",
+        "region_cls": "none",
+        "investment_cls": "specific",
+        "req_form_cls": "latest",
+        "indicator": "pib",
+        "seasonality": "nsa",
+        "activity_value": "none",
+        "sub_activity_value": "none",
+        "region_value": "none",
+        "investment_value": "variacion_existencias",
+        "gasto_value": "none",
+        "price": "co",
+        "history": "2018"
+      },
+      "key": "none::q::yoy::none::specific::latest::none::none::none::variacion_existencias::pib::nsa::none::co::2018",
+      "label": "pib_gasto",
+      "serie_default": "none",
+      "title_serie_default": "none",
+      "series": {},
+      "sources_url": {
+        "source_1": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_G1/637801108004606163"
+      },
+      "latest_update": "2025-10-01"
+    }
+  ],
+  "counts": {
+    "rows": 169,
+    "records": 169,
+    "unique_keys": 133,
+    "duplicate_records": 36,
+    "duplicate_keys": 36,
+    "duplicate_keys_unique": 16
+  },
+  "qa": {
+    "duplicate_keys_sample": [
+      "general::m::contribution::none::none::latest::none::none::none::none::imacec::nsa::none::co::2018",
+      "general::m::contribution::none::none::latest::none::none::none::none::imacec::sa::none::co::2018",
+      "none::q::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "none::q::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "none::q::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "none::q::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "none::q::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "general::q::yoy::specific::none::latest::none::none::rios::none::pib::nsa::none::co::2018",
+      "none::q::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "none::q::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "none::q::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "none::q::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "none::q::prev_period::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "none::q::prev_period::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "none::q::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "none::q::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "none::q::yoy::none::none::range::none::none::none::none::pib::nsa::none::co::2018",
+      "none::q::yoy::none::none::range::none::none::none::none::pib::nsa::none::co::2018",
+      "none::a::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "none::q::yoy::none::none::range::none::none::none::none::pib::nsa::none::co::2018"
+    ],
+    "duplicate_keys_unique_sample": [
+      "general::m::contribution::none::none::latest::none::none::none::none::imacec::nsa::none::co::2018",
+      "general::m::contribution::none::none::latest::none::none::none::none::imacec::sa::none::co::2018",
+      "none::q::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "general::q::yoy::specific::none::latest::none::none::rios::none::pib::nsa::none::co::2018",
+      "none::q::prev_period::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "none::q::yoy::none::none::range::none::none::none::none::pib::nsa::none::co::2018",
+      "none::a::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "general::q::contribution::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "none::q::yoy::general::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "specific::q::yoy::specific::none::latest::minero::none::lagos::none::pib::nsa::none::co::2018",
+      "specific::q::yoy::specific::none::latest::pesca::none::lagos::none::pib::nsa::none::co::2018",
+      "general::q::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018",
+      "none::q::yoy::none::general::latest::none::none::none::investment::pib::nsa::none::co::2018",
+      "none::q::yoy::none::general::latest::none::none::none::consumo::pib::nsa::none::co::2018",
+      "none::q::yoy::none::specific::latest::none::none::none::hogares::pib::nsa::none::co::2018",
+      "none::q::yoy::none::specific::latest::none::none::none::exportacion_bienes_servicios::pib::nsa::none::co::2018"
+    ],
+    "field_none_counts": {
+      "activity_cls": 49,
+      "frequency": 0,
+      "calc_mode_cls": 0,
+      "region_cls": 97,
+      "investment_cls": 114,
+      "req_form_cls": 0,
+      "indicator": 0,
+      "seasonality": 0,
+      "activity_value": 106,
+      "sub_activity_value": 133,
+      "region_value": 98,
+      "investment_value": 114,
+      "gasto_value": 133,
+      "price": 0,
+      "history": 0
+    }
+  }
+}

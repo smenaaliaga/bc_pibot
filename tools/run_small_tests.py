@@ -10,8 +10,7 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 TESTS: List[str] = [
-    "tests/test_data_flow_fetch.py::test_get_series_with_retry_records_error",
-    "tests/test_data_flow_fetch.py::test_fetch_series_for_year_uses_cod_serie",
+    "tests/test_followup_routing.py::test_followup_value_region_backfills_indicator_and_time_fields",
     "tests/test_prompt_registry.py::test_data_summary_prompt_is_parameterized",
 ]
 

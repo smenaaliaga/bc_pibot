@@ -53,6 +53,16 @@ Ayudas con consultas sobre indicadores económicos chilenos (IMACEC, PIB).
 
 
 def _first_entity_value(entity: Any) -> str:
+    if isinstance(entity, dict):
+        for key in ("standard_name", "normalized", "label", "value", "text_normalized"):
+            candidate = entity.get(key)
+            if isinstance(candidate, str) and candidate.strip():
+                return candidate
+            if isinstance(candidate, list):
+                for item in candidate:
+                    if isinstance(item, str) and item.strip():
+                        return item
+        return ""
     if isinstance(entity, list):
         for item in entity:
             if isinstance(item, str) and item.strip():
@@ -93,7 +103,7 @@ class LLMAdapter:
             try:
                 intent = intent_info.get("intent")
                 score = intent_info.get("score")
-                entities = intent_info.get("entities") or {}
+                entities = intent_info.get("normalized") or {}
                 spans = intent_info.get("spans") or []
                 system_content += f" Intento detectado: {intent} (confianza {score:.2f}). Entidades: {entities}. Spans: {spans}."
             except Exception:
@@ -123,7 +133,7 @@ class LLMAdapter:
                     meta_filter = {"topic": "seasonality"}
                 # Refine filter using detected entities (joint BIO model)
                 try:
-                    ent = intent_info.get("entities") if intent_info else {}
+                    ent = intent_info.get("normalized") if intent_info else {}
                 except Exception:
                     ent = {}
                 indicator = _first_entity_value(ent.get("indicator")).lower()

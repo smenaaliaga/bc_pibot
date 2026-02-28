@@ -9,8 +9,7 @@ follow-ups coherentes.
 	- `stream_data_flow_full`: orquesta todas las fases en streaming.
 	- `_get_series_with_retry`: envoltorio resiliente sobre `orchestrator.data.get_series.get_series_api_rest_bcch`.
 	- `_last_data_context`: cachea dominio, serie, frecuencia, datos crudos y errores para que otros
-		módulos (`intent_router`, follow-ups, toggles) reaccionen sin repetir llamadas a la API.
-- `method_router.py`: compatibilidad con el flujo legacy metodológico (permite togglear según flags).
+		módulos (follow-ups, toggles) reaccionen sin repetir llamadas a la API.
 
 ## Fases del pipeline
 | Paso | Descripción | Señales |

@@ -1,0 +1,664 @@
+﻿{
+  "series": [
+    {
+      "classification": {
+        "general": {
+          "indicator": "imacec",
+          "calc_mode": "original",
+          "seasonality": "nsa",
+          "about_activity": 1,
+          "about_region": 0,
+          "about_investment": 0
+        },
+        "specific": {
+          "activity": "none",
+          "region": "none",
+          "investment": "none"
+        }
+      },
+      "id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "title": "Imacec empalmado, serie original (índice 2018=100)",
+      "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_01_A&idSerie=F032.IMC.IND.Z.Z.EP18.Z.Z.0.M"
+    },
+    {
+      "classification": {
+        "general": {
+          "indicator": "imacec",
+          "calc_mode": "original",
+          "seasonality": "nsa",
+          "about_activity": 1,
+          "about_region": 0,
+          "about_investment": 0
+        },
+        "specific": {
+          "activity": "bienes",
+          "region": "none",
+          "investment": "none"
+        }
+      },
+      "id": "F032.IMC.IND.Z.Z.EP18.PB.Z.0.M",
+      "title": "Imacec producción de bienes, serie original (índice 2018=100)",
+      "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_01_A&idSerie=F032.IMC.IND.Z.Z.EP18.PB.Z.0.M"
+    },
+    {
+      "classification": {
+        "general": {
+          "indicator": "imacec",
+          "calc_mode": "original",
+          "seasonality": "nsa",
+          "about_activity": 1,
+          "about_region": 0,
+          "about_investment": 0
+        },
+        "specific": {
+          "activity": "mineria",
+          "region": "none",
+          "investment": "none"
+        }
+      },
+      "id": "F032.IMC.IND.Z.Z.EP18.03.Z.0.M",
+      "title": "Imacec minero, serie empalmada (Indice 2018=100)",
+      "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_01_A&idSerie=F032.IMC.IND.Z.Z.EP18.03.Z.0.M"
+    },
+    {
+      "classification": {
+        "general": {
+          "indicator": "imacec",
+          "calc_mode": "original",
+          "seasonality": "nsa",
+          "about_activity": 1,
+          "about_region": 0,
+          "about_investment": 0
+        },
+        "specific": {
+          "activity": "industria",
+          "region": "none",
+          "investment": "none"
+        }
+      },
+      "id": "F032.IMC.IND.Z.Z.EP18.04.Z.0.M",
+      "title": "Imacec industria, serie original (índice 2018=100)",
+      "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_01_A&idSerie=F032.IMC.IND.Z.Z.EP18.04.Z.0.M"
+    },
+    {
+      "classification": {
+        "general": {
+          "indicator": "imacec",
+          "calc_mode": "original",
+          "seasonality": "nsa",
+          "about_activity": 1,
+          "about_region": 0,
+          "about_investment": 0
+        },
+        "specific": {
+          "activity": "resto_bienes",
+          "region": "none",
+          "investment": "none"
+        }
+      },
+      "id": "F032.IMC.IND.Z.Z.EP18.RB.Z.0.M",
+      "title": "Imacec resto de bienes, serie original (índice 2018=100)",
+      "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_01_A&idSerie=F032.IMC.IND.Z.Z.EP18.RB.Z.0.M"
+    },
+    {
+      "classification": {
+        "general": {
+          "indicator": "imacec",
+          "calc_mode": "original",
+          "seasonality": "nsa",
+          "about_activity": 1,
+          "about_region": 0,
+          "about_investment": 0
+        },
+        "specific": {
+          "activity": "comercio",
+          "region": "none",
+          "investment": "none"
+        }
+      },
+      "id": "F032.IMC.IND.Z.Z.EP18.COM.Z.0.M",
+      "title": "Imacec comercio, serie original (índice 2018=100)",
+      "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_01_A&idSerie=F032.IMC.IND.Z.Z.EP18.COM.Z.0.M"
+    },
+    {
+      "classification": {
+        "general": {
+          "indicator": "imacec",
+          "calc_mode": "original",
+          "seasonality": "nsa",
+          "about_activity": 1,
+          "about_region": 0,
+          "about_investment": 0
+        },
+        "specific": {
+          "activity": "servicios",
+          "region": "none",
+          "investment": "none"
+        }
+      },
+      "id": "F032.IMC.IND.Z.Z.EP18.SERV.Z.0.M",
+      "title": "Imacec servicios, serie original (índice 2018=100)",
+      "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_01_A&idSerie=F032.IMC.IND.Z.Z.EP18.SERV.Z.0.M"
+    },
+    {
+      "classification": {
+        "general": {
+          "indicator": "imacec",
+          "calc_mode": "original",
+          "seasonality": "nsa",
+          "about_activity": 1,
+          "about_region": 0,
+          "about_investment": 0
+        },
+        "specific": {
+          "activity": "costo_factores",
+          "region": "none",
+          "investment": "none"
+        }
+      },
+      "id": "F032.ICF.IND.Z.Z.EP18.Z.Z.0.M",
+      "title": "Imacec a costo de factores, serie empalmada (índice 2018=100)",
+      "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_01_A&idSerie=F032.ICF.IND.Z.Z.EP18.Z.Z.0.M"
+    },
+    {
+      "classification": {
+        "general": {
+          "indicator": "imacec",
+          "calc_mode": "original",
+          "seasonality": "nsa",
+          "about_activity": 1,
+          "about_region": 0,
+          "about_investment": 0
+        },
+        "specific": {
+          "activity": "impuestos",
+          "region": "none",
+          "investment": "none"
+        }
+      },
+      "id": "F032.IMC.IND.Z.Z.EP18.IMP.Z.0.M",
+      "title": "Imacec impuestos sobre los productos, serie original (índice 2018=100)",
+      "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_01_A&idSerie=F032.IMC.IND.Z.Z.EP18.IMP.Z.0.M"
+    },
+    {
+      "classification": {
+        "general": {
+          "indicator": "imacec",
+          "calc_mode": "original",
+          "seasonality": "nsa",
+          "about_activity": 1,
+          "about_region": 0,
+          "about_investment": 0
+        },
+        "specific": {
+          "activity": "no_mineria",
+          "region": "none",
+          "investment": "none"
+        }
+      },
+      "id": "F032.IMC.IND.Z.Z.EP18.N03.Z.0.M",
+      "title": "Imacec no minero, serie empalmada (Indice 2018=100)",
+      "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_01_A&idSerie=F032.IMC.IND.Z.Z.EP18.N03.Z.0.M"
+    },
+    {
+      "classification": {
+        "general": {
+          "indicator": "imacec",
+          "calc_mode": "original",
+          "seasonality": "sa",
+          "about_activity": 0,
+          "about_region": 0,
+          "about_investment": 0
+        },
+        "specific": {
+          "activity": "none",
+          "region": "none",
+          "investment": "none"
+        }
+      },
+      "id": "F032.IMC.IND.Z.Z.EP18.Z.Z.1.M",
+      "title": "Imacec empalmado, desestacionalizado (índice 2018=100)",
+      "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_03_A&idSerie=F032.IMC.IND.Z.Z.EP18.Z.Z.1.M"
+    },
+    {
+      "classification": {
+        "general": {
+          "indicator": "imacec",
+          "calc_mode": "original",
+          "seasonality": "sa",
+          "about_activity": 1,
+          "about_region": 0,
+          "about_investment": 0
+        },
+        "specific": {
+          "activity": "bienes",
+          "region": "none",
+          "investment": "none"
+        }
+      },
+      "id": "F032.IMC.IND.Z.Z.EP18.PB.Z.1.M",
+      "title": "Imacec producción de bienes desestacionalizado, serie empalmada (Índice 2018=100)",
+      "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_03_A&idSerie=F032.IMC.IND.Z.Z.EP18.PB.Z.1.M"
+    },
+    {
+      "classification": {
+        "general": {
+          "indicator": "imacec",
+          "calc_mode": "original",
+          "seasonality": "sa",
+          "about_activity": 1,
+          "about_region": 0,
+          "about_investment": 0
+        },
+        "specific": {
+          "activity": "mineria",
+          "region": "none",
+          "investment": "none"
+        }
+      },
+      "id": "F032.IMC.IND.Z.Z.EP18.03.Z.1.M",
+      "title": "Imacec minero desestacionalizado, serie empalmada (Índice 2018=100)",
+      "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_03_A&idSerie=F032.IMC.IND.Z.Z.EP18.03.Z.1.M"
+    },
+    {
+      "classification": {
+        "general": {
+          "indicator": "imacec",
+          "calc_mode": "original",
+          "seasonality": "sa",
+          "about_activity": 1,
+          "about_region": 0,
+          "about_investment": 0
+        },
+        "specific": {
+          "activity": "industria",
+          "region": "none",
+          "investment": "none"
+        }
+      },
+      "id": "F032.IMC.IND.Z.Z.EP18.04.Z.1.M",
+      "title": "Imacec industria desestacionalizado, serie empalmada (Índice 2018=100)",
+      "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_03_A&idSerie=F032.IMC.IND.Z.Z.EP18.04.Z.1.M"
+    },
+    {
+      "classification": {
+        "general": {
+          "indicator": "imacec",
+          "calc_mode": "original",
+          "seasonality": "sa",
+          "about_activity": 1,
+          "about_region": 0,
+          "about_investment": 0
+        },
+        "specific": {
+          "activity": "resto_bienes",
+          "region": "none",
+          "investment": "none"
+        }
+      },
+      "id": "F032.IMC.IND.Z.Z.EP18.RB.Z.1.M",
+      "title": "Imacec resto de bienes desestacionalizado, serie empalmada (Índice 2018=100)",
+      "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_03_A&idSerie=F032.IMC.IND.Z.Z.EP18.RB.Z.1.M"
+    },
+    {
+      "classification": {
+        "general": {
+          "indicator": "imacec",
+          "calc_mode": "original",
+          "seasonality": "sa",
+          "about_activity": 1,
+          "about_region": 0,
+          "about_investment": 0
+        },
+        "specific": {
+          "activity": "comercio",
+          "region": "none",
+          "investment": "none"
+        }
+      },
+      "id": "F032.IMC.IND.Z.Z.EP18.COM.Z.1.M",
+      "title": "Imacec comercio desestacionalizado, serie empalmada (Índice 2018=100)",
+      "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_03_A&idSerie=F032.IMC.IND.Z.Z.EP18.COM.Z.1.M"
+    },
+    {
+      "classification": {
+        "general": {
+          "indicator": "imacec",
+          "calc_mode": "original",
+          "seasonality": "sa",
+          "about_activity": 1,
+          "about_region": 0,
+          "about_investment": 0
+        },
+        "specific": {
+          "activity": "servicios",
+          "region": "none",
+          "investment": "none"
+        }
+      },
+      "id": "F032.IMC.IND.Z.Z.EP18.SERV.Z.1.M",
+      "title": "Imacec servicios desestacionalizado, serie empalmada (Índice 2018=100)",
+      "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_03_A&idSerie=F032.IMC.IND.Z.Z.EP18.SERV.Z.1.M"
+    },
+    {
+      "classification": {
+        "general": {
+          "indicator": "imacec",
+          "calc_mode": "original",
+          "seasonality": "sa",
+          "about_activity": 1,
+          "about_region": 0,
+          "about_investment": 0
+        },
+        "specific": {
+          "activity": "costo_factores",
+          "region": "none",
+          "investment": "none"
+        }
+      },
+      "id": "F032.ICF.IND.Z.Z.EP18.Z.Z.1.M",
+      "title": "Imacec a costo de factores desestacionalizado, serie empalmada (Índice 2018=100)",
+      "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_03_A&idSerie=F032.ICF.IND.Z.Z.EP18.Z.Z.1.M"
+    },
+    {
+      "classification": {
+        "general": {
+          "indicator": "imacec",
+          "calc_mode": "original",
+          "seasonality": "sa",
+          "about_activity": 1,
+          "about_region": 0,
+          "about_investment": 0
+        },
+        "specific": {
+          "activity": "impuestos",
+          "region": "none",
+          "investment": "none"
+        }
+      },
+      "id": "F032.IMC.IND.Z.Z.EP18.IMP.Z.1.M",
+      "title": "Imacec impuestos sobre los productos, desestacionalizado, serie empalmada (Índice 2018=100)",
+      "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_03_A&idSerie=F032.IMC.IND.Z.Z.EP18.IMP.Z.1.M"
+    },
+    {
+      "classification": {
+        "general": {
+          "indicator": "imacec",
+          "calc_mode": "original",
+          "seasonality": "sa",
+          "about_activity": 1,
+          "about_region": 0,
+          "about_investment": 0
+        },
+        "specific": {
+          "activity": "no_mineria",
+          "region": "none",
+          "investment": "none"
+        }
+      },
+      "id": "F032.IMC.IND.Z.Z.EP18.N03.Z.1.M",
+      "title": "Imacec no minero desestacionalizado, serie empalmada (Índice 2018=100)",
+      "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_03_A&idSerie=F032.IMC.IND.Z.Z.EP18.N03.Z.1.M"
+    },
+    {
+      "classification": {
+        "general": {
+          "indicator": "pib",
+          "calc_mode": "original",
+          "seasonality": "nsa",
+          "about_activity": 1,
+          "about_region": 0,
+          "about_investment": 0
+        },
+        "specific": {
+          "activity": "pib",
+          "region": "none",
+          "investment": "none"
+        }
+      },
+      "id": "F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
+      "title": "PIB a precios corrientes; series empalmadas, referencia 2018; nominal; flujo; trimestral; miles de millones de pesos; BCCh",
+      "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_P0_V2&idSerie=F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T"
+    },
+    {
+      "classification": {
+        "general": {
+          "indicator": "pib",
+          "calc_mode": "original",
+          "seasonality": "nsa",
+          "about_activity": 1,
+          "about_region": 0,
+          "about_investment": 0
+        },
+        "specific": {
+          "activity": "mineria",
+          "region": "none",
+          "investment": "none"
+        }
+      },
+      "id": "F032.PIB.FLU.N.CLP.EP18.03.Z.0.T",
+      "title": "PIB Minería  a precios corrientes, series empalmadas, referencia 2018 (miles de millones de pesos)",
+      "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_P1&idSerie=F032.PIB.FLU.N.CLP.EP18.03.Z.0.T"
+    },
+    {
+      "classification": {
+        "general": {
+          "indicator": "pib",
+          "calc_mode": "original",
+          "seasonality": "sa",
+          "about_activity": 1,
+          "about_region": 0,
+          "about_investment": 0
+        },
+        "specific": {
+          "activity": "pib",
+          "region": "none",
+          "investment": "none"
+        }
+      },
+      "id": "F032.PIB.FLU.N.CLP.EP18.Z.Z.1.T",
+      "title": "Producto interno bruto a precios de mercado, desestacionalizado, referencia 2018  (miles de millones de pesos)",
+      "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_P1_DES&idSerie=F032.PIB.FLU.N.CLP.EP18.Z.Z.1.T"
+    },
+    {
+      "classification": {
+        "general": {
+          "indicator": "pib",
+          "calc_mode": "original",
+          "seasonality": "sa",
+          "about_activity": 1,
+          "about_region": 0,
+          "about_investment": 0
+        },
+        "specific": {
+          "activity": "mineria",
+          "region": "none",
+          "investment": "none"
+        }
+      },
+      "id": "F032.PIB.FLU.N.CLP.EP18.03.Z.1.T",
+      "title": "PIB Minería  a precios corrientes, series empalmadas, desestacionalizado, referencia 2018 (miles de millones de pesos)",
+      "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_P1_DES&idSerie=F032.PIB.FLU.N.CLP.EP18.03.Z.1.T"
+    },
+    {
+      "classification": {
+        "general": {
+          "indicator": "imacec",
+          "calc_mode": "original",
+          "seasonality": "nsa",
+          "about_activity": 0,
+          "about_region": 0,
+          "about_investment": 0
+        },
+        "specific": {
+          "activity": "none",
+          "region": "none",
+          "investment": "none"
+        }
+      },
+      "id": "F032.IMC.V12.Z.Z.2018.Z.Z.0.M",
+      "title": "Imacec, contribución año/año, referencia 2018",
+      "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_02_B&idSerie=F032.IMC.V12.Z.Z.2018.Z.Z.0.M"
+    },
+    {
+      "classification": {
+        "general": {
+          "indicator": "imacec",
+          "calc_mode": "original",
+          "seasonality": "nsa",
+          "about_activity": 1,
+          "about_region": 0,
+          "about_investment": 0
+        },
+        "specific": {
+          "activity": "bienes",
+          "region": "none",
+          "investment": "none"
+        }
+      },
+      "id": "F032.IMC.V12.Z.Z.2018.PB.Z.0.M",
+      "title": "Imacec producción de bienes, contribución año/año, referencia 2018",
+      "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_02_B&idSerie=F032.IMC.V12.Z.Z.2018.PB.Z.0.M"
+    },
+    {
+      "classification": {
+        "general": {
+          "indicator": "imacec",
+          "calc_mode": "original",
+          "seasonality": "nsa",
+          "about_activity": 1,
+          "about_region": 0,
+          "about_investment": 0
+        },
+        "specific": {
+          "activity": "industria",
+          "region": "none",
+          "investment": "none"
+        }
+      },
+      "id": "F032.IMC.V12.Z.Z.2018.04.Z.0.M",
+      "title": "Imacec industria, contribución año/año, referencia 2018",
+      "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_02_B&idSerie=F032.IMC.V12.Z.Z.2018.04.Z.0.M"
+    },
+    {
+      "classification": {
+        "general": {
+          "indicator": "imacec",
+          "calc_mode": "original",
+          "seasonality": "nsa",
+          "about_activity": 1,
+          "about_region": 0,
+          "about_investment": 0
+        },
+        "specific": {
+          "activity": "resto_bienes",
+          "region": "none",
+          "investment": "none"
+        }
+      },
+      "id": "F032.IMC.V12.Z.Z.2018.RB.Z.0.M",
+      "title": "Imacec resto de bienes, contribución año/año, referencia 2018",
+      "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_02_B&idSerie=F032.IMC.V12.Z.Z.2018.RB.Z.0.M"
+    },
+    {
+      "classification": {
+        "general": {
+          "indicator": "imacec",
+          "calc_mode": "original",
+          "seasonality": "nsa",
+          "about_activity": 1,
+          "about_region": 0,
+          "about_investment": 0
+        },
+        "specific": {
+          "activity": "comercio",
+          "region": "none",
+          "investment": "none"
+        }
+      },
+      "id": "F032.IMC.V12.Z.Z.2018.COM.Z.0.M",
+      "title": "Imacec comercio, contribución año/año, referencia 2018",
+      "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_02_B&idSerie=F032.IMC.V12.Z.Z.2018.COM.Z.0.M"
+    },
+    {
+      "classification": {
+        "general": {
+          "indicator": "imacec",
+          "calc_mode": "original",
+          "seasonality": "nsa",
+          "about_activity": 1,
+          "about_region": 0,
+          "about_investment": 0
+        },
+        "specific": {
+          "activity": "servicios",
+          "region": "none",
+          "investment": "none"
+        }
+      },
+      "id": "F032.IMC.V12.Z.Z.2018.SERV.Z.0.M",
+      "title": "Imacec servicios, contribución año/año, referencia 2018",
+      "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_02_B&idSerie=F032.IMC.V12.Z.Z.2018.SERV.Z.0.M"
+    },
+    {
+      "classification": {
+        "general": {
+          "indicator": "imacec",
+          "calc_mode": "original",
+          "seasonality": "nsa",
+          "about_activity": 1,
+          "about_region": 0,
+          "about_investment": 0
+        },
+        "specific": {
+          "activity": "impuestos",
+          "region": "none",
+          "investment": "none"
+        }
+      },
+      "id": "F032.IMC.V12.Z.Z.2018.IMP.Z.0.M",
+      "title": "Imacec impuestos sobre los productos, contribución año/año, referencia 2018",
+      "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_02_B&idSerie=F032.IMC.V12.Z.Z.2018.IMP.Z.0.M"
+    },
+    {
+      "classification": {
+        "general": {
+          "indicator": "imacec",
+          "calc_mode": "original",
+          "seasonality": "nsa",
+          "about_activity": 1,
+          "about_region": 0,
+          "about_investment": 0
+        },
+        "specific": {
+          "activity": "mineria",
+          "region": "none",
+          "investment": "none"
+        }
+      },
+      "id": "F032.IMC.V12.Z.Z.2018.03.Z.0.M",
+      "title": "Imacec minero, contribución año/año, referencia 2018",
+      "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_02_B&idSerie=F032.IMC.V12.Z.Z.2018.03.Z.0.M"
+    },
+    {
+      "classification": {
+        "general": {
+          "indicator": "imacec",
+          "calc_mode": "original",
+          "seasonality": "nsa",
+          "about_activity": 1,
+          "about_region": 0,
+          "about_investment": 0
+        },
+        "specific": {
+          "activity": "no_mineria",
+          "region": "none",
+          "investment": "none"
+        }
+      },
+      "id": "F032.IMC.V12.Z.Z.2018.N03.Z.0.M",
+      "title": "Imacec no minero, contribución año/año, referencia 2018",
+      "source_url": "https://si3.bcentral.cl/siete/login.aspx?idMenutree=MN_CCNN76&idCuadro=CCNN2018_IMACEC_02_B&idSerie=F032.IMC.V12.Z.Z.2018.N03.Z.0.M"
+    }
+  ]
+}

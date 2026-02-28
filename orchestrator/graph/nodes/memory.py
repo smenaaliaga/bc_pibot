@@ -44,7 +44,13 @@ def make_memory_node(memory_adapter: Any, intent_store) -> Any:
 
 
 def _append_followups(output: str, state: AgentState, intent_store) -> str:
+    if "##FOLLOWUP_START" in output:
+        return output
     suggested_questions = generate_suggested_questions(state, intent_store)
+    if "##FOLLOWUP_START" in output:
+        # Do not append a second followup block, but ensure suggestions/state
+        # have been updated by generate_suggested_questions above.
+        return output
     if not suggested_questions:
         suggested_questions = [
             "¿Quieres que busque los datos más recientes?",

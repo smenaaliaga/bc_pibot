@@ -7,15 +7,18 @@ import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
-from orchestrator.classifier.entity_normalizer import normalize_entities
 from orchestrator.utils.http_client import post_json
-from config import PREDICT_URL, INTENT_CLASSIFIER_URL
+from config import PREDICT_URL
 from registry import get_intent_router, get_series_interpreter
 
 logger = logging.getLogger(__name__)
 
 # Timeouts
 PREDICT_TIMEOUT_SECONDS = float(os.getenv("PREDICT_TIMEOUT_SECONDS", "10"))
+
+
+def _use_local_jointbert() -> bool:
+    return os.getenv("USE_JOINTBERT_CLASSIFIER", "false").lower() in {"1", "true", "yes", "on"}
 
 
 # ============================================================
@@ -79,7 +82,7 @@ def predict_with_router(query: str) -> Any:
     """
     router = load_intent_router()
     if router is None:
-        logger.warning("IntentRouter unavailable; returning None")
+        logger.debug("IntentRouter unavailable; returning None")
         return None
     return router.predict(query)
 
@@ -96,7 +99,7 @@ def predict_with_interpreter(query: str) -> Any:
     """
     interpreter = load_series_interpreter()
     if interpreter is None:
-        logger.warning("SeriesInterpreter unavailable; returning None")
+        logger.debug("SeriesInterpreter unavailable; returning None")
         return None
     return interpreter.predict(query)
 
@@ -130,90 +133,114 @@ def _build_history_text(history: Optional[List[Dict[str, str]]]) -> str:
         return ""
 
 
-def _flatten_api_entities(entities: Any) -> Dict[str, str]:
-    if not entities or not isinstance(entities, dict):
-        return {}
-    flattened: Dict[str, str] = {}
-    for key, value in entities.items():
-        if isinstance(value, list):
-            first = next((v for v in value if isinstance(v, str) and v.strip()), None)
-            if first:
-                flattened[str(key)] = first
-        elif isinstance(value, str) and value.strip():
-            flattened[str(key)] = value
-    return flattened
-
-
-def _get_first_entity_value(entities: Any, key: str) -> str:
-    if not entities or not isinstance(entities, dict):
-        return ""
-    value = entities.get(key)
+def _extract_normalized_scalar(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        cleaned = value.strip()
+        return cleaned or None
     if isinstance(value, list):
         for item in value:
             if isinstance(item, str) and item.strip():
-                return item
-        return ""
-    if isinstance(value, str):
-        return value
-    return ""
+                return item.strip()
+        return None
+    if isinstance(value, dict):
+        for key in ("standard_name", "normalized", "label", "value", "text_normalized"):
+            candidate = value.get(key)
+            if isinstance(candidate, str) and candidate.strip():
+                return candidate.strip()
+            if isinstance(candidate, list):
+                for item in candidate:
+                    if isinstance(item, str) and item.strip():
+                        return item.strip()
+    return None
+
+
+def _extract_label(value: Any) -> Any:
+    if isinstance(value, dict):
+        return value.get("label")
+    return value
+
+
+def _extract_confidence(value: Any) -> Optional[float]:
+    if isinstance(value, dict):
+        confidence = value.get("confidence")
+        return confidence if isinstance(confidence, (int, float)) else None
+    return value if isinstance(value, (int, float)) else None
+
+
+def _coalesce_defined(primary: Any, fallback: Any) -> Any:
+    if primary is None:
+        return fallback
+    if isinstance(primary, str) and not primary.strip():
+        return fallback
+    return primary
+
+
+def _intent_label_from_interpretation(predict_source: Dict[str, Any], key: str) -> Any:
+    intents = predict_source.get("intents") if isinstance(predict_source, dict) else {}
+    intents = intents if isinstance(intents, dict) else {}
+    payload = intents.get(key)
+    return _extract_label(payload)
 
 
 def _classify_with_jointbert(question: str) -> ClassificationResult:
     """
-    Clasificación usando APIs remotas.
+    Clasificación usando APIs remotas (o modelo local si está habilitado).
+    Clasificación usando APIs remotas (o modelo local si está habilitado).
     """
+    if _use_local_jointbert():
+        logger.warning("USE_JOINTBERT_CLASSIFIER enabled but local classifier is unavailable; using API flow")
+
     predict_payload = {"text": question}
     predict_result = post_json(PREDICT_URL, predict_payload, timeout=PREDICT_TIMEOUT_SECONDS)
     logger.debug("[PREDICT_API] response=%s", predict_result)
     predict_result_dict: Dict[str, Any] = predict_result if isinstance(predict_result, dict) else {}
     interpretation = predict_result_dict.get("interpretation")
+    predict_raw_for_state: Dict[str, Any] = dict(predict_result_dict) if isinstance(predict_result_dict, dict) else {}
     if isinstance(interpretation, dict):
-        predict_raw = interpretation
         predict_source = interpretation
+        if not isinstance(predict_raw_for_state.get("interpretation"), dict):
+            predict_raw_for_state["interpretation"] = interpretation
     else:
-        predict_raw = predict_result_dict if isinstance(predict_result, dict) else {"raw": predict_result}
         predict_source = predict_result_dict
+        fallback_interpretation = predict_source if isinstance(predict_source, dict) else {}
+        predict_raw_for_state = {
+            **predict_raw_for_state,
+            "interpretation": fallback_interpretation,
+        }
     predict_result = predict_result_dict
 
-    intent_payload = {"text": question}
-    intent_result = post_json(INTENT_CLASSIFIER_URL, intent_payload, timeout=PREDICT_TIMEOUT_SECONDS)
-    logger.debug("[INTENT_API] response=%s", intent_result)
-    intent_raw: Dict[str, Any] = intent_result if isinstance(intent_result, dict) else {"raw": intent_result}
-    if not isinstance(intent_result, dict):
-        intent_result = {}
-
     entities_api = predict_source.get("entities", {}) or {}
-    entities_flat = _flatten_api_entities(entities_api)
-    
-    # Aplicar normalización de entidades
-    normalized = normalize_entities(entities_flat)
+    normalized_api = predict_source.get("entities_normalized")
+    if not isinstance(normalized_api, dict):
+        normalized_api = predict_result_dict.get("entities_normalized")
+    normalized = normalized_api if isinstance(normalized_api, dict) else {}
+    routing_payload = predict_result_dict.get("routing")
+    if not isinstance(routing_payload, dict):
+        routing_payload = predict_source.get("routing")
+    routing_payload = routing_payload if isinstance(routing_payload, dict) else {}
+    routing_intent = routing_payload.get("intent") if isinstance(routing_payload.get("intent"), dict) else {}
+    routing_macro = routing_payload.get("macro") if isinstance(routing_payload.get("macro"), dict) else {}
+    routing_context = routing_payload.get("context") if isinstance(routing_payload.get("context"), dict) else {}
      
-    # Extraer intentención y entidades
-    intent = intent_result.get("intent")
+    # Extraer intención y entidades desde el payload unificado de PREDICT_URL
+    intent = _extract_label(routing_intent)
     entities = entities_api
-    macro = intent_result.get("macro")
-    context = intent_result.get("context")
-    confidence = intent_result.get("confidence")
-    
+    macro = _extract_label(routing_macro)
+    context = _extract_label(routing_context)
+    confidence = _extract_confidence(routing_intent)
+
     # Mostrar predicción completa
     logger.info("[CLASSIFIER_API] intent=%s confidence=%s macro=%s context=%s", intent, confidence, macro, context)
-    logger.info("[CLASSIFIER_API] Raw entities: %s", entities)
-    logger.info("[CLASSIFIER_API] Normalized entities: %s", normalized)
-    
-    # Usar entidades normalizadas si están disponibles, sino usar raw
-    indicator_norm = normalized.get('indicator', {})
-    
-    # Extraer indicador (priorizar normalizado)
-    if indicator_norm and indicator_norm.get('standard_name'):
-        indicator = indicator_norm['standard_name'].lower()
-    else:
-        indicator = _get_first_entity_value(entities, "indicator").lower()
+    logger.debug("[CLASSIFIER_API] Raw entities: %s", entities)
+    logger.debug("[CLASSIFIER_API] Normalized entities: %s", normalized)
     
     text = (
         interpretation.get("text")
         if isinstance(interpretation, dict)
         else None
-    ) or predict_result.get("text") or question
+    ) or predict_result_dict.get("text") or question
 
     return ClassificationResult(
         intent=intent,
@@ -223,15 +250,15 @@ def _classify_with_jointbert(question: str) -> ClassificationResult:
         text=text,
         words=predict_source.get("words") or [],
         slot_tags=predict_source.get("slot_tags") or predict_source.get("slots") or [],
-        calc_mode=predict_source.get("calc_mode"),
-        activity=predict_source.get("activity"),
-        region=predict_source.get("region"),
-        investment=predict_source.get("investment"),
-        req_form=predict_source.get("req_form"),
+        calc_mode=_intent_label_from_interpretation(predict_source, "calc_mode"),
+        activity=_intent_label_from_interpretation(predict_source, "activity"),
+        region=_intent_label_from_interpretation(predict_source, "region"),
+        investment=_intent_label_from_interpretation(predict_source, "investment"),
+        req_form=_intent_label_from_interpretation(predict_source, "req_form"),
         macro=macro,
         context=context,
-        intent_raw=intent_raw,
-        predict_raw=predict_raw,
+        intent_raw={"routing": routing_payload},
+        predict_raw=predict_raw_for_state,
     )
 
 def classify_question_with_history(
@@ -249,11 +276,9 @@ def classify_question_with_history(
         raise
     
     # Extraer indicador normalizado
-    indicator = None
+    indicator: Optional[str] = None
     if classification.normalized and isinstance(classification.normalized, dict):
-        indicator_data = classification.normalized.get('indicator', {})
-        if isinstance(indicator_data, dict):
-            indicator = indicator_data.get('standard_name') or indicator_data.get('normalized')
+        indicator = _extract_normalized_scalar(classification.normalized.get('indicator'))
     
     t_end = time.perf_counter()
     logger.info(
@@ -272,11 +297,69 @@ def classify_question_with_history(
         os.makedirs(logs_dir, exist_ok=True)
         fixed = os.getenv("RUN_MAIN_LOG", "").strip() or "run_main.log"
         path = os.path.join(logs_dir, fixed)
+        predict_raw = classification.predict_raw or {}
+        interpretation = predict_raw.get("interpretation") if isinstance(predict_raw.get("interpretation"), dict) else predict_raw
+        interpretation = interpretation if isinstance(interpretation, dict) else {}
+        interpretation_intents = interpretation.get("intents") or {}
+        entities_normalized = interpretation.get("entities_normalized") or {}
+        routing = predict_raw.get("routing") or {}
+
+        def _first_or_none(value: Any) -> Any:
+            if isinstance(value, list):
+                return next((item for item in value if item not in (None, "")), None)
+            return value
+
+        def _intent_label(key: str) -> Any:
+            intent_payload = interpretation_intents.get(key)
+            if isinstance(intent_payload, dict):
+                return intent_payload.get("label")
+            return intent_payload
+
+        mapped = {
+            "indicator": _first_or_none(entities_normalized.get("indicator"))
+            or _first_or_none((classification.normalized or {}).get("indicator")),
+            "seasonality": _first_or_none(entities_normalized.get("seasonality"))
+            or _first_or_none((classification.normalized or {}).get("seasonality")),
+            "frequency": _first_or_none(entities_normalized.get("frequency"))
+            or _first_or_none((classification.normalized or {}).get("frequency")),
+            "period": entities_normalized.get("period")
+            or (classification.normalized or {}).get("period"),
+            "calc_mode_cls": _intent_label("calc_mode"),
+            "activity_cls": _intent_label("activity"),
+            "region_cls": _intent_label("region"),
+            "investment_cls": _intent_label("investment"),
+            "req_form_cls": _intent_label("req_form"),
+            "macro_cls": (routing.get("macro") or {}).get("label"),
+            "intent_cls": (routing.get("intent") or {}).get("label"),
+            "context_cls": (routing.get("context") or {}).get("label"),
+        }
+        statuses = {
+            key: "PRESENT" if value not in (None, "", [], {}) else "MISSING"
+            for key, value in mapped.items()
+        }
         with open(path, "a", encoding="utf-8") as f:
             f.write(
                 "[CLASSIFIER_FILE] intent=%s confidence=%.3f indicator=%s\n"
                 % (classification.intent, classification.confidence or 0.0, indicator)
             )
+            f.write("[CLASSIFIER_FILE] PREDICT_RAW=%s\n" % (predict_raw,))
+            f.write("[CLASSIFIER_FILE] MAPPED_PARAMS=\n")
+            f.write("Key                                  | Status     | Value\n")
+            f.write("-------------------------------------+------------+--------------------------\n")
+            for key in sorted(mapped.keys()):
+                status = statuses.get(key, "MISSING")
+                raw_value = mapped.get(key)
+                value = "(empty)" if raw_value in (None, "", [], {}) else str(raw_value)
+                f.write(f"{key:<37} | {status:<10} | {value}\n")
+            f.write("[CLASSIFIER_FILE] PREDICT_RAW=%s\n" % (predict_raw,))
+            f.write("[CLASSIFIER_FILE] MAPPED_PARAMS=\n")
+            f.write("Key                                  | Status     | Value\n")
+            f.write("-------------------------------------+------------+--------------------------\n")
+            for key in sorted(mapped.keys()):
+                status = statuses.get(key, "MISSING")
+                raw_value = mapped.get(key)
+                value = "(empty)" if raw_value in (None, "", [], {}) else str(raw_value)
+                f.write(f"{key:<37} | {status:<10} | {value}\n")
     except Exception:
         pass
     history_text = _build_history_text(history)
@@ -289,11 +372,9 @@ def build_intent_info(cls: Optional[ClassificationResult]) -> Optional[Dict[str,
         return None
     try:
         # Extraer indicador desde normalized
-        indicator = None
+        indicator: Optional[str] = None
         if cls.normalized and isinstance(cls.normalized, dict):
-            indicator_data = cls.normalized.get('indicator', {})
-            if isinstance(indicator_data, dict):
-                indicator = indicator_data.get('standard_name') or indicator_data.get('normalized')
+            indicator = _extract_normalized_scalar(cls.normalized.get('indicator'))
         
         return {
             "intent": cls.intent or "unknown",

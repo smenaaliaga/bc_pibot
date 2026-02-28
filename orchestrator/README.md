@@ -43,10 +43,10 @@ flowchart LR
    desde `MemoryAdapter` y arma el `context` base.
 2. **classify** usa `orchestrator/prompts/query_classifier.py` y `classifier_agent.py` para obtener un
    `ClassificationResult` + `history_text` y genera `intent_info` estructurado.
-3. **intent** consulta el `IntentRouter` (macro/intent/context), rellena entidades con el historial y
-   propone un `route_decision` (`data`, `rag` o `fallback`).
-4. **router** valida la decisión (p. ej. follow-ups de gráficos) y fan-out hacia el nodo final.
-5. **data** dispara `data_router.stream_data_flow` → `data/data_flow.py`, que produce la fase
+3. **intent** evalúa macro/intent/context, rellena entidades con el historial y propone un
+   `route_decision` (`data`, `rag` o `fallback`).
+4. **router** valida la decisión y fan-out hacia el nodo final.
+5. **data** dispara `data/data_flow.py`, que produce la fase
    metodológica, tablas, markers de CSV/gráfico y follow-ups.
 6. **rag** alimenta `LLMAdapter` con el retriever creado por `rag/rag_factory.py` (PGVector/FAISS/Chroma).
 7. **fallback** usa el mismo adapter pero sin retriever, ideal para consultas out-of-domain.
@@ -59,7 +59,6 @@ flowchart LR
 | `graph/` | Define `AgentState`, nodos LangGraph y utilidades de streaming. |
 | `classifier/` | Clasificadores híbridos (`classifier_agent.py`, normalizadores, heurísticas). |
 | `catalog/` | Declaración de intents y helpers para expandir patrones JSON. |
-| `routes/` | Rutas deterministas (`intent_router.py`, `data_router.py`). |
 | `data/` | Flujo de series BCCh: prompts, fetch, tablas, markers, follow-ups. |
 | `prompts/` | Registro de prompts y el `query_classifier.py` (function calling). |
 | `llm/` | `LLMAdapter` y construcción del mensaje de sistema con guardrails. |

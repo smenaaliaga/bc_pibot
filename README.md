@@ -54,11 +54,12 @@ Este script comprueba:
 | --- | --- | --- |
 | `OPENAI_API_KEY`, `OPENAI_MODEL` | Modelo y clave usados por `LLMAdapter` | ✓ Sí |
 | `BCCH_USER`, `BCCH_PASS` | Credenciales para `get_series.py` | ✓ Sí |
-| `JOINT_BERT_MODEL_DIR` | Ruta al modelo JointBERT entrenado | No (default: `models/pibot_series_interpreter/pibot-jointbert`) |
-| `USE_AGENT_GRAPH=1` | Habilita el grafo LangGraph en `main.py` | No |
-| `PG_DSN`, `REQUIRE_PG_MEMORY` | Configuran memoria conversacional y checkpoints | No |
-| `REDIS_URL`, `USE_REDIS_CACHE` | Cache para consultas BCCh | No |
-| `RAG_ENABLED`, `RAG_BACKEND`, `RAG_PGVECTOR_URL` | Activa el retriever metodológico | No |
+| `PREDICT_URL` | Endpoint para clasificación `/predict` (check bc_pibot_models_api) | ✓ Sí |
+| `INTENT_CLASSIFIER_URL` | Endpoint para clasificación `/intent` (Docker expone intent-api en `http://localhost:8100`) | ✓ Sí |
+| `USE_AGENT_GRAPH=1` | Habilita el grafo LangGraph en `main.py` | ✓ Sí |
+| `PG_DSN`, `REQUIRE_PG_MEMORY` | Configuran memoria conversacional y checkpoints | ✓ Sí |
+| `REDIS_URL`, `USE_REDIS_CACHE` | Cache para consultas BCCh | ✓ Sí |
+| `RAG_ENABLED`, `RAG_BACKEND`, `RAG_PGVECTOR_URL` | Activa el retriever metodológico | ✓ Sí |
 
 ### Clonar modelo clasificador
 

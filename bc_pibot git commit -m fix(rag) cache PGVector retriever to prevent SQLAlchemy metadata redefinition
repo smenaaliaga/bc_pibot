@@ -1,0 +1,228 @@
+[33mcommit 545d08dce674f5bbba5a13d8f0e51a252c9fa0f4[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mfeature/refactor-datanode[m[33m, [m[1;31morigin/feature/refactor-datanode[m[33m)[m
+Author: Seba Mena <smenaaliaga@gmail.com>
+Date:   Sat Feb 28 14:12:16 2026 -0300
+
+    Refactor Data Node
+
+[33mcommit 7913f952b3549cde71d1a15d9b8208949bd0e7b0[m
+Author: Seba Mena <smenaaliaga@gmail.com>
+Date:   Wed Feb 25 01:17:03 2026 -0300
+
+    Refactor daata node
+
+[33mcommit 6a835f7d297d8d176fa1eeff6aed881763bd83de[m
+Author: belta1 <joseeefcof@gmail.com>
+Date:   Tue Feb 24 22:55:29 2026 -0300
+
+    Intent dummy api improvement for more natural tests. Included changes from feature/response, crucial for node data. Included the usage of entities_normalized and memory for specific cases. Improve READMEs.
+
+[33mcommit f86972f4f25c0b896a4f1a887ba7d0998bb95c64[m
+Author: belta1 <joseeefcof@gmail.com>
+Date:   Tue Feb 24 22:52:45 2026 -0300
+
+    Intent dummy api improvement for more natural tests. Included changes from feature/response, crucial for node data. Included the usage of entities_normalized and memory for specific cases. Improve READMEs.
+
+[33mcommit d8fcd81eccc0d50d3163491708ba0935f6764629[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mmain[m[33m)[m
+Merge: 7526363 ef85419
+Author: Sebastian <smenaaliaga@gmail.com>
+Date:   Mon Feb 23 16:46:43 2026 -0300
+
+    Merge pull request #9 from smenaaliaga/orchestrator_refactoring
+    
+    Orchestrator refactoring
+
+[33mcommit ef854197ecb91938176b63014fb77f61b1cc3e7e[m
+Author: belta1 <joseeefcof@gmail.com>
+Date:   Mon Feb 23 16:34:44 2026 -0300
+
+    Added usage of entites_normalized payload instead of entities. Included unitary test.
+
+[33mcommit 28ec7204592fe8d97b86380f97a4e348d9143ec0[m
+Author: belta1 <joseeefcof@gmail.com>
+Date:   Mon Feb 23 09:20:18 2026 -0300
+
+    Added suppot for memory entity retrieval. Added support for using it in RAG methological querying.
+
+[33mcommit 7526363e43a0f6676eb2c02adbb0ccfdc603daad[m
+Merge: 726edb5 d37e5a1
+Author: Sebastian <smenaaliaga@gmail.com>
+Date:   Fri Feb 20 18:56:02 2026 -0300
+
+    Merge pull request #8 from smenaaliaga/orchestrator_refactoring
+    
+    Orchestrator refactoring
+
+[33mcommit d37e5a101c3410a276599da98609116d95a209b0[m
+Author: belta1 <joseeefcof@gmail.com>
+Date:   Fri Feb 20 18:51:17 2026 -0300
+
+    Fixed suggestions.py for new intent response shape
+
+[33mcommit 068f39f25a9963b600ac8191fdb83361648bb069[m
+Author: belta1 <joseeefcof@gmail.com>
+Date:   Fri Feb 20 18:43:43 2026 -0300
+
+    Added missing type for dummy intent api response shape. Updated readme for dummy intent. Fixed normalization error from suggestions.py, given new shape from intent api.
+
+[33mcommit 726edb570e6133451e6eea46e0092b6cc08933e4[m
+Merge: 21c5c47 486af15
+Author: Sebastian <smenaaliaga@gmail.com>
+Date:   Fri Feb 20 18:32:00 2026 -0300
+
+    Merge pull request #7 from smenaaliaga/orchestrator_refactoring
+    
+    Orchestrator refactoring
+
+[33mcommit 486af158f9ad5c2aafd4d309208392b5eb94d819[m
+Author: belta1 <joseeefcof@gmail.com>
+Date:   Fri Feb 20 18:10:33 2026 -0300
+
+    Added support and unitary test for interpretation payload shape for jointbert api. Also, changed intent dummy api response shape for testing purposes.
+
+[33mcommit 8522efa35c24578414adb1eaca82e3b99e850f9f[m
+Author: belta1 <joseeefcof@gmail.com>
+Date:   Fri Feb 20 16:47:06 2026 -0300
+
+    Added unitary tests for in turn memory payloads retrieval and postgres memory payloads storage
+
+[33mcommit c02a4d4207999aab4104d1fc8638300c9ec741be[m
+Author: belta1 <joseeefcof@gmail.com>
+Date:   Fri Feb 20 16:20:08 2026 -0300
+
+    Recreated intent and jointbert payload storage in db and turn memory, in objects classfication.intent_raw and classification.predict_raw from AgentState.
+
+[33mcommit e7ce0617c2491739af442bd74e9440a5b98e3080[m
+Author: belta1 <joseeefcof@gmail.com>
+Date:   Fri Feb 20 09:55:52 2026 -0300
+
+    Fixed README port for dummy intent-classification api.
+
+[33mcommit 21c5c47dbdb1bad8c0d290a01f0085cd5d4b9077[m
+Merge: 592dd7e 1689575
+Author: Sebastian <smenaaliaga@gmail.com>
+Date:   Thu Feb 19 22:41:05 2026 -0300
+
+    Merge pull request #6 from smenaaliaga/orchestrator_refactoring
+    
+    Orchestrator refactoring
+
+[33mcommit 1689575ac797ed4efcdd46d8df8186a71668925f[m
+Author: belta1 <belta1@users.noreply.github.com>
+Date:   Thu Feb 19 18:42:56 2026 -0300
+
+    Added support for jointbert api. Added dummy intent_api docker for testing intent classification routing.
+
+[33mcommit a9518b42a5fa85946a139044880ec4b6e207f66c[m
+Author: belta1 <joseeefcof@gmail.com>
+Date:   Thu Feb 19 14:29:42 2026 -0300
+
+    Changes to orchestrator prior to model api merging. Orchestrator was modularized and new node was added.
+
+[33mcommit 70a88acdaa99412627de958b8e4cffda0891e150[m
+Author: belta1 <joseeefcof@gmail.com>
+Date:   Wed Feb 4 23:53:57 2026 -0300
+
+    Working version using jointbert and intent classifier. orchestrator agent_graph refactored to multiple modules.
+
+[33mcommit 592dd7efd565e05e58e73dd5f490587dfd0a5b3b[m
+Author: Seba Mena <smenaaliaga@gmail.com>
+Date:   Mon Jan 26 15:05:29 2026 -0300
+
+    contribution
+
+[33mcommit 4a1dcc472ed55d18a5bde3eb71da8acd39beffe1[m
+Author: Seba Mena <smenaaliaga@gmail.com>
+Date:   Wed Jan 14 10:59:10 2026 -0300
+
+    SentenceTransformer local
+
+[33mcommit 1f6dffb55fbcd0f09a0ac2a8fd4994df9dac478a[m
+Author: Seba Mena <smenaaliaga@gmail.com>
+Date:   Wed Jan 14 10:40:34 2026 -0300
+
+    update dependencies
+
+[33mcommit 17b98d7442ec320a44feb64b3f7756b3c5b499bf[m
+Merge: 7d57d17 8014bc0
+Author: Sebastian <smenaaliaga@gmail.com>
+Date:   Wed Jan 14 08:37:07 2026 -0300
+
+    Merge pull request #5 from smenaaliaga/feature/models
+    
+    stable
+
+[33mcommit 8014bc021c4c2c4b8de8231984523412af885fe5[m[33m ([m[1;31morigin/feature/models[m[33m, [m[1;32mfeature/models[m[33m)[m
+Author: Seba Mena <smenaaliaga@gmail.com>
+Date:   Wed Jan 14 08:36:13 2026 -0300
+
+    stable
+
+[33mcommit 7d57d17bcd13834133d89062215aa75f9a92283c[m[33m ([m[1;32mfeature/clf[m[33m)[m
+Merge: f5b6e35 dbac87f
+Author: Sebastian <smenaaliaga@gmail.com>
+Date:   Fri Jan 9 15:02:23 2026 -0300
+
+    Merge pull request #4 from smenaaliaga/feature/refactorcls
+    
+    Update README
+
+[33mcommit dbac87f1aecfc0029698c71129feeb6c6705d0a6[m[33m ([m[1;31morigin/feature/refactorcls[m[33m)[m
+Author: Seba Mena <smenaaliaga@gmail.com>
+Date:   Fri Jan 9 15:01:41 2026 -0300
+
+    Update README
+
+[33mcommit f5b6e356c1c70c758fe77adfb07e014101963b41[m
+Merge: 26dcb1a 434ee00
+Author: Sebastian <smenaaliaga@gmail.com>
+Date:   Thu Jan 8 16:56:56 2026 -0300
+
+    Merge pull request #3 from smenaaliaga/feature/refactorcls
+    
+    Feature/refactorcls
+
+[33mcommit 434ee008f5510d2cb0e7e500b64109c7faf3ae2f[m
+Author: Seba Mena <smenaaliaga@gmail.com>
+Date:   Thu Jan 8 16:54:40 2026 -0300
+
+    intent and slots labels
+
+[33mcommit fda1c269cc17867e05102f02c6f1a5c5c1002de5[m[33m ([m[1;32mfeature/refactorcls[m[33m)[m
+Author: Seba Mena <smenaaliaga@gmail.com>
+Date:   Thu Jan 8 08:48:00 2026 -0300
+
+    deactivate memory in flow data
+
+[33mcommit 8862b117c2f90fcd06646a9e6454fdc5a6d20aaf[m[33m ([m[1;32mfeature/jointbertv3[m[33m)[m
+Author: Seba Mena <smenaaliaga@gmail.com>
+Date:   Wed Jan 7 03:30:14 2026 -0300
+
+    latest changes
+
+[33mcommit ad7949d8828d4f10e860dce29e7d1e2b8434f63e[m
+Author: Seba Mena <smenaaliaga@gmail.com>
+Date:   Mon Dec 29 00:16:29 2025 -0300
+
+    Improve follow-up UI and link icons
+
+[33mcommit 1b2a6e2eb896d46eac3a59af347ea485f916eb4c[m
+Author: Seba Mena <smenaaliaga@gmail.com>
+Date:   Sun Dec 28 20:42:31 2025 -0300
+
+    refactor: LLM-generated responses for natural, varied output
+
+[33mcommit 011ccc7b65e6be9f3f35f5b7eaba76a442560153[m
+Author: Seba Mena <smenaaliaga@gmail.com>
+Date:   Sun Dec 28 19:48:35 2025 -0300
+
+    fix: use st.rerun instead of experimental_rerun
+
+[33mcommit 055636bd722b7fdb316ce6577fd516c6f90770df[m
+Author: Seba Mena <smenaaliaga@gmail.com>
+Date:   Sun Dec 28 17:36:30 2025 -0300
+
+    Persist intent and entities at classification time
+
+[33mcommit 58dbdda26a7c96763cccb0592ac046e46bd2a36e[m
+Author: Seba Mena <smenaaliaga@gmail.com>
+Date:
