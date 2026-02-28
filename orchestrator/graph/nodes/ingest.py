@@ -263,6 +263,9 @@ def make_intent_node(memory_adapter: Any, intent_store: Any = None, predict_with
         if macro_label is None:
             macro_label = intent_raw_macro_label
 
+        # TEMP: forzar contexto standalone tras clasificar; eliminar cuando se reactive routing por contexto.
+        context_label = "standalone"
+
         context_label = str(context_label or "").strip().lower()
         normalized_intent = _normalize_intent_label(intent_label)
 

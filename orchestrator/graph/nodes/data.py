@@ -213,6 +213,7 @@ def make_data_node(memory_adapter: Any):
                 "indicator": indicator_ent,
                 "calc_mode": calc_mode_cls if calc_mode_cls == "contribution" else "original",
                 "seasonality": seasonality_ent,
+                "frequency": frequency_ent,
                 "activity": activity_ent_resolved,
                 "region": region_ent,
                 "investment": investment_ent,
