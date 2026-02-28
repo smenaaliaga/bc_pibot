@@ -16,116 +16,17 @@ from ..state import (
     _merge_entity_fields,
 )
 from ..session import extract_latest_entity_from_history, load_previous_agent_state
+from ...normalizer.followup_rules import resolve_followup_route
+from ...normalizer.routing_utils import (
+    as_dict,
+    is_empty_value,
+    normalize_intent_label,
+    predict_payload_root,
+    routing_label,
+)
+from ...normalizer.standalone_rules import resolve_standalone_route
 
 logger = logging.getLogger(__name__)
-
-_PIB_ACTIVITY_HINTS = {
-    "agropecuario",
-    "pesca",
-    "industria",
-    "electricidad",
-    "construccion",
-    "construcción",
-    "restaurantes",
-    "transporte",
-    "comunicaciones",
-    "servicio_financieros",
-    "servicios_financieros",
-    "servicios_empresariales",
-    "servicio_viviendas",
-    "servicios_vivienda",
-    "servicio_personales",
-    "servicios_personales",
-    "admin_publica",
-    "administracion_publica",
-    "administración_pública",
-    "impuestos",
-}
-
-_IMACEC_ACTIVITY_HINTS = {
-    "bienes",
-    "mineria",
-    "minería",
-    "industria",
-    "resto_bienes",
-    "servicios",
-    "no_mineria",
-    "no_minería",
-}
-
-_PREVIOUS_ACTIVITY_HINTS = {
-    "comercio",
-    "impuesto",
-}
-
-
-def _as_dict(value: Any) -> Dict[str, Any]:
-    return value if isinstance(value, dict) else {}
-
-
-def _label(value: Any) -> Any:
-    if isinstance(value, dict):
-        return value.get("label")
-    return value
-
-
-def _routing_label(payload: Dict[str, Any], key: str) -> Any:
-    if not isinstance(payload, dict):
-        return None
-    direct = payload.get(key)
-    if not _is_empty_value(direct):
-        return _label(_as_dict(direct).get("label") if isinstance(direct, dict) else direct)
-    routing = _as_dict(payload.get("routing"))
-    nested = routing.get(key)
-    if _is_empty_value(nested):
-        return None
-    return _label(_as_dict(nested).get("label") if isinstance(nested, dict) else nested)
-
-
-def _is_empty_value(value: Any) -> bool:
-    if value in (None, "", "none", "None", "null", "NULL"):
-        return True
-    if isinstance(value, (list, tuple, set, dict)) and len(value) == 0:
-        return True
-    return False
-
-
-def _first_non_empty(value: Any) -> Any:
-    if isinstance(value, list):
-        for item in value:
-            if not _is_empty_value(item):
-                return item
-        return None
-    return None if _is_empty_value(value) else value
-
-
-def _normalize_intent_label(intent_label: Any) -> str:
-    raw = str(intent_label or "").strip().lower()
-    if raw == "methodology":
-        return "method"
-    return raw
-
-
-def _predict_payload_root(predict_raw: Any) -> Dict[str, Any]:
-    payload = _as_dict(predict_raw)
-    interpretation = payload.get("interpretation")
-    if isinstance(interpretation, dict):
-        return interpretation
-    return payload
-
-
-def _has_explicit_indicator(payload_root: Dict[str, Any]) -> bool:
-    if not isinstance(payload_root, dict):
-        return False
-    entities = _as_dict(payload_root.get("entities"))
-    if not _is_empty_value(entities.get("indicator")):
-        return True
-    slot_tags = payload_root.get("slot_tags")
-    if isinstance(slot_tags, list):
-        for tag in slot_tags:
-            if str(tag or "").strip().lower() == "b-indicator":
-                return True
-    return False
 
 
 def _extract_previous_turn_payload(
@@ -147,17 +48,11 @@ def _extract_previous_turn_payload(
         turn_id = getattr(rec, "turn_id", None)
         if current_turn_id is not None and isinstance(turn_id, int) and turn_id >= current_turn_id:
             continue
-        prev_intent_raw = _as_dict(getattr(rec, "intent_raw", None))
-        prev_predict_raw = _as_dict(getattr(rec, "predict_raw", None))
+        prev_intent_raw = as_dict(getattr(rec, "intent_raw", None))
+        prev_predict_raw = as_dict(getattr(rec, "predict_raw", None))
         if prev_intent_raw or prev_predict_raw:
             return prev_intent_raw, prev_predict_raw
     return {}, {}
-
-
-def _backfill_time_fields(current_norm: Dict[str, Any], prev_norm: Dict[str, Any]) -> None:
-    for key in ("period", "frequency", "seasonality"):
-        if _is_empty_value(current_norm.get(key)) and not _is_empty_value(prev_norm.get(key)):
-            current_norm[key] = prev_norm.get(key)
 
 
 def _build_intent_info_from_state(
@@ -241,8 +136,8 @@ def make_intent_node(memory_adapter: Any, intent_store: Any = None, predict_with
             intent_label = (getattr(classification, "intent", None) or "")
             context_label = (getattr(classification, "context", None) or "")
             macro_label = getattr(classification, "macro", None)
-            intent_raw = _as_dict(getattr(classification, "intent_raw", None))
-            predict_raw = _as_dict(getattr(classification, "predict_raw", None))
+            intent_raw = as_dict(getattr(classification, "intent_raw", None))
+            predict_raw = as_dict(getattr(classification, "predict_raw", None))
         elif callable(predict_with_router):
             results = predict_with_router(question)
             intent_label = (
@@ -259,116 +154,54 @@ def make_intent_node(memory_adapter: Any, intent_store: Any = None, predict_with
 
         if not intent_raw:
             current_intent_info = state.get("intent_info") if isinstance(state.get("intent_info"), dict) else {}
-            intent_raw = _as_dict(current_intent_info.get("intent_raw"))
+            intent_raw = as_dict(current_intent_info.get("intent_raw"))
         if not predict_raw:
             current_intent_info = state.get("intent_info") if isinstance(state.get("intent_info"), dict) else {}
-            predict_raw = _as_dict(current_intent_info.get("predict_raw"))
+            predict_raw = as_dict(current_intent_info.get("predict_raw"))
 
-        intent_raw_context_label = _routing_label(intent_raw, "context")
-        intent_raw_intent_label = _routing_label(intent_raw, "intent")
-        intent_raw_macro_label = _routing_label(intent_raw, "macro")
+        intent_raw_context_label = routing_label(intent_raw, "context")
+        intent_raw_intent_label = routing_label(intent_raw, "intent")
+        intent_raw_macro_label = routing_label(intent_raw, "macro")
 
-        if _is_empty_value(context_label):
+        if is_empty_value(context_label):
             context_label = intent_raw_context_label
-        if _is_empty_value(intent_label):
+        if is_empty_value(intent_label):
             intent_label = intent_raw_intent_label
         if macro_label is None:
             macro_label = intent_raw_macro_label
 
-        # TEMP: forzar contexto standalone tras clasificar; eliminar cuando se reactive routing por contexto.
-        context_label = "standalone"
-
         context_label = str(context_label or "").strip().lower()
-        normalized_intent = _normalize_intent_label(intent_label)
+        normalized_intent = normalize_intent_label(intent_label)
 
-        payload_root = _predict_payload_root(predict_raw)
-        current_intents = _as_dict(payload_root.get("intents"))
-        current_norm = _as_dict(payload_root.get("entities_normalized"))
+        payload_root = predict_payload_root(predict_raw)
+        current_intents = as_dict(payload_root.get("intents"))
+        current_norm = as_dict(payload_root.get("entities_normalized"))
 
         if context_label == "followup":
             prev_intent_raw, prev_predict_raw = _extract_previous_turn_payload(intent_store, session_id, current_turn_id)
-            prev_root = _predict_payload_root(prev_predict_raw)
-            prev_norm = _as_dict(prev_root.get("entities_normalized"))
-
-            is_first_turn = bool(current_turn_id in (None, 0, 1))
-            if is_first_turn or (not prev_intent_raw and not prev_predict_raw):
-                decision = "fallback"
-            else:
-                macro_from_api_is_zero = macro_label in (0, "0")
-                if macro_from_api_is_zero or normalized_intent in {"", "none", "other"}:
-                    prev_macro = _routing_label(prev_intent_raw, "macro")
-                    prev_intent = _routing_label(prev_intent_raw, "intent")
-                    if macro_from_api_is_zero and prev_macro is not None:
-                        macro_label = prev_macro
-                    if (macro_from_api_is_zero or normalized_intent in {"", "none", "other"}) and not _is_empty_value(prev_intent):
-                        normalized_intent = _normalize_intent_label(prev_intent)
-
-                indicator_missing = _is_empty_value(current_norm.get("indicator"))
-                prev_indicator = _first_non_empty(prev_norm.get("indicator"))
-                explicit_indicator = _has_explicit_indicator(payload_root)
-
-                if normalized_intent == "value":
-                    region_label = str(_label(current_intents.get("region")) or "").strip().lower()
-                    activity_label = str(_label(current_intents.get("activity")) or "").strip().lower()
-                    investment_label = str(_label(current_intents.get("investment")) or "").strip().lower()
-                    activity_value = str(_first_non_empty(current_norm.get("activity")) or "").strip().lower()
-
-                    applied_rule = False
-
-                    if region_label == "specific" and not _is_empty_value(current_norm.get("region")) and indicator_missing:
-                        if not _is_empty_value(prev_indicator):
-                            current_norm["indicator"] = prev_indicator
-                            applied_rule = True
-                    elif activity_label == "specific" and indicator_missing and activity_value in _PIB_ACTIVITY_HINTS:
-                        current_norm["indicator"] = "pib"
-                        applied_rule = True
-                    elif activity_label == "specific" and indicator_missing and activity_value in _IMACEC_ACTIVITY_HINTS:
-                        current_norm["indicator"] = "imacec"
-                        applied_rule = True
-                    elif activity_label == "specific" and indicator_missing and activity_value in _PREVIOUS_ACTIVITY_HINTS:
-                        if not _is_empty_value(prev_indicator):
-                            current_norm["indicator"] = prev_indicator
-                            applied_rule = True
-                    elif investment_label == "specific" and not _is_empty_value(current_norm.get("investment")) and indicator_missing:
-                        if not _is_empty_value(prev_indicator):
-                            current_norm["indicator"] = prev_indicator
-                            applied_rule = True
-
-                    if applied_rule:
-                        _backfill_time_fields(current_norm, prev_norm)
-                        decision = "data"
-                    else:
-                        decision = "fallback"
-
-                elif normalized_intent == "method":
-                    if not explicit_indicator:
-                        if _is_empty_value(prev_indicator):
-                            decision = "fallback"
-                        else:
-                            current_norm["indicator"] = prev_indicator
-                            decision = "rag"
-                    elif indicator_missing:
-                        if _is_empty_value(prev_indicator):
-                            decision = "fallback"
-                        else:
-                            current_norm["indicator"] = prev_indicator
-                            decision = "rag"
-                    else:
-                        decision = "rag"
-                else:
-                    decision = "fallback"
+            followup_result = resolve_followup_route(
+                normalized_intent=normalized_intent,
+                context_label=context_label,
+                macro_label=macro_label,
+                current_turn_id=current_turn_id,
+                payload_root=payload_root,
+                current_intents=current_intents,
+                current_norm=current_norm,
+                prev_intent_raw=prev_intent_raw,
+                prev_predict_raw=prev_predict_raw,
+            )
+            decision = str(followup_result["decision"])
+            normalized_intent = str(followup_result["normalized_intent"])
+            context_label = str(followup_result["context_label"])
+            macro_label = followup_result["macro_label"]
+            current_norm = as_dict(followup_result["current_norm"])
 
         else:
-            if macro_label in (0, "0", False):
-                decision = "fallback"
-            elif normalized_intent == "other" and context_label == "standalone":
-                decision = "fallback"
-            elif normalized_intent == "value":
-                decision = "data"
-            elif normalized_intent == "method":
-                decision = "rag"
-            else:
-                decision = "fallback"
+            decision = resolve_standalone_route(
+                normalized_intent=normalized_intent,
+                context_label=context_label,
+                macro_label=macro_label,
+            )
 
         if isinstance(payload_root, dict):
             payload_root["entities_normalized"] = current_norm
@@ -417,12 +250,12 @@ def make_intent_node(memory_adapter: Any, intent_store: Any = None, predict_with
             primary_entity.setdefault(key, None)
 
         indicator_value = current_norm.get("indicator")
-        if not _is_empty_value(indicator_value):
+        if not is_empty_value(indicator_value):
             primary_entity["indicator"] = indicator_value
             primary_entity["indicador"] = indicator_value
         for key in ("activity", "seasonality", "region", "period", "frequency"):
             value = current_norm.get(key)
-            if not _is_empty_value(value):
+            if not is_empty_value(value):
                 primary_entity[key] = value
 
         intent_info = _build_intent_info_from_state(

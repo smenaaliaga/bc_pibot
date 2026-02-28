@@ -69,6 +69,50 @@ def test_followup_first_turn_routes_fallback():
     assert result["route_decision"] == "fallback"
 
 
+def test_followup_first_turn_with_explicit_indicator_routes_data():
+    classification = _make_classification(
+        intent="value",
+        context="followup",
+        macro=1,
+        intent_raw={
+            "routing": {
+                "context": {"label": "followup"},
+                "intent": {"label": "value"},
+                "macro": {"label": 1},
+            }
+        },
+        predict_raw={
+            "interpretation": {
+                "slot_tags": ["O", "O", "O", "O", "B-indicator", "I-indicator", "O", "B-region"],
+                "entities": {"indicator": ["pib regional"], "region": ["valparaíso"]},
+                "entities_normalized": {
+                    "indicator": ["pib"],
+                    "seasonality": ["nsa"],
+                    "frequency": ["q"],
+                    "region": ["valparaiso"],
+                    "period": ["2025-10-01", "2025-12-31"],
+                },
+            }
+        },
+    )
+    node = make_intent_node(None, StubIntentStore([]))
+
+    result = node(
+        {
+            "question": "dame el valor del pib regional de valparaíso",
+            "session_id": "s1b",
+            "user_turn_id": 1,
+            "classification": classification,
+            "entities": [],
+        }
+    )
+
+    assert result["route_decision"] == "data"
+    assert result["intent"]["intent_cls"] == "value"
+    assert result["intent"]["context_cls"] == "standalone"
+    assert result["entities"][0]["indicator"] == ["pib"]
+
+
 def test_followup_recovers_macro_and_intent_from_previous_turn():
     prev_record = _build_prev_record(intent="method", macro=1, indicator="pib", turn_id=3)
     classification = _make_classification(
