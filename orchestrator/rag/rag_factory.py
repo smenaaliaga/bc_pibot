@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import logging
+import threading
 from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
@@ -24,6 +25,10 @@ except Exception:
     Chroma = None  # type: ignore
 
 
+_PGV_RETRIEVER_CACHE: Optional[Any] = None
+_PGV_RETRIEVER_LOCK = threading.Lock()
+
+
 def _embeddings() -> Optional[Any]:
     if not OpenAIEmbeddings:
         return None
@@ -38,6 +43,10 @@ def _embeddings() -> Optional[Any]:
 
 
 def _pgvector_retriever(emb: Any):
+    global _PGV_RETRIEVER_CACHE
+    if _PGV_RETRIEVER_CACHE is not None:
+        return _PGV_RETRIEVER_CACHE
+
     conn = os.getenv("RAG_PGVECTOR_URL") or os.getenv("PG_DSN")
     collection = os.getenv("RAG_PGVECTOR_COLLECTION", "methodology")
     if not conn:
@@ -47,22 +56,31 @@ def _pgvector_retriever(emb: Any):
     if not NewPGVector:
         logger.warning("langchain_postgres PGVector not available; skipping PG backend")
         return None
-    try:
-        vs = NewPGVector(
-            embeddings=emb,
-            collection_name=collection,
-            connection=conn,
-            use_jsonb=use_jsonb,
-            create_extension=create_ext,
-        )
-        k = int(os.getenv("RAG_TOP_K", "20"))
-        return vs.as_retriever(search_kwargs={"k": k})
-    except Exception as e:
-        if "extension \"vector\" is not available" in str(e).lower():
-            logger.warning("PGVector extension not available; falling back to other RAG backends")
+
+    with _PGV_RETRIEVER_LOCK:
+        if _PGV_RETRIEVER_CACHE is not None:
+            return _PGV_RETRIEVER_CACHE
+        try:
+            vs = NewPGVector(
+                embeddings=emb,
+                collection_name=collection,
+                connection=conn,
+                use_jsonb=use_jsonb,
+                create_extension=create_ext,
+            )
+            k = int(os.getenv("RAG_TOP_K", "20"))
+            _PGV_RETRIEVER_CACHE = vs.as_retriever(search_kwargs={"k": k})
+            return _PGV_RETRIEVER_CACHE
+        except Exception as e:
+            msg = str(e)
+            if "already defined for this MetaData instance" in msg:
+                logger.warning("PGVector metadata already initialized; skipping re-init and allowing backend fallback")
+                return None
+            if "extension \"vector\" is not available" in msg.lower():
+                logger.warning("PGVector extension not available; falling back to other RAG backends")
+                return None
+            logger.exception("Failed to build PGVector retriever")
             return None
-        logger.exception("Failed to build PGVector retriever")
-        return None
 
 
 def _faiss_retriever(emb: Any):
@@ -132,4 +150,3 @@ def create_retriever() -> Optional[Any]:
     if not retriever:
         logger.warning("RAG enabled but no retriever could be created; check configuration")
     return retriever
-import warnings

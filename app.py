@@ -735,30 +735,29 @@ def run_app(
     with st.chat_message("user"):
         st.markdown(user_message)
 
-    # Registrar turno de usuario en memoria (opt-in para evitar duplicados con el grafo)
-    ui_memory_writes_enabled = os.getenv("STREAMLIT_UI_MEMORY_WRITES", "0").lower() in {"1", "true", "yes", "on"}
-    if ui_memory_writes_enabled:
+    # Registrar turno de usuario en memoria
+    try:
+        _mem_adapter = st.session_state.get("_mem_adapter") or MemoryAdapter(pg_dsn=os.getenv("PG_DSN", "postgresql://postgres:postgres@localhost:5432/pibot"))
+        st.session_state._mem_adapter = _mem_adapter
+        _mem_adapter.on_user_turn(
+            st.session_state.session_id,
+            user_message,
+            metadata={
+                "source": "ui",
+                "model": os.getenv("OPENAI_MODEL", "gpt-3.5-turbo"),
+                "temperature": os.getenv("OPENAI_TEMPERATURE", "0"),
+            },
+        )
+        # Refrescar panel de memoria tras turno de usuario
         try:
-            _mem_adapter = st.session_state.get("_mem_adapter") or MemoryAdapter(pg_dsn=os.getenv("PG_DSN", "postgresql://postgres:postgres@localhost:5432/pibot"))
-            st.session_state._mem_adapter = _mem_adapter
-            _mem_adapter.on_user_turn(
-                st.session_state.session_id,
-                user_message,
-                metadata={
-                    "source": "ui",
-                    "model": os.getenv("OPENAI_MODEL", "gpt-3.5-turbo"),
-                    "temperature": os.getenv("OPENAI_TEMPERATURE", "0"),
-                },
-            )
-            try:
-                _ph = st.session_state.get("_mem_debug_placeholder")
-                if _ph:
-                    _ph.empty()
-                    _render_memory_debug(_ph.container())
-            except Exception:
-                pass
+            _ph = st.session_state.get("_mem_debug_placeholder")
+            if _ph:
+                _ph.empty()
+                _render_memory_debug(_ph.container())
         except Exception:
             pass
+    except Exception:
+        pass
 
     # Rate limiting simple
     now = datetime.datetime.now()
@@ -984,29 +983,29 @@ def run_app(
     st.session_state.last_response_chart_only = charts_requested_for_turn
     st.session_state.followup_markers = markers_followup
 
-    # Registrar turno del asistente en memoria (opt-in para evitar duplicados con el grafo)
-    if ui_memory_writes_enabled:
+    # Registrar turno del asistente en memoria
+    try:
+        _mem_adapter = st.session_state.get("_mem_adapter") or MemoryAdapter(pg_dsn=os.getenv("PG_DSN", "postgresql://postgres:postgres@localhost:5432/pibot"))
+        st.session_state._mem_adapter = _mem_adapter
+        _mem_adapter.on_assistant_turn(
+            st.session_state.session_id,
+            response_text,
+            metadata={
+                "source": "ui",
+                "model": os.getenv("OPENAI_MODEL", "gpt-3.5-turbo"),
+                "temperature": os.getenv("OPENAI_TEMPERATURE", "0"),
+            },
+        )
+        # Refrescar panel de memoria tras turno del asistente
         try:
-            _mem_adapter = st.session_state.get("_mem_adapter") or MemoryAdapter(pg_dsn=os.getenv("PG_DSN", "postgresql://postgres:postgres@localhost:5432/pibot"))
-            st.session_state._mem_adapter = _mem_adapter
-            _mem_adapter.on_assistant_turn(
-                st.session_state.session_id,
-                response_text,
-                metadata={
-                    "source": "ui",
-                    "model": os.getenv("OPENAI_MODEL", "gpt-3.5-turbo"),
-                    "temperature": os.getenv("OPENAI_TEMPERATURE", "0"),
-                },
-            )
-            try:
-                _ph = st.session_state.get("_mem_debug_placeholder")
-                if _ph:
-                    _ph.empty()
-                    _render_memory_debug(_ph.container())
-            except Exception:
-                pass
+            _ph = st.session_state.get("_mem_debug_placeholder")
+            if _ph:
+                _ph.empty()
+                _render_memory_debug(_ph.container())
         except Exception:
             pass
+    except Exception:
+        pass
 
     # Guardar respuesta en historial (chat principal sin markers)
     st.session_state.messages.append({"role": "user", "content": user_message})

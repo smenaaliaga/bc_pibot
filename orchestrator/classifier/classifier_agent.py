@@ -299,7 +299,7 @@ def _classify_with_jointbert(question: str) -> ClassificationResult:
     return ClassificationResult(
         intent=intent,
         confidence=confidence,
-        entities=normalized,
+        entities=entities,
         normalized=normalized,
         text=text,
         words=predict_source.get("words") or [],

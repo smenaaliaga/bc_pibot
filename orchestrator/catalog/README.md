@@ -28,3 +28,42 @@ atenderlas.
 - [README del orquestador](../README.md)
 - [README del clasificador](../classifier/README.md)
 - [README raíz del proyecto](../../README.md)
+
+## Búsqueda de series por classification
+
+Se agregó `series_search.py` para filtrar series en `catalog.json` por uno o más campos de `classification`.
+Soporta ambos formatos de catálogo: `classification` plano y `classification.general/specific`.
+
+### Uso desde terminal
+
+Ejemplo pedido (indicator, calc_mode, seasonality y activity distinto de null):
+
+```bash
+python orchestrator/catalog/series_search.py \
+   --eq indicator=imacec \
+   --eq calc_mode=original \
+   --eq seasonality=nsa \
+   --not-null activity \
+   --ids-only
+```
+
+Otros filtros:
+- `--ne key=value` para desigualdad.
+- `--is-null field` para exigir `null`.
+- `--limit N` para limitar resultados.
+
+### Uso desde código (por ejemplo en data.py)
+
+```python
+from orchestrator.catalog.series_search import find_series_by_classification
+
+matches = find_series_by_classification(
+      "orchestrator/catalog/catalog.json",
+      eq={
+            "indicator": "imacec",
+            "calc_mode": "original",
+            "seasonality": "nsa",
+      },
+      require_not_null=["activity"],
+)
+```

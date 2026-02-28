@@ -158,6 +158,7 @@ def main() -> None:
             },
         }
         current_state: Dict[str, Any] = dict(state)
+        qa_trace_enabled = os.getenv("QA_TRACE_ENABLED", "1").lower() in {"1", "true", "yes", "on"}
 
         def _safe_json(data: Any) -> str:
             try:
@@ -238,7 +239,8 @@ def main() -> None:
                 mode, payload = _split_event(event)
 
                 if mode in (None, "updates", "values") and isinstance(payload, dict):
-                    _log_qa_trace(payload)
+                    if qa_trace_enabled:
+                        _log_qa_trace(payload)
 
                 for chunk_payload in _extract_field(payload, "stream_chunks"):
                     payload_items = chunk_payload
