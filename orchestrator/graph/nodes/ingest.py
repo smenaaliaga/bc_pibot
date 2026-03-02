@@ -356,9 +356,9 @@ def make_intent_node(memory_adapter: Any, intent_store: Any = None, predict_with
             else:
                 decision = "fallback"
                 
-        ######## BORRAR ########
-        if decision == "fallback":
-            decision = "data"
+        # ######## BORRAR ########
+        # if decision == "fallback":
+        #     decision = "data"
 
         if isinstance(payload_root, dict):
             payload_root["entities_normalized"] = current_norm

@@ -614,7 +614,7 @@ def _build_latest_contribution_intro(
             requested_value = requested_row.get("value")
             return (
                 f"De acuerdo con la información publicada en la BDE, la contribución de {_sector_phrase(requested_title)} "
-                f"al IMACEC de {period_text} fue de {_percentage_es(requested_value)} {comparison_phrase}."
+                f"al {indicator_raw} de {period_text} fue de {_percentage_es(requested_value)} {comparison_phrase}."
             )
 
     candidates: List[Dict[str, Any]] = []

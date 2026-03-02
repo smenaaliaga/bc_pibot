@@ -255,6 +255,17 @@ def make_data_node(memory_adapter: Any):
         if calc_mode_cls != "contribution":
             family_frequency = None
         family_price = None if indicator_ent == "imacec" else price
+        is_pib_aggregate = (
+            indicator_ent == "pib"
+            and activity_cls_resolved in (None, "none")
+            and region_cls in (None, "none")
+            and investment_cls in (None, "none")
+        )
+        if calc_mode_cls == "contribution":
+            family_calc_mode = "contribution"
+        else:
+            family_calc_mode = "original"
+        family_seasonality = None if is_pib_aggregate else seasonality_ent
 
         # Buscar una sola familia de series en el catalogo agrupado
         family_dict = find_family_by_classification(
@@ -263,9 +274,9 @@ def make_data_node(memory_adapter: Any):
             activity_value=activity_ent_resolved if activity_ent_resolved is not None else activity_cls_resolved,
             region_value=region_ent if region_ent is not None else region_cls,
             investment_value=investment_ent if investment_ent is not None else investment_cls,
-            calc_mode=calc_mode_cls if calc_mode_cls == "contribution" else "original",
+            calc_mode=family_calc_mode,
             price=family_price,
-            seasonality=seasonality_ent,
+            seasonality=family_seasonality,
             frequency=family_frequency,
         )
         family_series = family_to_series_rows(family_dict) if isinstance(family_dict, dict) else []
