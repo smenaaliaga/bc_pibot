@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import logging
+import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from langgraph.types import StreamWriter
@@ -18,6 +19,67 @@ from ..state import (
 
 logger = logging.getLogger(__name__)
 
+
+def _build_target_series_url(
+    *,
+    source_url: Optional[str],
+    series_id: Optional[str],
+    period: Optional[List[Any]],
+    req_form: Optional[str] = None,
+    observations: Optional[List[Dict[str, Any]]] = None,
+    frequency: Optional[str] = None,
+    calc_mode: Optional[str] = None,
+) -> Optional[str]:
+    if not source_url or not series_id:
+        return None
+
+    def _extract_year_local(value: Any) -> Optional[str]:
+        match = re.search(r"(19|20)\d{2}", str(value or "").strip())
+        return match.group(0) if match else None
+
+    period_values = period or []
+    requested_end_year = _extract_year_local(period_values[-1]) if period_values else None
+    req = str(req_form or "").strip().lower()
+    observed_rows = [
+        row for row in (observations or [])
+        if isinstance(row, dict) and row.get("date")
+    ]
+    observed_end_year = _extract_year_local(observed_rows[-1].get("date")) if observed_rows else None
+
+    use_observed_end = req == "latest"
+    if requested_end_year and observed_end_year and requested_end_year != observed_end_year:
+        use_observed_end = True
+
+    end_year = observed_end_year if use_observed_end and observed_end_year else requested_end_year
+    start_year = None
+    if end_year is not None:
+        try:
+            start_year = str(int(end_year) - 10)
+        except Exception:
+            start_year = None
+
+    frequency_param = {
+        "a": "ANNUAL",
+        "q": "QUARTERLY",
+        "m": "MONTHLY",
+    }.get(str(frequency or "").strip().lower())
+    calc_param = {
+        "yoy": "YTYPCT",
+        "prev_period": "PCT",
+    }.get(str(calc_mode or "").strip().lower())
+
+    separator = "&" if "?" in str(source_url) else "?"
+    query_parts = [f"id5=SI", f"idSerie={series_id}"]
+    if start_year:
+        query_parts.append(f"cbFechaInicio={start_year}")
+    if end_year:
+        query_parts.append(f"cbFechaTermino={end_year}")
+    if frequency_param:
+        query_parts.append(f"cbFrecuencia={frequency_param}")
+    if calc_param:
+        query_parts.append(f"cbCalculo={calc_param}")
+
+    return f"{source_url}{separator}{'&'.join(query_parts)}"
 
 def _load_series_observations(
     *,
@@ -153,24 +215,31 @@ def make_data_node(memory_adapter: Any):
         if indicator_ent == "imacec" and activity_ent is None:
             activity_cls_resolved = "specific"
             activity_ent_resolved = "imacec"
+            
+        price = None
+        if indicator_ent == "pib" and activity_cls == "none" and region_cls == "none" and investment_cls == "none":
+            price = None
+        else:
+            price = "enc"
 
-        logger.info("[DATA_NODE !!!] =========================================================")
-        logger.info("[DATA_NODE !!!] calc_mode=%s", calc_mode_cls)
-        logger.info("[DATA_NODE !!!] activity=%s", activity_cls_resolved)
-        logger.info("[DATA_NODE !!!] region=%s", region_cls)
-        logger.info("[DATA_NODE !!!] investment=%s", investment_cls)
-        logger.info("[DATA_NODE !!!] req_form=%s", req_form_cls)
-        logger.info("[DATA_NODE !!!] entities=%s", entities)
-        logger.info("[DATA_NODE !!!] normalized=%s", normalized)
+        logger.info("[DATA_NODE] =========================================================")
+        logger.info("[DATA_NODE] calc_mode=%s", calc_mode_cls)
+        logger.info("[DATA_NODE] activity=%s", activity_cls_resolved)
+        logger.info("[DATA_NODE] region=%s", region_cls)
+        logger.info("[DATA_NODE] investment=%s", investment_cls)
+        logger.info("[DATA_NODE] req_form=%s", req_form_cls)
+        logger.info("[DATA_NODE] entities=%s", entities)
+        logger.info("[DATA_NODE] normalized=%s", normalized)
         
-        logger.info("[DATA_NODE !!!] indicator=%s", indicator_ent)
-        logger.info("[DATA_NODE !!!] seasonality=%s", seasonality_ent)
-        logger.info("[DATA_NODE !!!] frequency=%s", frequency_ent)
-        logger.info("[DATA_NODE !!!] activity=%s", activity_ent_resolved)
-        logger.info("[DATA_NODE !!!] region=%s", region_ent)
-        logger.info("[DATA_NODE !!!] investment=%s", investment_ent)
-        logger.info("[DATA_NODE !!!] period=%s", period_ent)
-        logger.info("[DATA_NODE !!!] =========================================================")
+        logger.info("[DATA_NODE] indicator=%s", indicator_ent)
+        logger.info("[DATA_NODE] seasonality=%s", seasonality_ent)
+        logger.info("[DATA_NODE] frequency=%s", frequency_ent)
+        logger.info("[DATA_NODE] activity=%s", activity_ent_resolved)
+        logger.info("[DATA_NODE] region=%s", region_ent)
+        logger.info("[DATA_NODE] investment=%s", investment_ent)
+        logger.info("[DATA_NODE] price=%s", price)
+        logger.info("[DATA_NODE] period=%s", period_ent)
+        logger.info("[DATA_NODE] =========================================================")
         
         
         ## Obtener ID Series
@@ -182,70 +251,91 @@ def make_data_node(memory_adapter: Any):
             select_target_series_by_classification,
         )
 
+        family_frequency = None if indicator_ent == "imacec" else frequency_ent
+        if calc_mode_cls != "contribution":
+            family_frequency = None
+        family_price = None if indicator_ent == "imacec" else price
+        is_pib_aggregate = (
+            indicator_ent == "pib"
+            and activity_cls_resolved in (None, "none")
+            and region_cls in (None, "none")
+            and investment_cls in (None, "none")
+        )
+        if calc_mode_cls == "contribution":
+            family_calc_mode = "contribution"
+        else:
+            family_calc_mode = "original"
+        family_seasonality = None if is_pib_aggregate else seasonality_ent
+
         # Buscar una sola familia de series en el catalogo agrupado
         family_dict = find_family_by_classification(
             "orchestrator/catalog/catalog.json",
             indicator=indicator_ent,
-            activity_value=activity_ent_resolved,
-            region_value=region_ent,
-            investment_value=investment_ent,
-            calc_mode=calc_mode_cls if calc_mode_cls == "contribution" else "original",
-            seasonality=seasonality_ent,
-            frequency=frequency_ent,
+            activity_value=activity_ent_resolved if activity_ent_resolved is not None else activity_cls_resolved,
+            region_value=region_ent if region_ent is not None else region_cls,
+            investment_value=investment_ent if investment_ent is not None else investment_cls,
+            calc_mode=family_calc_mode,
+            price=family_price,
+            seasonality=family_seasonality,
+            frequency=family_frequency,
         )
         family_series = family_to_series_rows(family_dict) if isinstance(family_dict, dict) else []
         source_family_series = family_dict.get("source_url") if isinstance(family_dict, dict) else None
         family_name = family_dict.get("family_name") if isinstance(family_dict, dict) else None
         
         logger.info(
-            "[DATA_NODE !!! REFACTORING !!!] family_name=%s",
+            "[DATA_NODE] family_name=%s",
             family_name,
         )
         logger.info(
-            "[DATA_NODE !!! REFACTORING !!!] family_source_url=%s",
+            "[DATA_NODE] family_source_url=%s",
             source_family_series,
         )
-        logger.info("[DATA_NODE !!!] =========================================================")
+        logger.info("[DATA_NODE] =========================================================")
 
         # Buscar serie especifica a partir de la familia de series
+        series_eq = {
+            "indicator": indicator_ent,
+            "calc_mode": calc_mode_cls if calc_mode_cls == "contribution" else "original",
+            "seasonality": seasonality_ent,
+            "activity": activity_ent_resolved,
+            "region": region_ent,
+            "investment": investment_ent,
+        }
+        if calc_mode_cls == "contribution":
+            series_eq["frequency"] = frequency_ent
+
         target_series = select_target_series_by_classification(
             family_series,
-            eq={
-                "indicator": indicator_ent,
-                "calc_mode": calc_mode_cls if calc_mode_cls == "contribution" else "original",
-                "seasonality": seasonality_ent,
-                "frequency": frequency_ent,
-                "activity": activity_ent_resolved,
-                "region": region_ent,
-                "investment": investment_ent,
-            },
+            eq=series_eq,
             fallback_to_first=True,
         )
         
         target_series_id = target_series.get("id") if isinstance(target_series, dict) else None
-        target_series_title_raw = target_series.get("title") if isinstance(target_series, dict) else None
+        target_series_long_raw = target_series.get("long_title") if isinstance(target_series, dict) else None
         target_series_display_raw = target_series.get("display_title") if isinstance(target_series, dict) else None
-        target_series_title = str(target_series_display_raw or "").strip()
-        target_series_url = None
-        if source_family_series and target_series_id:
-            separator = "&" if "?" in str(source_family_series) else "?"
-            target_series_url = (
-                f"{source_family_series}{separator}id5=SI&idSerie={target_series_id}"
-            )
+        target_series_title = str(target_series_long_raw or target_series_display_raw or "").strip()
+        target_series_url = _build_target_series_url(
+            source_url=source_family_series,
+            series_id=target_series_id,
+            period=period_ent if isinstance(period_ent, list) else None,
+            frequency=frequency_ent,
+            calc_mode=calc_mode_cls,
+        )
 
         logger.info(
-            "[DATA_NODE !!! REFACTORING !!!] target_series_id=%s",
+            "[DATA_NODE] target_series_id=%s",
             target_series_id,
         )
         logger.info(
-            "[DATA_NODE !!! REFACTORING !!!] target_series_title=%s",
+            "[DATA_NODE] target_series_title=%s",
             target_series_title,
         )
         logger.info(
-            "[DATA_NODE !!! REFACTORING !!!] target_series_url=%s",
+            "[DATA_NODE] target_series_url=%s",
             target_series_url,
         )
-        logger.info("[DATA_NODE !!!] =========================================================")
+        logger.info("[DATA_NODE] =========================================================")
         
         
         ## Obtener data 
@@ -256,20 +346,9 @@ def make_data_node(memory_adapter: Any):
         observations: List[Dict[str, Any]] = []
         observations_all: List[Dict[str, Any]] = []
         latest_obs: Optional[Dict[str, Any]] = None
+        used_latest_fallback_for_point = False
         
-        if activity_cls in ("specific", "none") and region_cls in ("specific", "none") and investment_cls in ("specific", "none"):
-        
-            observations, latest_obs = _fetch_series_by_req_form(
-                series_id=target_series_id,
-                req_form=req_form_cls,
-                frequency=frequency_ent,
-                indicator=indicator_ent,
-                firstdate=firstdate,
-                lastdate=lastdate,
-                calc_mode=calc_mode_cls if calc_mode_cls in {"prev_period", "yoy"} else "yoy",
-            )
-            
-        elif calc_mode_cls == "contribution":
+        if calc_mode_cls == "contribution":
             # recorrer family_series y obtener data de cada serie para luego agregar info a data_params y metadata_response
             for series in family_series:
                 series_id = series.get("id")
@@ -290,25 +369,81 @@ def make_data_node(memory_adapter: Any):
                 if not isinstance(latest_series_obs, dict):
                     continue
 
-                series_title = str(series.get("title") or series_id).strip()
+                row_title = str(series.get("short_title") or series_id).strip()
+                series_activity = (
+                    (series.get("classification") or {}).get("activity")
+                    if isinstance(series, dict)
+                    else None
+                )
+                series_activity_normalized = str(series_activity).strip().lower() if series_activity not in (None, "") else None
 
                 observations.append(
                     {
                         "series_id": series_id,
-                        "title": series_title,
-                        "activity": None,
+                        "title": row_title,
+                        "activity": series_activity_normalized,
                         "date": latest_series_obs.get("date"),
                         "value": latest_series_obs.get("value"),
                     }
                 )
-                observations_all.extend(series_observations)
+            observations_all = list(observations)
+
+            if activity_cls == "general" and activity_ent is None:
+                aggregate_row = None
+                for row in observations:
+                    title_norm = str(row.get("title") or "").strip().lower()
+                    if title_norm in {"pib", "imacec"}:
+                        aggregate_row = row
+                        break
+                    if aggregate_row is None and row.get("activity") in (None, "", "total"):
+                        aggregate_row = row
+
+                if isinstance(aggregate_row, dict):
+                    target_series_id = aggregate_row.get("series_id")
+                    target_series_title = str(
+                        aggregate_row.get("title") or family_name or ""
+                    ).strip()
+                    target_series_url = _build_target_series_url(
+                        source_url=source_family_series,
+                        series_id=target_series_id,
+                        period=period_ent if isinstance(period_ent, list) else None,
+                        req_form=req_form_cls,
+                        observations=observations,
+                        frequency=frequency_ent,
+                        calc_mode=calc_mode_cls,
+                    )
+                    observations = [aggregate_row]
+
+        elif activity_cls_resolved in ("specific", "none") and region_cls in ("specific", "none") and investment_cls in ("specific", "none"):
+
+            observations, latest_obs = _fetch_series_by_req_form(
+                series_id=target_series_id,
+                req_form=req_form_cls,
+                frequency=frequency_ent,
+                indicator=indicator_ent,
+                firstdate=firstdate,
+                lastdate=lastdate,
+                calc_mode=calc_mode_cls if calc_mode_cls in {"prev_period", "yoy"} else "yoy",
+            )
+            if str(req_form_cls or "").strip().lower() == "point" and not observations and isinstance(latest_obs, dict):
+                observations = [latest_obs]
+                used_latest_fallback_for_point = True
+
         
-        logger.info("[DATA_NODE !!! REFACTORING !!!] observations_count=%s", len(observations or observations_all))
-        logger.info("[DATA_NODE !!! REFACTORING !!!] observations_last_5=%s", (observations or observations_all)[-5:])
+        ## Construir payload 
+        ######################
         
-        logger.info("[DATA_NODE !!!] =========================================================")
-     
         if observations is not None or observations_all is not None: 
+            
+            target_series_url = _build_target_series_url(
+                source_url=source_family_series,
+                series_id=target_series_id,
+                period=period_ent if isinstance(period_ent, list) else None,
+                req_form=req_form_cls,
+                observations=observations if observations else observations_all,
+                frequency=frequency_ent,
+                calc_mode=calc_mode_cls,
+            )
             
             payload = {
                 "intent": "value",
@@ -340,6 +475,7 @@ def make_data_node(memory_adapter: Any):
                 "parsed_point": str(period_ent[-1]) if req_form_cls != "range" else None,
                 "parsed_range": (str(period_ent[0]), str(period_ent[-1])),
                 "reference_period": str(period_ent[-1] or period_ent[0]),
+                "used_latest_fallback_for_point": used_latest_fallback_for_point,
                 "result": observations,
                 "all_series_data": observations_all or None,
                 "source_url": target_series_url,

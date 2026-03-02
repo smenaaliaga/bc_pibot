@@ -19,6 +19,7 @@ from __future__ import annotations
 #   - attachments: vacío
 
 import logging
+import re
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
@@ -83,14 +84,16 @@ def format_period_labels(date_str: Optional[str], freq: str) -> list[str]:
         else:
             return [date_str or "--", date_str or "--"]
 
-        if freq in {"Q", "T"}:
+        freq_norm = str(freq or "").strip().upper()
+
+        if freq_norm in {"Q", "T", "QUARTERLY", "TRIMESTRAL"}:
             q = ((m - 1) // 3) + 1
             ordinal = {1: "1er", 2: "2do", 3: "3er", 4: "4to"}.get(q, f"{q}º")
-            long_label = f"el {ordinal} trimestre del {y}"
+            long_label = f"{ordinal} trimestre {y}"
             short_label = f"{q}T {y}"
             return [long_label, short_label]
-        if str(freq or "").upper() == "A":
-            return [str(y), str(y)]
+        if freq_norm in {"A", "ANNUAL", "ANUAL"}:
+            return [f"el año {y}", str(y)]
         meses_es = [
             "", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
             "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
@@ -200,6 +203,7 @@ def specific_response(
     is_contribution: bool,
     is_specific_activity: bool,
     all_series_data: Optional[List[Dict[str, Any]]],
+    used_latest_fallback_for_point: bool = False,
     source_urls: List[str],
     intro_llm_temperature: float = 0.7,
 ) -> Iterable[str]:
@@ -223,6 +227,7 @@ def specific_response(
             is_contribution=is_contribution,
             is_specific_activity=is_specific_activity,
             all_series_data=all_series_data,
+            used_latest_fallback_for_point=used_latest_fallback_for_point,
             intro_llm_temperature=intro_llm_temperature,
         ),
         metadata=_metadata_block(series_id, series_title),
@@ -232,6 +237,8 @@ def specific_response(
             is_contribution=is_contribution,
             all_series_data=all_series_data,
             freq=freq,
+            component_context_val=component_context_val,
+            is_specific_activity=is_specific_activity,
         ),
         suggestions=_specific_suggestions(
             indicator_context_val=indicator_context_val,
@@ -283,6 +290,7 @@ def specific_point_response(
     is_contribution: bool,
     is_specific_activity: bool,
     all_series_data: Optional[List[Dict[str, Any]]],
+    used_latest_fallback_for_point: bool = False,
     source_urls: List[str],
     intro_llm_temperature: float = 0.7,
 ) -> Iterable[str]:
@@ -306,6 +314,7 @@ def specific_point_response(
             is_contribution=is_contribution,
             is_specific_activity=is_specific_activity,
             all_series_data=all_series_data,
+            used_latest_fallback_for_point=used_latest_fallback_for_point,
             intro_llm_temperature=intro_llm_temperature,
         ),
         metadata=_metadata_block(series_id, series_title),
@@ -315,6 +324,8 @@ def specific_point_response(
             is_contribution=is_contribution,
             all_series_data=all_series_data,
             freq=freq,
+            component_context_val=component_context_val,
+            is_specific_activity=is_specific_activity,
         ),
         suggestions=_specific_suggestions(
             indicator_context_val=indicator_context_val,
@@ -357,16 +368,7 @@ def _general_intro(source_urls: List[str]) -> Iterable[str]:
 
 
 def _metadata_block(series_id: Optional[str], series_title: Optional[str] = None) -> Iterable[str]:
-    series_code = str(series_id or "").strip()
-    if not series_code or series_code.lower() == "none":
-        return ()
-    description = str(series_title or "").strip()
-    if description and description.lower() != "none":
-        return (
-            f"**Código de serie:** {series_code}\n\n",
-            f"**Descripción de la serie:** {description}\n\n",
-        )
-    return (f"**Código de serie:** {series_code}\n\n",)
+    return ()
 
 
 def _general_references(source_urls: List[str]) -> Iterable[str]:
@@ -406,8 +408,22 @@ def _specific_intro(
     is_contribution: bool,
     is_specific_activity: bool,
     all_series_data: Optional[List[Dict[str, Any]]],
+    used_latest_fallback_for_point: bool = False,
     intro_llm_temperature: float = 0.7,
 ) -> Iterable[str]:
+    if req_form in {"latest", "point", "specific_point"} and is_contribution:
+        yield _build_latest_contribution_intro(
+            obs_to_show=obs_to_show,
+            indicator_context_val=indicator_context_val,
+            display_period_label=display_period_label,
+            all_series_data=all_series_data,
+            freq=freq,
+            component_context_val=component_context_val,
+            is_specific_activity=is_specific_activity,
+        )
+        yield "\n\n"
+        return
+
     def _clean_text(value: Any) -> str:
         text = str(value or "").strip()
         if text.lower() in {"", "none", "null", "nan"}:
@@ -470,12 +486,163 @@ def _specific_intro(
         llm_temperature=intro_llm_temperature,
         req_form=req_form,
         final_indicator_name=final_indicator_name,
+        series_title=series_title,
+        freq=freq,
         date_range_label=date_range_label,
         display_period_label=display_period_label,
         obs_to_show=obs_to_show,
         is_contribution=is_contribution,
+        used_latest_fallback_for_point=used_latest_fallback_for_point,
         fallback_text=fallback_intro,
     )
+
+
+def _build_latest_contribution_intro(
+    *,
+    obs_to_show: List[Dict[str, Any]],
+    indicator_context_val: Optional[str],
+    display_period_label: str,
+    all_series_data: Optional[List[Dict[str, Any]]],
+    freq: Optional[str] = None,
+    component_context_val: Optional[str] = None,
+    is_specific_activity: bool = False,
+) -> str:
+    def _percentage_es(value: Any, *, absolute: bool = False) -> str:
+        try:
+            numeric = float(value)
+            if absolute:
+                numeric = abs(numeric)
+            return f"{numeric:.1f}%".replace(".", ",")
+        except Exception:
+            return "--"
+
+    def _normalize_period_label(period_text: str) -> str:
+        text = str(period_text or "").strip()
+        if not text:
+            return "el último período disponible"
+        parts = text.split()
+        if len(parts) == 2 and parts[1].isdigit():
+            month = parts[0].lower()
+            year = parts[1]
+            return f"{month} de {year}"
+        return text
+
+    def _comparison_phrase(freq_value: Optional[str]) -> str:
+        freq_norm = str(freq_value or "").strip().lower()
+        if freq_norm == "m":
+            return "en comparación con igual mes del año anterior"
+        if freq_norm == "q":
+            return "en comparación con igual trimestre del año anterior"
+        if freq_norm == "a":
+            return "en comparación con igual año anterior"
+        return "en comparación con igual período del año anterior"
+
+    def _sector_phrase(raw_sector_name: str) -> str:
+        normalized = str(raw_sector_name or "").strip()
+        normalized_lower = normalized.lower()
+        mapping = {
+            "no minero": "el sector no minero",
+            "producción de bienes": "la producción de bienes",
+            "minería": "la minería",
+            "industria": "la industria",
+            "industria manufacturera": "la industria manufacturera",
+            "resto de bienes": "el resto de bienes",
+            "comercio": "el comercio",
+            "servicios": "los servicios",
+            "impuestos sobre los productos": "los impuestos sobre los productos",
+        }
+        return mapping.get(normalized_lower, normalized)
+
+    def _normalize_activity_key(raw_value: Any) -> str:
+        return str(raw_value or "").strip().lower().replace(" ", "_")
+
+    def _prepend_de(noun_phrase: str) -> str:
+        phrase = str(noun_phrase or "").strip()
+        lowered = phrase.lower()
+        if lowered.startswith("el "):
+            return f"del {phrase[3:]}"
+        if lowered.startswith("la "):
+            return f"de la {phrase[3:]}"
+        if lowered.startswith("los "):
+            return f"de los {phrase[4:]}"
+        if lowered.startswith("las "):
+            return f"de las {phrase[4:]}"
+        return f"de {phrase}"
+
+    indicator_raw = str(indicator_context_val or "").strip().upper() or "INDICADOR"
+
+    row = obs_to_show[0] if obs_to_show else {}
+    contrib_value = row.get("value") if isinstance(row, dict) else None
+    period_text = _normalize_period_label(display_period_label)
+    comparison_phrase = _comparison_phrase(freq)
+
+    first_sentence = (
+        f"De acuerdo con la información publicada en la BDE, el {indicator_raw} de {period_text} "
+        f"creció {_percentage_es(contrib_value, absolute=True)} {comparison_phrase}."
+    )
+    try:
+        if float(contrib_value) < 0:
+            first_sentence = (
+                f"De acuerdo con la información publicada en la BDE, el {indicator_raw} de {period_text} "
+                f"cayó {_percentage_es(contrib_value, absolute=True)} {comparison_phrase}."
+            )
+    except Exception:
+        first_sentence = (
+            f"De acuerdo con la información publicada en la BDE, el {indicator_raw} de {period_text} "
+            f"registró una variación de {_percentage_es(contrib_value)} {comparison_phrase}."
+        )
+
+    if not isinstance(all_series_data, list) or not all_series_data:
+        return first_sentence
+
+    valid_rows = [series for series in all_series_data if isinstance(series, dict)]
+
+    if is_specific_activity and component_context_val:
+        requested_activity = _normalize_activity_key(component_context_val)
+        requested_row = next(
+            (
+                series
+                for series in valid_rows
+                if _normalize_activity_key(series.get("activity")) == requested_activity
+            ),
+            None,
+        )
+        if isinstance(requested_row, dict):
+            requested_title = str(
+                requested_row.get("title") or requested_row.get("activity") or component_context_val
+            ).strip().replace("_", " ")
+            requested_value = requested_row.get("value")
+            return (
+                f"De acuerdo con la información publicada en la BDE, la contribución de {_sector_phrase(requested_title)} "
+                f"al {indicator_raw} de {period_text} fue de {_percentage_es(requested_value)} {comparison_phrase}."
+            )
+
+    candidates: List[Dict[str, Any]] = []
+    for series in valid_rows:
+        activity_value = str(series.get("activity") or "").strip().lower()
+        if activity_value in {"", "total", "imacec", "pib"}:
+            continue
+        value = series.get("value")
+        try:
+            float(value)
+        except (TypeError, ValueError):
+            continue
+        candidates.append(series)
+
+    if not candidates:
+        return first_sentence
+
+    top_sector = max(candidates, key=lambda series: float(series.get("value") or 0.0))
+    sector_name = str(top_sector.get("title") or top_sector.get("activity") or "").strip()
+    sector_name = sector_name.replace("_", " ")
+    if not sector_name:
+        return first_sentence
+
+    sector_phrase = _sector_phrase(sector_name)
+    second_sentence = (
+        f"La mayor contribución provino {_prepend_de(sector_phrase)}, con {_percentage_es(top_sector.get('value'))}."
+    )
+    return f"{first_sentence} {second_sentence}"
 
 
 def _build_latest_intro_fallback(
@@ -544,6 +711,16 @@ def _build_latest_intro_fallback(
             "según datos de la BDE."
         )
 
+    row_period_label = format_period_labels(row.get("date"), freq_norm or freq)[0]
+    display_period_clean = _clean_text(display_period_label)
+    effective_period_label = (
+        row_period_label
+        if str(row_period_label or "").strip() not in {"", "--"}
+        else display_period_clean
+    )
+    if not effective_period_label:
+        effective_period_label = "el último período reportado"
+
     if row.get("yoy") is not None:
         var_key = "yoy"
         var_value = row.get("yoy")
@@ -571,10 +748,19 @@ def _build_latest_intro_fallback(
         intro_base = f"La variación {freq_label} de la serie {series_desc}"
 
     if var_value is None:
-        return f"{intro_base}, según datos de la BDE, no está disponible."
+        return (
+            f"{intro_base}, correspondiente a {effective_period_label} (último valor reportado por la BDE), "
+            "no está disponible."
+        )
     if comparison_text:
-        return f"{intro_base}, {comparison_text}, fue de {_percentage_es(var_value)}, según datos de la BDE."
-    return f"{intro_base} fue de {_percentage_es(var_value)}, según datos de la BDE."
+        return (
+            f"{intro_base}, {comparison_text}, correspondiente a {effective_period_label} "
+            f"(último valor reportado por la BDE), fue de {_percentage_es(var_value)}."
+        )
+    return (
+        f"{intro_base}, correspondiente a {effective_period_label} (último valor reportado por la BDE), "
+        f"fue de {_percentage_es(var_value)}."
+    )
 
 
 def _deterministic_variation_intro(
@@ -662,6 +848,7 @@ def _build_specific_prompt(
             is_contribution=is_contribution,
         )
     return _build_latest_prompt(
+        req_form=req_form,
         obs_to_show=obs_to_show,
         final_indicator_name=final_indicator_name,
         calc_mode_cls=calc_mode_cls,
@@ -777,6 +964,7 @@ def _build_range_prompt(
 
 def _build_latest_prompt(
     *,
+    req_form: str,
     obs_to_show: List[Dict[str, Any]],
     final_indicator_name: str,
     calc_mode_cls: Optional[str],
@@ -959,6 +1147,9 @@ def _build_latest_prompt(
             var_value = None
         freq_raw = str(freq or row.get("frequency") or row.get("freq") or "").strip().lower()
         var_label = _variation_label(var_key, freq_raw)
+        latest_period_label = format_period_labels(row.get("date"), freq_raw or freq)[0]
+        if str(latest_period_label or "").strip() in {"", "--"}:
+            latest_period_label = display_period_label
 
         llm_prompt_parts.append("SITUACIÓN: El usuario preguntó por un dato económico específico.")
         llm_prompt_parts.append("Reporta solo la variación (máximo 2 oraciones) informando:")
@@ -969,8 +1160,16 @@ def _build_latest_prompt(
             llm_prompt_parts.append("IMPORTANTE: NO menciones el valor absoluto de la serie; reporta solo la variación")
             llm_prompt_parts.append("IMPORTANTE: redacta en forma directa, por ejemplo: 'La variación ... fue de X%.'")
             llm_prompt_parts.append("IMPORTANTE: NO agregues frases meta como 'no se proporciona el valor absoluto'")
+            llm_prompt_parts.append(
+                f"IMPORTANTE: al ser una consulta latest, indica explícitamente que corresponde al último valor reportado por la BDE y menciona el período {latest_period_label}."
+            )
             if freq_raw == "a":
-                llm_prompt_parts.append("IMPORTANTE: para frecuencia anual, inicia con: 'La variación anual con respecto al año anterior es ...'")
+                if str(req_form or "").strip().lower() == "point":
+                    llm_prompt_parts.append(
+                        f"IMPORTANTE: para frecuencia anual en point, inicia con: 'En {display_period_label}, la variación anual con respecto al año anterior fue ...'"
+                    )
+                else:
+                    llm_prompt_parts.append("IMPORTANTE: para frecuencia anual, inicia con: 'La variación anual con respecto al año anterior es ...'")
         else:
             llm_prompt_parts.append("IMPORTANTE: si no hay variación disponible, indícalo explícitamente sin inventar cifras")
 
@@ -988,34 +1187,257 @@ def _stream_llm_or_fallback(
     llm_temperature: float,
     req_form: str,
     final_indicator_name: str,
+    series_title: Optional[str],
+    freq: str,
     date_range_label: str,
     display_period_label: str,
     obs_to_show: List[Dict[str, Any]],
     is_contribution: bool,
+    used_latest_fallback_for_point: bool = False,
     fallback_text: Optional[str] = None,
 ) -> Iterable[str]:
+    def _normalize_numeric_spacing(text: str) -> str:
+        normalized = str(text or "")
+        normalized = re.sub(r"[\u00A0\u202F]", " ", normalized)
+        normalized = re.sub(r"([\.,])\s+(\d)", r"\1\2", normalized)
+        normalized = re.sub(r"(\d)\s+%", r"\1%", normalized)
+        return normalized
+
     def _sanitize_generated_text(text: str) -> str:
         clean_text = str(text or "").strip()
         if not clean_text:
             return ""
+        clean_text = _normalize_numeric_spacing(clean_text)
         lowered = clean_text.lower()
         if any(token in lowered for token in ["none", "null", "nan"]):
             return ""
         return clean_text
 
+    def _dedupe_point_variation_text(text: str) -> str:
+        raw_sentences = [segment.strip() for segment in str(text or "").replace("\n", " ").split(".") if segment.strip()]
+        if len(raw_sentences) < 2:
+            return str(text or "").strip()
+
+        def _normalize_sentence(sentence: str) -> str:
+            return " ".join(sentence.lower().split())
+
+        unique_sentences: List[str] = []
+        seen: set[str] = set()
+        for sentence in raw_sentences:
+            normalized = _normalize_sentence(sentence)
+            if normalized in seen:
+                continue
+            seen.add(normalized)
+            unique_sentences.append(sentence)
+
+        if len(unique_sentences) >= 2 and req_form == "point" and not is_contribution:
+            first_sentence = unique_sentences[0]
+            second_sentence = unique_sentences[1]
+            first_norm = _normalize_sentence(first_sentence)
+            second_norm = _normalize_sentence(second_sentence)
+
+            is_first_annual = "variación anual" in first_norm and "año anterior" in first_norm
+            is_second_annual = "variación anual" in second_norm and "año anterior" in second_norm
+
+            if is_first_annual and is_second_annual:
+                requested_period = str(display_period_label or "").strip().lower()
+                first_has_period = bool(requested_period) and requested_period != "--" and requested_period in first_norm
+                second_has_period = bool(requested_period) and requested_period != "--" and requested_period in second_norm
+
+                kept_sentence = first_sentence
+                if first_has_period != second_has_period:
+                    kept_sentence = first_sentence if first_has_period else second_sentence
+
+                unique_sentences = [kept_sentence] + unique_sentences[2:]
+
+        if not unique_sentences:
+            return str(text or "").strip()
+        return ". ".join(unique_sentences).strip() + "."
+
+    def _dedupe_latest_variation_text(text: str) -> str:
+        raw_sentences = [segment.strip() for segment in str(text or "").replace("\n", " ").split(".") if segment.strip()]
+        if len(raw_sentences) < 2 or req_form != "latest" or is_contribution:
+            return str(text or "").strip()
+
+        def _normalize_sentence(sentence: str) -> str:
+            return " ".join(sentence.lower().split())
+
+        unique_sentences: List[str] = []
+        seen: set[str] = set()
+        for sentence in raw_sentences:
+            normalized = _normalize_sentence(sentence)
+            if normalized in seen:
+                continue
+            seen.add(normalized)
+            unique_sentences.append(sentence)
+
+        if len(unique_sentences) >= 2:
+            first_sentence = unique_sentences[0]
+            second_sentence = unique_sentences[1]
+            first_norm = _normalize_sentence(first_sentence)
+            second_norm = _normalize_sentence(second_sentence)
+
+            both_variation = "variación" in first_norm and "variación" in second_norm
+            if both_variation:
+                requested_period = str(display_period_label or "").strip().lower()
+                first_has_period = bool(requested_period) and requested_period != "--" and requested_period in first_norm
+                second_has_period = bool(requested_period) and requested_period != "--" and requested_period in second_norm
+                first_has_latest = "último valor reportado" in first_norm or "ultimo valor reportado" in first_norm
+                second_has_latest = "último valor reportado" in second_norm or "ultimo valor reportado" in second_norm
+
+                kept_sentence = first_sentence
+                if first_has_period != second_has_period:
+                    kept_sentence = first_sentence if first_has_period else second_sentence
+                if first_has_latest != second_has_latest:
+                    kept_sentence = first_sentence if first_has_latest else second_sentence
+
+                unique_sentences = [kept_sentence] + unique_sentences[2:]
+
+        if not unique_sentences:
+            return str(text or "").strip()
+        return ". ".join(unique_sentences).strip() + "."
+
+    def _build_point_single_sentence() -> Optional[str]:
+        req_norm = str(req_form or "").strip().lower()
+        if req_norm not in {"point", "specific_point"} or is_contribution:
+            return None
+        row = obs_to_show[0] if obs_to_show else {}
+        if not isinstance(row, dict):
+            return None
+
+        if row.get("yoy") is not None:
+            variation_value = row.get("yoy")
+            comparison_text = "respecto al mismo período del año anterior"
+        elif row.get("prev_period") is not None:
+            variation_value = row.get("prev_period")
+            comparison_text = "respecto al período anterior"
+        else:
+            return None
+
+        period_label = str(display_period_label or "").strip()
+        if not period_label or period_label == "--":
+            period_label = "el período consultado"
+
+        observed_period_label = format_period_labels(row.get("date"), freq)[0]
+        if not observed_period_label or observed_period_label == "--":
+            observed_period_label = period_label
+
+        indicator_phrase = str(series_title or final_indicator_name or "indicador").strip()
+        if not indicator_phrase:
+            indicator_phrase = "indicador"
+
+        indicator_phrase_lower = indicator_phrase.lower()
+        if "pib" in indicator_phrase_lower and ("mineria" in indicator_phrase_lower or "minería" in indicator_phrase_lower):
+            indicator_phrase = "el PIB minero"
+            indicator_phrase_lower = indicator_phrase.lower()
+        if not indicator_phrase_lower.startswith(("el ", "la ", "los ", "las ")):
+            indicator_phrase = f"el {indicator_phrase}"
+
+        if used_latest_fallback_for_point and observed_period_label != period_label:
+            return (
+                f"No hay datos disponibles para {period_label}; sin embargo, según la BDE, el último valor disponible "
+                f"corresponde a {observed_period_label}, donde {indicator_phrase} presentó una variación de "
+                f"{format_percentage(variation_value)} {comparison_text}."
+            )
+
+        return (
+            f"En {period_label}, según los datos de la BDE, {indicator_phrase} presentó una variación "
+            f"de {format_percentage(variation_value)} {comparison_text}."
+        )
+
+    def _build_range_single_sentence() -> Optional[str]:
+        req_norm = str(req_form or "").strip().lower()
+        if req_norm != "range" or is_contribution:
+            return None
+        if not obs_to_show:
+            return None
+
+        last_row = obs_to_show[-1]
+        if not isinstance(last_row, dict):
+            return None
+
+        if last_row.get("yoy") is not None:
+            variation_value = last_row.get("yoy")
+            comparison_text = "respecto al mismo período del año anterior"
+        elif last_row.get("prev_period") is not None:
+            variation_value = last_row.get("prev_period")
+            comparison_text = "respecto al período anterior"
+        else:
+            return None
+
+        range_label = str(date_range_label or display_period_label or "").strip()
+        if not range_label or range_label == "--":
+            first_date = str(obs_to_show[0].get("date") or "")
+            last_date = str(last_row.get("date") or "")
+            if first_date and last_date:
+                first_label = format_period_labels(first_date, "m")[0]
+                last_label = format_period_labels(last_date, "m")[0]
+                range_label = f"desde {first_label} hasta {last_label}"
+            else:
+                range_label = "en el período consultado"
+
+        last_period_label = format_period_labels(last_row.get("date"), "m")[0]
+        indicator_phrase = str(series_title or final_indicator_name or "indicador").strip() or "indicador"
+
+        return (
+            f"En el período {range_label}, según los datos de la BDE, {indicator_phrase} registró en "
+            f"{last_period_label} una variación de {format_percentage(variation_value)} {comparison_text}."
+        )
+
+    def _remove_latest_wording_for_non_latest(text: str) -> str:
+        if str(req_form or "").strip().lower() == "latest":
+            return str(text or "").strip()
+
+        cleaned = str(text or "")
+        patterns = [
+            r",?\s*que\s+corresponde\s+al\s+último\s+valor\s+reportado\s+por\s+la\s+bde",
+            r",?\s*que\s+corresponde\s+al\s+ultimo\s+valor\s+reportado\s+por\s+la\s+bde",
+            r",?\s*correspondiente\s+al\s+último\s+valor\s+reportado\s+por\s+la\s+bde",
+            r",?\s*correspondiente\s+al\s+ultimo\s+valor\s+reportado\s+por\s+la\s+bde",
+            r",?\s*de\s+acuerdo\s+al\s+último\s+valor\s+reportado\s+por\s+la\s+bde",
+            r",?\s*de\s+acuerdo\s+al\s+ultimo\s+valor\s+reportado\s+por\s+la\s+bde",
+            r",?\s*según\s+el\s+último\s+valor\s+reportado\s+por\s+la\s+bde",
+            r",?\s*segun\s+el\s+ultimo\s+valor\s+reportado\s+por\s+la\s+bde",
+        ]
+        for pattern in patterns:
+            cleaned = re.sub(pattern, "", cleaned, flags=re.IGNORECASE)
+
+        cleaned = re.sub(r"\s{2,}", " ", cleaned)
+        cleaned = re.sub(r"\s+,", ",", cleaned)
+        cleaned = re.sub(r"\s+\.", ".", cleaned)
+        return cleaned.strip()
+
     try:
         llm = build_llm(streaming=True, temperature=llm_temperature, mode="fallback")
         chunks: List[str] = []
+        streamed_chars = 0
+        max_streamed_chars = 1200
         for chunk in llm.stream(llm_prompt, history=[], intent_info=None):
             text = str(chunk)
             if text:
                 chunks.append(text)
+                streamed_chars += len(text)
+                if streamed_chars >= max_streamed_chars:
+                    logger.warning(
+                        "Respuesta LLM truncada por límite de caracteres | max=%s",
+                        max_streamed_chars,
+                    )
+                    break
 
         generated_text = _sanitize_generated_text("".join(chunks))
         if not generated_text or generated_text.lower().startswith("(error generando)"):
             raise RuntimeError("llm_generation_failed")
 
         final_text = generated_text
+
+        point_single_sentence = _build_point_single_sentence()
+        if point_single_sentence:
+            final_text = point_single_sentence
+
+        range_single_sentence = _build_range_single_sentence()
+        if range_single_sentence:
+            final_text = range_single_sentence
+
         if req_form == "latest" and is_contribution:
             period_label = str(display_period_label or "").strip()
             if period_label and period_label != "--":
@@ -1031,6 +1453,11 @@ def _stream_llm_or_fallback(
                             f"La contribución de {final_indicator_name} para {period_label} se presenta en la siguiente tabla."
                         )
                     final_text = f"{enforced} {generated_text}".strip()
+
+        final_text = _dedupe_point_variation_text(final_text)
+        final_text = _dedupe_latest_variation_text(final_text)
+        final_text = _remove_latest_wording_for_non_latest(final_text)
+        final_text = _normalize_numeric_spacing(final_text).strip()
 
         yield final_text
         yield "\n\n"
@@ -1071,7 +1498,15 @@ def _specific_table(
     is_contribution: bool,
     all_series_data: Optional[List[Dict[str, Any]]],
     freq: str,
+    component_context_val: Optional[str] = None,
+    is_specific_activity: bool = False,
 ) -> Iterable[str]:
+    def _normalize_activity_key(raw_value: Any) -> str:
+        return str(raw_value or "").strip().lower().replace(" ", "_")
+
+    freq_norm = str(freq or "").strip().lower()
+    use_short_annual_label = freq_norm in {"a", "annual", "anual"}
+
     if is_contribution and all_series_data:
         yield "Actividad | Contribución (a/a)\n"
         yield "----------|-------------------\n"
@@ -1094,6 +1529,10 @@ def _specific_table(
         ]
 
         valid_series = [s for s in all_series_data if isinstance(s, dict)]
+        highlighted_activity = None
+        if is_specific_activity and component_context_val:
+            highlighted_activity = _normalize_activity_key(component_context_val)
+
         series_by_activity = {
             str(s.get("activity") or "").strip().lower(): s
             for s in valid_series
@@ -1117,23 +1556,37 @@ def _specific_table(
                     display_name = activity_display_names.get(activity_key, activity_key)
                     value = series_info.get("value", 0)
 
-                    if activity_key == max_activity:
+                    should_highlight = (
+                        activity_key == highlighted_activity
+                        if highlighted_activity
+                        else activity_key == max_activity
+                    )
+
+                    if should_highlight:
                         yield f"**{display_name}** | **{format_percentage(value)}**\n"
                     else:
                         yield f"{display_name} | {format_percentage(value)}\n"
         else:
             max_title = None
+            max_activity_key = None
             for s in valid_series:
                 title = str(s.get("title") or s.get("activity") or "").strip() or "Actividad"
                 value = s.get("value", 0)
                 if value > max_value:
                     max_value = value
                     max_title = title
+                    max_activity_key = _normalize_activity_key(s.get("activity"))
 
             for s in valid_series:
                 title = str(s.get("title") or s.get("activity") or "").strip() or "Actividad"
                 value = s.get("value")
-                if title == max_title:
+                activity_key = _normalize_activity_key(s.get("activity"))
+                should_highlight = (
+                    activity_key == highlighted_activity
+                    if highlighted_activity
+                    else (title == max_title or activity_key == max_activity_key)
+                )
+                if should_highlight:
                     yield f"**{title}** | **{format_percentage(value)}**\n"
                 else:
                     yield f"{title} | {format_percentage(value)}\n"
@@ -1147,7 +1600,8 @@ def _specific_table(
         for row in obs_to_show:
             date_str = row.get("date", "")
             var_value = row.get("value")
-            period_label = format_period_labels(date_str, freq)[0]
+            labels = format_period_labels(date_str, freq)
+            period_label = labels[1] if use_short_annual_label else labels[0]
             yield f"{period_label} | {format_percentage(var_value)}\n"
     else:
         yield "Periodo | Valor | Variación\n"
@@ -1156,7 +1610,8 @@ def _specific_table(
             date_str = row.get("date", "")
             value = row.get("value")
             var_value = row.get("yoy") if "yoy" in row else row.get("prev_period")
-            period_label = format_period_labels(date_str, freq)[0]
+            labels = format_period_labels(date_str, freq)
+            period_label = labels[1] if use_short_annual_label else labels[0]
             yield f"{period_label} | {format_value(value)} | {format_percentage(var_value)}\n"
     yield "\n"
 

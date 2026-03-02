@@ -257,13 +257,21 @@ def _classify_with_jointbert(question: str) -> ClassificationResult:
 
     calc_mode_label = _intent_label_from_interpretation(predict_source, "calc_mode")
     req_form_label = _intent_label_from_interpretation(predict_source, "req_form")
+    activity_label = _intent_label_from_interpretation(predict_source, "activity")
+    region_label = _intent_label_from_interpretation(predict_source, "region")
+    investment_label = _intent_label_from_interpretation(predict_source, "investment")
     try:
         normalized = normalize_entities(
             entities=entities_api,
             calc_mode=calc_mode_label,
             req_form=req_form_label,
-            intent_label=routing_intent_label,
-            context_label=routing_context_label,
+            intents={
+                "intent": routing_intent_label,
+                "context": routing_context_label,
+                "activity": activity_label,
+                "region": region_label,
+                "investment": investment_label,
+            },
         )
     except Exception as exc:
         logger.exception("[CLASSIFIER_API] Failed to recompute entities_normalized")
@@ -305,9 +313,9 @@ def _classify_with_jointbert(question: str) -> ClassificationResult:
         words=predict_source.get("words") or [],
         slot_tags=predict_source.get("slot_tags") or predict_source.get("slots") or [],
         calc_mode=calc_mode_label,
-        activity=_intent_label_from_interpretation(predict_source, "activity"),
-        region=_intent_label_from_interpretation(predict_source, "region"),
-        investment=_intent_label_from_interpretation(predict_source, "investment"),
+        activity=activity_label,
+        region=region_label,
+        investment=investment_label,
         req_form=req_form_label,
         macro=macro,
         context=context,

@@ -64,12 +64,14 @@ def load_catalog_series(catalog_path: str | Path) -> List[Dict[str, Any]]:
 
             row = dict(item)
             row_classification = row.get("classification")
+            has_explicit_empty_classification = isinstance(row_classification, dict) and not row_classification
             merged_classification: Dict[str, Any] = {}
             if isinstance(family_classification, dict):
                 merged_classification.update(family_classification)
             if isinstance(row_classification, dict):
                 merged_classification.update(row_classification)
             row["classification"] = merged_classification
+            row["_classification_empty"] = has_explicit_empty_classification
 
             if "source_url" not in row and family_source_url is not None:
                 row["source_url"] = family_source_url
@@ -106,6 +108,7 @@ def find_family_by_classification(
     region_value: Any = None,
     investment_value: Any = None,
     calc_mode: Any = None,
+    price: Any = None,
     seasonality: Any = None,
     frequency: Any = None,
 ) -> Optional[Dict[str, Any]]:
@@ -113,14 +116,13 @@ def find_family_by_classification(
     if not payload:
         return None
 
-    requested_indicator = str(indicator or "").strip().lower()
-    if not requested_indicator:
-        return None
+    requested_indicator = str(indicator or "").strip().lower() or None
 
     requested_has_activity = 0 if _is_empty(activity_value) else 1
     requested_has_region = 0 if _is_empty(region_value) else 1
     requested_has_investment = 0 if _is_empty(investment_value) else 1
     requested_calc_mode = str(calc_mode).strip().lower() if calc_mode not in (None, "") else None
+    requested_price = str(price).strip().lower() if price not in (None, "") else None
     requested_seasonality = str(seasonality).strip().lower() if seasonality not in (None, "") else None
     requested_frequency = str(frequency).strip().lower() if frequency not in (None, "") else None
 
@@ -134,38 +136,57 @@ def find_family_by_classification(
         if not isinstance(family_classification, dict) or not isinstance(family_series, list):
             continue
 
-        indicator_value = str(family_classification.get("indicator") or "").strip().lower()
-        if indicator_value != requested_indicator:
-            continue
+        indicator_value = str(family_classification.get("indicator") or "").strip().lower() or None
 
         has_activity = _to_flag(family_classification.get("has_activity"))
         has_region = _to_flag(family_classification.get("has_region"))
         has_investment = _to_flag(family_classification.get("has_investment"))
 
-        if has_activity is not None and has_activity != requested_has_activity:
+        if has_activity != requested_has_activity:
             continue
-        if has_region is not None and has_region != requested_has_region:
+        if has_region != requested_has_region:
             continue
-        if has_investment is not None and has_investment != requested_has_investment:
+        if has_investment != requested_has_investment:
             continue
 
         family_calc_mode = family_classification.get("calc_mode")
-        if requested_calc_mode is not None and family_calc_mode not in (None, ""):
-            if str(family_calc_mode).strip().lower() != requested_calc_mode:
+        family_calc_mode_normalized = (
+            str(family_calc_mode).strip().lower() if family_calc_mode not in (None, "") else None
+        )
+        if requested_calc_mode is not None:
+            if family_calc_mode_normalized != requested_calc_mode:
+                continue
+
+        family_price = family_classification.get("price")
+        family_price_normalized = (
+            str(family_price).strip().lower() if family_price not in (None, "") else None
+        )
+        if requested_price is not None:
+            if family_price_normalized != requested_price:
                 continue
 
         family_seasonality = family_classification.get("seasonality")
-        if requested_seasonality is not None and family_seasonality not in (None, ""):
-            if str(family_seasonality).strip().lower() != requested_seasonality:
+        family_seasonality_normalized = (
+            str(family_seasonality).strip().lower() if family_seasonality not in (None, "") else None
+        )
+        if requested_seasonality is not None:
+            if family_seasonality_normalized != requested_seasonality:
                 continue
 
         family_frequency = family_classification.get("frequency")
-        if requested_frequency is not None and family_frequency not in (None, ""):
-            if str(family_frequency).strip().lower() != requested_frequency:
+        family_frequency_normalized = (
+            str(family_frequency).strip().lower() if family_frequency not in (None, "") else None
+        )
+        if requested_frequency is not None:
+            if family_frequency_normalized != requested_frequency:
                 continue
 
         score = 0
+        if requested_indicator is not None and indicator_value == requested_indicator:
+            score += 100
         if family_calc_mode not in (None, ""):
+            score += 1
+        if family_price not in (None, ""):
             score += 1
         if family_seasonality not in (None, ""):
             score += 1
@@ -208,12 +229,14 @@ def family_to_series_rows(family_payload: Dict[str, Any]) -> List[Dict[str, Any]
 
         row = dict(item)
         row_classification = row.get("classification")
+        has_explicit_empty_classification = isinstance(row_classification, dict) and not row_classification
         merged_classification: Dict[str, Any] = {}
         if isinstance(family_classification, dict):
             merged_classification.update(family_classification)
         if isinstance(row_classification, dict):
             merged_classification.update(row_classification)
         row["classification"] = merged_classification
+        row["_classification_empty"] = has_explicit_empty_classification
 
         if "source_url" not in row and family_source_url is not None:
             row["source_url"] = family_source_url
@@ -366,6 +389,9 @@ def select_target_series_by_classification(
 
     if normalized_filters:
         for row in matches:
+            if row.get("_classification_empty") is True:
+                continue
+
             classification = row.get("classification")
             if not isinstance(classification, dict):
                 continue
@@ -383,7 +409,14 @@ def select_target_series_by_classification(
             if ok:
                 return row
 
-    return matches[0] if fallback_to_first else None
+    if not fallback_to_first:
+        return None
+
+    for row in matches:
+        if row.get("_classification_empty") is not True:
+            return row
+
+    return None
 
 
 def _build_parser() -> argparse.ArgumentParser:

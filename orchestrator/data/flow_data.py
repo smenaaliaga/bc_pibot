@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+from datetime import date
 from typing import Any, Dict, Iterable, Optional
 
 from orchestrator.data.response import (
@@ -38,7 +39,11 @@ def stream_data_flow(
     classification_dict = payload.get("classification", {})
     result_data = payload.get("result", [])
     intent = payload.get("intent", "")
-    req_form = classification_dict.get("req_form", "latest")
+    req_form = (
+        classification_dict.get("req_form")
+        or classification_dict.get("req_form_cls")
+        or "latest"
+    )
     parsed_point = payload.get("parsed_point")  # DD-MM-YYYY o None
     parsed_range = payload.get("parsed_range")  # Tupla (DD-MM-YYYY, DD-MM-YYYY) o None
     reference_period = payload.get("reference_period")
@@ -46,6 +51,7 @@ def stream_data_flow(
     source_url = payload.get("source_url")  # URL de la fuente
     series_title = payload.get("series_title")
     source_urls = normalize_sources(source_url)
+    used_latest_fallback_for_point = bool(payload.get("used_latest_fallback_for_point"))
     intro_llm_temperature = payload.get("intro_llm_temperature", 0.7)
     try:
         intro_llm_temperature_value = float(intro_llm_temperature)
@@ -74,9 +80,12 @@ def stream_data_flow(
     
     # Extraer valores de clasificación
     indicator_context_val = classification_dict.get("indicator")
-    component_context_val = classification_dict.get("activity")  # o usar otro campo si aplica
+    component_context_val = (
+        classification_dict.get("activity")
+        or classification_dict.get("activity_value")
+    )
     seasonality_context_val = classification_dict.get("seasonality")
-    metric_type_val = classification_dict.get("metric_type")
+    metric_type_val = classification_dict.get("metric_type") or classification_dict.get("calc_mode_cls")
     freq = classification_dict.get("frequency", "M").upper()
     
     logger.info(
@@ -87,9 +96,75 @@ def stream_data_flow(
         req_form,
     )
 
-    # Para range/specific_point: mostrar todas las observaciones. Para latest/point: solo la última
+    def _parse_iso_date(value: Any) -> Optional[date]:
+        try:
+            text = str(value or "").strip()
+            if not text:
+                return None
+            return date.fromisoformat(text[:10])
+        except Exception:
+            return None
+
+    def _same_requested_period(requested: Optional[date], observed: Optional[date], freq_value: Any) -> bool:
+        if requested is None or observed is None:
+            return False
+        freq_norm = str(freq_value or "").strip().lower()
+        if freq_norm in {"a", "annual", "anual"}:
+            return requested.year == observed.year
+        if freq_norm in {"q", "t", "quarterly", "trimestral"}:
+            requested_quarter = ((requested.month - 1) // 3) + 1
+            observed_quarter = ((observed.month - 1) // 3) + 1
+            return requested.year == observed.year and requested_quarter == observed_quarter
+        return requested.year == observed.year and requested.month == observed.month
+
+    # Para range/specific_point: mostrar todas las observaciones.
+    # Para latest: última observación disponible.
+    # Para point: observación alineada al período consultado (parsed_point).
     if req_form in {"range", "specific_point"}:
         obs_to_show = obs
+    elif req_form == "point":
+        requested_date = _parse_iso_date(parsed_point)
+        dated_obs = [
+            (row, _parse_iso_date(row.get("date")))
+            for row in obs
+            if isinstance(row, dict)
+        ]
+
+        chosen_row = None
+        if requested_date:
+            same_date = [row for row, row_date in dated_obs if row_date == requested_date]
+            if same_date:
+                chosen_row = same_date[-1]
+            else:
+                previous_or_equal = [
+                    (row, row_date)
+                    for row, row_date in dated_obs
+                    if row_date is not None and row_date <= requested_date
+                ]
+                if previous_or_equal:
+                    chosen_row = max(previous_or_equal, key=lambda item: item[1])[0]
+                else:
+                    valid_dated = [
+                        (row, row_date)
+                        for row, row_date in dated_obs
+                        if row_date is not None
+                    ]
+                    if valid_dated:
+                        chosen_row = min(
+                            valid_dated,
+                            key=lambda item: abs((item[1] - requested_date).days),
+                        )[0]
+
+        if chosen_row is None:
+            chosen_row = max(obs, key=lambda o: o.get("date", "")) if obs else None
+
+        if not chosen_row:
+            logger.error("[STREAM_DATA_FLOW] No hay observaciones en result_data")
+            return
+        obs_to_show = [chosen_row]
+        observed_date = _parse_iso_date(chosen_row.get("date")) if isinstance(chosen_row, dict) else None
+        if requested_date and not _same_requested_period(requested_date, observed_date, freq):
+            used_latest_fallback_for_point = True
     else:
         chosen_row = max(obs, key=lambda o: o.get("date", "")) if obs else None
         if not chosen_row:
@@ -102,7 +177,11 @@ def stream_data_flow(
     if isinstance(indicator_context_val, str) and indicator_context_val.strip():
         indicator_parts.append(indicator_context_val.upper().strip())
     # Excluir "total" del componente/activity
-    if isinstance(component_context_val, str) and component_context_val.strip() and component_context_val.lower() != "total":
+    if (
+        isinstance(component_context_val, str)
+        and component_context_val.strip()
+        and component_context_val.lower() not in {"total", "general", "none", "specific"}
+    ):
         indicator_parts.append(component_context_val.strip())
     # Para estacionalidad: reemplazar "SA" por "desestacionalizado", excluir "nsa"
     if isinstance(seasonality_context_val, str) and seasonality_context_val.strip():
@@ -116,13 +195,13 @@ def stream_data_flow(
     is_specific_activity = (
         isinstance(component_context_val, str)
         and component_context_val.strip()
-        and component_context_val.lower() not in {"none", "total", ""}
+        and component_context_val.lower() not in {"none", "total", "general", "specific", ""}
     )
 
     # Flag para lógica especial de contribución
+    metric_type_norm = str(metric_type_val or "").strip().lower()
     is_contribution = (
-        isinstance(metric_type_val, str)
-        and metric_type_val.lower() == "contribution"
+        metric_type_norm == "contribution"
         and isinstance(indicator_context_val, str)
         and indicator_context_val.strip()
     )
@@ -194,6 +273,7 @@ def stream_data_flow(
             is_contribution=is_contribution,
             is_specific_activity=is_specific_activity,
             all_series_data=all_series_data,
+            used_latest_fallback_for_point=used_latest_fallback_for_point,
             source_urls=source_urls,
             intro_llm_temperature=intro_llm_temperature_value,
         )
@@ -219,6 +299,7 @@ def stream_data_flow(
             is_contribution=is_contribution,
             is_specific_activity=is_specific_activity,
             all_series_data=all_series_data,
+            used_latest_fallback_for_point=used_latest_fallback_for_point,
             source_urls=source_urls,
             intro_llm_temperature=intro_llm_temperature_value,
         )
