@@ -299,21 +299,13 @@ REGION_TERMS = {
         "los ríos", "los rios", "región de los ríos", "región los ríos",
         "región xiv", "xiv región", "región 14", "región n°14",
         "región nro 14", "decimocuarta región", "14va región",
-<<<<<<< HEAD
-        "14a región", "14m región", 'rios'
-=======
-        "14a región", "14m región","xiv"
->>>>>>> origin/orchestrator_refactoring
+        "14a región", "14m región", 'rios', "xiv"
     ],
     "los_lagos": [
         "los lagos", "región de los lagos", "región los lagos",
         "región x", "x región", "región 10", "región n°10",
         "región nro 10", "décima región", "decima región", "10ma región",
-<<<<<<< HEAD
-        "10a región", "10m región", 'lagos'
-=======
-        "10a región", "10m región","x"
->>>>>>> origin/orchestrator_refactoring
+        "10a región", "10m región", 'lagos', "x"
     ],
     "aysen": [
         "aysén", "aysen", "región de aysén",
@@ -329,11 +321,7 @@ REGION_TERMS = {
         "magallanes y de la antártica chilena", "punta arenas",
         "región xii", "xii región", "región 12", "región n°12",
         "región nro 12", "duodécima región", "duodecima región",
-<<<<<<< HEAD
         "12va región", "12a región", "12m región", 'xii '
-=======
-        "12va región", "12a región", "12m región","xii"
->>>>>>> origin/orchestrator_refactoring
     ],
 }
 
