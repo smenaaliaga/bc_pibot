@@ -20,6 +20,25 @@ from ..state import (
 logger = logging.getLogger(__name__)
 
 
+def _first_non_empty(value: Any) -> Any:
+    if isinstance(value, list):
+        for item in value:
+            if item not in (None, "", [], {}, ()):
+                return item
+        return None
+    if value in (None, "", [], {}, ()):
+        return None
+    return value
+
+
+def _coerce_period(period_value: Any) -> List[Any]:
+    if period_value in (None, "", [], {}, ()):
+        return []
+    if isinstance(period_value, list):
+        return period_value
+    return [period_value]
+
+
 def _build_target_series_url(
     *,
     source_url: Optional[str],
@@ -198,20 +217,44 @@ def make_data_node(memory_adapter: Any):
         investment_cls = getattr(classification, "investment", None) or {}
         req_form_cls = getattr(classification, "req_form", None) or {}
 
-        entities = getattr(classification, "entities", None) or {}
-        normalized = getattr(classification, "normalized", None) or {}
-        
-        indicator_ent = (normalized.get("indicator") or [None])[0]
-        seasonality_ent = (normalized.get("seasonality") or [None])[0]
-        frequency_ent = (normalized.get("frequency") or [None])[0]
-        activity_ent = (normalized.get("activity") or [None])[0]
-        region_ent = (normalized.get("region") or [None])[0]
-        investment_ent = (normalized.get("investment") or [None])[0]
-        period_ent = normalized.get("period")
+        classification_entities = getattr(classification, "entities", None) or {}
+        normalized_from_classification = getattr(classification, "normalized", None) or {}
+
+        interpretation_root = predict_raw.get("interpretation")
+        if not isinstance(interpretation_root, dict):
+            interpretation_root = predict_raw
+        interpretation_root = interpretation_root if isinstance(interpretation_root, dict) else {}
+
+        normalized_from_predict = interpretation_root.get("entities_normalized")
+        normalized_from_predict = normalized_from_predict if isinstance(normalized_from_predict, dict) else {}
+
+        # For follow-up turns, intent node mutates predict_raw.entities_normalized.
+        # Prefer that payload so downstream uses the resolved indicator/time fields.
+        normalized = normalized_from_predict or (
+            normalized_from_classification if isinstance(normalized_from_classification, dict) else {}
+        )
+
+        indicator_ent = _first_non_empty(normalized.get("indicator"))
+        seasonality_ent = _first_non_empty(normalized.get("seasonality"))
+        frequency_ent = _first_non_empty(normalized.get("frequency"))
+        activity_ent = _first_non_empty(normalized.get("activity"))
+        region_ent = _first_non_empty(normalized.get("region"))
+        investment_ent = _first_non_empty(normalized.get("investment"))
+        period_ent = _coerce_period(normalized.get("period"))
+        period_values = period_ent if isinstance(period_ent, list) else []
         
         # REGLAS DE NEGOCIO PARA TRASLADAR !
         activity_cls_resolved = activity_cls
         activity_ent_resolved = activity_ent
+
+        if (
+            calc_mode_cls == "contribution"
+            and activity_cls in (None, "none")
+            and investment_cls in (None, "none")
+            and region_cls in (None, "none")
+        ):
+            activity_cls_resolved = "general"
+
         if indicator_ent == "imacec" and activity_ent is None:
             activity_cls_resolved = "specific"
             activity_ent_resolved = "imacec"
@@ -230,6 +273,15 @@ def make_data_node(memory_adapter: Any):
         logger.info("[DATA_NODE] req_form=%s", req_form_cls)
         logger.info("[DATA_NODE] entities=%s", entities)
         logger.info("[DATA_NODE] normalized=%s", normalized)
+
+        logger.info("[DATA_NODE !!!] =========================================================")
+        logger.info("[DATA_NODE !!!] calc_mode=%s", calc_mode_cls)
+        logger.info("[DATA_NODE !!!] activity=%s", activity_cls_resolved)
+        logger.info("[DATA_NODE !!!] region=%s", region_cls)
+        logger.info("[DATA_NODE !!!] investment=%s", investment_cls)
+        logger.info("[DATA_NODE !!!] req_form=%s", req_form_cls)
+        logger.info("[DATA_NODE !!!] entities=%s", classification_entities)
+        logger.info("[DATA_NODE !!!] normalized=%s", normalized)
         
         logger.info("[DATA_NODE] indicator=%s", indicator_ent)
         logger.info("[DATA_NODE] seasonality=%s", seasonality_ent)
@@ -240,6 +292,29 @@ def make_data_node(memory_adapter: Any):
         logger.info("[DATA_NODE] price=%s", price)
         logger.info("[DATA_NODE] period=%s", period_ent)
         logger.info("[DATA_NODE] =========================================================")
+
+        if indicator_ent == "pib" and str(frequency_ent or "").strip().lower() == "m":
+            text = "No existe frecuencia mensual para el PIB. Puedes consultar PIB trimestral o anual."
+            logger.warning("[DATA_NODE] %s", text)
+            _emit_stream_chunk(text, writer)
+            return {
+                "output": text,
+                "entities": entities,
+                "parsed_point": None,
+                "parsed_range": None,
+                "series": None,
+                "data_classification": {
+                    "indicator": indicator_ent,
+                    "seasonality": seasonality_ent,
+                    "frequency": frequency_ent,
+                    "period": period_ent,
+                    "calc_mode_cls": calc_mode_cls,
+                    "activity_cls": activity_cls_resolved,
+                    "region_cls": region_cls,
+                    "investment_cls": investment_cls,
+                    "req_form_cls": req_form_cls,
+                },
+            }
         
         
         ## Obtener ID Series
@@ -305,6 +380,9 @@ def make_data_node(memory_adapter: Any):
         if calc_mode_cls == "contribution":
             series_eq["frequency"] = frequency_ent
 
+        if activity_cls_resolved == "specific" and activity_ent_resolved is None:
+            series_eq["activity"] = "__missing_specific_activity__"
+
         target_series = select_target_series_by_classification(
             family_series,
             eq=series_eq,
@@ -336,13 +414,52 @@ def make_data_node(memory_adapter: Any):
             target_series_url,
         )
         logger.info("[DATA_NODE] =========================================================")
+
+        if not source_family_series or not target_series_id:
+            requested_activity = None
+            if isinstance(entities, dict):
+                activity_values = entities.get("activity") or []
+                if isinstance(activity_values, list) and activity_values:
+                    requested_activity = str(activity_values[0]).strip()
+
+            if requested_activity:
+                text = (
+                    f"No existe una serie asociada para la actividad '{requested_activity}' "
+                    f"en el indicador solicitado."
+                )
+            else:
+                text = "No existe una serie asociada a la consulta solicitada."
+
+            logger.warning("[DATA_NODE] %s", text)
+            _emit_stream_chunk(text, writer)
+            return {
+                "output": text,
+                "entities": entities,
+                "parsed_point": None,
+                "parsed_range": None,
+                "series": None,
+                "data_classification": {
+                    "indicator": indicator_ent,
+                    "seasonality": seasonality_ent,
+                    "frequency": frequency_ent,
+                    "period": period_ent,
+                    "calc_mode_cls": calc_mode_cls,
+                    "activity_cls": activity_cls_resolved,
+                    "region_cls": region_cls,
+                    "investment_cls": investment_cls,
+                    "req_form_cls": req_form_cls,
+                    "activity_value": activity_ent,
+                    "region_value": region_ent,
+                    "investment_value": investment_ent,
+                },
+            }
         
         
         ## Obtener data 
         ####################
         
-        firstdate = str(period_ent[0])
-        lastdate = str(period_ent[-1])
+        firstdate = str(period_values[0]) if period_ent else None if period_values else None
+        lastdate = str(period_values[-1]) if period_ent else None if period_values else None
         observations: List[Dict[str, Any]] = []
         observations_all: List[Dict[str, Any]] = []
         latest_obs: Optional[Dict[str, Any]] = None
@@ -388,7 +505,7 @@ def make_data_node(memory_adapter: Any):
                 )
             observations_all = list(observations)
 
-            if activity_cls == "general" and activity_ent is None:
+            if activity_cls_resolved == "general" and activity_ent is None:
                 aggregate_row = None
                 for row in observations:
                     title_norm = str(row.get("title") or "").strip().lower()
@@ -453,7 +570,7 @@ def make_data_node(memory_adapter: Any):
                     "frequency": frequency_ent,
                     "period": period_ent,
                     "calc_mode_cls": calc_mode_cls,
-                    "activity_cls": activity_cls,
+                    "activity_cls": activity_cls_resolved,
                     "region_cls": region_cls,
                     "investment_cls": investment_cls,
                     "req_form_cls": req_form_cls,
@@ -472,9 +589,9 @@ def make_data_node(memory_adapter: Any):
                 },
                 "series": target_series_id,
                 "series_title": target_series_title or family_name or None,
-                "parsed_point": str(period_ent[-1]) if req_form_cls != "range" else None,
-                "parsed_range": (str(period_ent[0]), str(period_ent[-1])),
-                "reference_period": str(period_ent[-1] or period_ent[0]),
+                "parsed_point": str(period_values[-1]) if req_form_cls != "range" and period_ent and period_values else None,
+                "parsed_range": (str(period_values[0]), str(period_values[-1])) if period_ent else None if period_values else None,
+                "reference_period": str(period_values[-1]) if period_values else None if period_values else None,
                 "used_latest_fallback_for_point": used_latest_fallback_for_point,
                 "result": observations,
                 "all_series_data": observations_all or None,

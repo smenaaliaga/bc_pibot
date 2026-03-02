@@ -64,6 +64,9 @@ def has_explicit_indicator(payload_root: Dict[str, Any]) -> bool:
     entities = as_dict(payload_root.get("entities"))
     if not is_empty_value(entities.get("indicator")):
         return True
+    entities_normalized = as_dict(payload_root.get("entities_normalized"))
+    if not is_empty_value(entities_normalized.get("indicator")):
+        return True
     slot_tags = payload_root.get("slot_tags")
     if isinstance(slot_tags, list):
         for tag in slot_tags:

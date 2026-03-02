@@ -815,6 +815,50 @@ def get_series_from_redis(
     fd = None if firstdate in (None, "", "auto") else firstdate
     ld = None if lastdate in (None, "", "auto") else lastdate
 
+    def _fetch_fallback_and_filter() -> Optional[Dict[str, Any]]:
+        fallback_data = get_series_api_rest_bcch(
+            series_id=series_id,
+            target_date=ld,
+            target_frequency=target_frequency,
+            agg=agg,
+        )
+        if not isinstance(fallback_data, dict):
+            return fallback_data
+        if not fd and not ld:
+            return fallback_data
+
+        observations = fallback_data.get("observations", []) or []
+
+        def _parse_date_str_local(value: str) -> datetime.date:
+            return datetime.date.fromisoformat(value)
+
+        fd_date = _parse_date_str_local(fd) if fd else None
+        ld_date = _parse_date_str_local(ld) if ld else None
+
+        filtered_observations = []
+        for row in observations:
+            row_date_raw = row.get("date") if isinstance(row, dict) else None
+            if not row_date_raw:
+                continue
+            try:
+                row_date = _parse_date_str_local(str(row_date_raw))
+            except Exception:
+                continue
+            if fd_date and row_date < fd_date:
+                continue
+            if ld_date and row_date > ld_date:
+                continue
+            filtered_observations.append(row)
+
+        fallback_data["observations"] = filtered_observations
+        meta = fallback_data.get("meta", {}) or {}
+        if fd:
+            meta["firstdate"] = fd
+        if ld:
+            meta["lastdate"] = ld
+        fallback_data["meta"] = meta
+        return fallback_data
+
     # Cache siempre con fechas auto (serie completa); fd/ld solo para filtro posterior
     cache_key = _make_cache_key(series_id, None, None, target_frequency, agg)
     logger.info(
@@ -828,16 +872,7 @@ def get_series_from_redis(
             "[get_series_from_redis] Redis no disponible; "
             "usando fallback a get_series_api_rest_bcch."
         )
-        return (
-            get_series_api_rest_bcch(
-                series_id=series_id,
-                target_date=ld,
-                target_frequency=target_frequency,
-                agg=agg,
-            )
-            if use_fallback
-            else None
-        )
+        return _fetch_fallback_and_filter() if use_fallback else None
 
     try:
         raw = client.get(cache_key)
@@ -848,12 +883,7 @@ def get_series_from_redis(
         _redis_client = None  # forzar reintento en próximas peticiones
         if not use_fallback:
             return None
-        return get_series_api_rest_bcch(
-            series_id=series_id,
-            target_date=ld,
-            target_frequency=target_frequency,
-            agg=agg,
-        )
+        return _fetch_fallback_and_filter()
     if raw is None:
         logger.info(
             f"[get_series_from_redis] Clave no encontrada en Redis | key='{cache_key}'"
@@ -861,12 +891,7 @@ def get_series_from_redis(
         if not use_fallback:
             return None
         # Poblar Redis llamando a la API
-        return get_series_api_rest_bcch(
-            series_id=series_id,
-            target_date=ld,
-            target_frequency=target_frequency,
-            agg=agg,
-        )
+        return _fetch_fallback_and_filter()
 
     try:
         data = json.loads(raw)
@@ -879,12 +904,7 @@ def get_series_from_redis(
         )
         if not use_fallback:
             return None
-        return get_series_api_rest_bcch(
-            series_id=series_id,
-            target_date=ld,
-            target_frequency=target_frequency,
-            agg=agg,
-        )
+        return _fetch_fallback_and_filter()
 
     obs = data.get("observations", [])
 

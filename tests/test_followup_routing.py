@@ -175,7 +175,7 @@ def test_followup_macro_zero_and_other_recovers_previous_method_intent():
     assert result["entities"][0]["indicator"] == "pib"
 
 
-def test_followup_macro_zero_and_value_recovers_previous_method_intent_when_generic():
+def test_followup_macro_zero_and_value_with_indicator_routes_data():
     prev_record = _build_prev_record(intent="method", macro=1, indicator="pib", turn_id=7)
     classification = _make_classification(
         intent="value",
@@ -204,13 +204,13 @@ def test_followup_macro_zero_and_value_recovers_previous_method_intent_when_gene
         }
     )
 
-    assert result["route_decision"] == "rag"
-    assert result["intent"]["intent_cls"] == "method"
+    assert result["route_decision"] == "data"
+    assert result["intent"]["intent_cls"] == "value"
     assert result["intent"]["macro_cls"] == 1
     assert result["entities"][0]["indicator"] == "pib"
 
 
-def test_followup_macro_zero_recovers_previous_method_with_nested_routing_payload():
+def test_followup_macro_zero_value_with_nested_routing_payload_routes_data():
     prev_record = IntentRecord(
         intent="method",
         score=0.9,
@@ -264,9 +264,52 @@ def test_followup_macro_zero_recovers_previous_method_with_nested_routing_payloa
         }
     )
 
-    assert result["route_decision"] == "rag"
-    assert result["intent"]["intent_cls"] == "method"
+    assert result["route_decision"] == "data"
+    assert result["intent"]["intent_cls"] == "value"
     assert result["intent"]["macro_cls"] == 1
+    assert result["entities"][0]["indicator"] == "pib"
+
+
+def test_followup_value_without_explicit_indicator_prefers_previous_indicator():
+    prev_record = _build_prev_record(intent="method", macro=1, indicator="pib", turn_id=11)
+    classification = _make_classification(
+        intent="value",
+        context="followup",
+        macro=1,
+        intent_raw={
+            "routing": {
+                "intent": {"label": "value"},
+                "macro": {"label": 1},
+                "context": {"label": "followup"},
+            }
+        },
+        predict_raw={
+            "interpretation": {
+                "entities": {},
+                "slot_tags": ["O", "O", "O", "O", "O"],
+                "entities_normalized": {
+                    "indicator": ["imacec"],
+                    "seasonality": ["nsa"],
+                    "frequency": ["m"],
+                    "period": ["2026-02-01", "2026-02-28"],
+                },
+            }
+        },
+    )
+    node = make_intent_node(None, StubIntentStore([prev_record]))
+
+    result = node(
+        {
+            "question": "cual fue su ultimo valor",
+            "session_id": "s2e",
+            "user_turn_id": 12,
+            "classification": classification,
+            "entities": [],
+        }
+    )
+
+    assert result["route_decision"] == "data"
+    assert result["intent"]["intent_cls"] == "value"
     assert result["entities"][0]["indicator"] == "pib"
 
 
@@ -307,7 +350,7 @@ def test_followup_value_region_specific_backfills_indicator_and_time_fields():
     assert result["entities"][0]["seasonality"] == "sa"
 
 
-def test_followup_value_activity_specific_sets_pib_when_indicator_missing():
+def test_followup_value_activity_specific_uses_previous_indicator_when_missing():
     prev_record = _build_prev_record(intent="value", macro=1, indicator="imacec")
     classification = _make_classification(
         intent="value",
@@ -332,10 +375,10 @@ def test_followup_value_activity_specific_sets_pib_when_indicator_missing():
     )
 
     assert result["route_decision"] == "data"
-    assert result["entities"][0]["indicator"] == "pib"
+    assert result["entities"][0]["indicator"] == "imacec"
 
 
-def test_followup_value_activity_specific_sets_imacec_when_indicator_missing():
+def test_followup_value_activity_specific_uses_previous_indicator_when_missing_imacec():
     prev_record = _build_prev_record(intent="value", macro=1, indicator="pib")
     classification = _make_classification(
         intent="value",
@@ -360,7 +403,7 @@ def test_followup_value_activity_specific_sets_imacec_when_indicator_missing():
     )
 
     assert result["route_decision"] == "data"
-    assert result["entities"][0]["indicator"] == "imacec"
+    assert result["entities"][0]["indicator"] == "pib"
 
 
 def test_followup_value_activity_comercio_uses_previous_indicator():
@@ -521,7 +564,11 @@ def test_followup_value_without_matching_rule_routes_fallback():
         }
     )
 
-    assert result["route_decision"] == "fallback"
+    assert result["route_decision"] == "data"
+    assert result["entities"][0]["indicator"] == "imacec"
+    assert result["entities"][0]["period"] == "2023"
+    assert result["entities"][0]["frequency"] == "m"
+    assert result["entities"][0]["seasonality"] == "sa"
 
 
 def test_standalone_other_keeps_fallback_even_when_predict_signals_value():

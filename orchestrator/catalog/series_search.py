@@ -409,6 +409,11 @@ def select_target_series_by_classification(
             if ok:
                 return row
 
+    # Si se proporcionaron filtros de clasificación y ninguno matcheó,
+    # no aplicar fallback silencioso al primer elemento.
+    if normalized_filters:
+        return None
+
     if not fallback_to_first:
         return None
 

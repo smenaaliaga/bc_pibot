@@ -79,14 +79,19 @@ def resolve_followup_route(
     prev_root = predict_payload_root(prev_predict_raw)
     prev_norm = as_dict(prev_root.get("entities_normalized"))
 
+    entities_payload = as_dict(payload_root.get("entities"))
+    slot_tags = payload_root.get("slot_tags")
+    has_raw_indicator = not is_empty_value(entities_payload.get("indicator"))
+    if not has_raw_indicator and isinstance(slot_tags, list):
+        has_raw_indicator = any(str(tag or "").strip().lower() == "b-indicator" for tag in slot_tags)
+
     is_first_turn = bool(current_turn_id in (None, 0, 1))
     if is_first_turn:
         explicit_indicator = has_explicit_indicator(payload_root)
-        entities_payload = as_dict(payload_root.get("entities"))
         has_explicit_region = not is_empty_value(entities_payload.get("region"))
         has_explicit_signal = explicit_indicator or has_explicit_region
 
-        if has_explicit_signal and macro_label not in (0, "0", False):
+        if has_explicit_signal:
             context_label = "standalone"
             if normalized_intent == "value":
                 decision = "data"
@@ -115,12 +120,13 @@ def resolve_followup_route(
         }
 
     macro_from_api_is_zero = macro_label in (0, "0")
-    if macro_from_api_is_zero or normalized_intent in {"", "none", "other"}:
+    if macro_from_api_is_zero:
         prev_macro = routing_label(prev_intent_raw, "macro")
-        prev_intent = routing_label(prev_intent_raw, "intent")
-        if macro_from_api_is_zero and prev_macro is not None:
+        if prev_macro is not None:
             macro_label = prev_macro
-        if (macro_from_api_is_zero or normalized_intent in {"", "none", "other"}) and not is_empty_value(prev_intent):
+    if normalized_intent in {"", "none", "other"}:
+        prev_intent = routing_label(prev_intent_raw, "intent")
+        if not is_empty_value(prev_intent):
             normalized_intent = normalize_intent_label(prev_intent)
 
     indicator_missing = is_empty_value(current_norm.get("indicator"))
@@ -135,33 +141,44 @@ def resolve_followup_route(
 
         applied_rule = False
 
-        if region_label == "specific" and not is_empty_value(current_norm.get("region")) and indicator_missing:
-            if not is_empty_value(prev_indicator):
-                current_norm["indicator"] = prev_indicator
-                applied_rule = True
-        elif activity_label == "specific" and indicator_missing and activity_value in _PIB_ACTIVITY_HINTS:
-            current_norm["indicator"] = "pib"
-            applied_rule = True
-        elif activity_label == "specific" and indicator_missing and activity_value in _IMACEC_ACTIVITY_HINTS:
-            current_norm["indicator"] = "imacec"
-            applied_rule = True
-        elif activity_label == "specific" and indicator_missing and activity_value in _PREVIOUS_ACTIVITY_HINTS:
-            if not is_empty_value(prev_indicator):
-                current_norm["indicator"] = prev_indicator
-                applied_rule = True
-        elif investment_label == "specific" and not is_empty_value(current_norm.get("investment")) and indicator_missing:
-            if not is_empty_value(prev_indicator):
-                current_norm["indicator"] = prev_indicator
-                applied_rule = True
-
-        if applied_rule:
+        if not indicator_missing and not has_raw_indicator and not is_empty_value(prev_indicator):
+            current_norm["indicator"] = prev_indicator
+            _backfill_time_fields(current_norm, prev_norm)
+            decision = "data"
+        elif not indicator_missing:
             _backfill_time_fields(current_norm, prev_norm)
             decision = "data"
         else:
-            decision = "fallback"
+            if not is_empty_value(prev_indicator):
+                current_norm["indicator"] = prev_indicator
+                applied_rule = True
+            elif region_label == "specific" and not is_empty_value(current_norm.get("region")) and indicator_missing:
+                if not is_empty_value(prev_indicator):
+                    current_norm["indicator"] = prev_indicator
+                    applied_rule = True
+            elif activity_label == "specific" and indicator_missing and activity_value in _PIB_ACTIVITY_HINTS:
+                current_norm["indicator"] = "pib"
+                applied_rule = True
+            elif activity_label == "specific" and indicator_missing and activity_value in _IMACEC_ACTIVITY_HINTS:
+                current_norm["indicator"] = "imacec"
+                applied_rule = True
+            elif activity_label == "specific" and indicator_missing and activity_value in _PREVIOUS_ACTIVITY_HINTS:
+                if not is_empty_value(prev_indicator):
+                    current_norm["indicator"] = prev_indicator
+                    applied_rule = True
+            elif investment_label == "specific" and not is_empty_value(current_norm.get("investment")) and indicator_missing:
+                if not is_empty_value(prev_indicator):
+                    current_norm["indicator"] = prev_indicator
+                    applied_rule = True
+
+            if applied_rule:
+                _backfill_time_fields(current_norm, prev_norm)
+                decision = "data"
+            else:
+                decision = "fallback"
 
     elif normalized_intent == "method":
-        if not explicit_indicator:
+        if not has_raw_indicator:
             if is_empty_value(prev_indicator):
                 decision = "fallback"
             else:

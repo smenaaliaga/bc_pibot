@@ -230,82 +230,82 @@ REGION_TERMS = {
     "arica_parinacota": [
         "arica y parinacota", "arica", "parinacota", "región de arica y parinacota",
         "región xv", "xv región", "región 15", "región n°15", "región nro 15",
-        "decimoquinta región", "15va región", "15m región",
+        "decimoquinta región", "15va región", "15m región","xv"
     ],
     "tarapaca": [
         "tarapacá", "tarapaca", "región de tarapacá", "región i", "i región",
         "región 1", "región n°1", "región nro 1", "primera región",
-        "1ra región", "1a región", "1m región",
+        "1ra región", "1a región", "1m región", "i"
     ],
     "antofagasta": [
         "antofagasta", "región de antofagasta", "región ii", "ii región",
         "región 2", "región n°2", "región nro 2", "segunda región",
-        "2da región", "2a región", "2m región",
+        "2da región", "2a región", "2m región", "ii"
     ],
     "atacama": [
         "atacama", "región de atacama", "región iii", "iii región",
         "región 3", "región n°3", "región nro 3", "tercera región",
-        "3ra región", "3a región", "3m región",
+        "3ra región", "3a región", "3m región","iii"
     ],
     "coquimbo": [
         "coquimbo", "región de coquimbo", "región iv", "iv región",
         "región 4", "región n°4", "región nro 4", "cuarta región",
-        "4ta región", "4a región", "4m región",
+        "4ta región", "4a región", "4m región","iv"
     ],
     "valparaiso": [
         "valparaíso", "valparaiso", "región de valparaíso",
         "región del valparaíso", "región v", "v región", "región 5",
         "región n°5", "región nro 5", "quinta región", "5ta región",
-        "5a región", "5m región",
+        "5a región", "5m región","v"
     ],
     "metropolitana": [
         "región metropolitana", "metropolitana", "rm", "r.m.", "santiago",
         "región de santiago", "región metropolitana de santiago",
         "región central", "región xiii", "xiii región", "región 13",
         "región n°13", "región nro 13", "decimotercera región",
-        "13va región", "13m región",
+        "13va región", "13m región","xiii"
     ],
     "ohiggins": [
         "región del libertador general bernardo o'higgins",
         "libertador general bernardo o'higgins", "región del libertador",
         "región de o'higgins", "o'higgins", "o higgins", "región vi",
         "vi región", "región 6", "región n°6", "región nro 6",
-        "sexta región", "6ta región", "6a región", "6m región",
+        "sexta región", "6ta región", "6a región", "6m región","vi"
     ],
     "maule": [
         "maule", "región del maule", "región de maule", "región vii",
         "vii región", "región 7", "región n°7", "región nro 7",
         "séptima región", "septima región", "7ma región", "7a región",
-        "7m región",
+        "7m región","vii"
     ],
     "nuble": [
         "ñuble", "nuble", "región de ñuble", "región xvi", "xvi región",
         "región 16", "región n°16", "región nro 16", "decimosexta región",
-        "16va región", "16a región", "16m región",
+        "16va región", "16a región", "16m región","xvi"
     ],
     "biobio": [
         "biobío", "biobio", "región del biobío", "región de biobío",
         "región viii", "viii región", "región 8", "región n°8",
         "región nro 8", "octava región", "8va región", "8a región",
-        "8m región",
+        "8m región","viii"
     ],
     "araucania": [
         "araucanía", "araucania", "región de la araucanía",
         "región de araucanía", "región ix", "ix región", "región 9",
         "región n°9", "región nro 9", "novena región", "9na región",
-        "9a región", "9m región",
+        "9a región", "9m región","ix"
     ],
     "los_rios": [
         "los ríos", "los rios", "región de los ríos", "región los ríos",
         "región xiv", "xiv región", "región 14", "región n°14",
         "región nro 14", "decimocuarta región", "14va región",
-        "14a región", "14m región",
+        "14a región", "14m región", 'rios', "xiv"
     ],
     "los_lagos": [
         "los lagos", "región de los lagos", "región los lagos",
         "región x", "x región", "región 10", "región n°10",
         "región nro 10", "décima región", "decima región", "10ma región",
-        "10a región", "10m región",
+        "10a región", "10m región", 'lagos', "x"
     ],
     "aysen": [
         "aysén", "aysen", "región de aysén",
@@ -313,7 +313,7 @@ REGION_TERMS = {
         "aysén del general carlos ibáñez del campo", "región xi",
         "xi región", "región 11", "región n°11", "región nro 11",
         "undécima región", "undecima región", "11va región", "11a región",
-        "11m región",
+        "11m región","xi"
     ],
     "magallanes": [
         "magallanes", "región de magallanes",
@@ -321,7 +321,7 @@ REGION_TERMS = {
         "magallanes y de la antártica chilena", "punta arenas",
         "región xii", "xii región", "región 12", "región n°12",
         "región nro 12", "duodécima región", "duodecima región",
-        "12va región", "12a región", "12m región",
+        "12va región", "12a región", "12m región", 'xii '
     ],
 }
 
@@ -363,9 +363,29 @@ INVESTMENT_TERMS = {
 
 # Mapa de períodos implícitos a convertir
 PERIOD_LATEST_TERMS = [
-    "última", "ultima", "último", "ultimo", "reciente", "recientemente",
-    "último dato", "ultima cifra", "última cifra", "último dato disponible",
-    "cifra más reciente", "última publicación", "data más reciente",
+    "última", "ultima", "último", "ultimo", "ultimos", "últimos", "ultimas", "últimas",
+    "reciente", "recientemente", "más reciente", "mas reciente", "lo más reciente", "lo mas reciente",
+    "último dato", "ultimo dato", "último dato disponible", "ultimo dato disponible",
+    "ultima cifra", "última cifra", "ultima observacion", "última observación",
+    "última publicación", "ultima publicacion", "último registro", "ultimo registro",
+    "dato más reciente", "dato mas reciente", "cifra más reciente", "cifra mas reciente",
+    "valor más reciente", "valor mas reciente", "último valor", "ultimo valor",
+    "mas nuevo", "más nuevo", "al día", "al dia", "vigente", "actual",
+    "dato vigente", "dato actual", "ultima lectura", "última lectura",
+]
+
+PERIOD_LATEST_REGEX_PATTERNS = [
+    r"\bultim[oa]s?\b",
+    r"\breciente(s)?\b",
+    r"\bmas\s+reciente(s)?\b",
+    r"\bultimo\s+dato(s)?\b",
+    r"\bultimo\s+dato\s+disponible\b",
+    r"\bdato\s+disponible\b",
+    r"\bultima\s+cifra\b",
+    r"\bcifra\s+mas\s+reciente\b",
+    r"\bultimo\s+registro\b",
+    r"\bultima\s+lectura\b",
+    r"\bal\s+dia\b",
 ]
 
 # Números de meses y trimestres para conversión
@@ -444,6 +464,61 @@ def _normalize_text(text: str) -> str:
         text = text.replace(accented, unaccented)
     
     return text
+
+
+def _has_explicit_year(text: str) -> bool:
+    return bool(re.search(r"\b20\d{2}\b", _normalize_text(text)))
+
+
+def _contains_latest_reference(text: str) -> bool:
+    normalized = _normalize_text(text)
+    if not normalized:
+        return False
+
+    if any(term in normalized for term in PERIOD_LATEST_TERMS):
+        return True
+
+    return any(re.search(pattern, normalized) for pattern in PERIOD_LATEST_REGEX_PATTERNS)
+
+
+def _detect_latest_granularity_from_text(text: str) -> Optional[str]:
+    normalized = _normalize_text(text)
+    if not normalized or not _contains_latest_reference(normalized):
+        return None
+
+    if _has_explicit_year(normalized):
+        return None
+
+    if re.search(r"\btrimestre(s)?\b|\b[tq]\s*[1-4]\b|\b[tq][1-4]\b", normalized):
+        return "q"
+    if re.search(r"\bmes(es)?\b|\bmensual(es)?\b", normalized):
+        return "m"
+    if re.search(r"\bano(s)?\b|\banual(es)?\b", normalized):
+        return "a"
+    return None
+
+
+def _infer_relative_latest_granularity(raw_values: List[str], frequency: Optional[str]) -> Optional[str]:
+    default_frequency = str(frequency or "").strip().lower()
+    if default_frequency not in {"m", "q", "a"}:
+        default_frequency = None
+
+    has_latest_without_explicit_year = False
+    for raw in raw_values:
+        if not raw:
+            continue
+
+        inferred_from_text = _detect_latest_granularity_from_text(raw)
+        if inferred_from_text:
+            return inferred_from_text
+
+        if _contains_latest_reference(raw) and not _has_explicit_year(raw):
+            has_latest_without_explicit_year = True
+
+    if has_latest_without_explicit_year:
+        return default_frequency
+
+    return None
 
 
 def _similarity_ratio(a: str, b: str) -> float:
@@ -828,11 +903,9 @@ def normalize_period(period_value: Optional[str]) -> Tuple[Optional[str], List[s
     period_normalized = _normalize_text(period_value)
 
     # Caso 1: Términos implícitos (última, reciente, etc.)
-    for latest_term in PERIOD_LATEST_TERMS:
-        if _fuzzy_match(period_normalized, [latest_term], threshold=0.8):
-            # Usar fecha actual como fecha de último dato
-            today = datetime.now()
-            return _format_month_start(today), []
+    if _contains_latest_reference(period_normalized):
+        today = datetime.now()
+        return _format_month_start(today), []
 
     # Caso 2: Año explícito (ej: "2024") o implícito (año actual)
     year_match = re.search(r'\b(20\d{2})\b', period_normalized)
@@ -1232,6 +1305,10 @@ def _infer_frequency_from_period_for_point(raw_values: List[str]) -> Optional[st
     if not valid_values:
         return None
 
+    relative_granularity = _infer_relative_latest_granularity(valid_values, None)
+    if relative_granularity in {"m", "q", "a"}:
+        return relative_granularity
+
     if any(_has_quarter_reference(raw) for raw in valid_values):
         return "q"
 
@@ -1305,6 +1382,19 @@ def _resolve_period_value(
     - range  -> [fecha_inicio, fecha_fin]
     """
     candidate_dates: List[str] = []
+    req_form_norm = (req_form or "").strip().lower()
+    relative_latest_granularity = _infer_relative_latest_granularity(raw_values, frequency)
+    if relative_latest_granularity:
+        now = datetime.now()
+        if relative_latest_granularity == "q":
+            prev_quarter = _previous_quarter_anchor(now)
+            return [_format_quarter_start(prev_quarter), _format_quarter_end(prev_quarter)]
+        if relative_latest_granularity == "a":
+            prev_year = _previous_year_anchor(now)
+            return [_format_year_start(prev_year), f"{prev_year.year:04d}-12-31"]
+        prev_month = _previous_month_anchor(now)
+        return [_format_month_start(prev_month), _format_month_end(prev_month)]
+
     is_quarterly_context = (frequency == "q") or any(_has_quarter_reference(raw) for raw in raw_values if raw)
     has_year_only_reference = False
 
@@ -1345,8 +1435,6 @@ def _resolve_period_value(
         base_period = base_normalized.get("period")
         if base_period:
             candidate_dates.append(base_period)
-
-    req_form_norm = (req_form or "").strip().lower()
 
     if not candidate_dates:
         if req_form_norm == "latest":
