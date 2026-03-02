@@ -21,7 +21,7 @@ def test_first_turn_explicit_indicator_routes_standalone_data():
     assert result["context_label"] == "standalone"
 
 
-def test_macro_zero_recovers_previous_method_and_routes_rag():
+def test_macro_zero_value_with_indicator_routes_data():
     result = resolve_followup_route(
         normalized_intent="value",
         context_label="followup",
@@ -49,13 +49,16 @@ def test_macro_zero_recovers_previous_method_and_routes_rag():
         },
     )
 
-    assert result["decision"] == "rag"
-    assert result["normalized_intent"] == "method"
+    assert result["decision"] == "data"
+    assert result["normalized_intent"] == "value"
     assert result["macro_label"] == 1
     assert result["current_norm"]["indicator"] == "pib"
+    assert result["current_norm"]["period"] == "2023"
+    assert result["current_norm"]["frequency"] == "q"
+    assert result["current_norm"]["seasonality"] == "nsa"
 
 
-def test_value_activity_specific_assigns_pib_and_backfills_time_fields():
+def test_value_activity_specific_backfills_previous_indicator_and_time_fields():
     result = resolve_followup_route(
         normalized_intent="value",
         context_label="followup",
@@ -86,7 +89,43 @@ def test_value_activity_specific_assigns_pib_and_backfills_time_fields():
     )
 
     assert result["decision"] == "data"
-    assert result["current_norm"]["indicator"] == "pib"
+    assert result["current_norm"]["indicator"] == "imacec"
+    assert result["current_norm"]["period"] == "2023"
+    assert result["current_norm"]["frequency"] == "m"
+    assert result["current_norm"]["seasonality"] == "sa"
+
+
+def test_value_missing_indicator_backfills_previous_when_no_specifics():
+    result = resolve_followup_route(
+        normalized_intent="value",
+        context_label="followup",
+        macro_label=1,
+        current_turn_id=4,
+        payload_root={"entities": {}, "slot_tags": ["O", "O"]},
+        current_intents={"activity": {"label": "general"}},
+        current_norm={
+            "indicator": None,
+            "period": None,
+            "frequency": None,
+            "seasonality": None,
+        },
+        prev_intent_raw={
+            "intent": {"label": "value"},
+            "macro": {"label": 1},
+            "context": {"label": "standalone"},
+        },
+        prev_predict_raw={
+            "entities_normalized": {
+                "indicator": "imacec",
+                "period": "2023",
+                "frequency": "m",
+                "seasonality": "sa",
+            }
+        },
+    )
+
+    assert result["decision"] == "data"
+    assert result["current_norm"]["indicator"] == "imacec"
     assert result["current_norm"]["period"] == "2023"
     assert result["current_norm"]["frequency"] == "m"
     assert result["current_norm"]["seasonality"] == "sa"
