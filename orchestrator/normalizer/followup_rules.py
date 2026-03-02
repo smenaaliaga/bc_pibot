@@ -79,10 +79,15 @@ def resolve_followup_route(
     prev_root = predict_payload_root(prev_predict_raw)
     prev_norm = as_dict(prev_root.get("entities_normalized"))
 
+    entities_payload = as_dict(payload_root.get("entities"))
+    slot_tags = payload_root.get("slot_tags")
+    has_raw_indicator = not is_empty_value(entities_payload.get("indicator"))
+    if not has_raw_indicator and isinstance(slot_tags, list):
+        has_raw_indicator = any(str(tag or "").strip().lower() == "b-indicator" for tag in slot_tags)
+
     is_first_turn = bool(current_turn_id in (None, 0, 1))
     if is_first_turn:
         explicit_indicator = has_explicit_indicator(payload_root)
-        entities_payload = as_dict(payload_root.get("entities"))
         has_explicit_region = not is_empty_value(entities_payload.get("region"))
         has_explicit_signal = explicit_indicator or has_explicit_region
 
@@ -136,11 +141,18 @@ def resolve_followup_route(
 
         applied_rule = False
 
-        if not indicator_missing:
+        if not indicator_missing and not has_raw_indicator and not is_empty_value(prev_indicator):
+            current_norm["indicator"] = prev_indicator
+            _backfill_time_fields(current_norm, prev_norm)
+            decision = "data"
+        elif not indicator_missing:
             _backfill_time_fields(current_norm, prev_norm)
             decision = "data"
         else:
-            if region_label == "specific" and not is_empty_value(current_norm.get("region")) and indicator_missing:
+            if not is_empty_value(prev_indicator):
+                current_norm["indicator"] = prev_indicator
+                applied_rule = True
+            elif region_label == "specific" and not is_empty_value(current_norm.get("region")) and indicator_missing:
                 if not is_empty_value(prev_indicator):
                     current_norm["indicator"] = prev_indicator
                     applied_rule = True
@@ -166,7 +178,7 @@ def resolve_followup_route(
                 decision = "fallback"
 
     elif normalized_intent == "method":
-        if not explicit_indicator:
+        if not has_raw_indicator:
             if is_empty_value(prev_indicator):
                 decision = "fallback"
             else:

@@ -19,6 +19,25 @@ from ..state import (
 logger = logging.getLogger(__name__)
 
 
+def _first_non_empty(value: Any) -> Any:
+    if isinstance(value, list):
+        for item in value:
+            if item not in (None, "", [], {}, ()):
+                return item
+        return None
+    if value in (None, "", [], {}, ()):
+        return None
+    return value
+
+
+def _coerce_period(period_value: Any) -> List[Any]:
+    if period_value in (None, "", [], {}, ()):
+        return []
+    if isinstance(period_value, list):
+        return period_value
+    return [period_value]
+
+
 def _load_series_observations(
     *,
     series_id: Optional[str],
@@ -136,16 +155,30 @@ def make_data_node(memory_adapter: Any):
         investment_cls = getattr(classification, "investment", None) or {}
         req_form_cls = getattr(classification, "req_form", None) or {}
 
-        entities = getattr(classification, "entities", None) or {}
-        normalized = getattr(classification, "normalized", None) or {}
-        
-        indicator_ent = (normalized.get("indicator") or [None])[0]
-        seasonality_ent = (normalized.get("seasonality") or [None])[0]
-        frequency_ent = (normalized.get("frequency") or [None])[0]
-        activity_ent = (normalized.get("activity") or [None])[0]
-        region_ent = (normalized.get("region") or [None])[0]
-        investment_ent = (normalized.get("investment") or [None])[0]
-        period_ent = normalized.get("period")
+        classification_entities = getattr(classification, "entities", None) or {}
+        normalized_from_classification = getattr(classification, "normalized", None) or {}
+
+        interpretation_root = predict_raw.get("interpretation")
+        if not isinstance(interpretation_root, dict):
+            interpretation_root = predict_raw
+        interpretation_root = interpretation_root if isinstance(interpretation_root, dict) else {}
+
+        normalized_from_predict = interpretation_root.get("entities_normalized")
+        normalized_from_predict = normalized_from_predict if isinstance(normalized_from_predict, dict) else {}
+
+        # For follow-up turns, intent node mutates predict_raw.entities_normalized.
+        # Prefer that payload so downstream uses the resolved indicator/time fields.
+        normalized = normalized_from_predict or (
+            normalized_from_classification if isinstance(normalized_from_classification, dict) else {}
+        )
+
+        indicator_ent = _first_non_empty(normalized.get("indicator"))
+        seasonality_ent = _first_non_empty(normalized.get("seasonality"))
+        frequency_ent = _first_non_empty(normalized.get("frequency"))
+        activity_ent = _first_non_empty(normalized.get("activity"))
+        region_ent = _first_non_empty(normalized.get("region"))
+        investment_ent = _first_non_empty(normalized.get("investment"))
+        period_ent = _coerce_period(normalized.get("period"))
         
         # REGLAS DE NEGOCIO PARA TRASLADAR !
         activity_cls_resolved = activity_cls
@@ -160,7 +193,7 @@ def make_data_node(memory_adapter: Any):
         logger.info("[DATA_NODE !!!] region=%s", region_cls)
         logger.info("[DATA_NODE !!!] investment=%s", investment_cls)
         logger.info("[DATA_NODE !!!] req_form=%s", req_form_cls)
-        logger.info("[DATA_NODE !!!] entities=%s", entities)
+        logger.info("[DATA_NODE !!!] entities=%s", classification_entities)
         logger.info("[DATA_NODE !!!] normalized=%s", normalized)
         
         logger.info("[DATA_NODE !!!] indicator=%s", indicator_ent)
@@ -251,8 +284,8 @@ def make_data_node(memory_adapter: Any):
         ## Obtener data 
         ####################
         
-        firstdate = str(period_ent[0])
-        lastdate = str(period_ent[-1])
+        firstdate = str(period_ent[0]) if period_ent else None
+        lastdate = str(period_ent[-1]) if period_ent else None
         observations: List[Dict[str, Any]] = []
         observations_all: List[Dict[str, Any]] = []
         latest_obs: Optional[Dict[str, Any]] = None
@@ -337,9 +370,9 @@ def make_data_node(memory_adapter: Any):
                 },
                 "series": target_series_id,
                 "series_title": target_series_title or family_name or None,
-                "parsed_point": str(period_ent[-1]) if req_form_cls != "range" else None,
-                "parsed_range": (str(period_ent[0]), str(period_ent[-1])),
-                "reference_period": str(period_ent[-1] or period_ent[0]),
+                "parsed_point": str(period_ent[-1]) if req_form_cls != "range" and period_ent else None,
+                "parsed_range": (str(period_ent[0]), str(period_ent[-1])) if period_ent else None,
+                "reference_period": str(period_ent[-1]) if period_ent else None,
                 "result": observations,
                 "all_series_data": observations_all or None,
                 "source_url": target_series_url,
