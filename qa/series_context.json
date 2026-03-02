@@ -1,0 +1,3782 @@
+{
+  "qa-batch-20260302-004804-491029": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:48:04.538991+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:48:04.538991+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-004807-551750": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:48:07.589023+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:48:07.589023+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-004810-799965": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:48:10.821077+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:48:10.821077+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-004814-617971": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:48:14.643769+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:48:14.643769+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-004827-345029": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:48:27.369584+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:48:27.369584+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-004836-290749": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:48:36.311596+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:48:36.311596+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-004839-363892": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:48:39.387153+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:48:39.387153+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-004842-838476": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:48:42.860450+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:48:42.860450+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-004847-985718": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:48:48.008197+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:48:48.008197+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-004852-403867": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:48:52.425828+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:48:52.425828+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-004855-340507": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:48:55.362033+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:48:55.362033+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-004858-913374": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:48:58.935641+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:48:58.935641+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-004902-742145": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:49:02.762420+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:49:02.762420+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-004906-038601": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:49:06.059837+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:49:06.059837+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-004909-093469": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:49:09.114661+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:49:09.114661+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-004912-141054": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:49:12.158596+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:49:12.158596+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-004915-601106": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:49:15.621991+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:49:15.621991+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-004919-777866": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:49:19.803643+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:49:19.803643+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-004923-134562": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:49:23.158378+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:49:23.158378+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-004926-790593": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:49:26.809378+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:49:26.809378+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-004929-609248": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:49:29.630466+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:49:29.630466+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-004933-210309": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:49:33.232620+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:49:33.232620+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-004936-826583": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:49:36.848121+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:49:36.848121+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-004941-064837": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:49:41.088183+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:49:41.088183+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-004944-468813": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:49:44.493651+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:49:44.493651+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-004949-934788": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:49:49.957945+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:49:49.957945+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-004952-904380": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:49:52.926944+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:49:52.926944+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-004956-043557": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:49:56.067425+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:49:56.067425+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-004959-579604": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:49:59.601928+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:49:59.601928+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005003-086367": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:50:03.109185+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:50:03.109185+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005006-421265": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:50:06.442685+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:50:06.442685+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005009-818289": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:50:09.839957+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:50:09.839957+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005013-300158": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:50:13.318604+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:50:13.318604+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005016-892683": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:50:16.915184+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:50:16.915184+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005019-947923": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:50:19.971004+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:50:19.971004+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005022-957505": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:50:22.977424+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:50:22.977424+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005027-107542": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:50:27.128447+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:50:27.128447+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005030-407179": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:50:30.428769+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:50:30.428769+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005033-818301": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:50:33.837294+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:50:33.837294+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005037-288377": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:50:37.310427+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:50:37.310427+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005040-681971": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:50:40.705501+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:50:40.705501+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005044-196704": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:50:44.219347+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:50:44.219347+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005554-970409": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:55:55.013223+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:55:55.013223+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005557-953443": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:55:57.981534+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:55:57.981534+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005601-412790": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:56:01.434680+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:56:01.434680+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005604-687689": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:56:04.712861+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:56:04.712861+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005615-839984": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:56:15.860995+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:56:15.860995+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005623-371824": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:56:23.394730+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:56:23.394730+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005626-540112": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:56:26.560233+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:56:26.560233+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005629-522623": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:56:29.543064+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:56:29.543064+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005632-738097": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:56:32.759667+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:56:32.759667+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005636-010781": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:56:36.031213+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:56:36.031213+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005639-312806": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:56:39.335944+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:56:39.335944+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005642-635059": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:56:42.656002+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:56:42.656002+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005645-795032": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:56:45.816910+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:56:45.816910+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005649-049580": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:56:49.072303+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:56:49.072303+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005652-315835": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:56:52.335579+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:56:52.335579+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005655-155266": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:56:55.177681+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:56:55.177681+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005658-109455": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:56:58.131101+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:56:58.131101+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005701-488096": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:57:01.509841+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:57:01.509841+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005704-709437": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:57:04.732509+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:57:04.732509+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005707-775832": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:57:07.798180+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:57:07.798180+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005711-596851": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:57:11.613541+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:57:11.613541+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005714-594922": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:57:14.617977+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:57:14.617977+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005718-031199": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:57:18.053088+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:57:18.053088+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005721-699863": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:57:21.718646+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:57:21.718646+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005724-543352": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:57:24.565971+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:57:24.565971+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005731-171404": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:57:31.191424+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:57:31.191424+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005734-426689": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:57:34.449560+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:57:34.449560+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005737-380034": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:57:37.402725+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:57:37.402725+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005740-557092": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:57:40.582412+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:57:40.582412+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005743-263893": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:57:43.285480+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:57:43.285480+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005746-426342": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:57:46.443835+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:57:46.443835+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005749-495787": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:57:49.518152+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:57:49.518152+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005752-337951": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:57:52.361830+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:57:52.361830+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005755-486770": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:57:55.508479+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:57:55.508479+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005759-046801": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:57:59.069642+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:57:59.069642+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005802-467691": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:58:02.489491+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:58:02.489491+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005805-552904": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:58:05.577110+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:58:05.577110+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005808-225906": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:58:08.246983+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:58:08.246983+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005811-637461": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:58:11.654593+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:58:11.654593+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005814-979988": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:58:15.003550+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:58:15.003550+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005818-599059": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:58:18.619898+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:58:18.619898+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005822-149215": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:58:22.172633+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:58:22.172633+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005913-099335": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:59:14.561349+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:59:14.561349+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005917-272225": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:59:17.298476+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:59:17.298476+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005920-240377": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:59:20.262235+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:59:20.262235+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005922-919424": {
+    "active_series": {
+      "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+      "indicator": "imacec",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:59:22.941990+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        "indicator": "imacec",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:59:22.941990+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005934-617938": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:59:34.638391+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:59:34.638391+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005943-015466": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:59:44.100231+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:59:44.100231+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005946-936832": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:59:46.957109+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:59:46.957109+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005949-682573": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:59:49.703075+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:59:49.703075+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005952-304295": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:59:52.325708+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:59:52.325708+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005955-392597": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:59:55.411255+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:59:55.411255+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-005958-597479": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T00:59:58.619929+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T00:59:58.619929+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-010001-477352": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T01:00:01.498335+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T01:00:01.498335+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-010005-212469": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T01:00:05.230955+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T01:00:05.230955+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-010008-213705": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T01:00:08.236020+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T01:00:08.236020+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-010011-694378": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T01:00:11.712306+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T01:00:11.712306+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-010014-961703": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T01:00:14.983258+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T01:00:14.983258+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-010017-265299": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T01:00:17.286636+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T01:00:17.286636+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-010019-995401": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T01:00:20.016979+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T01:00:20.016979+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-010022-908539": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T01:00:22.931003+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T01:00:22.931003+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-010025-468162": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T01:00:25.488378+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T01:00:25.488378+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-010029-138099": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T01:00:29.160982+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T01:00:29.160982+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-010032-160848": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T01:00:32.183063+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T01:00:32.183063+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-010035-262434": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T01:00:35.280915+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T01:00:35.280915+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-010038-289086": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T01:00:38.305578+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T01:00:38.305578+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-010041-379612": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T01:00:41.402580+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T01:00:41.402580+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-010048-391963": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T01:00:48.414575+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T01:00:48.414575+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-010051-342586": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T01:00:51.362201+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T01:00:51.362201+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-010054-380879": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T01:00:54.403027+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T01:00:54.403027+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-010057-525604": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T01:00:57.546091+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T01:00:57.546091+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-010100-775177": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T01:01:00.794469+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T01:01:00.794469+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-010104-189615": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T01:01:04.211457+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T01:01:04.211457+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-010108-039289": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T01:01:08.060165+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T01:01:08.060165+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-010111-223212": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T01:01:11.283306+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T01:01:11.283306+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-010114-398330": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T01:01:14.417216+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T01:01:14.417216+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-010117-699638": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T01:01:17.745745+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T01:01:17.745745+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-010121-210171": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T01:01:21.229085+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T01:01:21.229085+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-010124-420037": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T01:01:24.440969+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T01:01:24.440969+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-010127-612458": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T01:01:27.632248+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T01:01:27.632248+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-010131-266619": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T01:01:31.286187+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T01:01:31.286187+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-010134-311496": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T01:01:34.331941+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T01:01:34.331941+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-010137-339040": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T01:01:37.361422+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T01:01:37.361422+00:00",
+        "series_changed": false
+      }
+    ]
+  },
+  "qa-batch-20260302-010140-558745": {
+    "active_series": {
+      "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+      "indicator": "pib",
+      "freq": "m",
+      "req_form": "latest",
+      "parsed_point": null,
+      "parsed_range_start": null,
+      "parsed_range_end": null,
+      "reference_period": null,
+      "calc_mode": null,
+      "updated_at": "2026-03-02T01:01:40.582180+00:00",
+      "series_changed": false
+    },
+    "history": [
+      {
+        "series_id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T",
+        "indicator": "pib",
+        "freq": "m",
+        "req_form": "latest",
+        "parsed_point": null,
+        "parsed_range_start": null,
+        "parsed_range_end": null,
+        "reference_period": null,
+        "calc_mode": null,
+        "updated_at": "2026-03-02T01:01:40.582180+00:00",
+        "series_changed": false
+      }
+    ]
+  }
+}

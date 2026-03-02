@@ -1,34 +1,41 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PIBOT_API_DIR="/Users/hernanfernandez/Documents/01 Workspace/Notebooks/pibot_api"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+INTENT_API_DIR="$PROJECT_ROOT/docker/intent_api"
 
-cd "$PIBOT_API_DIR"
-
-if [[ -f ".venv/bin/activate" ]]; then
-  # shellcheck disable=SC1091
-  source ".venv/bin/activate"
-else
-  echo "No se encontró .venv en $PIBOT_API_DIR" >&2
+if [[ ! -d "$INTENT_API_DIR" ]]; then
+  echo "No se encontró directorio intent_api en $INTENT_API_DIR" >&2
   exit 1
 fi
 
-uvicorn app.main:app --reload &
-UVICORN_PID=$!
+if [[ -x "$PROJECT_ROOT/.venv/bin/python" ]]; then
+  PYTHON_BIN="$PROJECT_ROOT/.venv/bin/python"
+elif [[ -n "${VIRTUAL_ENV:-}" ]]; then
+  PYTHON_BIN="$VIRTUAL_ENV/bin/python"
+elif command -v python3 >/dev/null 2>&1; then
+  PYTHON_BIN="$(command -v python3)"
+elif command -v python >/dev/null 2>&1; then
+  PYTHON_BIN="$(command -v python)"
+else
+  echo "No se encontró Python en PATH." >&2
+  exit 1
+fi
 
-cleanup() {
-  if ps -p "$UVICORN_PID" >/dev/null 2>&1; then
-    kill "$UVICORN_PID"
+cd "$INTENT_API_DIR"
+
+if ! "$PYTHON_BIN" -c "import fastapi, uvicorn, email_validator" >/dev/null 2>&1; then
+  echo "Instalando dependencias locales de API..."
+  if ! "$PYTHON_BIN" -m pip --version >/dev/null 2>&1; then
+    "$PYTHON_BIN" -m ensurepip --upgrade
   fi
-}
-trap cleanup EXIT
+  "$PYTHON_BIN" -m pip install -r requirements.txt
+fi
 
-# Espera breve para que el servidor levante
-sleep 5
+APP_MODULE="intent_api.app:app"
+HOST="${HOST:-0.0.0.0}"
+PORT="${PORT:-8000}"
 
-curl -X POST http://localhost:8000/predict \
-  -H "Content-Type: application/json" \
-  -d '{"text": "cual es el valor del imacec"}'
-
-# Mantener el servidor activo si el usuario lo desea
-wait "$UVICORN_PID"
+echo "Levantando API local en http://localhost:${PORT} (sin Docker)"
+exec "$PYTHON_BIN" -m uvicorn "$APP_MODULE" --host "$HOST" --port "$PORT" --reload

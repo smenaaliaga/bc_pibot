@@ -1,0 +1,5 @@
+{
+  "enabled": true,
+  "store_path": "qa/series_context.json",
+  "max_history": 5
+}

@@ -1,0 +1,28 @@
+{
+  "response_general": {
+    "title": "Regla 1: response_general",
+    "description": "Usar respuesta general cuando no exista serie identificada para la consulta.",
+    "conditions": {
+      "has_series": false
+    },
+    "result": "response_general"
+  },
+  "response_specific": {
+    "title": "Regla 2: response_specific",
+    "description": "Usar respuesta específica para consultas latest, range y point con serie válida.",
+    "conditions": {
+      "has_series": true,
+      "req_form_in": ["latest", "range", "point"]
+    },
+    "result": "response_specific"
+  },
+  "response_specific_point": {
+    "title": "Regla 3: response_specific_point",
+    "description": "Usar respuesta específica de punto cuando el tipo de consulta sea specific_point.",
+    "conditions": {
+      "has_series": true,
+      "req_form_in": ["specific_point"]
+    },
+    "result": "response_specific_point"
+  }
+}

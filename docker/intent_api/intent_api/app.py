@@ -1,6 +1,8 @@
 """FastAPI app exposing /intent for macro/intent/context classification."""
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import FastAPI
 from pydantic import BaseModel
 
@@ -20,6 +22,12 @@ class IntentResponse(BaseModel):
     context: LabelConfidence
 
 
+class PredictResponse(BaseModel):
+    text: str
+    routing: dict[str, Any]
+    interpretation: dict[str, Any]
+
+
 app = FastAPI(title="PIBot Intent API", version="0.1.0")
 
 
@@ -32,3 +40,20 @@ def health() -> dict:
 def intent_endpoint(payload: IntentRequest) -> IntentResponse:
     result = classify_intent(payload.text)
     return IntentResponse(**result)
+
+
+@app.post("/predict", response_model=PredictResponse)
+def predict_endpoint(payload: IntentRequest) -> PredictResponse:
+    routing = classify_intent(payload.text)
+    return PredictResponse(
+        text=payload.text,
+        routing=routing,
+        interpretation={
+            "text": payload.text,
+            "words": payload.text.split(),
+            "slot_tags": ["O"] * len(payload.text.split()),
+            "entities": {},
+            "entities_normalized": {},
+            "intents": {},
+        },
+    )

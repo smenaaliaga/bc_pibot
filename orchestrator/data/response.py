@@ -19,10 +19,14 @@ from __future__ import annotations
 #   - attachments: vacío
 
 import logging
+import re
+import tempfile
+from pathlib import Path
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from orchestrator.llm.llm_adapter import build_llm
+from rules.business_rule import resolve_response_rule
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +70,39 @@ def normalize_sources(source_url: Any) -> List[str]:
     if isinstance(source_url, str) and source_url.strip() and source_url.lower() != "none":
         return [source_url.strip()]
     return []
+
+
+def _normalize_text_field(value: Any) -> str:
+    text = str(value or "").strip()
+    if text.lower() in {"", "none", "null", "nan"}:
+        return ""
+    return text
+
+
+def _extract_year_int(value: Any) -> Optional[int]:
+    text = _normalize_text_field(value)
+    if not text:
+        return None
+    years = re.findall(r"\b(19\d{2}|20\d{2})\b", text)
+    if not years:
+        return None
+    try:
+        return max(int(year) for year in years)
+    except Exception:
+        return None
+
+
+def _has_year_posterior_than_limit(text: str, latest_available_period: Optional[str]) -> bool:
+    max_allowed_year = _extract_year_int(latest_available_period)
+    if max_allowed_year is None:
+        return False
+    generated_years = re.findall(r"\b(19\d{2}|20\d{2})\b", str(text or ""))
+    if not generated_years:
+        return False
+    try:
+        return any(int(year) > max_allowed_year for year in generated_years)
+    except Exception:
+        return False
 
 
 def format_period_labels(date_str: Optional[str], freq: str) -> list[str]:
@@ -166,6 +203,10 @@ def generate_csv_marker(
 
 
 def general_response(source_urls: List[str], *, series_id: Optional[str] = None) -> Iterable[str]:
+    response_type = resolve_response_rule(req_form="latest", series_id=series_id)
+    if response_type != "response_general":
+        logger.debug("[RESPONSE] Regla ajustada a %s para general_response", response_type)
+
     sections = ResponseSections(
         introduction=_general_intro(source_urls),
         metadata=_metadata_block(series_id),
@@ -174,6 +215,212 @@ def general_response(source_urls: List[str], *, series_id: Optional[str] = None)
         references=_general_references(source_urls),
         charts=(),
         attachments=(),
+    )
+    return compose_response(sections)
+
+
+def _build_specific_sections(
+    *,
+    req_form: str,
+    series_id: str,
+    series_title: Optional[str],
+    obs_to_show: List[Dict[str, Any]],
+    parsed_point: Optional[str],
+    parsed_range: Optional[Tuple[str, str]],
+    final_indicator_name: str,
+    indicator_context_val: Optional[str],
+    component_context_val: Optional[str],
+    seasonality_context_val: Optional[str],
+    metric_type_val: Optional[str],
+    calc_mode_cls: Optional[str],
+    intent_cls: Optional[str],
+    display_period_label: str,
+    freq: str,
+    date_range_label: str,
+    reference_period: Optional[str],
+    is_contribution: bool,
+    is_specific_activity: bool,
+    all_series_data: Optional[List[Dict[str, Any]]],
+    source_urls: List[str],
+    user_question: Optional[str],
+    conversation_context: Optional[str],
+    latest_available_period: Optional[str],
+    chart_context_series: Optional[List[str]],
+    intro_llm_temperature: float,
+) -> ResponseSections:
+    return ResponseSections(
+        introduction=_specific_intro(
+            req_form=req_form,
+            obs_to_show=obs_to_show,
+            parsed_point=parsed_point,
+            parsed_range=parsed_range,
+            final_indicator_name=final_indicator_name,
+            indicator_context_val=indicator_context_val,
+            component_context_val=component_context_val,
+            seasonality_context_val=seasonality_context_val,
+            metric_type_val=metric_type_val,
+            calc_mode_cls=calc_mode_cls,
+            series_title=series_title,
+            freq=freq,
+            display_period_label=display_period_label,
+            date_range_label=date_range_label,
+            reference_period=reference_period,
+            is_contribution=is_contribution,
+            is_specific_activity=is_specific_activity,
+            all_series_data=all_series_data,
+            user_question=user_question,
+            conversation_context=conversation_context,
+            latest_available_period=latest_available_period,
+            intro_llm_temperature=intro_llm_temperature,
+        ),
+        metadata=_metadata_block(series_id, series_title),
+        table=_specific_table(
+            req_form=req_form,
+            obs_to_show=obs_to_show,
+            is_contribution=is_contribution,
+            all_series_data=all_series_data,
+            freq=freq,
+        ),
+        suggestions=_specific_suggestions(
+            indicator_context_val=indicator_context_val,
+            component_context_val=component_context_val,
+            seasonality_context_val=seasonality_context_val,
+            final_indicator_name=final_indicator_name,
+            metric_type_val=metric_type_val,
+            intent_cls=intent_cls,
+            req_form=req_form,
+            display_period_label=display_period_label,
+        ),
+        references=_specific_references(
+            indicator_context_val=indicator_context_val,
+            is_contribution=is_contribution,
+            all_series_data=all_series_data,
+            source_urls=source_urls,
+        ),
+        charts=_default_charts(
+            series_id=series_id,
+            obs_to_show=obs_to_show,
+            req_form=req_form,
+            indicator_context_val=indicator_context_val,
+            chart_context_series=chart_context_series,
+        ),
+        attachments=_specific_attachments(
+            series_id=series_id,
+            req_form=req_form,
+            obs_to_show=obs_to_show,
+            is_contribution=is_contribution,
+            all_series_data=all_series_data,
+        ),
+    )
+
+
+def _stream_by_response_rule(
+    *,
+    req_form: str,
+    series_id: str,
+    series_title: Optional[str],
+    obs_to_show: List[Dict[str, Any]],
+    parsed_point: Optional[str],
+    parsed_range: Optional[Tuple[str, str]],
+    final_indicator_name: str,
+    indicator_context_val: Optional[str],
+    component_context_val: Optional[str],
+    seasonality_context_val: Optional[str],
+    metric_type_val: Optional[str],
+    calc_mode_cls: Optional[str],
+    intent_cls: Optional[str],
+    display_period_label: str,
+    freq: str,
+    date_range_label: str,
+    reference_period: Optional[str],
+    is_contribution: bool,
+    is_specific_activity: bool,
+    all_series_data: Optional[List[Dict[str, Any]]],
+    source_urls: List[str],
+    user_question: Optional[str],
+    conversation_context: Optional[str],
+    latest_available_period: Optional[str],
+    chart_context_series: Optional[List[str]],
+    intro_llm_temperature: float,
+) -> Iterable[str]:
+    response_type = resolve_response_rule(req_form=req_form, series_id=series_id)
+
+    # ## REGLA 1
+    # 1. ##Título: Respuesta general sin serie
+    # 2. ##Descripción: Si no hay serie válida, no se construye respuesta específica.
+    # 3. ##Condiciones: `response_type == "response_general"`.
+    # 4. ##Resultado: Ejecuta `general_response(...)`.
+    if response_type == "response_general":
+        return general_response(source_urls, series_id=series_id)
+
+    # ## REGLA 3
+    # 1. ##Título: Respuesta de punto específico
+    # 2. ##Descripción: Usa plantilla dedicada para consultas `specific_point`.
+    # 3. ##Condiciones: `response_type == "response_specific_point"`.
+    # 4. ##Resultado: Construye secciones con `req_form="specific_point"`.
+    if response_type == "response_specific_point":
+        sections = _build_specific_sections(
+            req_form="specific_point",
+            series_id=series_id,
+            series_title=series_title,
+            obs_to_show=obs_to_show,
+            parsed_point=parsed_point,
+            parsed_range=parsed_range,
+            final_indicator_name=final_indicator_name,
+            indicator_context_val=indicator_context_val,
+            component_context_val=component_context_val,
+            seasonality_context_val=seasonality_context_val,
+            metric_type_val=metric_type_val,
+            calc_mode_cls=calc_mode_cls,
+            intent_cls=intent_cls,
+            display_period_label=display_period_label,
+            freq=freq,
+            date_range_label=date_range_label,
+            reference_period=reference_period,
+            is_contribution=is_contribution,
+            is_specific_activity=is_specific_activity,
+            all_series_data=all_series_data,
+            source_urls=source_urls,
+            user_question=user_question,
+            conversation_context=conversation_context,
+            latest_available_period=latest_available_period,
+            chart_context_series=chart_context_series,
+            intro_llm_temperature=intro_llm_temperature,
+        )
+        return compose_response(sections)
+
+    # ## REGLA 2
+    # 1. ##Título: Respuesta específica estándar
+    # 2. ##Descripción: Ruta normal para `latest`, `range` y `point`.
+    # 3. ##Condiciones: `response_type == "response_specific"` (o fallback con serie válida).
+    # 4. ##Resultado: Construye secciones específicas con `req_form` original.
+    sections = _build_specific_sections(
+        req_form=req_form,
+        series_id=series_id,
+        series_title=series_title,
+        obs_to_show=obs_to_show,
+        parsed_point=parsed_point,
+        parsed_range=parsed_range,
+        final_indicator_name=final_indicator_name,
+        indicator_context_val=indicator_context_val,
+        component_context_val=component_context_val,
+        seasonality_context_val=seasonality_context_val,
+        metric_type_val=metric_type_val,
+        calc_mode_cls=calc_mode_cls,
+        intent_cls=intent_cls,
+        display_period_label=display_period_label,
+        freq=freq,
+        date_range_label=date_range_label,
+        reference_period=reference_period,
+        is_contribution=is_contribution,
+        is_specific_activity=is_specific_activity,
+        all_series_data=all_series_data,
+        source_urls=source_urls,
+        user_question=user_question,
+        conversation_context=conversation_context,
+        latest_available_period=latest_available_period,
+        chart_context_series=chart_context_series,
+        intro_llm_temperature=intro_llm_temperature,
     )
     return compose_response(sections)
 
@@ -201,64 +448,40 @@ def specific_response(
     is_specific_activity: bool,
     all_series_data: Optional[List[Dict[str, Any]]],
     source_urls: List[str],
+    user_question: Optional[str] = None,
+    conversation_context: Optional[str] = None,
+    latest_available_period: Optional[str] = None,
+    chart_context_series: Optional[List[str]] = None,
     intro_llm_temperature: float = 0.7,
 ) -> Iterable[str]:
-    sections = ResponseSections(
-        introduction=_specific_intro(
-            req_form=req_form,
-            obs_to_show=obs_to_show,
-            parsed_point=parsed_point,
-            parsed_range=parsed_range,
-            final_indicator_name=final_indicator_name,
-            indicator_context_val=indicator_context_val,
-            component_context_val=component_context_val,
-            seasonality_context_val=seasonality_context_val,
-            metric_type_val=metric_type_val,
-            calc_mode_cls=calc_mode_cls,
-            series_title=series_title,
-            freq=freq,
-            display_period_label=display_period_label,
-            date_range_label=date_range_label,
-            reference_period=reference_period,
-            is_contribution=is_contribution,
-            is_specific_activity=is_specific_activity,
-            all_series_data=all_series_data,
-            intro_llm_temperature=intro_llm_temperature,
-        ),
-        metadata=_metadata_block(series_id, series_title),
-        table=_specific_table(
-            req_form=req_form,
-            obs_to_show=obs_to_show,
-            is_contribution=is_contribution,
-            all_series_data=all_series_data,
-            freq=freq,
-        ),
-        suggestions=_specific_suggestions(
-            indicator_context_val=indicator_context_val,
-            component_context_val=component_context_val,
-            seasonality_context_val=seasonality_context_val,
-            final_indicator_name=final_indicator_name,
-            metric_type_val=metric_type_val,
-            intent_cls=intent_cls,
-            req_form=req_form,
-            display_period_label=display_period_label,
-        ),
-        references=_specific_references(
-            indicator_context_val=indicator_context_val,
-            is_contribution=is_contribution,
-            all_series_data=all_series_data,
-            source_urls=source_urls,
-        ),
-        charts=_default_charts(),
-        attachments=_specific_attachments(
-            series_id=series_id,
-            req_form=req_form,
-            obs_to_show=obs_to_show,
-            is_contribution=is_contribution,
-            all_series_data=all_series_data,
-        ),
+    return _stream_by_response_rule(
+        req_form=req_form,
+        series_id=series_id,
+        series_title=series_title,
+        obs_to_show=obs_to_show,
+        parsed_point=parsed_point,
+        parsed_range=parsed_range,
+        final_indicator_name=final_indicator_name,
+        indicator_context_val=indicator_context_val,
+        component_context_val=component_context_val,
+        seasonality_context_val=seasonality_context_val,
+        metric_type_val=metric_type_val,
+        calc_mode_cls=calc_mode_cls,
+        intent_cls=intent_cls,
+        display_period_label=display_period_label,
+        freq=freq,
+        date_range_label=date_range_label,
+        reference_period=reference_period,
+        is_contribution=is_contribution,
+        is_specific_activity=is_specific_activity,
+        all_series_data=all_series_data,
+        source_urls=source_urls,
+        user_question=user_question,
+        conversation_context=conversation_context,
+        latest_available_period=latest_available_period,
+        chart_context_series=chart_context_series,
+        intro_llm_temperature=intro_llm_temperature,
     )
-    return compose_response(sections)
 
 
 def specific_point_response(
@@ -284,64 +507,40 @@ def specific_point_response(
     is_specific_activity: bool,
     all_series_data: Optional[List[Dict[str, Any]]],
     source_urls: List[str],
+    user_question: Optional[str] = None,
+    conversation_context: Optional[str] = None,
+    latest_available_period: Optional[str] = None,
+    chart_context_series: Optional[List[str]] = None,
     intro_llm_temperature: float = 0.7,
 ) -> Iterable[str]:
-    sections = ResponseSections(
-        introduction=_specific_intro(
-            req_form="specific_point",
-            obs_to_show=obs_to_show,
-            parsed_point=parsed_point,
-            parsed_range=parsed_range,
-            final_indicator_name=final_indicator_name,
-            indicator_context_val=indicator_context_val,
-            component_context_val=component_context_val,
-            seasonality_context_val=seasonality_context_val,
-            metric_type_val=metric_type_val,
-            calc_mode_cls=calc_mode_cls,
-            series_title=series_title,
-            freq=freq,
-            display_period_label=display_period_label,
-            date_range_label=date_range_label,
-            reference_period=reference_period,
-            is_contribution=is_contribution,
-            is_specific_activity=is_specific_activity,
-            all_series_data=all_series_data,
-            intro_llm_temperature=intro_llm_temperature,
-        ),
-        metadata=_metadata_block(series_id, series_title),
-        table=_specific_table(
-            req_form="specific_point",
-            obs_to_show=obs_to_show,
-            is_contribution=is_contribution,
-            all_series_data=all_series_data,
-            freq=freq,
-        ),
-        suggestions=_specific_suggestions(
-            indicator_context_val=indicator_context_val,
-            component_context_val=component_context_val,
-            seasonality_context_val=seasonality_context_val,
-            final_indicator_name=final_indicator_name,
-            metric_type_val=metric_type_val,
-            intent_cls=intent_cls,
-            req_form="specific_point",
-            display_period_label=display_period_label,
-        ),
-        references=_specific_references(
-            indicator_context_val=indicator_context_val,
-            is_contribution=is_contribution,
-            all_series_data=all_series_data,
-            source_urls=source_urls,
-        ),
-        charts=_default_charts(),
-        attachments=_specific_attachments(
-            series_id=series_id,
-            req_form="specific_point",
-            obs_to_show=obs_to_show,
-            is_contribution=is_contribution,
-            all_series_data=all_series_data,
-        ),
+    return _stream_by_response_rule(
+        req_form="specific_point",
+        series_id=series_id,
+        series_title=series_title,
+        obs_to_show=obs_to_show,
+        parsed_point=parsed_point,
+        parsed_range=parsed_range,
+        final_indicator_name=final_indicator_name,
+        indicator_context_val=indicator_context_val,
+        component_context_val=component_context_val,
+        seasonality_context_val=seasonality_context_val,
+        metric_type_val=metric_type_val,
+        calc_mode_cls=calc_mode_cls,
+        intent_cls=intent_cls,
+        display_period_label=display_period_label,
+        freq=freq,
+        date_range_label=date_range_label,
+        reference_period=reference_period,
+        is_contribution=is_contribution,
+        is_specific_activity=is_specific_activity,
+        all_series_data=all_series_data,
+        source_urls=source_urls,
+        user_question=user_question,
+        conversation_context=conversation_context,
+        latest_available_period=latest_available_period,
+        chart_context_series=chart_context_series,
+        intro_llm_temperature=intro_llm_temperature,
     )
-    return compose_response(sections)
 
 
 # === Secciones: response_general ===
@@ -406,6 +605,9 @@ def _specific_intro(
     is_contribution: bool,
     is_specific_activity: bool,
     all_series_data: Optional[List[Dict[str, Any]]],
+    user_question: Optional[str],
+    conversation_context: Optional[str],
+    latest_available_period: Optional[str],
     intro_llm_temperature: float = 0.7,
 ) -> Iterable[str]:
     def _clean_text(value: Any) -> str:
@@ -464,6 +666,9 @@ def _specific_intro(
         is_contribution=is_contribution,
         is_specific_activity=is_specific_activity,
         all_series_data=all_series_data,
+        user_question=user_question,
+        conversation_context=conversation_context,
+        latest_available_period=latest_available_period,
     )
     yield from _stream_llm_or_fallback(
         llm_prompt=llm_prompt,
@@ -474,6 +679,7 @@ def _specific_intro(
         display_period_label=display_period_label,
         obs_to_show=obs_to_show,
         is_contribution=is_contribution,
+        latest_available_period=latest_available_period,
         fallback_text=fallback_intro,
     )
 
@@ -649,6 +855,9 @@ def _build_specific_prompt(
     is_contribution: bool,
     is_specific_activity: bool,
     all_series_data: Optional[List[Dict[str, Any]]],
+    user_question: Optional[str],
+    conversation_context: Optional[str],
+    latest_available_period: Optional[str],
 ) -> str:
     if req_form in {"range", "specific_point"}:
         return _build_range_prompt(
@@ -660,6 +869,9 @@ def _build_specific_prompt(
             freq=freq,
             display_period_label=display_period_label,
             is_contribution=is_contribution,
+            user_question=user_question,
+            conversation_context=conversation_context,
+            latest_available_period=latest_available_period,
         )
     return _build_latest_prompt(
         obs_to_show=obs_to_show,
@@ -675,6 +887,9 @@ def _build_specific_prompt(
         is_contribution=is_contribution,
         is_specific_activity=is_specific_activity,
         all_series_data=all_series_data,
+        user_question=user_question,
+        conversation_context=conversation_context,
+        latest_available_period=latest_available_period,
     )
 
 
@@ -688,6 +903,9 @@ def _build_range_prompt(
     freq: str,
     display_period_label: str,
     is_contribution: bool,
+    user_question: Optional[str],
+    conversation_context: Optional[str],
+    latest_available_period: Optional[str],
 ) -> str:
     freq_label = {
         "a": "anual",
@@ -705,17 +923,36 @@ def _build_range_prompt(
     if series_title_clean.lower() in {"", "none", "null", "nan"}:
         series_title_clean = ""
     series_desc = str(series_title_clean or final_indicator_name or "serie consultada").strip()
+    user_question_text = _normalize_text_field(user_question)
+    conversation_context_text = _normalize_text_field(conversation_context)
+    latest_period_text = _normalize_text_field(latest_available_period)
 
     llm_prompt_parts: List[str] = []
+    llm_prompt_parts.append("REGLAS DE RESPUESTA (OBLIGATORIAS):")
+    if user_question_text:
+        llm_prompt_parts.append(f"- Pregunta actual del usuario: {user_question_text}")
+    if conversation_context_text:
+        llm_prompt_parts.append(
+            f"- Contexto conversacional para continuidad (sin desviar el foco): {conversation_context_text}"
+        )
+    if latest_period_text:
+        llm_prompt_parts.append(
+            f"- Límite temporal estricto: no menciones ni infieras fechas posteriores a {latest_period_text}."
+        )
+    llm_prompt_parts.append(
+        "- Introducción en UN solo párrafo (máximo 3 oraciones), precisa, fluida y natural."
+    )
+    llm_prompt_parts.append(
+        "- Debe sonar generada de forma natural (no plantilla rígida), manteniendo exactitud factual."
+    )
+    llm_prompt_parts.append("")
     llm_prompt_parts.append("INSTRUCCIÓN DE INTRODUCCIÓN (OBLIGATORIA):")
     llm_prompt_parts.append(
         "La primera oración debe seguir esta estructura y el LLM puede complementar el cierre: "
         f"'La variación {freq_label} de la {series_desc} {comparison_text}, según los datos de la BDE, es ...'."
     )
     llm_prompt_parts.append("NO uses la palabra 'interanual'.")
-    llm_prompt_parts.append(
-        "Mantén tono factual, sin markdown, sin viñetas, sin referencias a que eres un modelo."
-    )
+    llm_prompt_parts.append("Mantén tono factual, sin markdown, sin viñetas, sin referencias a que eres un modelo.")
     llm_prompt_parts.append("")
 
     if obs_to_show:
@@ -760,14 +997,14 @@ def _build_range_prompt(
     llm_prompt_parts.append("")
     if is_contribution:
         llm_prompt_parts.append(
-            f"TAREA: Redacta una respuesta (máximo 2 oraciones) que MENCIONE el período ({display_period_label}) y cuánta fue la contribución del cierre (solo el porcentaje, 1 decimal). No menciones el valor del índice."
+            f"TAREA: Redacta un párrafo breve que MENCIONE el período ({display_period_label}) y cuánta fue la contribución del cierre (solo porcentaje, 1 decimal). No menciones el valor del índice."
         )
         llm_prompt_parts.append(
             "Termina con una frase que introduzca la tabla (ej: 'La evolución fue:', 'Los datos mes a mes:' o 'El comportamiento fue:'). Factual y neutral."
         )
     else:
         llm_prompt_parts.append(
-            f"TAREA: Redacta una respuesta (máximo 2 oraciones) que MENCIONE el período ({display_period_label}) y la variación del cierre."
+            f"TAREA: Redacta un párrafo breve que MENCIONE el período ({display_period_label}) y la variación del cierre."
         )
         llm_prompt_parts.append(
             "Termina con una frase que introduzca la tabla (ej: 'La evolución fue:', 'Los datos mes a mes:' o 'El comportamiento fue:'). Factual y neutral."
@@ -790,6 +1027,9 @@ def _build_latest_prompt(
     is_contribution: bool,
     is_specific_activity: bool,
     all_series_data: Optional[List[Dict[str, Any]]],
+    user_question: Optional[str],
+    conversation_context: Optional[str],
+    latest_available_period: Optional[str],
 ) -> str:
     def _variation_label(var_key: Optional[str], freq_value: str) -> str:
         freq_norm = str(freq_value or "").strip().lower()
@@ -825,6 +1065,9 @@ def _build_latest_prompt(
     else:
         comparison_text = "con respecto al período de referencia"
     series_desc = str(series_title or final_indicator_name or "serie consultada").strip()
+    user_question_text = _normalize_text_field(user_question)
+    conversation_context_text = _normalize_text_field(conversation_context)
+    latest_period_text = _normalize_text_field(latest_available_period)
 
     llm_prompt_parts.append("INSTRUCCIÓN DE INTRODUCCIÓN (OBLIGATORIA):")
     llm_prompt_parts.append(
@@ -834,6 +1077,19 @@ def _build_latest_prompt(
     llm_prompt_parts.append("NO uses la palabra 'interanual'.")
     llm_prompt_parts.append(
         "Mantén tono factual, sin markdown, sin viñetas, sin referencias a que eres un modelo."
+    )
+    if user_question_text:
+        llm_prompt_parts.append(f"PREGUNTA ACTUAL (prioritaria): {user_question_text}")
+    if conversation_context_text:
+        llm_prompt_parts.append(
+            f"CONTINUIDAD CONVERSACIONAL (solo apoyo, no cambiar foco): {conversation_context_text}"
+        )
+    if latest_period_text:
+        llm_prompt_parts.append(
+            f"RESTRICCIÓN TEMPORAL ESTRICTA: no menciones fechas posteriores a {latest_period_text}."
+        )
+    llm_prompt_parts.append(
+        "ESTILO OBLIGATORIO: un solo párrafo, máximo 3 oraciones, preciso y natural (menos determinista)."
     )
     llm_prompt_parts.append("")
 
@@ -992,6 +1248,7 @@ def _stream_llm_or_fallback(
     display_period_label: str,
     obs_to_show: List[Dict[str, Any]],
     is_contribution: bool,
+    latest_available_period: Optional[str],
     fallback_text: Optional[str] = None,
 ) -> Iterable[str]:
     def _sanitize_generated_text(text: str) -> str:
@@ -1031,6 +1288,13 @@ def _stream_llm_or_fallback(
                             f"La contribución de {final_indicator_name} para {period_label} se presenta en la siguiente tabla."
                         )
                     final_text = f"{enforced} {generated_text}".strip()
+
+        if _has_year_posterior_than_limit(final_text, latest_available_period):
+            limit_label = _normalize_text_field(latest_available_period) or "la última actualización disponible"
+            final_text = (
+                f"No puedo informar fechas posteriores a {limit_label}. "
+                f"Te comparto el último dato disponible en el período válido y su variación en la tabla."
+            )
 
         yield final_text
         yield "\n\n"
@@ -1351,8 +1615,96 @@ def _build_followup_block(suggestions: Iterable[str]) -> Iterable[str]:
     return lines
 
 
-def _default_charts() -> Iterable[str]:
-    return iter(())
+def _default_charts(
+    *,
+    series_id: str,
+    obs_to_show: List[Dict[str, Any]],
+    req_form: str,
+    indicator_context_val: Optional[str],
+    chart_context_series: Optional[List[str]],
+) -> Iterable[str]:
+    if not obs_to_show:
+        return iter(())
+
+    safe_series = str(series_id or "").strip()
+    if not safe_series:
+        return iter(())
+
+    indicator_label = str(indicator_context_val or "").strip().upper() or "SERIE"
+    chart_type = "line"
+    if req_form in {"range", "specific_point"}:
+        chart_type = "line"
+
+    recent_series = [
+        str(item).strip()
+        for item in (chart_context_series or [])
+        if str(item).strip()
+    ]
+    if safe_series not in recent_series:
+        recent_series.insert(0, safe_series)
+    recent_series = recent_series[:5]
+
+    rows: List[Dict[str, Any]] = []
+    for row in obs_to_show:
+        if not isinstance(row, dict):
+            continue
+        rows.append(
+            {
+                "date": row.get("date"),
+                "value": row.get("value"),
+                "yoy_pct": row.get("yoy"),
+                "prev_period": row.get("prev_period"),
+            }
+        )
+
+    if not rows:
+        return iter(())
+
+    temp_path = None
+    try:
+        import pandas as _pd
+
+        df = _pd.DataFrame(rows)
+        with tempfile.NamedTemporaryFile(
+            delete=False,
+            suffix=".csv",
+            prefix="chart_",
+            mode="w",
+            encoding="utf-8",
+        ) as tmp:
+            df.to_csv(tmp, index=False)
+            temp_path = tmp.name
+    except Exception:
+        try:
+            import csv as _csv
+
+            with tempfile.NamedTemporaryFile(
+                delete=False,
+                suffix=".csv",
+                prefix="chart_",
+                mode="w",
+                encoding="utf-8",
+                newline="",
+            ) as tmp:
+                writer = _csv.DictWriter(tmp, fieldnames=["date", "value", "yoy_pct", "prev_period"])
+                writer.writeheader()
+                writer.writerows(rows)
+                temp_path = tmp.name
+        except Exception:
+            temp_path = None
+
+    if not temp_path or not Path(temp_path).exists():
+        return iter(())
+
+    block: List[str] = ["##CHART_START\n"]
+    block.append(f"title=Evolución de {indicator_label}\n")
+    block.append(f"domain={indicator_label}\n")
+    block.append(f"type={chart_type}\n")
+    block.append(f"data_path={temp_path}\n")
+    block.append(f"series_id={safe_series}\n")
+    block.append(f"recent_series={','.join(recent_series)}\n")
+    block.append("##CHART_END\n")
+    return iter(block)
 
 
 def _specific_attachments(

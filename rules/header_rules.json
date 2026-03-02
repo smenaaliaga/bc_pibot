@@ -1,0 +1,27 @@
+{
+  "label_flags": {
+    "seasonality": false,
+    "price": false,
+    "history": false
+  },
+  "price_rules": {
+    "co": "\\b(precio|precios)\\s+corrientes?\\b|\\bcorrientes?\\b",
+    "en": "\\b(precio|precios)\\s+encadenados?\\b|\\bencadenados?\\b"
+  },
+  "seasonality_rules": {
+    "sa": "desestacionalizad[oa]s?|ajustad[oa]s?\\s+estacional",
+    "nsa": "\\b(sin\\s+desestacionalizar|original)\\b"
+  },
+  "history_rules": {
+    "inf_historic": "\\bhist[óo]ric[oa]s?\\b|\\bantes\\s+de\\s+1996\\b"
+  },
+  "calc_mode_aliases": {
+    "yoy": ["yoy", "ypct", "interanual", "annual", "anual"],
+    "prev_period": ["prev_period", "pct", "mom", "qoq", "period_previous", "periodo_anterior"],
+    "original": ["original", "value", "level", "valor"]
+  },
+  "calc_mode_patterns": {
+    "interanual": "\\b(interanual|a/a|anual\\s+anterior|mismo\\s+periodo\\s+del\\s+ano\\s+anterior|mismo\\s+per[ií]odo\\s+del\\s+a[nñ]o\\s+anterior)\\b",
+    "prev_period": "\\b(periodo\\s+anterior|per[ií]odo\\s+anterior|trimestre\\s+anterior|mes\\s+anterior|qoq|mom|t/t|m/m|c/r\\s+al\\s+periodo\\s+anterior|c/r\\s+al\\s+per[ií]odo\\s+anterior)\\b"
+  }
+}

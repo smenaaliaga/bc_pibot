@@ -9,6 +9,11 @@ from orchestrator.data.response import (
     specific_response,
     format_period_labels,
 )
+from rules.series_context_rule import (
+    apply_series_context_after,
+    apply_series_context_before,
+    get_recent_series_ids,
+)
     
 logger = logging.getLogger(__name__)
 
@@ -33,18 +38,23 @@ def stream_data_flow(
         session_id: Identificador de sesión (opcional)
     """
     
+    payload = apply_series_context_before(payload, session_id=session_id)
+    chart_context_series = get_recent_series_ids(payload, session_id=session_id, limit=5)
+
     # Extraer datos del payload
     series_id = payload.get("series")
     classification_dict = payload.get("classification", {})
     result_data = payload.get("result", [])
     intent = payload.get("intent", "")
-    req_form = classification_dict.get("req_form", "latest")
+    req_form = classification_dict.get("req_form", classification_dict.get("req_form_cls", "latest"))
     parsed_point = payload.get("parsed_point")  # DD-MM-YYYY o None
     parsed_range = payload.get("parsed_range")  # Tupla (DD-MM-YYYY, DD-MM-YYYY) o None
     reference_period = payload.get("reference_period")
     all_series_data = payload.get("all_series_data")  # Lista con todas las series (para contribución con activity=none)
     source_url = payload.get("source_url")  # URL de la fuente
     series_title = payload.get("series_title")
+    user_question = payload.get("question")
+    conversation_context = payload.get("history_text")
     source_urls = normalize_sources(source_url)
     intro_llm_temperature = payload.get("intro_llm_temperature", 0.7)
     try:
@@ -172,6 +182,8 @@ def stream_data_flow(
     else:
         display_period_label = date_range_label
 
+    apply_series_context_after(payload, session_id=session_id)
+
     response_stream = (
         specific_point_response(
             series_id=series_id,
@@ -195,6 +207,10 @@ def stream_data_flow(
             is_specific_activity=is_specific_activity,
             all_series_data=all_series_data,
             source_urls=source_urls,
+            user_question=str(user_question or ""),
+            conversation_context=str(conversation_context or ""),
+            latest_available_period=str(reference_period) if reference_period else None,
+            chart_context_series=chart_context_series,
             intro_llm_temperature=intro_llm_temperature_value,
         )
         if req_form == "specific_point"
@@ -220,6 +236,10 @@ def stream_data_flow(
             is_specific_activity=is_specific_activity,
             all_series_data=all_series_data,
             source_urls=source_urls,
+            user_question=str(user_question or ""),
+            conversation_context=str(conversation_context or ""),
+            latest_available_period=str(reference_period) if reference_period else None,
+            chart_context_series=chart_context_series,
             intro_llm_temperature=intro_llm_temperature_value,
         )
     )
