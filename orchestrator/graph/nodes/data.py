@@ -153,6 +153,10 @@ def make_data_node(memory_adapter: Any):
         if indicator_ent == "imacec" and activity_ent is None:
             activity_cls_resolved = "specific"
             activity_ent_resolved = "imacec"
+        if indicator_ent == "pib" and activity_cls == "none" and region_cls == "none" and investment_cls == "none":
+            price = None
+        else:
+            price = "enc"
 
         logger.info("[DATA_NODE !!!] =========================================================")
         logger.info("[DATA_NODE !!!] calc_mode=%s", calc_mode_cls)
@@ -169,6 +173,7 @@ def make_data_node(memory_adapter: Any):
         logger.info("[DATA_NODE !!!] activity=%s", activity_ent_resolved)
         logger.info("[DATA_NODE !!!] region=%s", region_ent)
         logger.info("[DATA_NODE !!!] investment=%s", investment_ent)
+        logger.info("[DATA_NODE !!!] price=%s", price)
         logger.info("[DATA_NODE !!!] period=%s", period_ent)
         logger.info("[DATA_NODE !!!] =========================================================")
         
@@ -186,10 +191,11 @@ def make_data_node(memory_adapter: Any):
         family_dict = find_family_by_classification(
             "orchestrator/catalog/catalog.json",
             indicator=indicator_ent,
-            activity_value=activity_ent_resolved,
-            region_value=region_ent,
-            investment_value=investment_ent,
+            activity_value=activity_ent_resolved if activity_ent_resolved is not None else activity_cls_resolved,
+            region_value=region_ent if region_ent is not None else region_cls,
+            investment_value=investment_ent if investment_ent is not None else investment_cls,
             calc_mode=calc_mode_cls if calc_mode_cls == "contribution" else "original",
+            price=price,
             seasonality=seasonality_ent,
             frequency=frequency_ent,
         )
@@ -223,9 +229,9 @@ def make_data_node(memory_adapter: Any):
         )
         
         target_series_id = target_series.get("id") if isinstance(target_series, dict) else None
-        target_series_title_raw = target_series.get("title") if isinstance(target_series, dict) else None
+        target_series_long_raw = target_series.get("long_title") if isinstance(target_series, dict) else None
         target_series_display_raw = target_series.get("display_title") if isinstance(target_series, dict) else None
-        target_series_title = str(target_series_display_raw or "").strip()
+        target_series_title = str(target_series_long_raw or target_series_display_raw or "").strip()
         target_series_url = None
         if source_family_series and target_series_id:
             separator = "&" if "?" in str(source_family_series) else "?"
@@ -290,7 +296,9 @@ def make_data_node(memory_adapter: Any):
                 if not isinstance(latest_series_obs, dict):
                     continue
 
-                series_title = str(series.get("title") or series_id).strip()
+                series_title = str(
+                    series.get("short_title") or series.get("title") or series_id
+                ).strip()
 
                 observations.append(
                     {

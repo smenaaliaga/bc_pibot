@@ -106,6 +106,7 @@ def find_family_by_classification(
     region_value: Any = None,
     investment_value: Any = None,
     calc_mode: Any = None,
+    price: Any = None,
     seasonality: Any = None,
     frequency: Any = None,
 ) -> Optional[Dict[str, Any]]:
@@ -121,6 +122,7 @@ def find_family_by_classification(
     requested_has_region = 0 if _is_empty(region_value) else 1
     requested_has_investment = 0 if _is_empty(investment_value) else 1
     requested_calc_mode = str(calc_mode).strip().lower() if calc_mode not in (None, "") else None
+    requested_price = str(price).strip().lower() if price not in (None, "") else None
     requested_seasonality = str(seasonality).strip().lower() if seasonality not in (None, "") else None
     requested_frequency = str(frequency).strip().lower() if frequency not in (None, "") else None
 
@@ -142,30 +144,49 @@ def find_family_by_classification(
         has_region = _to_flag(family_classification.get("has_region"))
         has_investment = _to_flag(family_classification.get("has_investment"))
 
-        if has_activity is not None and has_activity != requested_has_activity:
+        if has_activity != requested_has_activity:
             continue
-        if has_region is not None and has_region != requested_has_region:
+        if has_region != requested_has_region:
             continue
-        if has_investment is not None and has_investment != requested_has_investment:
+        if has_investment != requested_has_investment:
             continue
 
         family_calc_mode = family_classification.get("calc_mode")
-        if requested_calc_mode is not None and family_calc_mode not in (None, ""):
-            if str(family_calc_mode).strip().lower() != requested_calc_mode:
+        family_calc_mode_normalized = (
+            str(family_calc_mode).strip().lower() if family_calc_mode not in (None, "") else None
+        )
+        if requested_calc_mode is not None:
+            if family_calc_mode_normalized != requested_calc_mode:
+                continue
+
+        family_price = family_classification.get("price")
+        family_price_normalized = (
+            str(family_price).strip().lower() if family_price not in (None, "") else None
+        )
+        if requested_price is not None:
+            if family_price_normalized != requested_price:
                 continue
 
         family_seasonality = family_classification.get("seasonality")
-        if requested_seasonality is not None and family_seasonality not in (None, ""):
-            if str(family_seasonality).strip().lower() != requested_seasonality:
+        family_seasonality_normalized = (
+            str(family_seasonality).strip().lower() if family_seasonality not in (None, "") else None
+        )
+        if requested_seasonality is not None:
+            if family_seasonality_normalized != requested_seasonality:
                 continue
 
         family_frequency = family_classification.get("frequency")
-        if requested_frequency is not None and family_frequency not in (None, ""):
-            if str(family_frequency).strip().lower() != requested_frequency:
+        family_frequency_normalized = (
+            str(family_frequency).strip().lower() if family_frequency not in (None, "") else None
+        )
+        if requested_frequency is not None:
+            if family_frequency_normalized != requested_frequency:
                 continue
 
         score = 0
         if family_calc_mode not in (None, ""):
+            score += 1
+        if family_price not in (None, ""):
             score += 1
         if family_seasonality not in (None, ""):
             score += 1
