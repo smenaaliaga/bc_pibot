@@ -191,6 +191,7 @@ def make_data_node(memory_adapter: Any):
             investment_value=investment_ent,
             calc_mode=calc_mode_cls if calc_mode_cls == "contribution" else "original",
             seasonality=seasonality_ent,
+            frequency=frequency_ent,
         )
         family_series = family_to_series_rows(family_dict) if isinstance(family_dict, dict) else []
         source_family_series = family_dict.get("source_url") if isinstance(family_dict, dict) else None
@@ -222,7 +223,9 @@ def make_data_node(memory_adapter: Any):
         )
         
         target_series_id = target_series.get("id") if isinstance(target_series, dict) else None
-        target_series_title = target_series.get("title") if isinstance(target_series, dict) else None
+        target_series_title_raw = target_series.get("title") if isinstance(target_series, dict) else None
+        target_series_display_raw = target_series.get("display_title") if isinstance(target_series, dict) else None
+        target_series_title = str(target_series_display_raw or "").strip()
         target_series_url = None
         if source_family_series and target_series_id:
             separator = "&" if "?" in str(source_family_series) else "?"
@@ -333,7 +336,7 @@ def make_data_node(memory_adapter: Any):
                     "history": None
                 },
                 "series": target_series_id,
-                "series_title": family_name or None,
+                "series_title": target_series_title or family_name or None,
                 "parsed_point": str(period_ent[-1]) if req_form_cls != "range" else None,
                 "parsed_range": (str(period_ent[0]), str(period_ent[-1])),
                 "reference_period": str(period_ent[-1] or period_ent[0]),
