@@ -51,6 +51,7 @@ def stream_data_flow(
     source_url = payload.get("source_url")  # URL de la fuente
     series_title = payload.get("series_title")
     source_urls = normalize_sources(source_url)
+    used_latest_fallback_for_point = bool(payload.get("used_latest_fallback_for_point"))
     intro_llm_temperature = payload.get("intro_llm_temperature", 0.7)
     try:
         intro_llm_temperature_value = float(intro_llm_temperature)
@@ -104,6 +105,18 @@ def stream_data_flow(
         except Exception:
             return None
 
+    def _same_requested_period(requested: Optional[date], observed: Optional[date], freq_value: Any) -> bool:
+        if requested is None or observed is None:
+            return False
+        freq_norm = str(freq_value or "").strip().lower()
+        if freq_norm in {"a", "annual", "anual"}:
+            return requested.year == observed.year
+        if freq_norm in {"q", "t", "quarterly", "trimestral"}:
+            requested_quarter = ((requested.month - 1) // 3) + 1
+            observed_quarter = ((observed.month - 1) // 3) + 1
+            return requested.year == observed.year and requested_quarter == observed_quarter
+        return requested.year == observed.year and requested.month == observed.month
+
     # Para range/specific_point: mostrar todas las observaciones.
     # Para latest: última observación disponible.
     # Para point: observación alineada al período consultado (parsed_point).
@@ -149,6 +162,9 @@ def stream_data_flow(
             logger.error("[STREAM_DATA_FLOW] No hay observaciones en result_data")
             return
         obs_to_show = [chosen_row]
+        observed_date = _parse_iso_date(chosen_row.get("date")) if isinstance(chosen_row, dict) else None
+        if requested_date and not _same_requested_period(requested_date, observed_date, freq):
+            used_latest_fallback_for_point = True
     else:
         chosen_row = max(obs, key=lambda o: o.get("date", "")) if obs else None
         if not chosen_row:
@@ -257,6 +273,7 @@ def stream_data_flow(
             is_contribution=is_contribution,
             is_specific_activity=is_specific_activity,
             all_series_data=all_series_data,
+            used_latest_fallback_for_point=used_latest_fallback_for_point,
             source_urls=source_urls,
             intro_llm_temperature=intro_llm_temperature_value,
         )
@@ -282,6 +299,7 @@ def stream_data_flow(
             is_contribution=is_contribution,
             is_specific_activity=is_specific_activity,
             all_series_data=all_series_data,
+            used_latest_fallback_for_point=used_latest_fallback_for_point,
             source_urls=source_urls,
             intro_llm_temperature=intro_llm_temperature_value,
         )

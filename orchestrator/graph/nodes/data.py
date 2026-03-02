@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import logging
+import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from langgraph.types import StreamWriter
@@ -17,6 +18,107 @@ from ..state import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _extract_year(value: Optional[str]) -> Optional[str]:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    match = re.search(r"(19|20)\d{2}", text)
+    return match.group(0) if match else None
+
+
+def _map_frequency_param(frequency: Optional[str]) -> Optional[str]:
+    normalized = str(frequency or "").strip().lower()
+    mapping = {
+        "a": "ANNUAL",
+        "annual": "ANNUAL",
+        "anual": "ANNUAL",
+        "q": "QUARTERLY",
+        "quarterly": "QUARTERLY",
+        "trimestral": "QUARTERLY",
+        "m": "MONTHLY",
+        "monthly": "MONTHLY",
+        "mensual": "MONTHLY",
+    }
+    return mapping.get(normalized)
+
+
+def _map_calc_param(calc_mode: Optional[str]) -> Optional[str]:
+    normalized = str(calc_mode or "").strip().lower()
+    mapping = {
+        "yoy": "YTYPCT",
+        "prev_period": "PCT",
+    }
+    return mapping.get(normalized)
+
+
+def _build_target_series_url(
+    *,
+    source_url: Optional[str],
+    series_id: Optional[str],
+    period: Optional[List[Any]],
+    frequency: Optional[str],
+    calc_mode: Optional[str],
+) -> Optional[str]:
+    if not source_url or not series_id:
+        return None
+
+    period_values = period or []
+    end_year = _extract_year(str(period_values[-1])) if period_values else None
+    start_year = None
+    if end_year is not None:
+        try:
+            start_year = str(int(end_year) - 10)
+        except Exception:
+            start_year = None
+
+    frequency_param = _map_frequency_param(frequency)
+    calc_param = _map_calc_param(calc_mode)
+
+    separator = "&" if "?" in str(source_url) else "?"
+    query_parts = [f"id5=SI", f"idSerie={series_id}"]
+    if start_year:
+        query_parts.append(f"cbFechaInicio={start_year}")
+    if end_year:
+        query_parts.append(f"cbFechaTermino={end_year}")
+    if frequency_param:
+        query_parts.append(f"cbFrecuencia={frequency_param}")
+    if calc_param:
+        query_parts.append(f"cbCalculo={calc_param}")
+
+    return f"{source_url}{separator}{'&'.join(query_parts)}"
+
+
+def _resolve_url_period_from_data(
+    *,
+    requested_period: Optional[List[Any]],
+    req_form: Optional[str],
+    observations: Optional[List[Dict[str, Any]]],
+) -> Optional[List[Any]]:
+    requested = requested_period if isinstance(requested_period, list) else None
+    req = str(req_form or "").strip().lower()
+    rows = [row for row in (observations or []) if isinstance(row, dict) and row.get("date")]
+    if not rows:
+        return requested
+
+    data_start = str(rows[0].get("date"))
+    data_end = str(rows[-1].get("date"))
+
+    if req == "latest":
+        return [data_end, data_end]
+
+    requested_end = _extract_year(str(requested[-1])) if requested else None
+    data_end_year = _extract_year(data_end)
+    if requested_end and data_end_year and requested_end != data_end_year:
+        return [data_end, data_end]
+
+    requested_start = _extract_year(str(requested[0])) if requested else None
+    data_start_year = _extract_year(data_start)
+    if requested_start and data_start_year and requested_start != data_start_year and req in {"point", "specific_point"}:
+        return [data_end, data_end]
+
+    return requested
 
 
 def _load_series_observations(
@@ -242,12 +344,13 @@ def make_data_node(memory_adapter: Any):
         target_series_long_raw = target_series.get("long_title") if isinstance(target_series, dict) else None
         target_series_display_raw = target_series.get("display_title") if isinstance(target_series, dict) else None
         target_series_title = str(target_series_long_raw or target_series_display_raw or "").strip()
-        target_series_url = None
-        if source_family_series and target_series_id:
-            separator = "&" if "?" in str(source_family_series) else "?"
-            target_series_url = (
-                f"{source_family_series}{separator}id5=SI&idSerie={target_series_id}"
-            )
+        target_series_url = _build_target_series_url(
+            source_url=source_family_series,
+            series_id=target_series_id,
+            period=period_ent if isinstance(period_ent, list) else None,
+            frequency=frequency_ent,
+            calc_mode=calc_mode_cls,
+        )
 
         logger.info(
             "[DATA_NODE !!! REFACTORING !!!] target_series_id=%s",
@@ -272,6 +375,7 @@ def make_data_node(memory_adapter: Any):
         observations: List[Dict[str, Any]] = []
         observations_all: List[Dict[str, Any]] = []
         latest_obs: Optional[Dict[str, Any]] = None
+        used_latest_fallback_for_point = False
         
         if calc_mode_cls == "contribution":
             # recorrer family_series y obtener data de cada serie para luego agregar info a data_params y metadata_response
@@ -340,11 +444,13 @@ def make_data_node(memory_adapter: Any):
                     target_series_title = str(
                         aggregate_row.get("title") or family_name or ""
                     ).strip()
-                    if source_family_series and target_series_id:
-                        separator = "&" if "?" in str(source_family_series) else "?"
-                        target_series_url = (
-                            f"{source_family_series}{separator}id5=SI&idSerie={target_series_id}"
-                        )
+                    target_series_url = _build_target_series_url(
+                        source_url=source_family_series,
+                        series_id=target_series_id,
+                        period=period_ent if isinstance(period_ent, list) else None,
+                        frequency=frequency_ent,
+                        calc_mode=calc_mode_cls,
+                    )
                     observations = [aggregate_row]
 
         elif activity_cls_resolved in ("specific", "none") and region_cls in ("specific", "none") and investment_cls in ("specific", "none"):
@@ -358,9 +464,28 @@ def make_data_node(memory_adapter: Any):
                 lastdate=lastdate,
                 calc_mode=calc_mode_cls if calc_mode_cls in {"prev_period", "yoy"} else "yoy",
             )
+            if str(req_form_cls or "").strip().lower() == "point" and not observations and isinstance(latest_obs, dict):
+                observations = [latest_obs]
+                used_latest_fallback_for_point = True
         
+        observed_rows_for_url = observations if observations else observations_all
+        target_series_url_period = _resolve_url_period_from_data(
+            requested_period=period_ent if isinstance(period_ent, list) else None,
+            req_form=req_form_cls,
+            observations=observed_rows_for_url,
+        )
+        target_series_url = _build_target_series_url(
+            source_url=source_family_series,
+            series_id=target_series_id,
+            period=target_series_url_period,
+            frequency=frequency_ent,
+            calc_mode=calc_mode_cls,
+        )
+
         logger.info("[DATA_NODE !!! REFACTORING !!!] observations_count=%s", len(observations or observations_all))
         logger.info("[DATA_NODE !!! REFACTORING !!!] observations_last_5=%s", (observations or observations_all)[-5:])
+        logger.info("[DATA_NODE !!! REFACTORING !!!] target_series_url_period=%s", target_series_url_period)
+        logger.info("[DATA_NODE !!! REFACTORING !!!] target_series_url_effective=%s", target_series_url)
         
         logger.info("[DATA_NODE !!!] =========================================================")
      
@@ -396,6 +521,7 @@ def make_data_node(memory_adapter: Any):
                 "parsed_point": str(period_ent[-1]) if req_form_cls != "range" else None,
                 "parsed_range": (str(period_ent[0]), str(period_ent[-1])),
                 "reference_period": str(period_ent[-1] or period_ent[0]),
+                "used_latest_fallback_for_point": used_latest_fallback_for_point,
                 "result": observations,
                 "all_series_data": observations_all or None,
                 "source_url": target_series_url,

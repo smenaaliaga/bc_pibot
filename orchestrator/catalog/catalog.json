@@ -564,6 +564,7 @@
       "calc_mode": "original",
       "seasonality": "nsa",
       "frequency": "q",
+      "price": "enc",
       "has_activity": 0,
       "has_region": 1,
       "has_investment": 0
@@ -597,6 +598,7 @@
       "calc_mode": "original",
       "seasonality": "nsa",
       "frequency": "a",
+      "price": "enc",
       "has_activity": 0,
       "has_region": 1,
       "has_investment": 0
