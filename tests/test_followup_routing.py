@@ -175,7 +175,7 @@ def test_followup_macro_zero_and_other_recovers_previous_method_intent():
     assert result["entities"][0]["indicator"] == "pib"
 
 
-def test_followup_macro_zero_and_value_recovers_previous_method_intent_when_generic():
+def test_followup_macro_zero_and_value_with_indicator_routes_data():
     prev_record = _build_prev_record(intent="method", macro=1, indicator="pib", turn_id=7)
     classification = _make_classification(
         intent="value",
@@ -204,13 +204,13 @@ def test_followup_macro_zero_and_value_recovers_previous_method_intent_when_gene
         }
     )
 
-    assert result["route_decision"] == "rag"
-    assert result["intent"]["intent_cls"] == "method"
+    assert result["route_decision"] == "data"
+    assert result["intent"]["intent_cls"] == "value"
     assert result["intent"]["macro_cls"] == 1
-    assert result["entities"][0]["indicator"] == "pib"
+    assert result["entities"][0]["indicator"] == ["imacec"]
 
 
-def test_followup_macro_zero_recovers_previous_method_with_nested_routing_payload():
+def test_followup_macro_zero_value_with_nested_routing_payload_routes_data():
     prev_record = IntentRecord(
         intent="method",
         score=0.9,
@@ -264,10 +264,10 @@ def test_followup_macro_zero_recovers_previous_method_with_nested_routing_payloa
         }
     )
 
-    assert result["route_decision"] == "rag"
-    assert result["intent"]["intent_cls"] == "method"
+    assert result["route_decision"] == "data"
+    assert result["intent"]["intent_cls"] == "value"
     assert result["intent"]["macro_cls"] == 1
-    assert result["entities"][0]["indicator"] == "pib"
+    assert result["entities"][0]["indicator"] == ["imacec"]
 
 
 def test_followup_value_region_specific_backfills_indicator_and_time_fields():
