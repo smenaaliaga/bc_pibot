@@ -20,52 +20,37 @@ from ..state import (
 logger = logging.getLogger(__name__)
 
 
-def _extract_year(value: Optional[str]) -> Optional[str]:
-    text = str(value or "").strip()
-    if not text:
-        return None
-    match = re.search(r"(19|20)\d{2}", text)
-    return match.group(0) if match else None
-
-
-def _map_frequency_param(frequency: Optional[str]) -> Optional[str]:
-    normalized = str(frequency or "").strip().lower()
-    mapping = {
-        "a": "ANNUAL",
-        "annual": "ANNUAL",
-        "anual": "ANNUAL",
-        "q": "QUARTERLY",
-        "quarterly": "QUARTERLY",
-        "trimestral": "QUARTERLY",
-        "m": "MONTHLY",
-        "monthly": "MONTHLY",
-        "mensual": "MONTHLY",
-    }
-    return mapping.get(normalized)
-
-
-def _map_calc_param(calc_mode: Optional[str]) -> Optional[str]:
-    normalized = str(calc_mode or "").strip().lower()
-    mapping = {
-        "yoy": "YTYPCT",
-        "prev_period": "PCT",
-    }
-    return mapping.get(normalized)
-
-
 def _build_target_series_url(
     *,
     source_url: Optional[str],
     series_id: Optional[str],
     period: Optional[List[Any]],
-    frequency: Optional[str],
-    calc_mode: Optional[str],
+    req_form: Optional[str] = None,
+    observations: Optional[List[Dict[str, Any]]] = None,
+    frequency: Optional[str] = None,
+    calc_mode: Optional[str] = None,
 ) -> Optional[str]:
     if not source_url or not series_id:
         return None
 
+    def _extract_year_local(value: Any) -> Optional[str]:
+        match = re.search(r"(19|20)\d{2}", str(value or "").strip())
+        return match.group(0) if match else None
+
     period_values = period or []
-    end_year = _extract_year(str(period_values[-1])) if period_values else None
+    requested_end_year = _extract_year_local(period_values[-1]) if period_values else None
+    req = str(req_form or "").strip().lower()
+    observed_rows = [
+        row for row in (observations or [])
+        if isinstance(row, dict) and row.get("date")
+    ]
+    observed_end_year = _extract_year_local(observed_rows[-1].get("date")) if observed_rows else None
+
+    use_observed_end = req == "latest"
+    if requested_end_year and observed_end_year and requested_end_year != observed_end_year:
+        use_observed_end = True
+
+    end_year = observed_end_year if use_observed_end and observed_end_year else requested_end_year
     start_year = None
     if end_year is not None:
         try:
@@ -73,8 +58,15 @@ def _build_target_series_url(
         except Exception:
             start_year = None
 
-    frequency_param = _map_frequency_param(frequency)
-    calc_param = _map_calc_param(calc_mode)
+    frequency_param = {
+        "a": "ANNUAL",
+        "q": "QUARTERLY",
+        "m": "MONTHLY",
+    }.get(str(frequency or "").strip().lower())
+    calc_param = {
+        "yoy": "YTYPCT",
+        "prev_period": "PCT",
+    }.get(str(calc_mode or "").strip().lower())
 
     separator = "&" if "?" in str(source_url) else "?"
     query_parts = [f"id5=SI", f"idSerie={series_id}"]
@@ -88,38 +80,6 @@ def _build_target_series_url(
         query_parts.append(f"cbCalculo={calc_param}")
 
     return f"{source_url}{separator}{'&'.join(query_parts)}"
-
-
-def _resolve_url_period_from_data(
-    *,
-    requested_period: Optional[List[Any]],
-    req_form: Optional[str],
-    observations: Optional[List[Dict[str, Any]]],
-) -> Optional[List[Any]]:
-    requested = requested_period if isinstance(requested_period, list) else None
-    req = str(req_form or "").strip().lower()
-    rows = [row for row in (observations or []) if isinstance(row, dict) and row.get("date")]
-    if not rows:
-        return requested
-
-    data_start = str(rows[0].get("date"))
-    data_end = str(rows[-1].get("date"))
-
-    if req == "latest":
-        return [data_end, data_end]
-
-    requested_end = _extract_year(str(requested[-1])) if requested else None
-    data_end_year = _extract_year(data_end)
-    if requested_end and data_end_year and requested_end != data_end_year:
-        return [data_end, data_end]
-
-    requested_start = _extract_year(str(requested[0])) if requested else None
-    data_start_year = _extract_year(data_start)
-    if requested_start and data_start_year and requested_start != data_start_year and req in {"point", "specific_point"}:
-        return [data_end, data_end]
-
-    return requested
-
 
 def _load_series_observations(
     *,
@@ -262,24 +222,24 @@ def make_data_node(memory_adapter: Any):
         else:
             price = "enc"
 
-        logger.info("[DATA_NODE !!!] =========================================================")
-        logger.info("[DATA_NODE !!!] calc_mode=%s", calc_mode_cls)
-        logger.info("[DATA_NODE !!!] activity=%s", activity_cls_resolved)
-        logger.info("[DATA_NODE !!!] region=%s", region_cls)
-        logger.info("[DATA_NODE !!!] investment=%s", investment_cls)
-        logger.info("[DATA_NODE !!!] req_form=%s", req_form_cls)
-        logger.info("[DATA_NODE !!!] entities=%s", entities)
-        logger.info("[DATA_NODE !!!] normalized=%s", normalized)
+        logger.info("[DATA_NODE] =========================================================")
+        logger.info("[DATA_NODE] calc_mode=%s", calc_mode_cls)
+        logger.info("[DATA_NODE] activity=%s", activity_cls_resolved)
+        logger.info("[DATA_NODE] region=%s", region_cls)
+        logger.info("[DATA_NODE] investment=%s", investment_cls)
+        logger.info("[DATA_NODE] req_form=%s", req_form_cls)
+        logger.info("[DATA_NODE] entities=%s", entities)
+        logger.info("[DATA_NODE] normalized=%s", normalized)
         
-        logger.info("[DATA_NODE !!!] indicator=%s", indicator_ent)
-        logger.info("[DATA_NODE !!!] seasonality=%s", seasonality_ent)
-        logger.info("[DATA_NODE !!!] frequency=%s", frequency_ent)
-        logger.info("[DATA_NODE !!!] activity=%s", activity_ent_resolved)
-        logger.info("[DATA_NODE !!!] region=%s", region_ent)
-        logger.info("[DATA_NODE !!!] investment=%s", investment_ent)
-        logger.info("[DATA_NODE !!!] price=%s", price)
-        logger.info("[DATA_NODE !!!] period=%s", period_ent)
-        logger.info("[DATA_NODE !!!] =========================================================")
+        logger.info("[DATA_NODE] indicator=%s", indicator_ent)
+        logger.info("[DATA_NODE] seasonality=%s", seasonality_ent)
+        logger.info("[DATA_NODE] frequency=%s", frequency_ent)
+        logger.info("[DATA_NODE] activity=%s", activity_ent_resolved)
+        logger.info("[DATA_NODE] region=%s", region_ent)
+        logger.info("[DATA_NODE] investment=%s", investment_ent)
+        logger.info("[DATA_NODE] price=%s", price)
+        logger.info("[DATA_NODE] period=%s", period_ent)
+        logger.info("[DATA_NODE] =========================================================")
         
         
         ## Obtener ID Series
@@ -313,14 +273,14 @@ def make_data_node(memory_adapter: Any):
         family_name = family_dict.get("family_name") if isinstance(family_dict, dict) else None
         
         logger.info(
-            "[DATA_NODE !!! REFACTORING !!!] family_name=%s",
+            "[DATA_NODE] family_name=%s",
             family_name,
         )
         logger.info(
-            "[DATA_NODE !!! REFACTORING !!!] family_source_url=%s",
+            "[DATA_NODE] family_source_url=%s",
             source_family_series,
         )
-        logger.info("[DATA_NODE !!!] =========================================================")
+        logger.info("[DATA_NODE] =========================================================")
 
         # Buscar serie especifica a partir de la familia de series
         series_eq = {
@@ -353,18 +313,18 @@ def make_data_node(memory_adapter: Any):
         )
 
         logger.info(
-            "[DATA_NODE !!! REFACTORING !!!] target_series_id=%s",
+            "[DATA_NODE] target_series_id=%s",
             target_series_id,
         )
         logger.info(
-            "[DATA_NODE !!! REFACTORING !!!] target_series_title=%s",
+            "[DATA_NODE] target_series_title=%s",
             target_series_title,
         )
         logger.info(
-            "[DATA_NODE !!! REFACTORING !!!] target_series_url=%s",
+            "[DATA_NODE] target_series_url=%s",
             target_series_url,
         )
-        logger.info("[DATA_NODE !!!] =========================================================")
+        logger.info("[DATA_NODE] =========================================================")
         
         
         ## Obtener data 
@@ -398,21 +358,18 @@ def make_data_node(memory_adapter: Any):
                 if not isinstance(latest_series_obs, dict):
                     continue
 
-                series_title = str(
-                    series.get("short_title") or series_id
-                ).strip()
-                series_classification = series.get("classification") if isinstance(series, dict) else None
-                series_activity = None
-                if isinstance(series_classification, dict):
-                    series_activity = series_classification.get("activity")
-                series_activity_normalized = (
-                    str(series_activity).strip().lower() if series_activity not in (None, "") else None
+                row_title = str(series.get("short_title") or series_id).strip()
+                series_activity = (
+                    (series.get("classification") or {}).get("activity")
+                    if isinstance(series, dict)
+                    else None
                 )
+                series_activity_normalized = str(series_activity).strip().lower() if series_activity not in (None, "") else None
 
                 observations.append(
                     {
                         "series_id": series_id,
-                        "title": series_title,
+                        "title": row_title,
                         "activity": series_activity_normalized,
                         "date": latest_series_obs.get("date"),
                         "value": latest_series_obs.get("value"),
@@ -421,23 +378,14 @@ def make_data_node(memory_adapter: Any):
             observations_all = list(observations)
 
             if activity_cls == "general" and activity_ent is None:
-                aggregate_row = next(
-                    (
-                        row
-                        for row in observations
-                        if str(row.get("title") or "").strip().lower() in {"pib", "imacec"}
-                    ),
-                    None,
-                )
-                if aggregate_row is None:
-                    aggregate_row = next(
-                        (
-                            row
-                            for row in observations
-                            if row.get("activity") in (None, "", "total")
-                        ),
-                        None,
-                    )
+                aggregate_row = None
+                for row in observations:
+                    title_norm = str(row.get("title") or "").strip().lower()
+                    if title_norm in {"pib", "imacec"}:
+                        aggregate_row = row
+                        break
+                    if aggregate_row is None and row.get("activity") in (None, "", "total"):
+                        aggregate_row = row
 
                 if isinstance(aggregate_row, dict):
                     target_series_id = aggregate_row.get("series_id")
@@ -448,6 +396,8 @@ def make_data_node(memory_adapter: Any):
                         source_url=source_family_series,
                         series_id=target_series_id,
                         period=period_ent if isinstance(period_ent, list) else None,
+                        req_form=req_form_cls,
+                        observations=observations,
                         frequency=frequency_ent,
                         calc_mode=calc_mode_cls,
                     )
@@ -467,29 +417,22 @@ def make_data_node(memory_adapter: Any):
             if str(req_form_cls or "").strip().lower() == "point" and not observations and isinstance(latest_obs, dict):
                 observations = [latest_obs]
                 used_latest_fallback_for_point = True
-        
-        observed_rows_for_url = observations if observations else observations_all
-        target_series_url_period = _resolve_url_period_from_data(
-            requested_period=period_ent if isinstance(period_ent, list) else None,
-            req_form=req_form_cls,
-            observations=observed_rows_for_url,
-        )
-        target_series_url = _build_target_series_url(
-            source_url=source_family_series,
-            series_id=target_series_id,
-            period=target_series_url_period,
-            frequency=frequency_ent,
-            calc_mode=calc_mode_cls,
-        )
 
-        logger.info("[DATA_NODE !!! REFACTORING !!!] observations_count=%s", len(observations or observations_all))
-        logger.info("[DATA_NODE !!! REFACTORING !!!] observations_last_5=%s", (observations or observations_all)[-5:])
-        logger.info("[DATA_NODE !!! REFACTORING !!!] target_series_url_period=%s", target_series_url_period)
-        logger.info("[DATA_NODE !!! REFACTORING !!!] target_series_url_effective=%s", target_series_url)
         
-        logger.info("[DATA_NODE !!!] =========================================================")
-     
+        ## Construir payload 
+        ######################
+        
         if observations is not None or observations_all is not None: 
+            
+            target_series_url = _build_target_series_url(
+                source_url=source_family_series,
+                series_id=target_series_id,
+                period=period_ent if isinstance(period_ent, list) else None,
+                req_form=req_form_cls,
+                observations=observations if observations else observations_all,
+                frequency=frequency_ent,
+                calc_mode=calc_mode_cls,
+            )
             
             payload = {
                 "intent": "value",
