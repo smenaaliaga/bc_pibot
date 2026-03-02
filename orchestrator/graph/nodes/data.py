@@ -153,6 +153,8 @@ def make_data_node(memory_adapter: Any):
         if indicator_ent == "imacec" and activity_ent is None:
             activity_cls_resolved = "specific"
             activity_ent_resolved = "imacec"
+            
+        price = None
         if indicator_ent == "pib" and activity_cls == "none" and region_cls == "none" and investment_cls == "none":
             price = None
         else:
@@ -187,6 +189,11 @@ def make_data_node(memory_adapter: Any):
             select_target_series_by_classification,
         )
 
+        family_frequency = None if indicator_ent == "imacec" else frequency_ent
+        if calc_mode_cls != "contribution":
+            family_frequency = None
+        family_price = None if indicator_ent == "imacec" else price
+
         # Buscar una sola familia de series en el catalogo agrupado
         family_dict = find_family_by_classification(
             "orchestrator/catalog/catalog.json",
@@ -195,9 +202,9 @@ def make_data_node(memory_adapter: Any):
             region_value=region_ent if region_ent is not None else region_cls,
             investment_value=investment_ent if investment_ent is not None else investment_cls,
             calc_mode=calc_mode_cls if calc_mode_cls == "contribution" else "original",
-            price=price,
+            price=family_price,
             seasonality=seasonality_ent,
-            frequency=frequency_ent,
+            frequency=family_frequency,
         )
         family_series = family_to_series_rows(family_dict) if isinstance(family_dict, dict) else []
         source_family_series = family_dict.get("source_url") if isinstance(family_dict, dict) else None
@@ -214,17 +221,20 @@ def make_data_node(memory_adapter: Any):
         logger.info("[DATA_NODE !!!] =========================================================")
 
         # Buscar serie especifica a partir de la familia de series
+        series_eq = {
+            "indicator": indicator_ent,
+            "calc_mode": calc_mode_cls if calc_mode_cls == "contribution" else "original",
+            "seasonality": seasonality_ent,
+            "activity": activity_ent_resolved,
+            "region": region_ent,
+            "investment": investment_ent,
+        }
+        if calc_mode_cls == "contribution":
+            series_eq["frequency"] = frequency_ent
+
         target_series = select_target_series_by_classification(
             family_series,
-            eq={
-                "indicator": indicator_ent,
-                "calc_mode": calc_mode_cls if calc_mode_cls == "contribution" else "original",
-                "seasonality": seasonality_ent,
-                "frequency": frequency_ent,
-                "activity": activity_ent_resolved,
-                "region": region_ent,
-                "investment": investment_ent,
-            },
+            eq=series_eq,
             fallback_to_first=True,
         )
         
@@ -263,19 +273,7 @@ def make_data_node(memory_adapter: Any):
         observations_all: List[Dict[str, Any]] = []
         latest_obs: Optional[Dict[str, Any]] = None
         
-        if activity_cls in ("specific", "none") and region_cls in ("specific", "none") and investment_cls in ("specific", "none"):
-        
-            observations, latest_obs = _fetch_series_by_req_form(
-                series_id=target_series_id,
-                req_form=req_form_cls,
-                frequency=frequency_ent,
-                indicator=indicator_ent,
-                firstdate=firstdate,
-                lastdate=lastdate,
-                calc_mode=calc_mode_cls if calc_mode_cls in {"prev_period", "yoy"} else "yoy",
-            )
-            
-        elif calc_mode_cls == "contribution":
+        if calc_mode_cls == "contribution":
             # recorrer family_series y obtener data de cada serie para luego agregar info a data_params y metadata_response
             for series in family_series:
                 series_id = series.get("id")
@@ -297,19 +295,69 @@ def make_data_node(memory_adapter: Any):
                     continue
 
                 series_title = str(
-                    series.get("short_title") or series.get("title") or series_id
+                    series.get("short_title") or series_id
                 ).strip()
+                series_classification = series.get("classification") if isinstance(series, dict) else None
+                series_activity = None
+                if isinstance(series_classification, dict):
+                    series_activity = series_classification.get("activity")
+                series_activity_normalized = (
+                    str(series_activity).strip().lower() if series_activity not in (None, "") else None
+                )
 
                 observations.append(
                     {
                         "series_id": series_id,
                         "title": series_title,
-                        "activity": None,
+                        "activity": series_activity_normalized,
                         "date": latest_series_obs.get("date"),
                         "value": latest_series_obs.get("value"),
                     }
                 )
-                observations_all.extend(series_observations)
+            observations_all = list(observations)
+
+            if activity_cls == "general" and activity_ent is None:
+                aggregate_row = next(
+                    (
+                        row
+                        for row in observations
+                        if str(row.get("title") or "").strip().lower() in {"pib", "imacec"}
+                    ),
+                    None,
+                )
+                if aggregate_row is None:
+                    aggregate_row = next(
+                        (
+                            row
+                            for row in observations
+                            if row.get("activity") in (None, "", "total")
+                        ),
+                        None,
+                    )
+
+                if isinstance(aggregate_row, dict):
+                    target_series_id = aggregate_row.get("series_id")
+                    target_series_title = str(
+                        aggregate_row.get("title") or family_name or ""
+                    ).strip()
+                    if source_family_series and target_series_id:
+                        separator = "&" if "?" in str(source_family_series) else "?"
+                        target_series_url = (
+                            f"{source_family_series}{separator}id5=SI&idSerie={target_series_id}"
+                        )
+                    observations = [aggregate_row]
+
+        elif activity_cls_resolved in ("specific", "none") and region_cls in ("specific", "none") and investment_cls in ("specific", "none"):
+
+            observations, latest_obs = _fetch_series_by_req_form(
+                series_id=target_series_id,
+                req_form=req_form_cls,
+                frequency=frequency_ent,
+                indicator=indicator_ent,
+                firstdate=firstdate,
+                lastdate=lastdate,
+                calc_mode=calc_mode_cls if calc_mode_cls in {"prev_period", "yoy"} else "yoy",
+            )
         
         logger.info("[DATA_NODE !!! REFACTORING !!!] observations_count=%s", len(observations or observations_all))
         logger.info("[DATA_NODE !!! REFACTORING !!!] observations_last_5=%s", (observations or observations_all)[-5:])

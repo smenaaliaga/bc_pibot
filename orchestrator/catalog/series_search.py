@@ -64,12 +64,14 @@ def load_catalog_series(catalog_path: str | Path) -> List[Dict[str, Any]]:
 
             row = dict(item)
             row_classification = row.get("classification")
+            has_explicit_empty_classification = isinstance(row_classification, dict) and not row_classification
             merged_classification: Dict[str, Any] = {}
             if isinstance(family_classification, dict):
                 merged_classification.update(family_classification)
             if isinstance(row_classification, dict):
                 merged_classification.update(row_classification)
             row["classification"] = merged_classification
+            row["_classification_empty"] = has_explicit_empty_classification
 
             if "source_url" not in row and family_source_url is not None:
                 row["source_url"] = family_source_url
@@ -114,9 +116,7 @@ def find_family_by_classification(
     if not payload:
         return None
 
-    requested_indicator = str(indicator or "").strip().lower()
-    if not requested_indicator:
-        return None
+    requested_indicator = str(indicator or "").strip().lower() or None
 
     requested_has_activity = 0 if _is_empty(activity_value) else 1
     requested_has_region = 0 if _is_empty(region_value) else 1
@@ -136,9 +136,7 @@ def find_family_by_classification(
         if not isinstance(family_classification, dict) or not isinstance(family_series, list):
             continue
 
-        indicator_value = str(family_classification.get("indicator") or "").strip().lower()
-        if indicator_value != requested_indicator:
-            continue
+        indicator_value = str(family_classification.get("indicator") or "").strip().lower() or None
 
         has_activity = _to_flag(family_classification.get("has_activity"))
         has_region = _to_flag(family_classification.get("has_region"))
@@ -184,6 +182,8 @@ def find_family_by_classification(
                 continue
 
         score = 0
+        if requested_indicator is not None and indicator_value == requested_indicator:
+            score += 100
         if family_calc_mode not in (None, ""):
             score += 1
         if family_price not in (None, ""):
@@ -229,12 +229,14 @@ def family_to_series_rows(family_payload: Dict[str, Any]) -> List[Dict[str, Any]
 
         row = dict(item)
         row_classification = row.get("classification")
+        has_explicit_empty_classification = isinstance(row_classification, dict) and not row_classification
         merged_classification: Dict[str, Any] = {}
         if isinstance(family_classification, dict):
             merged_classification.update(family_classification)
         if isinstance(row_classification, dict):
             merged_classification.update(row_classification)
         row["classification"] = merged_classification
+        row["_classification_empty"] = has_explicit_empty_classification
 
         if "source_url" not in row and family_source_url is not None:
             row["source_url"] = family_source_url
@@ -387,6 +389,9 @@ def select_target_series_by_classification(
 
     if normalized_filters:
         for row in matches:
+            if row.get("_classification_empty") is True:
+                continue
+
             classification = row.get("classification")
             if not isinstance(classification, dict):
                 continue
@@ -404,7 +409,14 @@ def select_target_series_by_classification(
             if ok:
                 return row
 
-    return matches[0] if fallback_to_first else None
+    if not fallback_to_first:
+        return None
+
+    for row in matches:
+        if row.get("_classification_empty") is not True:
+            return row
+
+    return None
 
 
 def _build_parser() -> argparse.ArgumentParser:

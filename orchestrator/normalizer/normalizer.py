@@ -593,9 +593,7 @@ def _activity_match_count(raw_values: List[str], vocab: Dict[str, List[str]]) ->
 # ============================================================================
 
 def normalize_indicator(indicator_value: Optional[str],
-                        frequency: Optional[str],
-                        intent_label: Optional[str] = None,
-                        context_label: Optional[str] = None) -> Optional[str]:
+                        frequency: Optional[str]) -> Optional[str]:
     """
     Normaliza INDICATOR detectado o infiere valor basado en FREQUENCY.
     
@@ -613,20 +611,15 @@ def normalize_indicator(indicator_value: Optional[str],
     Retorna:
         "imacec", "pib", o None si no se puede determinar
     """
-    _ = context_label
-    intent_normalized = _normalize_text(intent_label or "")
-    is_value_intent = intent_normalized == "value"
-
     if _is_generic_indicator_value(indicator_value):
-        if is_value_intent and frequency == "m":
+        # Indicador vacío o genérico (ej. "economia"): inferir de frecuencia
+        if frequency == "m":
             return "imacec"
-        if is_value_intent and frequency in ("q", "a"):
+        elif frequency in ("q", "a"):
             return "pib"
-        if is_value_intent and not frequency:
+        else:
+            # Por defecto asumir IMACEC (más general)
             return "imacec"
-        if not frequency and not is_value_intent:
-            return None
-        return None
 
     indicator_normalized = _normalize_text(indicator_value)
 
@@ -648,15 +641,11 @@ def normalize_indicator(indicator_value: Optional[str],
     if match:
         return match
 
-    # Si no coincide bien, aplicar reglas de fallback condicionadas por intent.
-    if is_value_intent and frequency == "m":
+    # Si no coincide bien pero hay frecuencia, usar regla de frecuencia como fallback
+    if frequency == "m":
         return "imacec"
-    elif is_value_intent and frequency in ("q", "a"):
+    elif frequency in ("q", "a"):
         return "pib"
-    elif is_value_intent and not frequency:
-        return "imacec"
-    elif not is_value_intent and not frequency:
-        return None
 
     return None
 
@@ -881,9 +870,7 @@ def normalize_period(period_value: Optional[str]) -> Tuple[Optional[str], List[s
 # ============================================================================
 
 def normalize_ner_entities(ner_output: Dict[str, Any],
-                           calc_mode: Optional[str] = None,
-                           intent_label: Optional[str] = None,
-                           context_label: Optional[str] = None) -> Dict[str, Any]:
+                           calc_mode: Optional[str] = None) -> Dict[str, Any]:
     """
     Normaliza todas las entidades detectadas por el modelo NER.
     
@@ -947,12 +934,7 @@ def normalize_ner_entities(ner_output: Dict[str, Any],
 
     # Normalizar entidades
     normalized_frequency = normalize_frequency(frequency_raw)
-    normalized_indicator = normalize_indicator(
-        indicator_raw,
-        normalized_frequency,
-        intent_label=intent_label,
-        context_label=context_label,
-    )
+    normalized_indicator = normalize_indicator(indicator_raw, normalized_frequency)
     normalized_seasonality = normalize_seasonality(seasonality_raw, calc_mode)
     normalized_activity, failed_activity = normalize_activity(activity_raw, normalized_indicator)
     normalized_region, failed_region = normalize_region(region_raw)
@@ -1023,8 +1005,6 @@ def _normalize_multiple_values(
     raw_values: List[str],
     calc_mode: Optional[str],
     base_normalized: Dict[str, Optional[str]],
-    intent_label: Optional[str] = None,
-    context_label: Optional[str] = None,
 ) -> List[str]:
     """
     Normaliza múltiples valores para una misma entidad.
@@ -1040,12 +1020,7 @@ def _normalize_multiple_values(
 
         normalized_value: Optional[str]
         if entity_key == "indicator":
-            normalized_value = normalize_indicator(
-                raw,
-                base_normalized.get("frequency"),
-                intent_label=intent_label,
-                context_label=context_label,
-            )
+            normalized_value = normalize_indicator(raw, base_normalized.get("frequency"))
         elif entity_key == "seasonality":
             normalized_value = normalize_seasonality(raw, calc_mode)
         elif entity_key == "frequency":
@@ -1435,8 +1410,6 @@ def normalize_entities(
     calc_mode: Optional[str] = None,
     req_form: Optional[str] = None,
     intents: Optional[Dict[str, Any]] = None,
-    intent_label: Optional[str] = None,
-    context_label: Optional[str] = None,
 ) -> Dict[str, Union[List[str], None]]:
     """
     API-friendly normalizer used by `/predict`.
@@ -1448,29 +1421,8 @@ def normalize_entities(
         - Puede usar `intents` (activity/region/investment) para inferencias de
             indicator/frequency
     """
-    def _extract_label(value: Any) -> Optional[str]:
-        if value is None:
-            return None
-        if isinstance(value, dict):
-            label = value.get("label")
-            return str(label).lower() if label is not None else None
-        return str(value).lower()
-
-    routing_intent_label = _extract_label(intent_label)
-    if routing_intent_label is None:
-        routing_intent_label = _extract_label((intents or {}).get("intent"))
-
-    routing_context_label = _extract_label(context_label)
-    if routing_context_label is None:
-        routing_context_label = _extract_label((intents or {}).get("context"))
-
     ner_output = {"interpretation": {"entities": entities}}
-    base_result = normalize_ner_entities(
-        ner_output,
-        calc_mode=calc_mode,
-        intent_label=routing_intent_label,
-        context_label=routing_context_label,
-    )
+    base_result = normalize_ner_entities(ner_output, calc_mode=calc_mode)
     base_normalized = base_result.get("normalized_entities", {})
 
     response: Dict[str, Union[List[str], str, None]] = {}
@@ -1489,36 +1441,102 @@ def normalize_entities(
         )
 
         if len(raw_values) > 1:
-            value = _normalize_multiple_values(
-                key,
-                raw_values,
-                calc_mode,
-                base_normalized,
-                intent_label=routing_intent_label,
-                context_label=routing_context_label,
-            )
+            value = _normalize_multiple_values(key, raw_values, calc_mode, base_normalized)
         else:
             value = _as_list(base_normalized.get(key))
 
         response[key] = value
 
-    # Regla de negocio: indicador genérico/vacío depende de frequency + intent.
+    # Regla crítica de negocio para indicador genérico/vacío sin frecuencia:
+    # 1) Si req_form=point, evalúa period para inferir m/q/a y resolver indicador.
+    # 2) Si no hay inferencia por period (o req_form != point):
+    #    - imacec/m solo con cobertura IMACEC y region/investment=none.
+    #    - pib/q si hay señales PIB (region/investment o cobertura actividad PIB).
+    # 3) Si no hay señales suficientes, fallback final imacec/m.
     raw_indicator = (entities.get("indicator") or [None])[0]
     raw_frequency = (entities.get("frequency") or [None])[0]
     indicator_is_generic_or_missing = _is_generic_indicator_value(raw_indicator)
-    intent_is_value = _normalize_text(routing_intent_label or "") == "value"
+
+    def _intent_label(intent_value: Any) -> Optional[str]:
+        if intent_value is None:
+            return None
+        if isinstance(intent_value, dict):
+            label = intent_value.get("label")
+            return str(label).lower() if label is not None else None
+        return str(intent_value).lower()
+
+    region_intent_label = _intent_label((intents or {}).get("region"))
+    investment_intent_label = _intent_label((intents or {}).get("investment"))
+    req_form_norm = (req_form or "").strip().lower()
+    region_context_for_pib = region_intent_label not in {None, "none"}
+    investment_context_for_pib = investment_intent_label not in {None, "none"}
+    has_region_or_investment_context = region_context_for_pib or investment_context_for_pib
+    raw_activity_values = entities.get("activity") or []
     period_raw_values = entities.get("period") or []
+    inferred_frequency_from_period = (
+        _infer_frequency_from_period_for_point(period_raw_values)
+        if req_form_norm == "point" and not raw_frequency
+        else None
+    )
+    split_activity_values = _split_conjoined_values(
+        entity_key="activity",
+        raw_values=raw_activity_values,
+        indicator=None,
+    )
+    has_activity_entities = bool(split_activity_values)
+    total_activity_values = len(split_activity_values)
+    imacec_match_count = _activity_match_count(split_activity_values, ACTIVITY_TERMS_IMACEC) if has_activity_entities else 0
+    pib_match_count = _activity_match_count(split_activity_values, ACTIVITY_TERMS_PIB) if has_activity_entities else 0
+    activity_covered_by_imacec = has_activity_entities and imacec_match_count == total_activity_values
+    activity_covered_by_pib = has_activity_entities and pib_match_count == total_activity_values
 
     if indicator_is_generic_or_missing and not raw_frequency:
-        if intent_is_value:
+        if inferred_frequency_from_period == "m":
             response["indicator"] = ["imacec"]
             response["frequency"] = ["m"]
+        elif inferred_frequency_from_period in {"q", "a"}:
+            response["indicator"] = ["pib"]
+            response["frequency"] = [inferred_frequency_from_period]
+        elif activity_covered_by_imacec and not has_region_or_investment_context:
+            response["indicator"] = ["imacec"]
+            response["frequency"] = ["m"]
+        elif has_region_or_investment_context or activity_covered_by_pib:
+            response["indicator"] = ["pib"]
+            response["frequency"] = ["q"]
         else:
-            response["indicator"] = []
+            response["indicator"] = ["imacec"]
+            response["frequency"] = ["m"]
     elif not raw_frequency and "pib" in response.get("indicator", []):
-        response["frequency"] = ["q"]
+        response["frequency"] = [inferred_frequency_from_period or "q"]
     elif not raw_frequency and "imacec" in response.get("indicator", []):
-        response["frequency"] = ["m"]
+        response["frequency"] = [inferred_frequency_from_period or "m"]
+    elif not raw_frequency and inferred_frequency_from_period and not response.get("frequency"):
+        response["frequency"] = [inferred_frequency_from_period]
+
+    # Re-normalizar activity con el indicador final inferido para evitar
+    # desalineación cuando indicator cambia por reglas críticas de negocio.
+    final_indicator_values = response.get("indicator", [])
+    final_indicator = (
+        final_indicator_values[0]
+        if isinstance(final_indicator_values, list) and final_indicator_values
+        else None
+    )
+    if raw_activity_values:
+        activity_values_for_normalization = _split_conjoined_values(
+            entity_key="activity",
+            raw_values=raw_activity_values,
+            indicator=final_indicator,
+        )
+        normalized_activity_values: List[str] = []
+        for raw_activity in activity_values_for_normalization:
+            normalized_activity, _ = normalize_activity(raw_activity, final_indicator)
+            if normalized_activity and normalized_activity not in normalized_activity_values:
+                normalized_activity_values.append(normalized_activity)
+        response["activity"] = normalized_activity_values
+
+    has_year_only_point_period = any(_is_year_only_period_reference(raw) for raw in period_raw_values if raw)
+    if req_form_norm == "point" and "pib" in response.get("indicator", []) and has_year_only_point_period:
+        response["frequency"] = ["a"]
 
     effective_frequency = response.get("frequency", [])
     frequency_code = effective_frequency[0] if isinstance(effective_frequency, list) and effective_frequency else None
