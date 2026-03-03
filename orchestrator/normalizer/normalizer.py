@@ -34,7 +34,7 @@ Reglas aplicadas (orden de ejecución conceptual):
         - Regla crítica para indicador genérico (ej. `economia`) sin `frequency`:
           a) Primero: si hay `frequency` explícita, se resuelve desde ahí
               (`m` -> `imacec`, `q/a` -> `pib`).
-          b) Luego: si no hay `frequency` y `req_form=point`, se evalúa `period`
+          b) Luego: si no hay `frequency` y `req_form` in (`point`,`range`,`latest`), se evalúa `period`
               para inferir frecuencia:
             - mes -> `m` (y `indicator=imacec`)
             - trimestre (incluyendo typos) -> `q` (y `indicator=pib`)
@@ -45,7 +45,7 @@ Reglas aplicadas (orden de ejecución conceptual):
           d) Si hay señales de PIB (contexto de `region`/`investment` o
               cobertura de actividades PIB), se asigna `pib/q`.
           e) Si no hay señales suficientes, fallback final `imacec/m`.
-        - Regla adicional: si `req_form=point`, `indicator=pib` y `period` es solo
+        - Regla adicional: si `req_form` in (`point`,`range`,`latest`), `indicator=pib` y `period` es solo
             año (sin mes/trimestre), la frecuencia se ajusta a `a`.
 
 4) Inferencia de `seasonality`
@@ -467,7 +467,7 @@ def _normalize_text(text: str) -> str:
 
 
 def _has_explicit_year(text: str) -> bool:
-    return bool(re.search(r"\b20\d{2}\b", _normalize_text(text)))
+    return bool(re.search(r"\b(?:19|20)\d{2}\b", _normalize_text(text)))
 
 
 def _contains_latest_reference(text: str) -> bool:
@@ -908,7 +908,7 @@ def normalize_period(period_value: Optional[str]) -> Tuple[Optional[str], List[s
         return _format_month_start(today), []
 
     # Caso 2: Año explícito (ej: "2024") o implícito (año actual)
-    year_match = re.search(r'\b(20\d{2})\b', period_normalized)
+    year_match = re.search(r'\b((?:19|20)\d{2})\b', period_normalized)
     year = int(year_match.group(1)) if year_match else datetime.now().year
 
     # Buscar mes explícito (ej: "enero 2024" o "enero")
@@ -928,7 +928,7 @@ def normalize_period(period_value: Optional[str]) -> Tuple[Optional[str], List[s
         return f"{year:04d}-01-01", []
 
     # Caso 3: Formato ISO (ej: "2024-01", "2024-T1")
-    iso_match = re.search(r'(20\d{2})-(\d{2})', period_normalized)
+    iso_match = re.search(r'((?:19|20)\d{2})-(\d{2})', period_normalized)
     if iso_match:
         year = int(iso_match.group(1))
         month = int(iso_match.group(2))
@@ -1207,7 +1207,7 @@ def _extract_quarter_based_dates(text: str) -> List[str]:
     year_tokens: List[Tuple[int, int]] = []     # (token_idx, year)
 
     for idx, token in enumerate(tokens):
-        if re.fullmatch(r'20\d{2}', token):
+        if re.fullmatch(r'(?:19|20)\d{2}', token):
             year_tokens.append((idx, int(token)))
             continue
 
@@ -1271,7 +1271,7 @@ def _is_trimester_like_token(token: str) -> bool:
 def _extract_year_based_dates(text: str) -> List[str]:
     """Extrae años explícitos como fechas de inicio de año YYYY-MM-DD."""
     normalized_text = _normalize_text(text)
-    year_matches = re.findall(r'\b(20\d{2})\b', normalized_text)
+    year_matches = re.findall(r'\b((?:19|20)\d{2})\b', normalized_text)
     if not year_matches:
         return []
 
@@ -1290,7 +1290,7 @@ def _is_year_only_period_reference(text: str) -> bool:
         return False
 
     normalized_text = _normalize_text(text)
-    has_year = bool(re.search(r'\b20\d{2}\b', normalized_text))
+    has_year = bool(re.search(r'\b(?:19|20)\d{2}\b', normalized_text))
     if not has_year:
         return False
 
@@ -1300,7 +1300,7 @@ def _is_year_only_period_reference(text: str) -> bool:
 
 
 def _infer_frequency_from_period_for_point(raw_values: List[str]) -> Optional[str]:
-    """Infiere frecuencia m/q/a desde period cuando req_form=point."""
+    """Infiere frecuencia m/q/a desde period para req_form point/range/latest."""
     valid_values = [raw for raw in raw_values if raw]
     if not valid_values:
         return None
@@ -1333,7 +1333,7 @@ def _extract_month_based_dates(text: str) -> List[str]:
     year_tokens: List[Tuple[int, int]] = []   # (token_idx, year)
 
     for idx, token in enumerate(tokens):
-        if re.fullmatch(r'20\d{2}', token):
+        if re.fullmatch(r'(?:19|20)\d{2}', token):
             year_tokens.append((idx, int(token)))
             continue
 
@@ -1536,7 +1536,7 @@ def normalize_entities(
         response[key] = value
 
     # Regla crítica de negocio para indicador genérico/vacío sin frecuencia:
-    # 1) Si req_form=point, evalúa period para inferir m/q/a y resolver indicador.
+    # 1) Si req_form in (point/range/latest), evalúa period para inferir m/q/a y resolver indicador.
     # 2) Si no hay inferencia por period (o req_form != point):
     #    - imacec/m solo con cobertura IMACEC y region/investment=none.
     #    - pib/q si hay señales PIB (region/investment o cobertura actividad PIB).
@@ -1563,7 +1563,7 @@ def normalize_entities(
     period_raw_values = entities.get("period") or []
     inferred_frequency_from_period = (
         _infer_frequency_from_period_for_point(period_raw_values)
-        if req_form_norm == "point" and not raw_frequency
+        if req_form_norm in {"point", "range", "latest"} and not raw_frequency
         else None
     )
     split_activity_values = _split_conjoined_values(
@@ -1623,7 +1623,7 @@ def normalize_entities(
         response["activity"] = normalized_activity_values
 
     has_year_only_point_period = any(_is_year_only_period_reference(raw) for raw in period_raw_values if raw)
-    if req_form_norm == "point" and "pib" in response.get("indicator", []) and has_year_only_point_period:
+    if req_form_norm in {"point", "range", "latest"} and "pib" in response.get("indicator", []) and has_year_only_point_period:
         response["frequency"] = ["a"]
 
     effective_frequency = response.get("frequency", [])

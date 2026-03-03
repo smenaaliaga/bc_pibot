@@ -111,6 +111,7 @@ def find_family_by_classification(
     price: Any = None,
     seasonality: Any = None,
     frequency: Any = None,
+    hist: Any = None,
 ) -> Optional[Dict[str, Any]]:
     payload = _read_catalog_payload(catalog_path)
     if not payload:
@@ -125,6 +126,14 @@ def find_family_by_classification(
     requested_price = str(price).strip().lower() if price not in (None, "") else None
     requested_seasonality = str(seasonality).strip().lower() if seasonality not in (None, "") else None
     requested_frequency = str(frequency).strip().lower() if frequency not in (None, "") else None
+    requested_hist = _to_flag(hist)
+
+    has_hist_dimension = any(
+        isinstance(family_payload, dict)
+        and isinstance(family_payload.get("classification"), dict)
+        and _to_flag(family_payload.get("classification", {}).get("hist")) is not None
+        for family_payload in payload.values()
+    )
 
     candidates: List[Dict[str, Any]] = []
     for family_name, family_payload in payload.items():
@@ -141,6 +150,7 @@ def find_family_by_classification(
         has_activity = _to_flag(family_classification.get("has_activity"))
         has_region = _to_flag(family_classification.get("has_region"))
         has_investment = _to_flag(family_classification.get("has_investment"))
+        family_hist = _to_flag(family_classification.get("hist"))
 
         if has_activity != requested_has_activity:
             continue
@@ -181,6 +191,10 @@ def find_family_by_classification(
             if family_frequency_normalized != requested_frequency:
                 continue
 
+        if requested_hist is not None and has_hist_dimension:
+            if family_hist != requested_hist:
+                continue
+
         score = 0
         if requested_indicator is not None and indicator_value == requested_indicator:
             score += 100
@@ -191,6 +205,8 @@ def find_family_by_classification(
         if family_seasonality not in (None, ""):
             score += 1
         if family_frequency not in (None, ""):
+            score += 1
+        if requested_hist is not None and family_hist == requested_hist:
             score += 1
 
         candidates.append(

@@ -514,6 +514,10 @@ def get_series_api_rest_bcch(
         "function": "GetSeries",
         "timeseries": series_id,
     }
+    params_public = {
+        "function": "GetSeries",
+        "timeseries": series_id,
+    }
     # No se envían firstdate/lastdate: se trae la serie completa.
 
     headers = {"Accept": "application/json"}
@@ -531,6 +535,7 @@ def get_series_api_rest_bcch(
             "agg": agg,
         }
         url_masked = f"{BCCH_BASE}?{urlencode(log_params)}"
+        source_url = f"{BCCH_BASE}?{urlencode(params_public)}"
         # URL expuesta: versión codificada y versión legible (sin %xx)
         url_plain_encoded = f"{BCCH_BASE}?{urlencode(params)}"
         url_plain_readable = unquote(url_plain_encoded)
@@ -546,6 +551,10 @@ def get_series_api_rest_bcch(
         logger.info(
             f"[API_REQUEST_URL:{tag}] caller_file={caller.get('file')} caller_func={caller.get('func')} "
             f"params={args_summary} url={url_masked}"
+        )
+        logger.info(
+            f"[API_SOURCE_URL:{tag}] caller_file={caller.get('file')} caller_func={caller.get('func')} "
+            f"url={source_url}"
         )
         # Opcional: exponer link plano completo sólo si está habilitado explícitamente
         if LOG_EXPOSE_API_LINKS:
@@ -637,6 +646,8 @@ def get_series_api_rest_bcch(
             "series_id": series.get("seriesId", series_id),
             "descripEsp": series.get("descripEsp", ""),
             "descripIng": series.get("descripIng", ""),
+            "source_provider": "BCCh SieteRestWS",
+            "source_url": f"{BCCH_BASE}?{urlencode(params_public)}",
             "original_frequency": original_freq,
             "target_frequency": target_frequency or original_freq,
             "freq_effective": effective_freq,
@@ -898,6 +909,10 @@ def get_series_from_redis(
         logger.info(
             f"[get_series_from_redis] Cache hit | key='{cache_key}' | rows={len((data or {}).get('observations', []) or [])}"
         )
+        meta_ref = data.setdefault("meta", {})
+        if "source_url" not in meta_ref:
+            meta_ref["source_provider"] = "BCCh SieteRestWS"
+            meta_ref["source_url"] = f"{BCCH_BASE}?{urlencode({'function': 'GetSeries', 'timeseries': series_id})}"
     except Exception as e:
         logger.error(
             f"[get_series_from_redis] Error parseando JSON desde Redis | key='{cache_key}' | error={e}"

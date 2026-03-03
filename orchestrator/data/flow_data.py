@@ -44,6 +44,7 @@ def stream_data_flow(
         or classification_dict.get("req_form_cls")
         or "latest"
     )
+    effective_req_form = str(req_form or "").strip().lower()
     parsed_point = payload.get("parsed_point")  # DD-MM-YYYY o None
     parsed_range = payload.get("parsed_range")  # Tupla (DD-MM-YYYY, DD-MM-YYYY) o None
     reference_period = payload.get("reference_period")
@@ -117,12 +118,38 @@ def stream_data_flow(
             return requested.year == observed.year and requested_quarter == observed_quarter
         return requested.year == observed.year and requested.month == observed.month
 
+    if effective_req_form == "range":
+        freq_norm = str(freq or "").strip().lower()
+        if freq_norm in {"a", "annual", "anual"}:
+            start_date: Optional[date] = None
+            end_date: Optional[date] = None
+
+            if isinstance(parsed_range, (tuple, list)) and len(parsed_range) == 2:
+                start_date = _parse_iso_date(parsed_range[0])
+                end_date = _parse_iso_date(parsed_range[1])
+
+            if start_date is None or end_date is None:
+                observed_dates = [
+                    _parse_iso_date(row.get("date"))
+                    for row in obs
+                    if isinstance(row, dict)
+                ]
+                valid_observed_dates = [value for value in observed_dates if value is not None]
+                if valid_observed_dates:
+                    start_date = min(valid_observed_dates)
+                    end_date = max(valid_observed_dates)
+
+            if start_date is not None and end_date is not None and start_date.year == end_date.year:
+                effective_req_form = "point"
+                if not parsed_point:
+                    parsed_point = end_date.isoformat()
+
     # Para range/specific_point: mostrar todas las observaciones.
     # Para latest: última observación disponible.
     # Para point: observación alineada al período consultado (parsed_point).
-    if req_form in {"range", "specific_point"}:
+    if effective_req_form in {"range", "specific_point"}:
         obs_to_show = obs
-    elif req_form == "point":
+    elif effective_req_form == "point":
         requested_date = _parse_iso_date(parsed_point)
         dated_obs = [
             (row, _parse_iso_date(row.get("date")))
@@ -216,7 +243,7 @@ def stream_data_flow(
             reference_period = max(date_candidates)
     
     # Para range/specific_point: mostrar rango de fechas usando parsed_range si está disponible; para latest/point: usar parsed_point o fecha de observación
-    if req_form in {"range", "specific_point"}:
+    if effective_req_form in {"range", "specific_point"}:
         if parsed_range:
             start_str, end_str = parsed_range
             start_labels = format_period_labels(start_str, freq)
@@ -246,7 +273,7 @@ def stream_data_flow(
             logger.info("[STREAM_DATA_FLOW] Renderizando (observación) | date=%s", date_raw)
 
     # Etiqueta para mostrar en prompts: para latest usar texto genérico
-    if req_form == "latest":
+    if effective_req_form == "latest":
         display_period_label = date_range_label if (is_contribution and date_range_label != "--") else "el último período disponible"
     else:
         display_period_label = date_range_label
@@ -255,7 +282,7 @@ def stream_data_flow(
         specific_point_response(
             series_id=series_id,
             series_title=series_title,
-            req_form=req_form,
+            req_form=effective_req_form,
             obs_to_show=obs_to_show,
             parsed_point=parsed_point,
             parsed_range=parsed_range,
@@ -277,11 +304,11 @@ def stream_data_flow(
             source_urls=source_urls,
             intro_llm_temperature=intro_llm_temperature_value,
         )
-        if req_form == "specific_point"
+        if effective_req_form == "specific_point"
         else specific_response(
             series_id=series_id,
             series_title=series_title,
-            req_form=req_form,
+            req_form=effective_req_form,
             obs_to_show=obs_to_show,
             parsed_point=parsed_point,
             parsed_range=parsed_range,

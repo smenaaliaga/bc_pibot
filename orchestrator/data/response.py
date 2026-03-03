@@ -748,9 +748,10 @@ def _build_latest_intro_fallback(
         intro_base = f"La variación {freq_label} de la serie {series_desc}"
 
     if var_value is None:
+        value_text = format_value(row.get("value"))
         return (
             f"{intro_base}, correspondiente a {effective_period_label} (último valor reportado por la BDE), "
-            "no está disponible."
+            f"no está disponible; el valor informado para ese período es {value_text}."
         )
     if comparison_text:
         return (
@@ -1171,7 +1172,10 @@ def _build_latest_prompt(
                 else:
                     llm_prompt_parts.append("IMPORTANTE: para frecuencia anual, inicia con: 'La variación anual con respecto al año anterior es ...'")
         else:
-            llm_prompt_parts.append("IMPORTANTE: si no hay variación disponible, indícalo explícitamente sin inventar cifras")
+            llm_prompt_parts.append(f"- Valor del período: {format_value(row.get('value'))}")
+            llm_prompt_parts.append(
+                "IMPORTANTE: si no hay variación disponible, indícalo explícitamente y reporta igualmente el valor del período sin inventar cifras."
+            )
 
         llm_prompt_parts.append("\nREQUISITOS DE ESTILO:")
         llm_prompt_parts.append("- Usa un tono neutral y factual")
@@ -1312,7 +1316,13 @@ def _stream_llm_or_fallback(
             variation_value = row.get("prev_period")
             comparison_text = "respecto al período anterior"
         else:
-            return None
+            variation_value = None
+            if "yoy" in row:
+                comparison_text = "respecto al mismo período del año anterior"
+            elif "prev_period" in row:
+                comparison_text = "respecto al período anterior"
+            else:
+                comparison_text = ""
 
         period_label = str(display_period_label or "").strip()
         if not period_label or period_label == "--":
@@ -1334,10 +1344,27 @@ def _stream_llm_or_fallback(
             indicator_phrase = f"el {indicator_phrase}"
 
         if used_latest_fallback_for_point and observed_period_label != period_label:
+            if variation_value is None:
+                return (
+                    f"No hay datos disponibles para {period_label}; sin embargo, según la BDE, el último valor disponible "
+                    f"corresponde a {observed_period_label}, donde {indicator_phrase} registró un valor de "
+                    f"{format_value(row.get('value'))} y la variación {comparison_text or 'de referencia'} no está disponible."
+                )
             return (
                 f"No hay datos disponibles para {period_label}; sin embargo, según la BDE, el último valor disponible "
                 f"corresponde a {observed_period_label}, donde {indicator_phrase} presentó una variación de "
                 f"{format_percentage(variation_value)} {comparison_text}."
+            )
+
+        if variation_value is None:
+            if comparison_text:
+                return (
+                    f"En {period_label}, según los datos de la BDE, {indicator_phrase} registró un valor de "
+                    f"{format_value(row.get('value'))} y la variación {comparison_text} no está disponible."
+                )
+            return (
+                f"En {period_label}, según los datos de la BDE, {indicator_phrase} registró un valor de "
+                f"{format_value(row.get('value'))} y la variación no está disponible."
             )
 
         return (
@@ -1363,7 +1390,13 @@ def _stream_llm_or_fallback(
             variation_value = last_row.get("prev_period")
             comparison_text = "respecto al período anterior"
         else:
-            return None
+            variation_value = None
+            if "yoy" in last_row:
+                comparison_text = "respecto al mismo período del año anterior"
+            elif "prev_period" in last_row:
+                comparison_text = "respecto al período anterior"
+            else:
+                comparison_text = ""
 
         range_label = str(date_range_label or display_period_label or "").strip()
         if not range_label or range_label == "--":
@@ -1376,12 +1409,21 @@ def _stream_llm_or_fallback(
             else:
                 range_label = "en el período consultado"
 
-        last_period_label = format_period_labels(last_row.get("date"), "m")[0]
+        last_period_label = format_period_labels(last_row.get("date"), freq)[0]
         indicator_phrase = str(series_title or final_indicator_name or "indicador").strip() or "indicador"
 
         return (
             f"En el período {range_label}, según los datos de la BDE, {indicator_phrase} registró en "
-            f"{last_period_label} una variación de {format_percentage(variation_value)} {comparison_text}."
+            f"{last_period_label} un valor de {format_value(last_row.get('value'))} y "
+            + (
+                f"una variación de {format_percentage(variation_value)} {comparison_text}."
+                if variation_value is not None
+                else (
+                    f"la variación {comparison_text} no está disponible."
+                    if comparison_text
+                    else "la variación no está disponible."
+                )
+            )
         )
 
     def _remove_latest_wording_for_non_latest(text: str) -> str:
@@ -1485,7 +1527,10 @@ def _stream_llm_or_fallback(
                 var_value = None
 
             if var_value is None:
-                yield f"{final_indicator_name} en {display_period_label}: no hay variación disponible"
+                yield (
+                    f"{final_indicator_name} en {display_period_label}: no hay variación disponible; "
+                    f"valor del período {format_value(row.get('value'))}"
+                )
             else:
                 yield f"{final_indicator_name} en {display_period_label}: {var_label} de {format_percentage(var_value)}"
         yield "\n\n"

@@ -105,3 +105,16 @@ def test_point_ultimo_mes_infieres_m_frequency_for_pib():
     normalized = normalize_entities(entities, calc_mode="yoy", req_form="point")
 
     assert normalized["frequency"] == ["m"]
+
+
+def test_range_generic_indicator_with_1960_inferrs_pib_annual_and_full_year_period():
+    entities = {
+        "indicator": ["economia"],
+        "period": ["1960"],
+    }
+
+    normalized = normalize_entities(entities, calc_mode="yoy", req_form="range")
+
+    assert normalized["indicator"] == ["pib"]
+    assert normalized["frequency"] == ["a"]
+    assert normalized["period"] == ["1960-01-01", "1960-12-31"]
