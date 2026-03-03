@@ -904,9 +904,6 @@ def _build_latest_intro_fallback(
             has_region_dimension = bool(region_value) and region_value not in {"total", "general", "none"}
             has_investment_dimension = bool(investment_value) and investment_value not in {"total", "general", "none"}
 
-            if not (has_activity_dimension or has_region_dimension or has_investment_dimension):
-                continue
-
             if has_activity_dimension:
                 activity_candidate_count += 1
             if has_region_dimension:
@@ -930,6 +927,16 @@ def _build_latest_intro_fallback(
                 or ""
             ).strip().replace("_", " ")
             if not series_name:
+                continue
+
+            series_name_norm = series_name.lower().strip()
+            if series_name_norm in {
+                "total",
+                "pib",
+                "imacec",
+                "producto interno bruto",
+                "pib a costo de factores",
+            }:
                 continue
 
             candidates.append((var_numeric, series_name))
@@ -1874,9 +1881,6 @@ def _stream_llm_or_fallback(
             has_region_dimension = bool(region_value) and region_value not in {"total", "general", "none"}
             has_investment_dimension = bool(investment_value) and investment_value not in {"total", "general", "none"}
 
-            if not (has_activity_dimension or has_region_dimension or has_investment_dimension):
-                continue
-
             if has_activity_dimension:
                 activity_candidate_count += 1
             if has_region_dimension:
@@ -1900,6 +1904,16 @@ def _stream_llm_or_fallback(
                 or ""
             ).strip().replace("_", " ")
             if not series_name:
+                continue
+
+            series_name_norm = series_name.lower().strip()
+            if series_name_norm in {
+                "total",
+                "pib",
+                "imacec",
+                "producto interno bruto",
+                "pib a costo de factores",
+            }:
                 continue
 
             candidates.append((var_numeric, series_name))
