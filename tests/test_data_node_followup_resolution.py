@@ -953,6 +953,94 @@ def test_data_node_latest_contribution_uses_target_series_latest_date(monkeypatc
     assert result["output"].endswith("ok")
 
 
+def test_data_node_contribution_general_prefers_target_series_id_for_aggregate_row(monkeypatch):
+    payload_holder = {}
+
+    monkeypatch.setattr(
+        series_search,
+        "find_family_by_classification",
+        lambda *args, **kwargs: {
+            "family_name": "PIB contrib regional family",
+            "source_url": "https://example.test/family",
+        },
+    )
+    monkeypatch.setattr(
+        series_search,
+        "family_to_series_rows",
+        lambda family: [
+            {"id": "SERIE.ARICA", "short_title": "Región de Arica y Parinacota", "classification": {"region": "arica_parinacota"}},
+            {"id": "SERIE.PIB.TOTAL", "short_title": "Producto Interno Bruto", "classification": {"indicator": "pib"}},
+            {"id": "SERIE.TARAPACA", "short_title": "Región de Tarapacá", "classification": {"region": "tarapaca"}},
+        ],
+    )
+    monkeypatch.setattr(
+        series_search,
+        "select_target_series_by_classification",
+        lambda family_series, eq, fallback_to_first=True: family_series[1],
+    )
+
+    def fake_fetch_series_by_req_form(**kwargs):
+        series_id = kwargs.get("series_id")
+        if series_id == "SERIE.PIB.TOTAL":
+            return (
+                [{"date": "2025-09-30", "value": 1.6}],
+                {"date": "2025-09-30", "value": 1.6},
+                None,
+            )
+        return (
+            [{"date": "2025-09-30", "value": 0.0}],
+            {"date": "2025-09-30", "value": 0.0},
+            None,
+        )
+
+    monkeypatch.setattr(
+        data_module,
+        "_fetch_series_by_req_form",
+        fake_fetch_series_by_req_form,
+    )
+
+    def fake_stream_data_flow(payload, session_id=""):
+        payload_holder["payload"] = payload
+        yield "ok"
+
+    monkeypatch.setattr(data_module.flow_data, "stream_data_flow", fake_stream_data_flow)
+
+    classification = types.SimpleNamespace(
+        normalized={
+            "indicator": ["pib"],
+            "seasonality": ["nsa"],
+            "frequency": ["q"],
+            "period": ["2025-10-01", "2025-12-31"],
+            "activity": [],
+            "region": [],
+            "investment": [],
+        },
+        predict_raw={},
+        entities={"indicator": ["pib"]},
+        calc_mode="contribution",
+        activity="general",
+        region="general",
+        investment="none",
+        req_form="latest",
+    )
+
+    node = make_data_node(None)
+    result = node(
+        {
+            "question": "contribución pib por región",
+            "session_id": "s-contrib-regional-aggregate",
+            "classification": classification,
+            "entities": [{"indicator": ["pib"]}],
+        }
+    )
+
+    payload = payload_holder["payload"]
+    assert payload["series"] == "SERIE.PIB.TOTAL"
+    assert str(payload["result"][0].get("series_id")) == "SERIE.PIB.TOTAL"
+    assert float(payload["result"][0].get("value")) == 1.6
+    assert result["output"].endswith("ok")
+
+
 def test_data_node_contribution_aggregate_forces_target_activity_to_pib(monkeypatch):
     captured_eq = {}
 
@@ -1309,4 +1397,96 @@ def test_data_node_yoy_general_collects_family_series_and_keeps_target(monkeypat
     assert len(payload.get("all_series_data") or []) == 2
     assert str(payload["result"][0].get("series_id")) == "SERIE.IMACEC.TARGET"
     assert payload["all_series_data"][0].get("yoy") is not None
+    assert result["output"].endswith("ok")
+
+
+def test_data_node_contribution_specific_region_returns_only_target_row(monkeypatch):
+    payload_holder = {}
+
+    monkeypatch.setattr(
+        series_search,
+        "find_family_by_classification",
+        lambda *args, **kwargs: {
+            "family_name": "PIB contrib regional family",
+            "source_url": "https://example.test/family",
+        },
+    )
+    monkeypatch.setattr(
+        series_search,
+        "family_to_series_rows",
+        lambda family: [
+            {"id": "SERIE.ARICA", "short_title": "Región de Arica y Parinacota", "classification": {"region": "arica_parinacota"}},
+            {"id": "SERIE.NUBLE", "short_title": "Región de Ñuble", "classification": {"region": "nuble"}},
+            {"id": "SERIE.PIB", "short_title": "Producto Interno Bruto", "classification": {"indicator": "pib"}},
+        ],
+    )
+    monkeypatch.setattr(
+        series_search,
+        "select_target_series_by_classification",
+        lambda family_series, eq, fallback_to_first=True: family_series[1],
+    )
+
+    def fake_fetch_series_by_req_form(**kwargs):
+        series_id = kwargs.get("series_id")
+        if series_id == "SERIE.NUBLE":
+            return (
+                [{"date": "2025-09-30", "value": 0.0}],
+                {"date": "2025-09-30", "value": 0.0},
+                None,
+            )
+        if series_id == "SERIE.PIB":
+            return (
+                [{"date": "2025-09-30", "value": 1.6}],
+                {"date": "2025-09-30", "value": 1.6},
+                None,
+            )
+        return (
+            [{"date": "2025-09-30", "value": 0.3}],
+            {"date": "2025-09-30", "value": 0.3},
+            None,
+        )
+
+    monkeypatch.setattr(data_module, "_fetch_series_by_req_form", fake_fetch_series_by_req_form)
+
+    def fake_stream_data_flow(payload, session_id=""):
+        payload_holder["payload"] = payload
+        yield "ok"
+
+    monkeypatch.setattr(data_module.flow_data, "stream_data_flow", fake_stream_data_flow)
+
+    classification = types.SimpleNamespace(
+        normalized={
+            "indicator": ["pib"],
+            "seasonality": ["nsa"],
+            "frequency": ["q"],
+            "period": ["2025-10-01", "2025-12-31"],
+            "activity": [],
+            "region": ["nuble"],
+            "investment": [],
+        },
+        predict_raw={},
+        entities={"indicator": ["pib"], "region": ["nuble"]},
+        calc_mode="contribution",
+        activity="none",
+        region="specific",
+        investment="none",
+        req_form="point",
+    )
+
+    node = make_data_node(None)
+    result = node(
+        {
+            "question": "contribución de ñuble al pib trimestre pasado",
+            "session_id": "s-contrib-specific-region",
+            "classification": classification,
+            "entities": [{"indicator": ["pib"], "region": ["nuble"]}],
+        }
+    )
+
+    payload = payload_holder["payload"]
+    assert payload["series"] == "SERIE.NUBLE"
+    assert len(payload.get("result") or []) == 1
+    assert len(payload.get("all_series_data") or []) == 1
+    assert str(payload["result"][0].get("series_id")) == "SERIE.NUBLE"
+    assert str(payload["all_series_data"][0].get("series_id")) == "SERIE.NUBLE"
     assert result["output"].endswith("ok")

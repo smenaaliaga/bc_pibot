@@ -132,6 +132,12 @@ import re
 from typing import Dict, List, Optional, Tuple, Any, Union
 from difflib import SequenceMatcher
 from datetime import datetime, timedelta
+from calendar import monthrange
+
+try:
+    from zoneinfo import ZoneInfo
+except Exception:  # pragma: no cover
+    ZoneInfo = None
 
 
 # ============================================================================
@@ -345,7 +351,8 @@ REGION_TERMS = {
         "magallanes y de la antártica chilena", "punta arenas",
         "región xii", "xii región", "región 12", "región n°12",
         "región nro 12", "duodécima región", "duodecima región",
-        "12va región", "12a región", "12m región", 'xii '
+        "12va región", "12a región", "12m región", 'xii ',
+        'antartica', 'la antartica', 'antartica chilena', 'antartica chilena y magallanes',
     ],
 }
 
@@ -464,6 +471,33 @@ QUARTERS_START_MONTH = {
     1: 1, 2: 4, 3: 7, 4: 10,
 }
 
+SPANISH_NUMBER_WORDS = {
+    "un": 1,
+    "uno": 1,
+    "una": 1,
+    "dos": 2,
+    "tres": 3,
+    "cuatro": 4,
+    "cinco": 5,
+    "seis": 6,
+    "siete": 7,
+    "ocho": 8,
+    "nueve": 9,
+    "diez": 10,
+    "once": 11,
+    "doce": 12,
+    "trece": 13,
+    "catorce": 14,
+    "quince": 15,
+    "dieciseis": 16,
+    "diecisiete": 17,
+    "dieciocho": 18,
+    "diecinueve": 19,
+    "veinte": 20,
+}
+
+REFERENCE_TIMEZONE = "America/Santiago"
+
 
 # ============================================================================
 # FUNCIONES AUXILIARES DE FUZZY MATCHING
@@ -535,6 +569,151 @@ def _has_explicit_year(text: str) -> bool:
     return bool(re.search(r"\b(?:19|20)\d{2}\b", _normalize_text(text)))
 
 
+def _reference_now() -> datetime:
+    if ZoneInfo is None:
+        return datetime.now()
+    try:
+        return datetime.now(ZoneInfo(REFERENCE_TIMEZONE)).replace(tzinfo=None)
+    except Exception:
+        return datetime.now()
+
+
+def _parse_number_token(token: Optional[str]) -> Optional[int]:
+    normalized = _normalize_text(str(token or "")).strip()
+    if not normalized:
+        return None
+
+    if normalized.isdigit():
+        return int(normalized)
+
+    return SPANISH_NUMBER_WORDS.get(normalized)
+
+
+def _extract_relative_year_offset(text: str) -> Optional[int]:
+    normalized = _normalize_text(text)
+    if not normalized:
+        return None
+
+    if re.search(r"\b(?:ano|anio)\s+antepasad[oa]s?\b", normalized):
+        return 2
+    if re.search(r"\b(?:ano|anio)\s+antes\s+pasad[oa]s?\b", normalized):
+        return 2
+    if re.search(r"\b(?:ano|anio)\s+pasad[oa]s?\b", normalized):
+        return 1
+
+    match = re.search(r"\bhace\s+([a-z0-9]+)\s+(?:ano|anio)s?\b(?:\s+atras)?", normalized)
+    if match:
+        return _parse_number_token(match.group(1))
+
+    return None
+
+
+def _extract_relative_shift(text: str) -> Optional[Tuple[str, int]]:
+    normalized = _normalize_text(text)
+    if not normalized:
+        return None
+
+    match = re.search(
+        r"\bhace\s+([a-z0-9]+)\s+(mes(?:es)?|trimestre(?:s)?|(?:ano|anio)s?)\b(?:\s+atras)?",
+        normalized,
+    )
+    if not match:
+        return None
+
+    amount = _parse_number_token(match.group(1))
+    if amount is None or amount <= 0:
+        return None
+
+    unit = match.group(2)
+    if unit.startswith("mes"):
+        return "m", amount
+    if unit.startswith("trimestre"):
+        return "q", amount
+    return "a", amount
+
+
+def _add_months(base: datetime, delta_months: int) -> datetime:
+    month_index = (base.year * 12 + (base.month - 1)) + delta_months
+    year = month_index // 12
+    month = (month_index % 12) + 1
+    day = min(base.day, monthrange(year, month)[1])
+    return datetime(year, month, day)
+
+
+def _shift_anchor(base: datetime, granularity: str, steps_back: int) -> datetime:
+    if granularity == "m":
+        month_anchor = datetime(base.year, base.month, 1)
+        return _add_months(month_anchor, -steps_back)
+    if granularity == "q":
+        quarter_anchor = datetime(base.year, _quarter_start_month(base.month), 1)
+        return _add_months(quarter_anchor, -(steps_back * 3))
+    return datetime(base.year - steps_back, 1, 1)
+
+
+def _has_explicit_relative_year_anchor(text: str) -> bool:
+    normalized = _normalize_text(text)
+    if not normalized:
+        return False
+    if _extract_relative_year_offset(normalized) is None:
+        return False
+
+    has_month = any(month_name in normalized for month_name in MONTHS) or bool(
+        re.search(r"\bmes(?:es)?\b", normalized)
+    )
+    has_quarter = _has_quarter_reference(normalized)
+    has_year = bool(re.search(r"\b(?:ano|anio)s?\b", normalized))
+    return has_month or has_quarter or has_year
+
+
+def _extract_relative_anchored_dates(text: str, reference_now: Optional[datetime] = None) -> List[str]:
+    normalized = _normalize_text(text)
+    if not normalized:
+        return []
+
+    now = reference_now or _reference_now()
+    resolved_dates: List[str] = []
+
+    relative_shift = _extract_relative_shift(normalized)
+    if relative_shift:
+        granularity, amount = relative_shift
+        shifted = _shift_anchor(now, granularity, amount)
+        if granularity == "q":
+            resolved_dates.append(_format_quarter_start(shifted))
+        elif granularity == "a":
+            resolved_dates.append(_format_year_start(shifted))
+        else:
+            resolved_dates.append(_format_month_start(shifted))
+        return resolved_dates
+
+    year_offset = _extract_relative_year_offset(normalized)
+    if year_offset is None:
+        return []
+
+    target_year = now.year - year_offset
+    quarter_dates = _extract_quarter_based_dates(normalized, reference_year=target_year)
+    for date_value in quarter_dates:
+        if date_value not in resolved_dates:
+            resolved_dates.append(date_value)
+
+    month_dates = _extract_month_based_dates(normalized, reference_year=target_year)
+    for date_value in month_dates:
+        if date_value not in resolved_dates:
+            resolved_dates.append(date_value)
+
+    if resolved_dates:
+        return resolved_dates
+
+    if re.search(r"\bmes(?:es)?\b", normalized):
+        return [f"{target_year:04d}-{now.month:02d}-01"]
+    if _has_quarter_reference(normalized):
+        quarter_start = _quarter_start_month(now.month)
+        return [f"{target_year:04d}-{quarter_start:02d}-01"]
+    if re.search(r"\b(?:ano|anio)s?\b", normalized):
+        return [f"{target_year:04d}-01-01"]
+
+    return []
+
+
 def _contains_latest_reference(text: str) -> bool:
     normalized = _normalize_text(text)
     if not normalized:
@@ -558,7 +737,12 @@ def _contains_current_reference(text: str) -> bool:
     normalized = _normalize_text(text)
     if not normalized:
         return False
-    return bool(re.search(r"\beste\b|\bactual\b", normalized))
+    return bool(
+        re.search(
+            r"\beste\b|\bactual\b|\ben\s+curso\b|\bcurso\b",
+            normalized,
+        )
+    )
 
 
 def _detect_current_granularity_from_text(text: str) -> Optional[str]:
@@ -579,6 +763,9 @@ def _detect_current_granularity_from_text(text: str) -> Optional[str]:
 def _detect_latest_granularity_from_text(text: str) -> Optional[str]:
     normalized = _normalize_text(text)
     if not normalized:
+        return None
+
+    if _has_explicit_relative_year_anchor(normalized):
         return None
 
     has_relative_reference = _contains_latest_reference(normalized) or _contains_previous_reference(normalized)
@@ -708,6 +895,7 @@ def _is_generic_indicator_value(indicator_value: Optional[str]) -> bool:
         "actividad economica",
         "economico",
         "economica",
+        "economia chilena",
     ]
     indicator_normalized = _normalize_text(indicator_value)
     return any(_fuzzy_match(indicator_normalized, [term], threshold=0.72) for term in generic_terms)
@@ -1053,12 +1241,12 @@ def normalize_period(period_value: Optional[str]) -> Tuple[Optional[str], List[s
 
     # Caso 1: Términos implícitos (última, reciente, etc.)
     if _contains_latest_reference(period_normalized):
-        today = datetime.now()
+        today = _reference_now()
         return _format_month_start(today), []
 
     # Caso 2: Año explícito (ej: "2024") o implícito (año actual)
     year_match = re.search(r'\b((?:19|20)\d{2})\b', period_normalized)
-    year = int(year_match.group(1)) if year_match else datetime.now().year
+    year = int(year_match.group(1)) if year_match else _reference_now().year
 
     # Buscar mes explícito (ej: "enero 2024" o "enero")
     for month_name, month_num in MONTHS.items():
@@ -1354,7 +1542,7 @@ def _format_quarter_end(date_value: datetime) -> str:
     return _format_month_end(quarter_end_anchor)
 
 
-def _extract_quarter_based_dates(text: str) -> List[str]:
+def _extract_quarter_based_dates(text: str, reference_year: Optional[int] = None) -> List[str]:
     """Extrae fechas trimestrales YYYY-MM-DD desde menciones de trimestres."""
     normalized_text = _normalize_text(text)
     tokens = re.findall(r'[a-záéíóúüñ0-9]+', normalized_text)
@@ -1410,7 +1598,7 @@ def _extract_quarter_based_dates(text: str) -> List[str]:
         return []
 
     resolved_dates: List[str] = []
-    current_year = datetime.now().year
+    current_year = reference_year if reference_year is not None else _reference_now().year
 
     for quarter_idx, quarter in quarter_tokens:
         right_year = next((year for idx, year in year_tokens if idx > quarter_idx), None)
@@ -1536,6 +1724,21 @@ def _infer_frequency_from_period_for_point(raw_values: List[str]) -> Optional[st
     if relative_granularity in {"m", "q", "a"}:
         return relative_granularity
 
+    for raw in valid_values:
+        relative_shift = _extract_relative_shift(raw)
+        if relative_shift:
+            return relative_shift[0]
+
+        relative_year_offset = _extract_relative_year_offset(raw)
+        if relative_year_offset is not None:
+            normalized = _normalize_text(raw)
+            if _has_quarter_reference(normalized):
+                return "q"
+            if any(month_name in normalized for month_name in MONTHS) or re.search(r"\bmes(?:es)?\b", normalized):
+                return "m"
+            if re.search(r"\b(?:ano|anio)s?\b", normalized):
+                return "a"
+
     if any(_has_quarter_reference(raw) for raw in valid_values):
         return "q"
 
@@ -1551,7 +1754,7 @@ def _infer_frequency_from_period_for_point(raw_values: List[str]) -> Optional[st
     return None
 
 
-def _extract_month_based_dates(text: str) -> List[str]:
+def _extract_month_based_dates(text: str, reference_year: Optional[int] = None) -> List[str]:
     """Extrae fechas YYYY-MM-DD desde menciones de meses en un texto de período."""
     normalized_text = _normalize_text(text)
     tokens = re.findall(r'[a-záéíóúüñ0-9]+', normalized_text)
@@ -1567,10 +1770,18 @@ def _extract_month_based_dates(text: str) -> List[str]:
             year_tokens.append((idx, int(token)))
             continue
 
-        if len(token) < 3:
+        if token in MONTHS:
+            month_tokens.append((idx, MONTHS[token]))
             continue
 
-        month_match = _fuzzy_match(token, month_names, threshold=0.72)
+        if token in MONTH_ALIASES:
+            month_tokens.append((idx, MONTH_ALIASES[token]))
+            continue
+
+        if len(token) < 4:
+            continue
+
+        month_match = _fuzzy_match(token, month_names, threshold=0.82)
         if month_match:
             month_num = MONTHS.get(month_match) or MONTH_ALIASES.get(month_match)
             if month_num is not None:
@@ -1580,7 +1791,7 @@ def _extract_month_based_dates(text: str) -> List[str]:
         return []
 
     if not year_tokens:
-        current_year = datetime.now().year
+        current_year = reference_year if reference_year is not None else _reference_now().year
         resolved_dates: List[str] = []
         for _, month_num in month_tokens:
             date_value = f"{current_year:04d}-{month_num:02d}-01"
@@ -1618,26 +1829,43 @@ def _resolve_period_value(
     """
     candidate_dates: List[str] = []
     req_form_norm = (req_form or "").strip().lower()
+    reference_now = _reference_now()
+    has_year_only_reference = False
+
+    for raw in raw_values:
+        if not raw:
+            continue
+        anchored_dates = _extract_relative_anchored_dates(raw, reference_now=reference_now)
+        for anchored_date in anchored_dates:
+            if anchored_date not in candidate_dates:
+                candidate_dates.append(anchored_date)
+
+        if anchored_dates:
+            relative_shift = _extract_relative_shift(raw)
+            if relative_shift and relative_shift[0] == "a":
+                has_year_only_reference = True
+            else:
+                relative_year_offset = _extract_relative_year_offset(raw)
+                normalized_raw = _normalize_text(raw)
+                has_month_reference = any(month_name in normalized_raw for month_name in MONTHS) or bool(
+                    re.search(r"\bmes(?:es)?\b", normalized_raw)
+                )
+                if (
+                    relative_year_offset is not None
+                    and bool(re.search(r"\b(?:ano|anio)s?\b", normalized_raw))
+                    and not has_month_reference
+                    and not _has_quarter_reference(raw)
+                ):
+                    has_year_only_reference = True
+
     current_granularity = _infer_current_granularity(raw_values, frequency)
     if current_granularity:
-        now = datetime.now()
+        now = reference_now
         if current_granularity == "q":
             return [_format_quarter_start(now), _format_quarter_end(now)]
         if current_granularity == "a":
             return [_format_year_start(now), f"{now.year:04d}-12-31"]
         return [_format_month_start(now), _format_month_end(now)]
-
-    relative_latest_granularity = _infer_relative_latest_granularity(raw_values, frequency)
-    if relative_latest_granularity:
-        now = datetime.now()
-        if relative_latest_granularity == "q":
-            prev_quarter = _previous_quarter_anchor(now)
-            return [_format_quarter_start(prev_quarter), _format_quarter_end(prev_quarter)]
-        if relative_latest_granularity == "a":
-            prev_year = _previous_year_anchor(now)
-            return [_format_year_start(prev_year), f"{prev_year.year:04d}-12-31"]
-        prev_month = _previous_month_anchor(now)
-        return [_format_month_start(prev_month), _format_month_end(prev_month)]
 
     decade_ranges = [
         decade_range
@@ -1650,18 +1878,21 @@ def _resolve_period_value(
         return [f"{start_year:04d}-01-01", f"{end_year:04d}-12-31"]
 
     is_quarterly_context = (frequency == "q") or any(_has_quarter_reference(raw) for raw in raw_values if raw)
-    has_year_only_reference = False
 
     for raw in raw_values:
         if not raw:
             continue
 
         # En contexto trimestral, priorizar extracción de trimestres explícitos.
-        extracted_dates = _extract_quarter_based_dates(raw) if is_quarterly_context else []
+        extracted_dates = _extract_quarter_based_dates(raw, reference_year=reference_now.year) if is_quarterly_context else []
 
         # Luego intentar extracción por meses (útil para contexto mensual o fallback).
-        if not extracted_dates:
-            extracted_dates = _extract_month_based_dates(raw)
+        if not extracted_dates and (
+            not is_quarterly_context
+            or any(month_name in _normalize_text(raw) for month_name in MONTHS)
+            or any(month_alias in _normalize_text(raw).split() for month_alias in MONTH_ALIASES)
+        ):
+            extracted_dates = _extract_month_based_dates(raw, reference_year=reference_now.year)
 
         for extracted in extracted_dates:
             if extracted not in candidate_dates:
@@ -1681,18 +1912,31 @@ def _resolve_period_value(
 
         # Si no hubo extracción, usar parse simple como fallback
         if not extracted_dates and not _extract_year_based_dates(raw):
+            if (_contains_latest_reference(raw) or _contains_previous_reference(raw)) and not _has_explicit_year(raw):
+                continue
             normalized_single = normalize_period(raw)[0]
             if normalized_single and normalized_single not in candidate_dates:
                 candidate_dates.append(normalized_single)
 
     if not candidate_dates:
+        relative_latest_granularity = _infer_relative_latest_granularity(raw_values, frequency)
+        if relative_latest_granularity:
+            if relative_latest_granularity == "q":
+                prev_quarter = _previous_quarter_anchor(reference_now)
+                return [_format_quarter_start(prev_quarter), _format_quarter_end(prev_quarter)]
+            if relative_latest_granularity == "a":
+                prev_year = _previous_year_anchor(reference_now)
+                return [_format_year_start(prev_year), f"{prev_year.year:04d}-12-31"]
+            prev_month = _previous_month_anchor(reference_now)
+            return [_format_month_start(prev_month), _format_month_end(prev_month)]
+
         base_period = base_normalized.get("period")
         if base_period:
             candidate_dates.append(base_period)
 
     if not candidate_dates:
         if req_form_norm == "latest":
-            today = datetime.now()
+            today = reference_now
             if is_quarterly_context:
                 prev_quarter = _previous_quarter_anchor(today)
                 return [_format_quarter_start(prev_quarter), _format_quarter_end(prev_quarter)]
@@ -1719,12 +1963,12 @@ def _resolve_period_value(
 
     if req_form_norm == "latest":
         if has_year_only_reference and all(date_value.month == 1 and date_value.day == 1 for date_value in parsed_dates):
-            prev_year = _previous_year_anchor(datetime.now())
+            prev_year = _previous_year_anchor(reference_now)
             return [_format_year_start(prev_year), f"{prev_year.year:04d}-12-31"]
         if is_quarterly_context:
-            prev_quarter = _previous_quarter_anchor(datetime.now())
+            prev_quarter = _previous_quarter_anchor(reference_now)
             return [_format_quarter_start(prev_quarter), _format_quarter_end(prev_quarter)]
-        prev_month = _previous_month_anchor(datetime.now())
+        prev_month = _previous_month_anchor(reference_now)
         return [_format_month_start(prev_month), _format_month_end(prev_month)]
 
     if req_form_norm == "range":

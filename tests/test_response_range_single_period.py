@@ -697,3 +697,273 @@ def test_specific_response_point_missing_variation_explains_no_comparable_prior_
     assert "En el año 1960, según los datos de la BDE" in output
     assert "No se reporta variación respecto al mismo período del año anterior" in output
     assert "porque no hay dato de referencia en la serie histórica." in output
+
+
+def test_specific_response_contribution_regional_intro_uses_aggregate_value_and_mentions_top_region(monkeypatch):
+    class _FakeLLM:
+        def stream(self, prompt, history=None, intent_info=None):
+            raise RuntimeError("force deterministic intro")
+
+    monkeypatch.setattr(
+        response_module,
+        "build_llm",
+        lambda **kwargs: _FakeLLM(),
+    )
+
+    output = "".join(
+        response_module.specific_response(
+            series_id="F035.PIB.V12.R.CLP.2018.Z.Z.Z.Z.0.T",
+            series_title="Producto Interno Bruto",
+            req_form="latest",
+            obs_to_show=[
+                {
+                    "series_id": "F035.PIB.V12.R.CLP.2018.Z.Z.Z.15.0.T",
+                    "title": "Región de Arica y Parinacota",
+                    "date": "2025-09-30",
+                    "value": 0.0,
+                }
+            ],
+            parsed_point="2025-09-30",
+            parsed_range=None,
+            final_indicator_name="PIB",
+            indicator_context_val="pib",
+            component_context_val=None,
+            seasonality_context_val="nsa",
+            metric_type_val="contribution",
+            calc_mode_cls="contribution",
+            intent_cls="value",
+            display_period_label="3er trimestre 2025",
+            freq="q",
+            date_range_label="3er trimestre 2025",
+            reference_period="2025-09-30",
+            is_contribution=True,
+            is_specific_activity=False,
+            all_series_data=[
+                {
+                    "series_id": "F035.PIB.V12.R.CLP.2018.Z.Z.Z.15.0.T",
+                    "title": "Región de Arica y Parinacota",
+                    "date": "2025-09-30",
+                    "value": 0.0,
+                },
+                {
+                    "series_id": "F035.PIB.V12.R.CLP.2018.Z.Z.Z.13.0.T",
+                    "title": "Región Metropolitana de Santiago",
+                    "date": "2025-09-30",
+                    "value": 1.3,
+                },
+                {
+                    "series_id": "F035.PIB.V12.R.CLP.2018.Z.Z.Z.Z.0.T",
+                    "title": "Producto Interno Bruto",
+                    "date": "2025-09-30",
+                    "value": 1.6,
+                },
+            ],
+            source_urls=["https://si3.bcentral.cl/siete"],
+        )
+    )
+
+    assert "el PIB de 3er trimestre 2025 creció 1,6%" in output
+    assert "la mayor contribución provino" in output.lower()
+    assert "región metropolitana de santiago" in output.lower()
+    assert "1,3%" in output.lower()
+
+
+def test_specific_response_contribution_single_region_uses_direct_contribution_sentence(monkeypatch):
+    class _FakeLLM:
+        def stream(self, prompt, history=None, intent_info=None):
+            raise RuntimeError("force deterministic intro")
+
+    monkeypatch.setattr(
+        response_module,
+        "build_llm",
+        lambda **kwargs: _FakeLLM(),
+    )
+
+    output = "".join(
+        response_module.specific_response(
+            series_id="F035.PIB.V12.R.CLP.2018.Z.Z.Z.16.0.T",
+            series_title="PIB para la Región de Ñuble",
+            req_form="point",
+            obs_to_show=[
+                {
+                    "series_id": "F035.PIB.V12.R.CLP.2018.Z.Z.Z.16.0.T",
+                    "title": "Región de Ñuble",
+                    "date": "2025-09-30",
+                    "value": 0.0,
+                }
+            ],
+            parsed_point="2025-12-31",
+            parsed_range=None,
+            final_indicator_name="PIB",
+            indicator_context_val="pib",
+            component_context_val=None,
+            seasonality_context_val="nsa",
+            metric_type_val="contribution",
+            calc_mode_cls="contribution",
+            intent_cls="value",
+            display_period_label="3er trimestre 2025",
+            freq="q",
+            date_range_label="3er trimestre 2025",
+            reference_period="2025-09-30",
+            is_contribution=True,
+            is_specific_activity=False,
+            all_series_data=[
+                {
+                    "series_id": "F035.PIB.V12.R.CLP.2018.Z.Z.Z.16.0.T",
+                    "title": "Región de Ñuble",
+                    "date": "2025-09-30",
+                    "value": 0.0,
+                }
+            ],
+            used_latest_fallback_for_point=True,
+            source_urls=["https://si3.bcentral.cl/siete"],
+        )
+    )
+
+    assert "la contribución de la región de ñuble al pib de 3er trimestre 2025 fue de 0,0%" in output.lower()
+    assert "la mayor contribución provino" not in output.lower()
+
+
+def test_specific_response_contribution_regional_does_not_highlight_aggregate_indicator(monkeypatch):
+    class _FakeLLM:
+        def stream(self, prompt, history=None, intent_info=None):
+            raise RuntimeError("force deterministic intro")
+
+    monkeypatch.setattr(
+        response_module,
+        "build_llm",
+        lambda **kwargs: _FakeLLM(),
+    )
+
+    output = "".join(
+        response_module.specific_response(
+            series_id="SERIE.PIB.REGIONAL.TOTAL",
+            series_title="Producto Interno Bruto",
+            req_form="latest",
+            obs_to_show=[
+                {
+                    "series_id": "SERIE.PIB.REGIONAL.TOTAL",
+                    "title": "Producto Interno Bruto",
+                    "date": "2025-09-30",
+                    "value": 1.6,
+                }
+            ],
+            parsed_point="2025-09-30",
+            parsed_range=None,
+            final_indicator_name="PIB",
+            indicator_context_val="pib",
+            component_context_val=None,
+            seasonality_context_val="nsa",
+            metric_type_val="contribution",
+            calc_mode_cls="contribution",
+            intent_cls="value",
+            display_period_label="el último período disponible",
+            freq="q",
+            date_range_label="3er trimestre 2025",
+            reference_period="2025-09-30",
+            is_contribution=True,
+            is_specific_activity=False,
+            all_series_data=[
+                {
+                    "series_id": "SERIE.ARICA",
+                    "title": "Región de Arica y Parinacota",
+                    "region": "arica_parinacota",
+                    "date": "2025-09-30",
+                    "value": 0.0,
+                },
+                {
+                    "series_id": "SERIE.RM",
+                    "title": "Región Metropolitana de Santiago",
+                    "region": "metropolitana",
+                    "date": "2025-09-30",
+                    "value": 1.3,
+                },
+                {
+                    "series_id": "SERIE.PIB.REGIONAL.TOTAL",
+                    "title": "Producto Interno Bruto",
+                    "date": "2025-09-30",
+                    "value": 1.6,
+                },
+            ],
+            source_urls=["https://si3.bcentral.cl/siete"],
+        )
+    )
+
+    assert "**Región Metropolitana de Santiago** | **1,3%**" in output
+    assert "**Producto Interno Bruto**" not in output
+
+
+def test_specific_response_general_breakdown_does_not_highlight_aggregate_indicator(monkeypatch):
+    class _FakeLLM:
+        def stream(self, prompt, history=None, intent_info=None):
+            raise RuntimeError("force deterministic intro")
+
+    monkeypatch.setattr(
+        response_module,
+        "build_llm",
+        lambda **kwargs: _FakeLLM(),
+    )
+
+    output = "".join(
+        response_module.specific_response(
+            series_id="SERIE.PIB.REGIONAL.TOTAL",
+            series_title="Producto Interno Bruto",
+            req_form="latest",
+            obs_to_show=[
+                {
+                    "series_id": "SERIE.PIB.REGIONAL.TOTAL",
+                    "title": "Producto Interno Bruto",
+                    "date": "2025-09-30",
+                    "value": 1000,
+                    "yoy": 1.6,
+                }
+            ],
+            parsed_point="2025-09-30",
+            parsed_range=None,
+            final_indicator_name="PIB",
+            indicator_context_val="pib",
+            component_context_val=None,
+            seasonality_context_val="nsa",
+            metric_type_val="yoy",
+            calc_mode_cls="yoy",
+            intent_cls="value",
+            display_period_label="el último período disponible",
+            freq="q",
+            date_range_label="3er trimestre 2025",
+            reference_period="2025-09-30",
+            is_contribution=False,
+            is_specific_activity=False,
+            all_series_data=[
+                {
+                    "series_id": "SERIE.PIB.REGIONAL.TOTAL",
+                    "title": "Producto Interno Bruto",
+                    "date": "2025-09-30",
+                    "value": 1000,
+                    "yoy": 1.6,
+                    "comparison_value": 1.6,
+                },
+                {
+                    "series_id": "SERIE.RM",
+                    "title": "Región Metropolitana de Santiago",
+                    "region": "metropolitana",
+                    "date": "2025-09-30",
+                    "value": 900,
+                    "yoy": 1.3,
+                    "comparison_value": 1.3,
+                },
+                {
+                    "series_id": "SERIE.TARAPACA",
+                    "title": "Región de Tarapacá",
+                    "region": "tarapaca",
+                    "date": "2025-09-30",
+                    "value": 600,
+                    "yoy": -0.3,
+                    "comparison_value": -0.3,
+                },
+            ],
+            source_urls=["https://si3.bcentral.cl/siete"],
+        )
+    )
+
+    assert "**Región Metropolitana de Santiago** | **900** | **1,3%**" in output
+    assert "**Producto Interno Bruto** | **1.000** | **1,6%**" not in output

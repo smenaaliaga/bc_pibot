@@ -19,6 +19,7 @@ from __future__ import annotations
 #   - attachments: vacío
 
 import logging
+import math
 import re
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional, Tuple
@@ -597,6 +598,26 @@ def _build_latest_contribution_intro(
     is_specific_activity: bool = False,
     used_latest_fallback_for_point: bool = False,
 ) -> str:
+    def _is_aggregate_indicator_row(series: Dict[str, Any]) -> bool:
+        activity_value = str(series.get("activity") or "").strip().lower()
+        region_value = str(series.get("region") or "").strip().lower()
+        investment_value = str(series.get("investment") or "").strip().lower()
+        title_value = str(series.get("title") or "").strip().lower()
+
+        if activity_value in {"total", "imacec", "pib"}:
+            return True
+
+        has_dimension = (
+            (activity_value and activity_value not in {"total", "imacec", "pib"})
+            or (region_value and region_value not in {"total", "general", "none", "null"})
+            or (investment_value and investment_value not in {"total", "general", "none", "null"})
+        )
+        if title_value in {"subtotal regionalizado", "extrarregional"}:
+            return True
+        if not has_dimension and title_value in {"pib", "imacec", "producto interno bruto"}:
+            return True
+        return False
+
     def _percentage_es(value: Any, *, absolute: bool = False) -> str:
         try:
             numeric = float(value)
@@ -641,7 +662,12 @@ def _build_latest_contribution_intro(
             "servicios": "los servicios",
             "impuestos sobre los productos": "los impuestos sobre los productos",
         }
-        return mapping.get(normalized_lower, normalized)
+        mapped = mapping.get(normalized_lower)
+        if mapped:
+            return mapped
+        if normalized_lower.startswith("región ") or normalized_lower.startswith("region "):
+            return f"la {normalized}"
+        return normalized
 
     def _normalize_activity_key(raw_value: Any) -> str:
         return str(raw_value or "").strip().lower().replace(" ", "_")
@@ -665,6 +691,24 @@ def _build_latest_contribution_intro(
             return f"el {indicator} del {period_clean[3:]}"
         return f"el {indicator} de {period_clean}"
 
+    def _find_aggregate_row(rows: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        for series in rows:
+            if not isinstance(series, dict):
+                continue
+            activity_value = str(series.get("activity") or "").strip().lower()
+            title_value = str(series.get("title") or "").strip().lower()
+            if activity_value in {"total", "imacec", "pib"}:
+                return series
+            if title_value in {"pib", "imacec", "producto interno bruto"}:
+                return series
+
+        for series in rows:
+            if not isinstance(series, dict):
+                continue
+            if _is_aggregate_indicator_row(series):
+                return series
+        return None
+
     indicator_raw = _indicator_display_name(
         indicator_context_val=indicator_context_val,
         seasonality_context_val=seasonality_context_val,
@@ -672,10 +716,13 @@ def _build_latest_contribution_intro(
     )
 
     row = obs_to_show[0] if obs_to_show else {}
-    contrib_value = row.get("value") if isinstance(row, dict) else None
+    valid_rows = [series for series in all_series_data if isinstance(series, dict)] if isinstance(all_series_data, list) else []
+    aggregate_row = _find_aggregate_row(valid_rows)
+    base_row = aggregate_row if isinstance(aggregate_row, dict) else row
+    contrib_value = base_row.get("value") if isinstance(base_row, dict) else None
     period_text = _normalize_period_label(display_period_label)
     observed_period_text = _normalize_period_label(
-        format_period_labels(row.get("date") if isinstance(row, dict) else None, str(freq or ""))[0]
+        format_period_labels(base_row.get("date") if isinstance(base_row, dict) else None, str(freq or ""))[0]
     )
     comparison_phrase = _comparison_phrase(freq)
     requested_subject = _indicator_with_period(indicator_raw, period_text)
@@ -724,7 +771,24 @@ def _build_latest_contribution_intro(
     if not isinstance(all_series_data, list) or not all_series_data:
         return first_sentence
 
-    valid_rows = [series for series in all_series_data if isinstance(series, dict)]
+    if (
+        len(valid_rows) == 1
+        and isinstance(valid_rows[0], dict)
+        and not _is_aggregate_indicator_row(valid_rows[0])
+    ):
+        selected_row = valid_rows[0]
+        selected_title = str(
+            selected_row.get("title")
+            or selected_row.get("activity")
+            or selected_row.get("region")
+            or selected_row.get("investment")
+            or ""
+        ).strip().replace("_", " ")
+        if selected_title:
+            return (
+                f"De acuerdo con la información publicada en la BDE, la contribución de {_sector_phrase(selected_title)} "
+                f"al {indicator_raw} de {period_text} fue de {_percentage_es(selected_row.get('value'))} {comparison_phrase}."
+            )
 
     if is_specific_activity and component_context_val:
         requested_activity = _normalize_activity_key(component_context_val)
@@ -748,9 +812,9 @@ def _build_latest_contribution_intro(
 
     candidates: List[Dict[str, Any]] = []
     for series in valid_rows:
-        activity_value = str(series.get("activity") or "").strip().lower()
-        if activity_value in {"", "total", "imacec", "pib"}:
+        if _is_aggregate_indicator_row(series):
             continue
+
         value = series.get("value")
         try:
             float(value)
@@ -762,7 +826,13 @@ def _build_latest_contribution_intro(
         return first_sentence
 
     top_sector = max(candidates, key=lambda series: float(series.get("value") or 0.0))
-    sector_name = str(top_sector.get("title") or top_sector.get("activity") or "").strip()
+    sector_name = str(
+        top_sector.get("title")
+        or top_sector.get("activity")
+        or top_sector.get("region")
+        or top_sector.get("investment")
+        or ""
+    ).strip()
     sector_name = sector_name.replace("_", " ")
     if not sector_name:
         return first_sentence
@@ -1113,6 +1183,7 @@ def _build_range_prompt(
     if series_title_clean.lower() in {"", "none", "null", "nan"}:
         series_title_clean = ""
     series_desc = str(series_title_clean or final_indicator_name or "serie consultada").strip()
+    indicator_desc = series_desc or str(final_indicator_name or "").strip() or "serie consultada"
 
     llm_prompt_parts: List[str] = []
     llm_prompt_parts.append("INSTRUCCIÓN DE INTRODUCCIÓN (OBLIGATORIA):")
@@ -1159,7 +1230,7 @@ def _build_range_prompt(
             )
         else:
             llm_prompt_parts.append(
-                f"El usuario preguntó por {final_indicator_name} en el período: {display_period_label}."
+                f"El usuario preguntó por {indicator_desc} en el período: {display_period_label}."
             )
             llm_prompt_parts.append(
                 f"Cierre: {last_period_label} registró una variación de {format_percentage(last_var)}."
@@ -1234,6 +1305,7 @@ def _build_latest_prompt(
     else:
         comparison_text = "con respecto al período de referencia"
     series_desc = str(series_title or final_indicator_name or "serie consultada").strip()
+    indicator_desc = series_desc or str(final_indicator_name or "").strip() or "serie consultada"
 
     llm_prompt_parts.append("INSTRUCCIÓN DE INTRODUCCIÓN (OBLIGATORIA):")
     llm_prompt_parts.append(
@@ -1374,7 +1446,7 @@ def _build_latest_prompt(
 
         llm_prompt_parts.append("SITUACIÓN: El usuario preguntó por un dato económico específico.")
         llm_prompt_parts.append("Reporta solo la variación (máximo 2 oraciones) informando:")
-        llm_prompt_parts.append(f"- Indicador: {final_indicator_name}")
+        llm_prompt_parts.append(f"- Indicador: {indicator_desc}")
         seasonality_norm = str(seasonality_context_val or "").strip().lower()
         indicator_norm = str(indicator_context_val or "").strip().lower()
         if seasonality_norm == "sa" and indicator_norm in {"pib", "imacec"}:
@@ -1439,17 +1511,14 @@ def _stream_llm_or_fallback(
         final_indicator_text = str(final_indicator_name or "").strip()
 
         series_title_lower = series_title_text.lower()
-        final_indicator_lower = final_indicator_text.lower()
-
         series_is_generic_indicator = series_title_lower in {"", "pib", "imacec", "indicador"}
-        final_has_regional_context = "región" in final_indicator_lower or "region" in final_indicator_lower
 
-        if final_indicator_text and (series_is_generic_indicator or final_has_regional_context):
-            return final_indicator_text
-        if series_title_text:
+        if series_title_text and not series_is_generic_indicator:
             return series_title_text
         if final_indicator_text:
             return final_indicator_text
+        if series_title_text:
+            return series_title_text
         return "indicador"
 
     def _normalize_numeric_spacing(text: str) -> str:
@@ -1955,6 +2024,26 @@ def _specific_table(
     component_context_val: Optional[str] = None,
     is_specific_activity: bool = False,
 ) -> Iterable[str]:
+    def _is_aggregate_indicator_row(series: Dict[str, Any]) -> bool:
+        activity_value = str(series.get("activity") or "").strip().lower()
+        region_value = str(series.get("region") or "").strip().lower()
+        investment_value = str(series.get("investment") or "").strip().lower()
+        title_value = str(series.get("title") or "").strip().lower()
+
+        if activity_value in {"total", "imacec", "pib"}:
+            return True
+
+        has_dimension = (
+            (activity_value and activity_value not in {"total", "imacec", "pib"})
+            or (region_value and region_value not in {"total", "general", "none", "null"})
+            or (investment_value and investment_value not in {"total", "general", "none", "null"})
+        )
+        if title_value in {"subtotal regionalizado", "extrarregional"}:
+            return True
+        if not has_dimension and title_value in {"pib", "imacec", "producto interno bruto"}:
+            return True
+        return False
+
     def _normalize_activity_key(raw_value: Any) -> str:
         return str(raw_value or "").strip().lower().replace(" ", "_")
 
@@ -1996,11 +2085,24 @@ def _specific_table(
 
         max_activity = None
         max_value = float("-inf")
+
+        def _safe_numeric(value: Any) -> Optional[float]:
+            if isinstance(value, bool) or value is None:
+                return None
+            if isinstance(value, (int, float)):
+                try:
+                    if math.isnan(float(value)):
+                        return None
+                except Exception:
+                    return None
+                return float(value)
+            return None
+
         if has_imacec_breakdown:
             for s in valid_series:
                 activity = str(s.get("activity") or "").strip().lower()
-                value = s.get("value", 0)
-                if activity and activity != "total" and value > max_value:
+                value = _safe_numeric(s.get("value"))
+                if activity and activity != "total" and value is not None and value > max_value:
                     max_value = value
                     max_activity = activity
 
@@ -2023,22 +2125,36 @@ def _specific_table(
         else:
             max_title = None
             max_activity_key = None
+            max_series_id = None
             for s in valid_series:
+                if _is_aggregate_indicator_row(s):
+                    continue
                 title = str(s.get("title") or s.get("activity") or "").strip() or "Actividad"
-                value = s.get("value", 0)
-                if value > max_value:
+                value = _safe_numeric(s.get("value"))
+                if value is not None and value > max_value:
                     max_value = value
                     max_title = title
                     max_activity_key = _normalize_activity_key(s.get("activity"))
+                    max_series_id = str(s.get("series_id") or "").strip()
 
             for s in valid_series:
                 title = str(s.get("title") or s.get("activity") or "").strip() or "Actividad"
                 value = s.get("value")
                 activity_key = _normalize_activity_key(s.get("activity"))
+                series_id = str(s.get("series_id") or "").strip()
+                has_activity_key = bool(activity_key)
                 should_highlight = (
                     activity_key == highlighted_activity
                     if highlighted_activity
-                    else (title == max_title or activity_key == max_activity_key)
+                    else (
+                        activity_key == max_activity_key
+                        if has_activity_key
+                        else (
+                            series_id == max_series_id
+                            if max_series_id
+                            else title == max_title
+                        )
+                    )
                 )
                 if should_highlight:
                     yield f"**{title}** | **{format_percentage(value)}**\n"
@@ -2082,6 +2198,8 @@ def _specific_table(
             max_row = None
             max_variation = float("-inf")
             for row in rows_with_variation:
+                if _is_aggregate_indicator_row(row):
+                    continue
                 var_value = row.get("comparison_value")
                 if var_value is None:
                     var_value = row.get("yoy") if row.get("yoy") is not None else row.get("prev_period")

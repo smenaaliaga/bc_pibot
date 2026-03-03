@@ -479,7 +479,9 @@ def make_data_node(memory_adapter: Any):
             family_calc_mode = "original"
         requested_seasonality = str(seasonality_ent or "").strip().lower()
         has_requested_seasonality = requested_seasonality not in {"", "none", "null"}
-        if is_pib_aggregate and not has_requested_seasonality:
+        if is_pib_aggregate and calc_mode_cls != "contribution":
+            family_seasonality = None
+        elif is_pib_aggregate and not has_requested_seasonality:
             family_seasonality = None
         else:
             family_seasonality = seasonality_ent
@@ -528,10 +530,17 @@ def make_data_node(memory_adapter: Any):
             and investment_cls in (None, "none")
         ):
             indicator_norm = str(indicator_ent or "").strip().lower()
-            if indicator_norm == "pib":
-                series_eq["activity"] = "pib"
-            elif indicator_norm == "imacec":
-                series_eq["activity"] = "imacec"
+            if indicator_norm in {"pib", "imacec"}:
+                activity_tokens_in_family = {
+                    str(((row.get("classification") or {}).get("activity") or "")).strip().lower()
+                    for row in family_series
+                    if isinstance(row, dict)
+                }
+                if indicator_norm in activity_tokens_in_family:
+                    series_eq["activity"] = indicator_norm
+                else:
+                    series_eq.pop("activity", None)
+                    series_eq["indicator"] = indicator_norm
 
         if calc_mode_cls == "contribution":
             series_eq["frequency"] = frequency_ent
@@ -744,11 +753,22 @@ def make_data_node(memory_adapter: Any):
                         None,
                     )
 
+                    if selected_series_obs is None and req_form_norm == "latest":
+                        candidates_at_or_before_ref = [
+                            row
+                            for row in series_observations
+                            if isinstance(row, dict)
+                            and str(row.get("date") or "").strip()
+                            and str(row.get("date") or "").strip() <= str(target_reference_date)
+                        ]
+                        if candidates_at_or_before_ref:
+                            selected_series_obs = max(
+                                candidates_at_or_before_ref,
+                                key=lambda item: str(item.get("date") or "").strip(),
+                            )
+
                 if selected_series_obs is None and series_observations:
-                    if req_form_norm == "latest" and target_reference_date:
-                        selected_series_obs = None
-                    else:
-                        selected_series_obs = series_observations[-1]
+                    selected_series_obs = series_observations[-1]
 
                 if selected_series_obs is None and isinstance(series_latest_obs, dict):
                     if not (req_form_norm == "latest" and target_reference_date):
@@ -780,9 +800,61 @@ def make_data_node(memory_adapter: Any):
                 )
             observations_all = list(observations)
 
+            def _distinct_dimension_values(dimension_key: str) -> set[str]:
+                values: set[str] = set()
+                for series in family_series:
+                    if not isinstance(series, dict):
+                        continue
+                    classification = series.get("classification")
+                    if not isinstance(classification, dict):
+                        continue
+                    raw_value = str(classification.get(dimension_key) or "").strip().lower()
+                    if raw_value in {"", "none", "null", "general", "total"}:
+                        continue
+                    values.add(raw_value)
+                return values
+
+            activity_values = _distinct_dimension_values("activity")
+            region_values = _distinct_dimension_values("region")
+            investment_values = _distinct_dimension_values("investment")
+
+            has_activity_dimension = len(activity_values) > 1
+            has_region_dimension = len(region_values) > 1
+            has_investment_dimension = len(investment_values) > 1
+
+            is_specific_contribution_dimension = (
+                (str(activity_cls_resolved or "").strip().lower() == "specific" and has_activity_dimension)
+                or (str(region_cls or "").strip().lower() == "specific" and has_region_dimension)
+                or (str(investment_cls or "").strip().lower() == "specific" and has_investment_dimension)
+            )
+            if is_specific_contribution_dimension:
+                target_row_specific = next(
+                    (
+                        row
+                        for row in observations
+                        if str(row.get("series_id") or "").strip() == str(target_series_id or "").strip()
+                    ),
+                    None,
+                )
+                if isinstance(target_row_specific, dict):
+                    observations = [target_row_specific]
+                    observations_all = [target_row_specific]
+                    target_series_title = str(
+                        target_row_specific.get("title") or target_series_title or family_name or ""
+                    ).strip()
+
             if activity_cls_resolved == "general" and activity_ent is None:
-                aggregate_row = None
+                aggregate_row = next(
+                    (
+                        row
+                        for row in observations
+                        if str(row.get("series_id") or "").strip() == str(target_series_id or "").strip()
+                    ),
+                    None,
+                )
                 for row in observations:
+                    if isinstance(aggregate_row, dict):
+                        break
                     title_norm = str(row.get("title") or "").strip().lower()
                     if title_norm in {"pib", "imacec"}:
                         aggregate_row = row
@@ -987,27 +1059,49 @@ def make_data_node(memory_adapter: Any):
 
             requested_start_year = _extract_year(period_values[0]) if period_values else None
             requested_end_year = _extract_year(period_values[-1]) if period_values else None
+            req_form_norm_local = str(req_form_cls or "").strip().lower()
+            latest_available_year = None
+            if observations:
+                latest_available_year = _extract_year(str(observations[-1].get("date") or ""))
+            elif isinstance(latest_obs, dict):
+                latest_available_year = _extract_year(str(latest_obs.get("date") or ""))
+
+            validation_year = requested_end_year
+            if validation_year is None and req_form_norm_local == "latest":
+                validation_year = latest_available_year
+
             should_validate_annual_completeness = (
-                str(req_form_cls or "").strip().lower() == "range"
-                and str(indicator_ent or "").strip().lower() == "pib"
+                str(indicator_ent or "").strip().lower() == "pib"
                 and str(frequency_ent or "").strip().lower() == "a"
-                and requested_start_year is not None
-                and requested_end_year is not None
-                and requested_start_year == requested_end_year
+                and validation_year is not None
+                and (
+                    req_form_norm_local in {"point", "specific_point", "latest"}
+                    or (
+                        req_form_norm_local == "range"
+                        and requested_start_year is not None
+                        and requested_end_year is not None
+                        and requested_start_year == requested_end_year
+                    )
+                )
                 and (bool(observations) or isinstance(latest_obs, dict))
             )
 
-            if should_validate_annual_completeness and requested_end_year is not None:
+            if should_validate_annual_completeness and validation_year is not None:
+                q_firstdate = firstdate
+                q_lastdate = lastdate
+                if req_form_norm_local == "latest":
+                    q_firstdate = None
+                    q_lastdate = None
                 quarterly_observations, _ = _load_series_observations(
                     series_id=target_series_id,
-                    firstdate=firstdate,
-                    lastdate=lastdate,
+                    firstdate=q_firstdate,
+                    lastdate=q_lastdate,
                     target_frequency="Q",
                     agg_mode=agg_mode,
                     calc_mode=calc_mode_cls if calc_mode_cls in {"prev_period", "yoy"} else "yoy",
                 )
 
-                if not _has_full_quarterly_year(quarterly_observations, requested_end_year):
+                if not _has_full_quarterly_year(quarterly_observations, validation_year):
                     annual_observations_full, _ = _load_series_observations(
                         series_id=target_series_id,
                         firstdate=None,
@@ -1018,7 +1112,7 @@ def make_data_node(memory_adapter: Any):
                     )
                     fallback_annual_obs = _latest_annual_observation_before_year(
                         annual_observations_full,
-                        requested_end_year,
+                        validation_year,
                     )
                     if isinstance(fallback_annual_obs, dict):
                         fallback_date = str(fallback_annual_obs.get("date") or "").strip()
@@ -1031,7 +1125,7 @@ def make_data_node(memory_adapter: Any):
                             period_ent = [fallback_date, fallback_date]
                             period_values = [fallback_date, fallback_date]
                         incomplete_frequency_note = (
-                            f"Como la información de {requested_end_year} aún no está completa, "
+                            f"Como la información de {validation_year} aún no está completa, "
                             f"se informa el resultado de {fallback_year or 'N/D'}."
                         )
 

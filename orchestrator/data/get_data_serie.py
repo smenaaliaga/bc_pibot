@@ -689,17 +689,6 @@ def get_series_api_rest_bcch(
                 }
             )
 
-        if not observations:
-            observations = [
-                {
-                    "date": "",
-                    "value": None,
-                    "status": "",
-                    "pct": None,
-                    "yoy_pct": None,
-                }
-            ]
-
         result = {
             "meta": meta,
             "observations": observations,
@@ -1003,15 +992,27 @@ def get_series_from_redis(
         return data
 
     # Filtrado por rango de fechas
-    def _parse_date_str(s: str) -> datetime.date:
-        return datetime.date.fromisoformat(s)
+    def _parse_date_str(s: str) -> Optional[datetime.date]:
+        if not isinstance(s, str):
+            return None
+        s_clean = s.strip()
+        if not s_clean:
+            return None
+        try:
+            return datetime.date.fromisoformat(s_clean)
+        except Exception:
+            return None
 
     fd_date = _parse_date_str(fd) if fd else None
     ld_date = _parse_date_str(ld) if ld else None
 
     filtered_obs = []
     for o in obs:
-        d = _parse_date_str(o["date"])
+        if not isinstance(o, dict):
+            continue
+        d = _parse_date_str(str(o.get("date", "")))
+        if d is None:
+            continue
         if fd_date and d < fd_date:
             continue
         if ld_date and d > ld_date:

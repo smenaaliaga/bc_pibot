@@ -1,5 +1,6 @@
 from datetime import datetime
 
+import orchestrator.normalizer.normalizer as normalizer_mod
 from orchestrator.normalizer.normalizer import normalize_entities
 
 
@@ -175,6 +176,30 @@ def test_point_pib_este_mes_inferrs_monthly_frequency_and_current_month_period()
     assert normalized["period"] == _expected_current_month_range()
 
 
+def test_point_pib_trimestre_en_curso_inferrs_quarterly_frequency_and_current_quarter_period():
+    now = datetime.now()
+    quarter_start = ((now.month - 1) // 3) * 3 + 1
+    quarter_end_month = quarter_start + 2
+    if quarter_end_month == 12:
+        next_q_month_start = datetime(now.year + 1, 1, 1)
+    else:
+        next_q_month_start = datetime(now.year, quarter_end_month + 1, 1)
+    quarter_end = (next_q_month_start - datetime.resolution).day
+
+    entities = {
+        "indicator": ["pib"],
+        "period": ["trimestre en curso"],
+    }
+
+    normalized = normalize_entities(entities, calc_mode="yoy", req_form="point")
+
+    assert normalized["frequency"] == ["q"]
+    assert normalized["period"] == [
+        f"{now.year:04d}-{quarter_start:02d}-01",
+        f"{now.year:04d}-{quarter_end_month:02d}-{quarter_end:02d}",
+    ]
+
+
 def test_imacec_explicit_annual_frequency_is_forced_to_monthly():
     entities = {
         "indicator": ["imacec"],
@@ -235,3 +260,55 @@ def test_point_pib_split_period_tokens_ignores_preposition_token():
 
     assert normalized["frequency"] == ["m"]
     assert normalized["period"] == ["2025-03-01", "2025-03-31"]
+
+
+def test_point_pib_primer_trimestre_del_ano_pasado_uses_q1_previous_year(monkeypatch):
+    monkeypatch.setattr(normalizer_mod, "_reference_now", lambda: datetime(2026, 3, 3))
+    entities = {
+        "indicator": ["pib"],
+        "period": ["primer trimestre del año pasado"],
+    }
+
+    normalized = normalize_entities(entities, calc_mode="yoy", req_form="point")
+
+    assert normalized["frequency"] == ["q"]
+    assert normalized["period"] == ["2025-01-01", "2025-03-31"]
+
+
+def test_point_imacec_mes_del_ano_antepasado_uses_same_month_two_years_back(monkeypatch):
+    monkeypatch.setattr(normalizer_mod, "_reference_now", lambda: datetime(2026, 3, 3))
+    entities = {
+        "indicator": ["imacec"],
+        "period": ["mes del año antepasado"],
+    }
+
+    normalized = normalize_entities(entities, calc_mode="yoy", req_form="point")
+
+    assert normalized["frequency"] == ["m"]
+    assert normalized["period"] == ["2024-03-01", "2024-03-31"]
+
+
+def test_point_pib_hace_3_anos_atras_is_annual(monkeypatch):
+    monkeypatch.setattr(normalizer_mod, "_reference_now", lambda: datetime(2026, 3, 3))
+    entities = {
+        "indicator": ["pib"],
+        "period": ["hace 3 años atrás"],
+    }
+
+    normalized = normalize_entities(entities, calc_mode="yoy", req_form="point")
+
+    assert normalized["frequency"] == ["a"]
+    assert normalized["period"] == ["2023-01-01", "2023-12-31"]
+
+
+def test_point_pib_hace_dos_trimestres_atras_uses_quarter_shift(monkeypatch):
+    monkeypatch.setattr(normalizer_mod, "_reference_now", lambda: datetime(2026, 3, 3))
+    entities = {
+        "indicator": ["pib"],
+        "period": ["hace dos trimestres atrás"],
+    }
+
+    normalized = normalize_entities(entities, calc_mode="yoy", req_form="point")
+
+    assert normalized["frequency"] == ["q"]
+    assert normalized["period"] == ["2025-07-01", "2025-09-30"]
