@@ -96,6 +96,21 @@ def _to_flag(value: Any) -> Optional[int]:
     return None
 
 
+def _to_flag_options(value: Any) -> Optional[set[int]]:
+    if isinstance(value, (list, tuple, set)):
+        options: set[int] = set()
+        for item in value:
+            flag = _to_flag(item)
+            if flag is not None:
+                options.add(flag)
+        return options or None
+
+    single = _to_flag(value)
+    if single is None:
+        return None
+    return {single}
+
+
 def _is_empty(value: Any) -> bool:
     return value in (None, "", [], {}, "none")
 
@@ -143,7 +158,7 @@ def find_family_by_classification(
     has_hist_dimension = any(
         isinstance(family_payload, dict)
         and isinstance(family_payload.get("classification"), dict)
-        and _to_flag(family_payload.get("classification", {}).get("hist")) is not None
+        and _to_flag_options(family_payload.get("classification", {}).get("hist")) is not None
         for family_payload in payload.values()
     )
 
@@ -159,20 +174,20 @@ def find_family_by_classification(
 
         indicator_value = str(family_classification.get("indicator") or "").strip().lower() or None
 
-        has_activity = _to_flag(family_classification.get("has_activity"))
-        has_region = _to_flag(family_classification.get("has_region"))
-        has_investment = _to_flag(family_classification.get("has_investment"))
+        has_activity_options = _to_flag_options(family_classification.get("has_activity"))
+        has_region_options = _to_flag_options(family_classification.get("has_region"))
+        has_investment_options = _to_flag_options(family_classification.get("has_investment"))
         family_activity_token = _normalized_token(family_classification.get("activity"))
         family_region_token = _normalized_token(family_classification.get("region"))
         family_investment_token = _normalized_token(family_classification.get("investment"))
         family_has_hist_key = "hist" in family_classification
-        family_hist = _to_flag(family_classification.get("hist"))
+        family_hist_options = _to_flag_options(family_classification.get("hist"))
 
-        if has_activity != requested_has_activity:
+        if has_activity_options is None or requested_has_activity not in has_activity_options:
             continue
-        if has_region != requested_has_region:
+        if has_region_options is None or requested_has_region not in has_region_options:
             continue
-        if has_investment != requested_has_investment:
+        if has_investment_options is None or requested_has_investment not in has_investment_options:
             continue
 
         if requested_has_activity == 1 and requested_activity_token is not None:
@@ -221,7 +236,7 @@ def find_family_by_classification(
             if requested_hist is None:
                 if family_has_hist_key:
                     continue
-            elif family_hist != requested_hist:
+            elif family_hist_options is None or requested_hist not in family_hist_options:
                 continue
 
         score = 0
@@ -241,7 +256,11 @@ def find_family_by_classification(
             score += 1
         if family_frequency not in (None, ""):
             score += 1
-        if requested_hist is not None and family_hist == requested_hist:
+        if (
+            requested_hist is not None
+            and family_hist_options is not None
+            and requested_hist in family_hist_options
+        ):
             score += 1
 
         candidates.append(

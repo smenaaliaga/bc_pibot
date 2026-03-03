@@ -159,3 +159,79 @@ def test_family_region_value_selects_matching_region(tmp_path):
     assert family is not None
     assert family.get("family_name") == "PIB región Metropolitana"
     assert family.get("source_url") == "metro-url"
+
+
+def test_family_has_investment_list_accepts_request_without_investment(tmp_path):
+    catalog = {
+        "PIB histórico flexible": {
+            "classification": {
+                "indicator": "pib",
+                "calc_mode": "original",
+                "seasonality": "nsa",
+                "frequency": "a",
+                "price": "enc",
+                "has_activity": 0,
+                "has_region": 0,
+                "has_investment": [1, 0],
+                "hist": 1,
+            },
+            "source_url": "hist-flex-url",
+            "series": [{"id": "HIST.FLEX", "classification": {"indicator": "pib"}}],
+        },
+    }
+    catalog_path = tmp_path / "catalog.json"
+    catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
+
+    family = find_family_by_classification(
+        catalog_path,
+        indicator="pib",
+        activity_value=None,
+        region_value=None,
+        investment_value=None,
+        calc_mode="original",
+        price="enc",
+        seasonality="nsa",
+        frequency="a",
+        hist=1,
+    )
+
+    assert family is not None
+    assert family.get("family_name") == "PIB histórico flexible"
+
+
+def test_family_has_investment_list_accepts_request_with_investment(tmp_path):
+    catalog = {
+        "PIB histórico flexible": {
+            "classification": {
+                "indicator": "pib",
+                "calc_mode": "original",
+                "seasonality": "nsa",
+                "frequency": "a",
+                "price": "enc",
+                "has_activity": 0,
+                "has_region": 0,
+                "has_investment": [1, 0],
+                "hist": 1,
+            },
+            "source_url": "hist-flex-url",
+            "series": [{"id": "HIST.FLEX", "classification": {"indicator": "pib"}}],
+        },
+    }
+    catalog_path = tmp_path / "catalog.json"
+    catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
+
+    family = find_family_by_classification(
+        catalog_path,
+        indicator="pib",
+        activity_value=None,
+        region_value=None,
+        investment_value="exportacion",
+        calc_mode="original",
+        price="enc",
+        seasonality="nsa",
+        frequency="a",
+        hist=1,
+    )
+
+    assert family is not None
+    assert family.get("family_name") == "PIB histórico flexible"

@@ -200,7 +200,7 @@ def test_point_pib_trimestre_en_curso_inferrs_quarterly_frequency_and_current_qu
     ]
 
 
-def test_imacec_explicit_annual_frequency_is_forced_to_monthly():
+def test_imacec_explicit_annual_frequency_is_preserved():
     entities = {
         "indicator": ["imacec"],
         "frequency": ["anual"],
@@ -210,7 +210,7 @@ def test_imacec_explicit_annual_frequency_is_forced_to_monthly():
     normalized = normalize_entities(entities, calc_mode="yoy", req_form="point")
 
     assert normalized["indicator"] == ["imacec"]
-    assert normalized["frequency"] == ["m"]
+    assert normalized["frequency"] == ["a"]
 
 
 def test_point_imacec_first_quarter_without_year_detects_current_year_range():

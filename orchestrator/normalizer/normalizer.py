@@ -896,6 +896,7 @@ def _is_generic_indicator_value(indicator_value: Optional[str]) -> bool:
         "economico",
         "economica",
         "economia chilena",
+        'crecimiento económico'
     ]
     indicator_normalized = _normalize_text(indicator_value)
     return any(_fuzzy_match(indicator_normalized, [term], threshold=0.72) for term in generic_terms)
@@ -2044,6 +2045,7 @@ def normalize_entities(
     #    (region explícita o intents.region en specific/general).
     raw_indicator = (entities.get("indicator") or [None])[0]
     raw_frequency = (entities.get("frequency") or [None])[0]
+    has_explicit_frequency = bool(str(raw_frequency or "").strip())
     indicator_is_generic_or_missing = _is_generic_indicator_value(raw_indicator)
 
     def _intent_label(intent_value: Any) -> Optional[str]:
@@ -2166,9 +2168,14 @@ def normalize_entities(
         response["activity"] = normalized_activity_values
 
     has_year_only_point_period = any(_is_year_only_period_reference(raw) for raw in period_raw_values if raw)
-    if "imacec" in response.get("indicator", []):
+    if "imacec" in response.get("indicator", []) and not has_explicit_frequency:
         response["frequency"] = ["m"]
-    elif req_form_norm in {"point", "range", "latest"} and "pib" in response.get("indicator", []) and has_year_only_point_period:
+    elif (
+        req_form_norm in {"point", "range", "latest"}
+        and "pib" in response.get("indicator", [])
+        and has_year_only_point_period
+        and not has_explicit_frequency
+    ):
         response["frequency"] = ["a"]
 
     effective_frequency = response.get("frequency", [])
@@ -2182,6 +2189,51 @@ def normalize_entities(
     )
 
     return response
+
+
+def coerce_req_form_from_period_and_frequency(
+    req_form: Optional[str],
+    normalized_entities: Optional[Dict[str, Any]],
+) -> Optional[str]:
+    req_form_norm = str(req_form or "").strip().lower()
+    if req_form_norm not in {"point", "specific_point"}:
+        return req_form
+
+    if not isinstance(normalized_entities, dict):
+        return req_form
+
+    period_values = normalized_entities.get("period")
+    if not isinstance(period_values, list) or len(period_values) < 2:
+        return req_form
+
+    start_text = str(period_values[0] or "").strip()
+    end_text = str(period_values[-1] or "").strip()
+    if not start_text or not end_text:
+        return req_form
+
+    start_date = _parse_yyyymmdd(start_text)
+    end_date = _parse_yyyymmdd(end_text)
+    if start_date is None or end_date is None:
+        return req_form
+
+    frequency_values = normalized_entities.get("frequency")
+    frequency_code = None
+    if isinstance(frequency_values, list) and frequency_values:
+        frequency_code = str(frequency_values[0] or "").strip().lower()
+
+    same_period = False
+    if frequency_code in {"a", "annual", "anual"}:
+        same_period = start_date.year == end_date.year
+    elif frequency_code in {"q", "t", "quarterly", "trimestral"}:
+        start_quarter = ((start_date.month - 1) // 3) + 1
+        end_quarter = ((end_date.month - 1) // 3) + 1
+        same_period = start_date.year == end_date.year and start_quarter == end_quarter
+    else:
+        same_period = start_date.year == end_date.year and start_date.month == end_date.month
+
+    if same_period:
+        return req_form
+    return "range"
 
 
 # ============================================================================

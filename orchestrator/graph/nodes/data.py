@@ -1141,25 +1141,7 @@ def make_data_node(memory_adapter: Any):
                 req_form_for_payload = "point"
 
         if not observations and not observations_all:
-            period_summary = None
-            if period_values:
-                start_period = str(period_values[0])
-                end_period = str(period_values[-1])
-                period_summary = start_period if start_period == end_period else f"{start_period} a {end_period}"
-
-            indicator_label = str(indicator_ent or "indicador solicitado").upper()
-            freq_label = str(frequency_ent or "").strip().lower()
-            freq_text = {
-                "a": "anual",
-                "q": "trimestral",
-                "m": "mensual",
-            }.get(freq_label, freq_label or "sin frecuencia especificada")
-
-            text = (
-                f"No hay datos disponibles para {indicator_label} en la frecuencia {freq_text}"
-                f"{f' y período {period_summary}' if period_summary else ''}. "
-                "Prueba con otro período o consulta el último dato disponible."
-            )
+            text = "No hay datos disponibles para la serie solicitada."
             logger.warning("[DATA_NODE] %s", text)
             _emit_stream_chunk(text, writer)
             return {
