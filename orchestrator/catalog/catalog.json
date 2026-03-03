@@ -199,7 +199,7 @@
       {"id": "F032.PIB.RPA.N.Z.EP18.11.Z.0.A", "short_title": "Servicios personales", "classification": {"activity": "servicio_personales"}, "long_title": "Servicios personales"},
       {"id": "F032.PIB.RPA.N.Z.EP18.12.Z.0.A", "short_title": "Administración pública", "classification": {"activity": "admin_publica"}, "long_title": "Administración pública"},
       {"id": "F032.PIB.RPA.N.Z.EP18.1415.Z.0.A", "short_title": "Impuestos sobre los productos", "classification": {"activity": "impuestos"}, "long_title": "Impuestos sobre los productos"},
-      {"id": "F032.PIB.RPA.N.Z.EP18.Z.Z.0.A", "short_title": "Producto Interno Bruto", "classification": {}, "long_title": "Producto Interno Bruto"}
+      {"id": "F032.PIB.RPA.N.Z.EP18.Z.Z.0.A", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "Producto Interno Bruto"}
     ]
   },
   "PIB por clase de actividad económica, a precios corrientes, series empalmadas, desestacionalizado, referencia 2018 (miles de millones de pesos)": {
@@ -244,7 +244,7 @@
       {"id": "F032.PIB.FLU.N.CLP.EP18.12.Z.1.T", "short_title": "Administración pública", "classification": {"activity": "admin_publica"}, "long_title": "PIB de administración pública desestacionalizado a precios corrientes"},
       {"id": "F032.PIB.FLU.N.CLP.2018.16.Z.1.T", "short_title": "PIB a costo de factores", "classification": {}, "long_title": "PIB a costo de factores desestacionalizado a precios corrientes"},
       {"id": "F032.PIB.FLU.N.CLP.EP18.1415.Z.1.T", "short_title": "Impuestos sobre los productos", "classification": {"activity": "impuestos"}, "long_title": "PIB de impuestos sobre los productos desestacionalizado a precios corrientes"},
-      {"id": "F032.PIB.FLU.N.CLP.EP18.Z.Z.1.T", "short_title": "Producto interno bruto", "classification": {}, "long_title": "PIB desestacionalizado a precios corrientes"}
+      {"id": "F032.PIB.FLU.N.CLP.EP18.Z.Z.1.T", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "PIB desestacionalizado a precios corrientes"}
     ]
   },
   "PIB por actividad económica, volumen a precios año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
@@ -289,7 +289,7 @@
       {"id": "F032.PIB.FLU.R.CLP.EP18.12.Z.0.T", "short_title": "Administración pública", "classification": {"activity": "admin_publica"}, "long_title": "PIB para el sector Administración pública"},
       {"id": "F032.PIB.FLU.R.CLP.2018.16.Z.0.T", "short_title": "PIB a costo de factores", "classification": {}, "long_title": "PIB a costo de factores"},
       {"id": "F032.PIB.FLU.R.CLP.EP18.1415.Z.0.T", "short_title": "Impuestos sobre los productos", "classification": {"activity": "impuestos"}, "long_title": "PIB Impuestos sobre los productos"},
-      {"id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T", "short_title": "Producto Interno Bruto", "classification": {}, "long_title": "PIB"},
+      {"id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "PIB"},
       {"id": "F032.PIB.FLU.R.CLP.EP18.N03.Z.0.T", "short_title": "PIB no minero", "classification": {"activity": "no_mineria"}, "long_title": "PIB No minero"}
     ]
   },
@@ -332,7 +332,7 @@
       {"id": "F032.PIB.V12.R.Z.2018.11.Z.0.T", "short_title": "Servicios personales", "classification": {"activity": "servicio_personales"}, "long_title": "Contribución año/año del sector Servicios personales en el PIB"},
       {"id": "F032.PIB.V12.R.Z.2018.12.Z.0.T", "short_title": "Administración pública", "classification": {"activity": "admin_publica"}, "long_title": "Contribución año/año del sector Administración pública en el PIB"},
       {"id": "F032.PIB.V12.R.Z.2018.1415.Z.0.T", "short_title": "Impuestos sobre los productos", "classification": {"activity": "impuestos"}, "long_title": "Contribución año/año del sector Impuestos sobre los productos en el PIB"},
-      {"id": "F032.PIB.V12.R.Z.2018.Z.Z.0.T", "short_title": "PIB", "classification": {}, "long_title": "Contribución año/año del PIB"}
+      {"id": "F032.PIB.V12.R.Z.2018.Z.Z.0.T", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "Contribución año/año del PIB"}
     ]
   },
   "PIB por clase de actividad económica, contribución porcentual anual respecto de igual periodo del año anterior, referencia 2018": {
@@ -374,7 +374,7 @@
       {"id": "F032.PIB.V12.R.Z.2018.11.Z.0.A", "short_title": "Servicios personales", "classification": {"activity": "servicio_personales"}, "long_title": "Contribución anual del sector Servicios personales en el PIB"},
       {"id": "F032.PIB.V12.R.Z.2018.12.Z.0.A", "short_title": "Administración pública", "classification": {"activity": "admin_publica"}, "long_title": "Contribución anual del sector Administración pública en el PIB"},
       {"id": "F032.PIB.V12.R.Z.2018.1415.Z.0.A", "short_title": "Impuestos sobre los productos", "classification": {"activity": "impuestos"}, "long_title": "Contribución anual del sector Impuestos sobre los productos en el PIB"},
-      {"id": "F032.PIB.V12.R.Z.2018.Z.Z.0.A", "short_title": "PIB", "classification": {}, "long_title": "Contribución anual del PIB"}
+      {"id": "F032.PIB.V12.R.Z.2018.Z.Z.0.A", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "Contribución anual del PIB"}
     ]
   },
   "PIB por clase de actividad económica, volumen a precios del año anterior encadenado, series empalmadas, desestacionalizado, referencia 2018 (miles de millones de pesos encadenados)": {
@@ -419,7 +419,7 @@
       {"id": "F032.PIB.FLU.R.CLP.EP18.12.Z.3.T", "short_title": "Administración pública", "classification": {"activity": "admin_publica"}, "long_title": "PIB para el sector Administración pública desestacionalizado"},
       {"id": "F032.PIB.FLU.R.CLP.2018.16.Z.3.T", "short_title": "PIB a costo de factores", "classification": {}, "long_title": "PIB a costo de factores desestacionalizado"},
       {"id": "F032.PIB.FLU.R.CLP.EP18.1415.Z.3.T", "short_title": "Impuestos sobre los productos", "classification": {"activity": "impuestos"}, "long_title": "PIB Impuestos sobre los productos desestacionalizado"},
-      {"id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.1.T", "short_title": "Producto Interno Bruto", "classification": {}, "long_title": "PIB desestacionalizado"},
+      {"id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.1.T", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "PIB desestacionalizado"},
       {"id": "F032.PIB.FLU.R.CLP.EP18.N03.Z.1.T", "short_title": "PIB no minero", "classification": {"activity": "no_mineria"}, "long_title": "PIB No minero desestacionalizado"}
     ]
   },
@@ -462,7 +462,7 @@
       {"id": "F032.PIB.V12.R.Z.2018.11.Z.3.T", "short_title": "Servicios personales", "classification": {"activity": "servicio_personales"}, "long_title": "Contribución año/año del sector Servicios personales en el PIB desestacionalizado"},
       {"id": "F032.PIB.V12.R.Z.2018.12.Z.3.T", "short_title": "Administración pública", "classification": {"activity": "admin_publica"}, "long_title": "Contribución año/año del sector Administración pública en el PIB desestacionalizado"},
       {"id": "F032.PIB.V12.R.Z.2018.1415.Z.3.T", "short_title": "Impuestos sobre los productos", "classification": {"activity": "impuestos"}, "long_title": "Contribución año/año del sector Impuestos sobre los productos en el PIB desestacionalizado"},
-      {"id": "F032.PIB.V12.R.Z.2018.Z.Z.3.T", "short_title": "PIB", "classification": {}, "long_title": "Contribución año/año del PIB desestacionalizado"}
+      {"id": "F032.PIB.V12.R.Z.2018.Z.Z.3.T", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "Contribución año/año del PIB desestacionalizado"}
     ]
   },
   "Producto interno bruto por clase de actividad económica, contribución porcentual respecto al periodo anterior, desestacionalizado, referencia 2018": {
@@ -504,7 +504,7 @@
       {"id": "F032.PIB.VAR.R.Z.2018.11.Z.3.T", "short_title": "Servicios personales", "classification": {"activity": "servicio_personales"}, "long_title": "Contribución trim/trim del sector Servicios personales en el PIB desestacionalizado"},
       {"id": "F032.PIB.VAR.R.Z.2018.12.Z.3.T", "short_title": "Administración pública", "classification": {"activity": "admin_publica"}, "long_title": "Contribución trim/trim del sector Administración pública en el PIB desestacionalizado"},
       {"id": "F032.PIB.VAR.R.Z.2018.1415.Z.3.T", "short_title": "Impuestos sobre los productos", "classification": {"activity": "impuestos"}, "long_title": "Contribución trim/trim del sector Impuestos sobre los productos en el PIB desestacionalizado"},
-      {"id": "F032.PIB.VAR.R.Z.2018.Z.Z.3.T", "short_title": "PIB", "classification": {}, "long_title": "Contribución trim/trim del PIB desestacionalizado"}
+      {"id": "F032.PIB.VAR.R.Z.2018.Z.Z.3.T", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "Contribución trim/trim del PIB desestacionalizado"}
     ]
   },
   "Gasto del producto interno bruto, a precios corrientes, series empalmadas, referencia 2018 (miles de millones de pesos)": {
@@ -552,13 +552,6 @@
     
     ]
   },
-
-
-
-
-
-
-  
   "PIB trimestral por región, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
     "classification": {
       "indicator": "pib",
@@ -590,9 +583,394 @@
       {"id": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.12.0.T", "short_title": "Región de Magallanes y de la Antártica Chilena", "classification": {"region": "magallanes"}, "long_title": "PIB para la Región de Magallanes y de la Antártica Chilena"},
       {"id": "F035.PCF.FLU.R.CLP.2018.Z.Z.Z.Z.0.T", "short_title": "Subtotal regionalizado", "classification": {}, "long_title": "Subtotal regionalizado"},
       {"id": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.99.0.T", "short_title": "Extrarregional", "classification": {}, "long_title": "Extrarregional"},
-      {"id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T", "short_title": "Producto Interno Bruto", "classification": {}, "long_title": "PIB"}
+      {"id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "PIB"}
     ]
   },
+  "PIB por actividad económica, Región  de Arica y Parinacota, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
+    "classification": {
+      "indicator": "pib",
+      "calc_mode": "original",
+      "seasonality": "nsa",
+      "frequency": "q",
+      "price": "enc",
+      "has_activity": 1,
+      "has_region": 1,
+      "has_investment": 0,
+      "region": "arica_parinacota"
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_XV_ACT_T",
+    "series": [
+      {"id": "F035.PIB.FLU.R.CLP.2018.PB.Z.Z.15.0.T", "short_title": "Producción de bienes", "classification": {"activity": "bienes"}, "long_title": "PIB para el sector Producción de bienes en la Región de Arica y Parinacota"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.03.Z.Z.15.0.T", "short_title": "Minería", "classification": {"activity": "mineria"}, "long_title": "PIB para el sector Minería en la Región de Arica y Parinacota"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.04.Z.Z.15.0.T", "short_title": "Industria manufacturera", "classification": {"activity": "industria"}, "long_title": "PIB para el sector Industria manufacturera en la Región de Arica y Parinacota"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.RB.Z.Z.15.0.T", "short_title": "Resto de bienes", "classification": {"activity": "resto_bienes"}, "long_title": "PIB para el sector Resto de bienes en la Región de Arica y Parinacota"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.COM.Z.Z.15.0.T", "short_title": "Comercio", "classification": {"activity": "comercio"}, "long_title": "PIB para el sector Comercio en la Región de Arica y Parinacota"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.SERV.Z.Z.15.0.T", "short_title": "Servicios", "classification": {"activity": "servicios"}, "long_title": "PIB para el sector Servicios en la Región de Arica y Parinacota"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.15.0.T", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "PIB para la Región de Arica y Parinacota"}
+    ]
+  },
+  "PIB por actividad económica, Región de Tarapacá, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
+    "classification": {
+      "indicator": "pib",
+      "calc_mode": "original",
+      "seasonality": "nsa",
+      "frequency": "q",
+      "price": "enc",
+      "has_activity": 1,
+      "has_region": 1,
+      "has_investment": 0,
+      "region": "tarapaca"
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_I_ACT_T",
+    "series": [
+      {"id": "F035.PIB.FLU.R.CLP.2018.PB.21.Z.01.0.T", "short_title": "Producción de bienes", "classification": {"activity": "bienes"}, "long_title": "PIB para el sector Producción de bienes en la Región de Tarapacá"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.03.21.Z.01.0.T", "short_title": "Minería", "classification": {"activity": "mineria"}, "long_title": "PIB para el sector Minería en la Región de Tarapacá"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.04.21.Z.01.0.T", "short_title": "Industria", "classification": {"activity": "industria"}, "long_title": "PIB para el sector Industria en la Región de Tarapacá"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.RB.21.Z.01.0.T", "short_title": "Resto de bienes", "classification": {"activity": "resto_bienes"}, "long_title": "PIB para el sector Resto de bienes en la Región de Tarapacá"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.COM.21.Z.01.0.T", "short_title": "Comercio", "classification": {"activity": "comercio"}, "long_title": "PIB para el sector Comercio en la Región de Tarapacá"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.SERV.21.Z.01.0.T", "short_title": "Servicios", "classification": {"activity": "servicios"}, "long_title": "PIB para el sector Servicios en la Región de Tarapacá"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.01.0.T", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "PIB para la Región de Tarapacá"}
+    ]
+  },
+
+  "PIB por actividad económica, Región de Antofagasta, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
+    "classification": {
+      "indicator": "pib",
+      "calc_mode": "original",
+      "seasonality": "nsa",
+      "frequency": "q",
+      "price": "enc",
+      "has_activity": 1,
+      "has_region": 1,
+      "has_investment": 0,
+      "region": "antofagasta"
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_II_ACT_T",
+    "series": [
+      {"id": "F035.PIB.FLU.R.CLP.2018.PB.Z.Z.02.0.T", "short_title": "Producción de bienes", "classification": {"activity": "bienes"}, "long_title": "PIB para el sector Producción de bienes en la Región de Antofagasta"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.03.Z.Z.02.0.T", "short_title": "Minería", "classification": {"activity": "mineria"}, "long_title": "PIB para el sector Minería en la Región de Antofagasta"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.04.Z.Z.02.0.T", "short_title": "Industria", "classification": {"activity": "industria"}, "long_title": "PIB para el sector Industria en la Región de Antofagasta"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.RB.Z.Z.02.0.T", "short_title": "Resto de bienes", "classification": {"activity": "resto_bienes"}, "long_title": "PIB para el sector Resto de bienes en la Región de Antofagasta"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.COM.Z.Z.02.0.T", "short_title": "Comercio", "classification": {"activity": "comercio"}, "long_title": "PIB para el sector Comercio en la Región de Antofagasta"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.SERV.Z.Z.02.0.T", "short_title": "Servicios", "classification": {"activity": "servicios"}, "long_title": "PIB para el sector Servicios en la Región de Antofagasta"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.02.0.T", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "PIB para la Región de Antofagasta"}
+    ]
+  },
+
+  "PIB por actividad económica, Región de Atacama, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
+    "classification": {
+      "indicator": "pib",
+      "calc_mode": "original",
+      "seasonality": "nsa",
+      "frequency": "q",
+      "price": "enc",
+      "has_activity": 1,
+      "has_region": 1,
+      "has_investment": 0,
+      "region": "atacama"
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_III_ACT_T",
+    "series": [
+      {"id": "F035.PIB.FLU.R.CLP.2018.PB.Z.Z.03.0.T", "short_title": "Producción de bienes", "classification": {"activity": "bienes"}, "long_title": "PIB para el sector Producción de bienes en la Región de Atacama"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.03.Z.Z.03.0.T", "short_title": "Minería", "classification": {"activity": "mineria"}, "long_title": "PIB para el sector Minería en la Región de Atacama"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.04.Z.Z.03.0.T", "short_title": "Industria manufacturera", "classification": {"activity": "industria"}, "long_title": "PIB para el sector Industria manufacturera en la Región de Atacama"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.RB.Z.Z.03.0.T", "short_title": "Resto de bienes", "classification": {"activity": "resto_bienes"}, "long_title": "PIB para el sector Resto de bienes en la Región de Atacama"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.COM.Z.Z.03.0.T", "short_title": "Comercio", "classification": {"activity": "comercio"}, "long_title": "PIB para el sector Comercio en la Región de Atacama"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.SERV.Z.Z.03.0.T", "short_title": "Servicios", "classification": {"activity": "servicios"}, "long_title": "PIB para el sector Servicios en la Región de Atacama"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.03.0.T", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "PIB para la Región de Atacama"}
+    ]
+  },
+
+  "PIB por actividad económica, Región de Coquimbo, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
+    "classification": {
+      "indicator": "pib",
+      "calc_mode": "original",
+      "seasonality": "nsa",
+      "frequency": "q",
+      "price": "enc",
+      "has_activity": 1,
+      "has_region": 1,
+      "has_investment": 0,
+      "region": "coquimbo"
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_IV_ACT_T",
+    "series": [
+      {"id": "F035.PIB.FLU.R.CLP.2018.PB.Z.Z.04.0.T", "short_title": "Producción de bienes", "classification": {"activity": "bienes"}, "long_title": "PIB para el sector Producción de bienes en la Región de Coquimbo"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.03.Z.Z.04.0.T", "short_title": "Minería", "classification": {"activity": "mineria"}, "long_title": "PIB para el sector Minería en la Región de Coquimbo"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.04.Z.Z.04.0.T", "short_title": "Industria", "classification": {"activity": "industria"}, "long_title": "PIB para el sector Industria en la Región de Coquimbo"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.RB.Z.Z.04.0.T", "short_title": "Resto de bienes", "classification": {"activity": "resto_bienes"}, "long_title": "PIB para el sector Resto de bienes en la Región de Coquimbo"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.COM.Z.Z.04.0.T", "short_title": "Comercio", "classification": {"activity": "comercio"}, "long_title": "PIB para el sector Comercio en la Región de Coquimbo"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.SERV.Z.Z.04.0.T", "short_title": "Servicios", "classification": {"activity": "servicios"}, "long_title": "PIB para el sector Servicios en la Región de Coquimbo"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.04.0.T", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "PIB para la Región de Coquimbo"}
+    ]
+  },
+
+  "PIB por actividad económica, Región de Valparaíso, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
+    "classification": {
+      "indicator": "pib",
+      "calc_mode": "original",
+      "seasonality": "nsa",
+      "frequency": "q",
+      "price": "enc",
+      "has_activity": 1,
+      "has_region": 1,
+      "has_investment": 0,
+      "region": "valparaiso"
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_V_ACT_T",
+    "series": [
+      {"id": "F035.PIB.FLU.R.CLP.2018.PB.Z.Z.05.0.T", "short_title": "Producción de bienes", "classification": {"activity": "bienes"}, "long_title": "PIB para el sector Producción de bienes en la Región de Valparaíso"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.03.Z.Z.05.0.T", "short_title": "Minería", "classification": {"activity": "mineria"}, "long_title": "PIB para el sector Minería en la Región de Valparaíso"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.04.Z.Z.05.0.T", "short_title": "Industria", "classification": {"activity": "industria"}, "long_title": "PIB para el sector Industria en la Región de Valparaíso"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.RB.Z.Z.05.0.T", "short_title": "Resto de bienes", "classification": {"activity": "resto_bienes"}, "long_title": "PIB para el sector Resto de bienes en la Región de Valparaíso"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.COM.Z.Z.05.0.T", "short_title": "Comercio", "classification": {"activity": "comercio"}, "long_title": "PIB para el sector Comercio en la Región de Valparaíso"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.SERV.Z.Z.05.0.T", "short_title": "Servicios", "classification": {"activity": "servicios"}, "long_title": "PIB para el sector Servicios en la Región de Valparaíso"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.05.0.T", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "PIB para la Región de Valparaíso"}
+    ]
+  },
+
+  "PIB por actividad económica, Región Metropolitana de Santiago, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
+    "classification": {
+      "indicator": "pib",
+      "calc_mode": "original",
+      "seasonality": "nsa",
+      "frequency": "q",
+      "price": "enc",
+      "has_activity": 1,
+      "has_region": 1,
+      "has_investment": 0,
+      "region": "metropolitana"
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_XIII_ACT_T",
+    "series": [
+      {"id": "F035.PIB.FLU.R.CLP.2018.PB.Z.Z.13.0.T", "short_title": "Producción de bienes", "classification": {"activity": "bienes"}, "long_title": "PIB para el sector Producción de bienes en la Región Metropolitana de Santiago"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.03.Z.Z.13.0.T", "short_title": "Minería", "classification": {"activity": "mineria"}, "long_title": "PIB para el sector Minería en la Región Metropolitana de Santiago"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.04.Z.Z.13.0.T", "short_title": "Industria", "classification": {"activity": "industria"}, "long_title": "PIB para el sector Industria en la Región Metropolitana de Santiago"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.RB.Z.Z.13.0.T", "short_title": "Resto de bienes", "classification": {"activity": "resto_bienes"}, "long_title": "PIB para el sector Resto de bienes en la Región Metropolitana de Santiago"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.COM.Z.Z.13.0.T", "short_title": "Comercio", "classification": {"activity": "comercio"}, "long_title": "PIB para el sector Comercio en la Región Metropolitana de Santiago"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.SERV.Z.Z.13.0.T", "short_title": "Servicios", "classification": {"activity": "servicios"}, "long_title": "PIB para el sector Servicios en la Región Metropolitana de Santiago"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.13.0.T", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "PIB para la Región Metropolitana de Santiago"}
+    ]
+  },
+
+  "PIB por actividad económica, Región del Libertador General Bernardo O Higgins, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
+    "classification": {
+      "indicator": "pib",
+      "calc_mode": "original",
+      "seasonality": "nsa",
+      "frequency": "q",
+      "price": "enc",
+      "has_activity": 1,
+      "has_region": 1,
+      "has_investment": 0,
+      "region": "ohiggins"
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_VI_ACT_T",
+    "series": [
+      {"id": "F035.PIB.FLU.R.CLP.2018.PB.Z.Z.06.0.T", "short_title": "Producción de bienes", "classification": {"activity": "bienes"}, "long_title": "PIB para el sector Producción de bienes en la Región del Libertador General Bernardo O Higgins"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.03.Z.Z.06.0.T", "short_title": "Minería", "classification": {"activity": "mineria"}, "long_title": "PIB para el sector Minería en la Región del Libertador General Bernardo O Higgins"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.04.Z.Z.06.0.T", "short_title": "Industria", "classification": {"activity": "industria"}, "long_title": "PIB para el sector Industria en la Región del Libertador General Bernardo O Higgins"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.RB.Z.Z.06.0.T", "short_title": "Resto de bienes", "classification": {"activity": "resto_bienes"}, "long_title": "PIB para el sector Resto de bienes en la Región del Libertador General Bernardo O Higgins"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.COM.Z.Z.06.0.T", "short_title": "Comercio", "classification": {"activity": "comercio"}, "long_title": "PIB para el sector Comercio en la Región del Libertador General Bernardo O Higgins"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.SERV.Z.Z.06.0.T", "short_title": "Servicios", "classification": {"activity": "servicios"}, "long_title": "PIB para el sector Servicios en la Región del Libertador General Bernardo O Higgins"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.06.0.T", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "PIB para la Región del Libertador General Bernardo O Higgins"}
+    ]
+  },
+
+  "PIB por actividad económica, Región del Maule, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
+    "classification": {
+      "indicator": "pib",
+      "calc_mode": "original",
+      "seasonality": "nsa",
+      "frequency": "q",
+      "price": "enc",
+      "has_activity": 1,
+      "has_region": 1,
+      "has_investment": 0,
+      "region": "maule"
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_VII_ACT_T",
+    "series": [
+      {"id": "F035.PIB.FLU.R.CLP.2018.PB.Z.Z.07.0.T", "short_title": "Producción de bienes", "classification": {"activity": "bienes"}, "long_title": "PIB para el sector Producción de bienes en la Región del Maule"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.03.Z.Z.07.0.T", "short_title": "Minería", "classification": {"activity": "mineria"}, "long_title": "PIB para el sector Minería en la Región del Maule"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.04.Z.Z.07.0.T", "short_title": "Industria", "classification": {"activity": "industria"}, "long_title": "PIB para el sector Industria en la Región del Maule"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.RB.Z.Z.07.0.T", "short_title": "Resto de bienes", "classification": {"activity": "resto_bienes"}, "long_title": "PIB para el sector Resto de bienes en la Región del Maule"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.COM.Z.Z.07.0.T", "short_title": "Comercio", "classification": {"activity": "comercio"}, "long_title": "PIB para el sector Comercio en la Región del Maule"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.SERV.Z.Z.07.0.T", "short_title": "Servicios", "classification": {"activity": "servicios"}, "long_title": "PIB para el sector Servicios en la Región del Maule"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.07.0.T", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "PIB para la Región del Maule"}
+    ]
+  },
+
+  "PIB por actividad económica, Región de Ñuble, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
+    "classification": {
+      "indicator": "pib",
+      "calc_mode": "original",
+      "seasonality": "nsa",
+      "frequency": "q",
+      "price": "enc",
+      "has_activity": 1,
+      "has_region": 1,
+      "has_investment": 0,
+      "region": "nuble"
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_XVI_ACT_T",
+    "series": [
+      {"id": "F035.PIB.FLU.R.CLP.2018.PB.Z.Z.16.0.T", "short_title": "Producción de bienes", "classification": {"activity": "bienes"}, "long_title": "PIB para el sector Producción de bienes en la Región de Ñuble"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.03.Z.Z.16.0.T", "short_title": "Minería", "classification": {"activity": "mineria"}, "long_title": "PIB para el sector Minería en la Región de Ñuble"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.04.Z.Z.16.0.T", "short_title": "Industria", "classification": {"activity": "industria"}, "long_title": "PIB para el sector Industria en la Región de Ñuble"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.RB.Z.Z.16.0.T", "short_title": "Resto de bienes", "classification": {"activity": "resto_bienes"}, "long_title": "PIB para el sector Resto de bienes en la Región de Ñuble"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.COM.Z.Z.16.0.T", "short_title": "Comercio", "classification": {"activity": "comercio"}, "long_title": "PIB para el sector Comercio en la Región de Ñuble"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.SERV.Z.Z.16.0.T", "short_title": "Servicios", "classification": {"activity": "servicios"}, "long_title": "PIB para el sector Servicios en la Región de Ñuble"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.16.0.T", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "PIB para la Región de Ñuble"}
+    ]
+  },
+
+  "PIB por actividad económica, Región del Biobío, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
+    "classification": {
+      "indicator": "pib",
+      "calc_mode": "original",
+      "seasonality": "nsa",
+      "frequency": "q",
+      "price": "enc",
+      "has_activity": 1,
+      "has_region": 1,
+      "has_investment": 0,
+      "region": "biobio"
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_VIII_ACT_T",
+    "series": [
+      {"id": "F035.PIB.FLU.R.CLP.2018.PB.Z.Z.08.0.T", "short_title": "Producción de bienes", "classification": {"activity": "bienes"}, "long_title": "PIB para el sector Producción de bienes en la Región del Biobío"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.03.Z.Z.08.0.T", "short_title": "Minería", "classification": {"activity": "mineria"}, "long_title": "PIB para el sector Minería en la Región del Biobío"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.04.Z.Z.08.0.T", "short_title": "Industria", "classification": {"activity": "industria"}, "long_title": "PIB para el sector Industria en la Región del Biobío"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.RB.Z.Z.08.0.T", "short_title": "Resto de bienes", "classification": {"activity": "resto_bienes"}, "long_title": "PIB para el sector Resto de bienes en la Región del Biobío"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.COM.Z.Z.08.0.T", "short_title": "Comercio", "classification": {"activity": "comercio"}, "long_title": "PIB para el sector Comercio en la Región del Biobío"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.SERV.Z.Z.08.0.T", "short_title": "Servicios", "classification": {"activity": "servicios"}, "long_title": "PIB para el sector Servicios en la Región del Biobío"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.08.0.T", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "PIB para la Región del Biobío"}
+    ]
+  },
+
+  "PIB por actividad económica, Región de La Araucanía, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
+    "classification": {
+      "indicator": "pib",
+      "calc_mode": "original",
+      "seasonality": "nsa",
+      "frequency": "q",
+      "price": "enc",
+      "has_activity": 1,
+      "has_region": 1,
+      "has_investment": 0,
+      "region": "araucania"
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_IX_ACT_T",
+    "series": [
+      {"id": "F035.PIB.FLU.R.CLP.2018.PB.Z.Z.09.0.T", "short_title": "Producción de bienes", "classification": {"activity": "bienes"}, "long_title": "PIB para el sector Producción de bienes en la Región de La Araucanía"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.03.Z.Z.09.0.T", "short_title": "Minería", "classification": {"activity": "mineria"}, "long_title": "PIB para el sector Minería en la Región de La Araucanía"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.04.Z.Z.09.0.T", "short_title": "Industria", "classification": {"activity": "industria"}, "long_title": "PIB para el sector Industria en la Región de La Araucanía"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.RB.Z.Z.09.0.T", "short_title": "Resto de bienes", "classification": {"activity": "resto_bienes"}, "long_title": "PIB para el sector Resto de bienes en la Región de La Araucanía"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.COM.Z.Z.09.0.T", "short_title": "Comercio", "classification": {"activity": "comercio"}, "long_title": "PIB para el sector Comercio en la Región de La Araucanía"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.SERV.Z.Z.09.0.T", "short_title": "Servicios", "classification": {"activity": "servicios"}, "long_title": "PIB para el sector Servicios en la Región de La Araucanía"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.09.0.T", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "PIB para la Región de La Araucanía"}
+    ]
+  },
+
+  "PIB por actividad económica, Región de Los Ríos, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
+    "classification": {
+      "indicator": "pib",
+      "calc_mode": "original",
+      "seasonality": "nsa",
+      "frequency": "q",
+      "price": "enc",
+      "has_activity": 1,
+      "has_region": 1,
+      "has_investment": 0,
+      "region": "los_rios"
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_XIV_ACT_T",
+    "series": [
+      {"id": "F035.PIB.FLU.R.CLP.2018.PB.Z.Z.14.0.T", "short_title": "Producción de bienes", "classification": {"activity": "bienes"}, "long_title": "PIB para el sector Producción de bienes en la Región de Los Ríos"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.03.Z.Z.14.0.T", "short_title": "Minería", "classification": {"activity": "mineria"}, "long_title": "PIB para el sector Minería en la Región de Los Ríos"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.04.Z.Z.14.0.T", "short_title": "Industria", "classification": {"activity": "industria"}, "long_title": "PIB para el sector Industria en la Región de Los Ríos"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.RB.Z.Z.14.0.T", "short_title": "Resto de bienes", "classification": {"activity": "resto_bienes"}, "long_title": "PIB para el sector Resto de bienes en la Región de Los Ríos"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.COM.Z.Z.14.0.T", "short_title": "Comercio", "classification": {"activity": "comercio"}, "long_title": "PIB para el sector Comercio en la Región de Los Ríos"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.SERV.Z.Z.14.0.T", "short_title": "Servicios", "classification": {"activity": "servicios"}, "long_title": "PIB para el sector Servicios en la Región de Los Ríos"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.14.0.T", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "PIB para la Región de Los Ríos"}
+    ]
+  },
+
+  "PIB por actividad económica, Región de Los Lagos, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
+    "classification": {
+      "indicator": "pib",
+      "calc_mode": "original",
+      "seasonality": "nsa",
+      "frequency": "q",
+      "price": "enc",
+      "has_activity": 1,
+      "has_region": 1,
+      "has_investment": 0,
+      "region": "los_lagos"
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_X_ACT_T",
+    "series": [
+      {"id": "F035.PIB.FLU.R.CLP.2018.PB.Z.Z.10.0.T", "short_title": "Producción de bienes", "classification": {"activity": "bienes"}, "long_title": "PIB para el sector Producción de bienes en la Región de Los Lagos"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.03.Z.Z.10.0.T", "short_title": "Minería", "classification": {"activity": "mineria"}, "long_title": "PIB para el sector Minería en la Región de Los Lagos"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.04.Z.Z.10.0.T", "short_title": "Industria", "classification": {"activity": "industria"}, "long_title": "PIB para el sector Industria en la Región de Los Lagos"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.RB.Z.Z.10.0.T", "short_title": "Resto de bienes", "classification": {"activity": "resto_bienes"}, "long_title": "PIB para el sector Resto de bienes en la Región de Los Lagos"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.COM.Z.Z.10.0.T", "short_title": "Comercio", "classification": {"activity": "comercio"}, "long_title": "PIB para el sector Comercio en la Región de Los Lagos"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.SERV.Z.Z.10.0.T", "short_title": "Servicios", "classification": {"activity": "servicios"}, "long_title": "PIB para el sector Servicios en la Región de Los Lagos"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.10.0.T", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "PIB para la Región de Los Lagos"}
+    ]
+  },
+
+  "PIB por actividad económica, Región de Aysén del General Carlos Ibáñez del Campo, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
+    "classification": {
+      "indicator": "pib",
+      "calc_mode": "original",
+      "seasonality": "nsa",
+      "frequency": "q",
+      "price": "enc",
+      "has_activity": 1,
+      "has_region": 1,
+      "has_investment": 0,
+      "region": "aysen"
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_XI_ACT_T",
+    "series": [
+      {"id": "F035.PIB.FLU.R.CLP.2018.PB.Z.Z.11.0.T", "short_title": "Producción de bienes", "classification": {"activity": "bienes"}, "long_title": "PIB para el sector Producción de bienes en la Región de Aysén del General Carlos Ibáñez del Campo"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.03.Z.Z.11.0.T", "short_title": "Minería", "classification": {"activity": "mineria"}, "long_title": "PIB para el sector Minería en la Región de Aysén del General Carlos Ibáñez del Campo"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.04.Z.Z.11.0.T", "short_title": "Industria", "classification": {"activity": "industria"}, "long_title": "PIB para el sector Industria en la Región de Aysén del General Carlos Ibáñez del Campo"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.RB.Z.Z.11.0.T", "short_title": "Resto de bienes", "classification": {"activity": "resto_bienes"}, "long_title": "PIB para el sector Resto de bienes en la Región de Aysén del General Carlos Ibáñez del Campo"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.COM.Z.Z.11.0.T", "short_title": "Comercio", "classification": {"activity": "comercio"}, "long_title": "PIB para el sector Comercio en la Región de Aysén del General Carlos Ibáñez del Campo"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.SERV.Z.Z.11.0.T", "short_title": "Servicios", "classification": {"activity": "servicios"}, "long_title": "PIB para el sector Servicios en la Región de Aysén del General Carlos Ibáñez del Campo"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.11.0.T", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "PIB para la Región de Aysén del General Carlos Ibáñez del Campo"}
+    ]
+  },
+
+  "PIB por actividad económica, Región de Magallanes y de la Antártica Chilena, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
+    "classification": {
+      "indicator": "pib",
+      "calc_mode": "original",
+      "seasonality": "nsa",
+      "frequency": "q",
+      "price": "enc",
+      "has_activity": 1,
+      "has_region": 1,
+      "has_investment": 0,
+      "region": "magallanes"
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_XII_ACT_T",
+    "series": [
+      {"id": "F035.PIB.FLU.R.CLP.2018.PB.Z.Z.12.0.T", "short_title": "Producción de bienes", "classification": {"activity": "bienes"}, "long_title": "PIB para el sector Producción de bienes en la Región de Magallanes y de la Antártica Chilena"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.03.Z.Z.12.0.T", "short_title": "Minería", "classification": {"activity": "mineria"}, "long_title": "PIB para el sector Minería en la Región de Magallanes y de la Antártica Chilena"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.04.Z.Z.12.0.T", "short_title": "Industria", "classification": {"activity": "industria"}, "long_title": "PIB para el sector Industria en la Región de Magallanes y de la Antártica Chilena"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.RB.Z.Z.12.0.T", "short_title": "Resto de bienes", "classification": {"activity": "resto_bienes"}, "long_title": "PIB para el sector Resto de bienes en la Región de Magallanes y de la Antártica Chilena"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.COM.Z.Z.12.0.T", "short_title": "Comercio", "classification": {"activity": "comercio"}, "long_title": "PIB para el sector Comercio en la Región de Magallanes y de la Antártica Chilena"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.SERV.Z.Z.12.0.T", "short_title": "Servicios", "classification": {"activity": "servicios"}, "long_title": "PIB para el sector Servicios en la Región de Magallanes y de la Antártica Chilena"},
+      {"id": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.12.0.T", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "PIB para la Región de Magallanes y de la Antártica Chilena"}
+    ]
+  },
+
+
+
   "PIB anual por región, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
     "classification": {
       "indicator": "pib",
@@ -624,7 +1002,7 @@
       {"id": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.12.0.T", "short_title": "Región de Magallanes y de la Antártica Chilena", "classification": {"region": "magallanes"}, "long_title": "PIB para la Región de Magallanes y de la Antártica Chilena"},
       {"id": "F035.PCF.FLU.R.CLP.2018.Z.Z.Z.Z.0.T", "short_title": "Subtotal regionalizado", "classification": {}, "long_title": "Subtotal regionalizado"},
       {"id": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.99.0.T", "short_title": "Extrarregional", "classification": {}, "long_title": "Extrarregional"},
-      {"id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T", "short_title": "PIB", "classification": {}, "long_title": "PIB"}
+      {"id": "F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "PIB"}
     ]
   },
 

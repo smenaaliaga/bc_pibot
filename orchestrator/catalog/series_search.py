@@ -100,6 +100,15 @@ def _is_empty(value: Any) -> bool:
     return value in (None, "", [], {}, "none")
 
 
+def _normalized_token(value: Any) -> Optional[str]:
+    if value in (None, "", [], {}, ()): 
+        return None
+    token = str(value).strip().lower()
+    if token in {"", "none", "null"}:
+        return None
+    return token
+
+
 def find_family_by_classification(
     catalog_path: str | Path,
     *,
@@ -122,6 +131,9 @@ def find_family_by_classification(
     requested_has_activity = 0 if _is_empty(activity_value) else 1
     requested_has_region = 0 if _is_empty(region_value) else 1
     requested_has_investment = 0 if _is_empty(investment_value) else 1
+    requested_activity_token = _normalized_token(activity_value)
+    requested_region_token = _normalized_token(region_value)
+    requested_investment_token = _normalized_token(investment_value)
     requested_calc_mode = str(calc_mode).strip().lower() if calc_mode not in (None, "") else None
     requested_price = str(price).strip().lower() if price not in (None, "") else None
     requested_seasonality = str(seasonality).strip().lower() if seasonality not in (None, "") else None
@@ -150,6 +162,10 @@ def find_family_by_classification(
         has_activity = _to_flag(family_classification.get("has_activity"))
         has_region = _to_flag(family_classification.get("has_region"))
         has_investment = _to_flag(family_classification.get("has_investment"))
+        family_activity_token = _normalized_token(family_classification.get("activity"))
+        family_region_token = _normalized_token(family_classification.get("region"))
+        family_investment_token = _normalized_token(family_classification.get("investment"))
+        family_has_hist_key = "hist" in family_classification
         family_hist = _to_flag(family_classification.get("hist"))
 
         if has_activity != requested_has_activity:
@@ -158,6 +174,16 @@ def find_family_by_classification(
             continue
         if has_investment != requested_has_investment:
             continue
+
+        if requested_has_activity == 1 and requested_activity_token is not None:
+            if family_activity_token is not None and family_activity_token != requested_activity_token:
+                continue
+        if requested_has_region == 1 and requested_region_token is not None:
+            if family_region_token is not None and family_region_token != requested_region_token:
+                continue
+        if requested_has_investment == 1 and requested_investment_token is not None:
+            if family_investment_token is not None and family_investment_token != requested_investment_token:
+                continue
 
         family_calc_mode = family_classification.get("calc_mode")
         family_calc_mode_normalized = (
@@ -191,13 +217,22 @@ def find_family_by_classification(
             if family_frequency_normalized != requested_frequency:
                 continue
 
-        if requested_hist is not None and has_hist_dimension:
-            if family_hist != requested_hist:
+        if has_hist_dimension:
+            if requested_hist is None:
+                if family_has_hist_key:
+                    continue
+            elif family_hist != requested_hist:
                 continue
 
         score = 0
         if requested_indicator is not None and indicator_value == requested_indicator:
             score += 100
+        if requested_activity_token is not None and family_activity_token == requested_activity_token:
+            score += 20
+        if requested_region_token is not None and family_region_token == requested_region_token:
+            score += 30
+        if requested_investment_token is not None and family_investment_token == requested_investment_token:
+            score += 20
         if family_calc_mode not in (None, ""):
             score += 1
         if family_price not in (None, ""):

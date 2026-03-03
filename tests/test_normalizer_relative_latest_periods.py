@@ -25,6 +25,24 @@ def _expected_prev_month_range() -> list[str]:
     return [start, end]
 
 
+def _expected_current_month_range() -> list[str]:
+    now = datetime.now()
+    year = now.year
+    month = now.month
+
+    start = f"{year:04d}-{month:02d}-01"
+    if month == 12:
+        next_year = year + 1
+        next_month = 1
+    else:
+        next_year = year
+        next_month = month + 1
+
+    next_month_start = datetime(next_year, next_month, 1)
+    end = (next_month_start - datetime.resolution).strftime("%Y-%m-%d")
+    return [start, end]
+
+
 def _expected_prev_quarter_range() -> list[str]:
     now = datetime.now()
     current_quarter_start = ((now.month - 1) // 3) * 3 + 1
@@ -65,6 +83,17 @@ def test_point_ultimo_mes_uses_previous_month():
     entities = {
         "indicator": ["imacec"],
         "period": ["ultimo mes"],
+    }
+
+    normalized = normalize_entities(entities, calc_mode="yoy", req_form="point")
+
+    assert normalized["period"] == _expected_prev_month_range()
+
+
+def test_point_mes_pasado_uses_previous_month():
+    entities = {
+        "indicator": ["imacec"],
+        "period": ["mes pasado"],
     }
 
     normalized = normalize_entities(entities, calc_mode="yoy", req_form="point")
@@ -118,3 +147,91 @@ def test_range_generic_indicator_with_1960_inferrs_pib_annual_and_full_year_peri
     assert normalized["indicator"] == ["pib"]
     assert normalized["frequency"] == ["a"]
     assert normalized["period"] == ["1960-01-01", "1960-12-31"]
+
+
+def test_range_imacec_with_year_only_keeps_monthly_frequency_without_period_inference():
+    entities = {
+        "indicator": ["imacec"],
+        "period": ["durante el 2020"],
+    }
+
+    normalized = normalize_entities(entities, calc_mode="yoy", req_form="range")
+
+    assert normalized["indicator"] == ["imacec"]
+    assert normalized["frequency"] == ["m"]
+    assert normalized["period"] == ["2020-01-01", "2020-12-31"]
+
+
+def test_point_pib_este_mes_inferrs_monthly_frequency_and_current_month_period():
+    entities = {
+        "indicator": ["pib"],
+        "period": ["este mes"],
+    }
+
+    normalized = normalize_entities(entities, calc_mode="yoy", req_form="point")
+
+    assert normalized["indicator"] == ["pib"]
+    assert normalized["frequency"] == ["m"]
+    assert normalized["period"] == _expected_current_month_range()
+
+
+def test_imacec_explicit_annual_frequency_is_forced_to_monthly():
+    entities = {
+        "indicator": ["imacec"],
+        "frequency": ["anual"],
+        "period": ["2025"],
+    }
+
+    normalized = normalize_entities(entities, calc_mode="yoy", req_form="point")
+
+    assert normalized["indicator"] == ["imacec"]
+    assert normalized["frequency"] == ["m"]
+
+
+def test_point_imacec_first_quarter_without_year_detects_current_year_range():
+    now = datetime.now()
+    entities = {
+        "indicator": ["imacec"],
+        "period": ["1er trimestre"],
+    }
+
+    normalized = normalize_entities(entities, calc_mode="yoy", req_form="point")
+
+    assert normalized["frequency"] == ["m"]
+    assert normalized["period"] == [f"{now.year:04d}-01-01", f"{now.year:04d}-03-31"]
+
+
+def test_point_imacec_month_abbreviation_detects_period():
+    entities = {
+        "indicator": ["imacec"],
+        "period": ["sep 2024"],
+    }
+
+    normalized = normalize_entities(entities, calc_mode="yoy", req_form="point")
+
+    assert normalized["frequency"] == ["m"]
+    assert normalized["period"] == ["2024-09-01", "2024-09-30"]
+
+
+def test_range_pib_decade_reference_detects_full_decade():
+    entities = {
+        "indicator": ["pib"],
+        "period": ["años 90"],
+    }
+
+    normalized = normalize_entities(entities, calc_mode="yoy", req_form="range")
+
+    assert normalized["frequency"] == ["a"]
+    assert normalized["period"] == ["1990-01-01", "1999-12-31"]
+
+
+def test_point_pib_split_period_tokens_ignores_preposition_token():
+    entities = {
+        "indicator": ["pib"],
+        "period": ["en", "marzo del 2025"],
+    }
+
+    normalized = normalize_entities(entities, calc_mode="yoy", req_form="point")
+
+    assert normalized["frequency"] == ["m"]
+    assert normalized["period"] == ["2025-03-01", "2025-03-31"]

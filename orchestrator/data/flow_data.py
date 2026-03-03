@@ -86,6 +86,10 @@ def stream_data_flow(
         or classification_dict.get("activity_value")
     )
     seasonality_context_val = classification_dict.get("seasonality")
+    region_context_val = (
+        classification_dict.get("region_value")
+        or classification_dict.get("region")
+    )
     metric_type_val = classification_dict.get("metric_type") or classification_dict.get("calc_mode_cls")
     freq = classification_dict.get("frequency", "M").upper()
     
@@ -123,6 +127,7 @@ def stream_data_flow(
         if freq_norm in {"a", "annual", "anual"}:
             start_date: Optional[date] = None
             end_date: Optional[date] = None
+            indicator_norm = str(indicator_context_val or "").strip().lower()
 
             if isinstance(parsed_range, (tuple, list)) and len(parsed_range) == 2:
                 start_date = _parse_iso_date(parsed_range[0])
@@ -139,7 +144,12 @@ def stream_data_flow(
                     start_date = min(valid_observed_dates)
                     end_date = max(valid_observed_dates)
 
-            if start_date is not None and end_date is not None and start_date.year == end_date.year:
+            if (
+                start_date is not None
+                and end_date is not None
+                and start_date.year == end_date.year
+                and indicator_norm != "imacec"
+            ):
                 effective_req_form = "point"
                 if not parsed_point:
                     parsed_point = end_date.isoformat()
@@ -217,6 +227,14 @@ def stream_data_flow(
         elif seasonality_context_val.lower() != "nsa":
             indicator_parts.append(seasonality_context_val.strip())
     final_indicator_name = " ".join(indicator_parts).strip() if indicator_parts else "indicador"
+
+    region_context_norm = str(region_context_val or "").strip()
+    region_context_key = region_context_norm.lower().replace("_", " ")
+    has_specific_region = region_context_key not in {"", "none", "null", "general", "specific", "total"}
+    if str(indicator_context_val or "").strip().lower() == "pib" and has_specific_region:
+        region_display = " ".join(word.capitalize() for word in region_context_key.split())
+        if "region" not in final_indicator_name.lower() and "región" not in final_indicator_name.lower():
+            final_indicator_name = f"{final_indicator_name} de la región de {region_display}".strip()
     
     # Determinar si component_context_val es una actividad concreta o no
     is_specific_activity = (
@@ -258,14 +276,20 @@ def stream_data_flow(
             date_range_label = f"desde {first_labels[0]} hasta {last_labels[0]}"
             logger.info("[STREAM_DATA_FLOW] Rango (observaciones) | %s | %d observaciones", date_range_label, len(obs_to_show))
     else:
-        if parsed_point:
+        if effective_req_form == "latest" and is_contribution:
+            if reference_period:
+                period_labels = format_period_labels(str(reference_period), freq)
+                date_range_label = period_labels[0]
+                logger.info("[STREAM_DATA_FLOW] Renderizando (reference_period) | date=%s", reference_period)
+            else:
+                date_raw = obs_to_show[0].get("date", "") if obs_to_show else ""
+                period_labels = format_period_labels(date_raw, freq)
+                date_range_label = period_labels[0]
+                logger.info("[STREAM_DATA_FLOW] Renderizando (observación/latest_contrib) | date=%s", date_raw)
+        elif parsed_point:
             period_labels = format_period_labels(parsed_point, freq)
             date_range_label = period_labels[0]
             logger.info("[STREAM_DATA_FLOW] Renderizando (parsed_point) | date=%s", parsed_point)
-        elif req_form == "latest" and is_contribution and reference_period:
-            period_labels = format_period_labels(str(reference_period), freq)
-            date_range_label = period_labels[0]
-            logger.info("[STREAM_DATA_FLOW] Renderizando (reference_period) | date=%s", reference_period)
         else:
             date_raw = obs_to_show[0].get("date", "") if obs_to_show else ""
             period_labels = format_period_labels(date_raw, freq)

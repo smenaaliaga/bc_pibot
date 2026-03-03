@@ -345,6 +345,9 @@ def _resample(
     agg: str,
     original_freq: str,
 ) -> pd.DataFrame:
+    if df is None or df.empty:
+        return df
+
     if not target_freq or target_freq.upper() in {"", original_freq.upper()}:
         return df
 
@@ -399,7 +402,20 @@ def _normalize_observations(obs: List[Dict[str, Any]]) -> pd.DataFrame:
                 "status": o.get("statusCode", ""),
             }
         )
-    df = pd.DataFrame(rows).dropna(subset=["value", "date"]).sort_values("date")
+
+    if not rows:
+        return pd.DataFrame(columns=["date", "value", "status"])
+
+    df = pd.DataFrame(rows)
+    for col in ("date", "value", "status"):
+        if col not in df.columns:
+            df[col] = None
+
+    df = df.dropna(subset=["value", "date"]).sort_values("date")
+
+    if df.empty:
+        return pd.DataFrame(columns=["date", "value", "status"])
+
     # Asegurar que la columna 'date' sea datetime para permitir resampleo
     df["date"] = pd.to_datetime(df["date"])
     return df
@@ -672,6 +688,17 @@ def get_series_api_rest_bcch(
                     "yoy_pct": None if pd.isna(yoy) else float(yoy),
                 }
             )
+
+        if not observations:
+            observations = [
+                {
+                    "date": "",
+                    "value": None,
+                    "status": "",
+                    "pct": None,
+                    "yoy_pct": None,
+                }
+            ]
 
         result = {
             "meta": meta,
