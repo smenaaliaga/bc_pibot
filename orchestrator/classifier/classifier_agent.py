@@ -7,7 +7,10 @@ import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
-from orchestrator.normalizer.normalizer import normalize_entities
+from orchestrator.normalizer.normalizer import (
+    coerce_req_form_from_period_and_frequency,
+    normalize_entities,
+)
 from orchestrator.utils.http_client import post_json
 from config import PREDICT_URL
 from registry import get_intent_router, get_series_interpreter
@@ -276,6 +279,8 @@ def _classify_with_jointbert(question: str) -> ClassificationResult:
     except Exception as exc:
         logger.exception("[CLASSIFIER_API] Failed to recompute entities_normalized")
         raise RuntimeError("Failed to recompute entities_normalized from /predict response") from exc
+
+    req_form_label = coerce_req_form_from_period_and_frequency(req_form_label, normalized)
 
     interpretation_state = predict_raw_for_state.get("interpretation")
     if isinstance(interpretation_state, dict):

@@ -120,3 +120,35 @@ def test_non_value_intent_keeps_empty_indicator_when_frequency_missing(monkeypat
     assert result.intent == "methodology"
     assert result.entities["indicator"] == []
     assert result.entities["frequency"] == []
+
+
+def test_req_form_point_is_coerced_to_range_when_period_spans_multiple_quarters(monkeypatch):
+    predict_response = {
+        "text": "pib trimestral 2020",
+        "routing": {
+            "macro": {"label": 1, "confidence": 0.95},
+            "intent": {"label": "value", "confidence": 0.95},
+            "context": {"label": "standalone", "confidence": 0.9},
+        },
+        "interpretation": {
+            "entities": {
+                "indicator": ["pib"],
+                "frequency": ["trimestral"],
+                "period": ["2020"],
+            },
+            "intents": {
+                "calc_mode": {"label": "original", "confidence": 0.99},
+                "req_form": {"label": "point", "confidence": 0.88},
+            },
+        },
+    }
+
+    def fake_post_json(url, payload, timeout=None):
+        return predict_response
+
+    monkeypatch.setattr(ca, "PREDICT_URL", "predict-url")
+    monkeypatch.setattr(ca, "post_json", fake_post_json)
+
+    result = ca._classify_with_jointbert("q")
+
+    assert result.req_form == "range"

@@ -345,6 +345,9 @@ def _resample(
     agg: str,
     original_freq: str,
 ) -> pd.DataFrame:
+    if df is None or df.empty:
+        return df
+
     if not target_freq or target_freq.upper() in {"", original_freq.upper()}:
         return df
 
@@ -399,7 +402,20 @@ def _normalize_observations(obs: List[Dict[str, Any]]) -> pd.DataFrame:
                 "status": o.get("statusCode", ""),
             }
         )
-    df = pd.DataFrame(rows).dropna(subset=["value", "date"]).sort_values("date")
+
+    if not rows:
+        return pd.DataFrame(columns=["date", "value", "status"])
+
+    df = pd.DataFrame(rows)
+    for col in ("date", "value", "status"):
+        if col not in df.columns:
+            df[col] = None
+
+    df = df.dropna(subset=["value", "date"]).sort_values("date")
+
+    if df.empty:
+        return pd.DataFrame(columns=["date", "value", "status"])
+
     # Asegurar que la columna 'date' sea datetime para permitir resampleo
     df["date"] = pd.to_datetime(df["date"])
     return df
@@ -514,6 +530,10 @@ def get_series_api_rest_bcch(
         "function": "GetSeries",
         "timeseries": series_id,
     }
+    params_public = {
+        "function": "GetSeries",
+        "timeseries": series_id,
+    }
     # No se envían firstdate/lastdate: se trae la serie completa.
 
     headers = {"Accept": "application/json"}
@@ -531,6 +551,7 @@ def get_series_api_rest_bcch(
             "agg": agg,
         }
         url_masked = f"{BCCH_BASE}?{urlencode(log_params)}"
+        source_url = f"{BCCH_BASE}?{urlencode(params_public)}"
         # URL expuesta: versión codificada y versión legible (sin %xx)
         url_plain_encoded = f"{BCCH_BASE}?{urlencode(params)}"
         url_plain_readable = unquote(url_plain_encoded)
@@ -546,6 +567,10 @@ def get_series_api_rest_bcch(
         logger.info(
             f"[API_REQUEST_URL:{tag}] caller_file={caller.get('file')} caller_func={caller.get('func')} "
             f"params={args_summary} url={url_masked}"
+        )
+        logger.info(
+            f"[API_SOURCE_URL:{tag}] caller_file={caller.get('file')} caller_func={caller.get('func')} "
+            f"url={source_url}"
         )
         # Opcional: exponer link plano completo sólo si está habilitado explícitamente
         if LOG_EXPOSE_API_LINKS:
@@ -637,6 +662,8 @@ def get_series_api_rest_bcch(
             "series_id": series.get("seriesId", series_id),
             "descripEsp": series.get("descripEsp", ""),
             "descripIng": series.get("descripIng", ""),
+            "source_provider": "BCCh SieteRestWS",
+            "source_url": f"{BCCH_BASE}?{urlencode(params_public)}",
             "original_frequency": original_freq,
             "target_frequency": target_frequency or original_freq,
             "freq_effective": effective_freq,
@@ -898,6 +925,10 @@ def get_series_from_redis(
         logger.info(
             f"[get_series_from_redis] Cache hit | key='{cache_key}' | rows={len((data or {}).get('observations', []) or [])}"
         )
+        meta_ref = data.setdefault("meta", {})
+        if "source_url" not in meta_ref:
+            meta_ref["source_provider"] = "BCCh SieteRestWS"
+            meta_ref["source_url"] = f"{BCCH_BASE}?{urlencode({'function': 'GetSeries', 'timeseries': series_id})}"
     except Exception as e:
         logger.error(
             f"[get_series_from_redis] Error parseando JSON desde Redis | key='{cache_key}' | error={e}"
@@ -961,15 +992,27 @@ def get_series_from_redis(
         return data
 
     # Filtrado por rango de fechas
-    def _parse_date_str(s: str) -> datetime.date:
-        return datetime.date.fromisoformat(s)
+    def _parse_date_str(s: str) -> Optional[datetime.date]:
+        if not isinstance(s, str):
+            return None
+        s_clean = s.strip()
+        if not s_clean:
+            return None
+        try:
+            return datetime.date.fromisoformat(s_clean)
+        except Exception:
+            return None
 
     fd_date = _parse_date_str(fd) if fd else None
     ld_date = _parse_date_str(ld) if ld else None
 
     filtered_obs = []
     for o in obs:
-        d = _parse_date_str(o["date"])
+        if not isinstance(o, dict):
+            continue
+        d = _parse_date_str(str(o.get("date", "")))
+        if d is None:
+            continue
         if fd_date and d < fd_date:
             continue
         if ld_date and d > ld_date:

@@ -96,8 +96,32 @@ def _to_flag(value: Any) -> Optional[int]:
     return None
 
 
+def _to_flag_options(value: Any) -> Optional[set[int]]:
+    if isinstance(value, (list, tuple, set)):
+        options: set[int] = set()
+        for item in value:
+            flag = _to_flag(item)
+            if flag is not None:
+                options.add(flag)
+        return options or None
+
+    single = _to_flag(value)
+    if single is None:
+        return None
+    return {single}
+
+
 def _is_empty(value: Any) -> bool:
     return value in (None, "", [], {}, "none")
+
+
+def _normalized_token(value: Any) -> Optional[str]:
+    if value in (None, "", [], {}, ()): 
+        return None
+    token = str(value).strip().lower()
+    if token in {"", "none", "null"}:
+        return None
+    return token
 
 
 def find_family_by_classification(
@@ -111,6 +135,7 @@ def find_family_by_classification(
     price: Any = None,
     seasonality: Any = None,
     frequency: Any = None,
+    hist: Any = None,
 ) -> Optional[Dict[str, Any]]:
     payload = _read_catalog_payload(catalog_path)
     if not payload:
@@ -121,10 +146,21 @@ def find_family_by_classification(
     requested_has_activity = 0 if _is_empty(activity_value) else 1
     requested_has_region = 0 if _is_empty(region_value) else 1
     requested_has_investment = 0 if _is_empty(investment_value) else 1
+    requested_activity_token = _normalized_token(activity_value)
+    requested_region_token = _normalized_token(region_value)
+    requested_investment_token = _normalized_token(investment_value)
     requested_calc_mode = str(calc_mode).strip().lower() if calc_mode not in (None, "") else None
     requested_price = str(price).strip().lower() if price not in (None, "") else None
     requested_seasonality = str(seasonality).strip().lower() if seasonality not in (None, "") else None
     requested_frequency = str(frequency).strip().lower() if frequency not in (None, "") else None
+    requested_hist = _to_flag(hist)
+
+    has_hist_dimension = any(
+        isinstance(family_payload, dict)
+        and isinstance(family_payload.get("classification"), dict)
+        and _to_flag_options(family_payload.get("classification", {}).get("hist")) is not None
+        for family_payload in payload.values()
+    )
 
     candidates: List[Dict[str, Any]] = []
     for family_name, family_payload in payload.items():
@@ -138,16 +174,31 @@ def find_family_by_classification(
 
         indicator_value = str(family_classification.get("indicator") or "").strip().lower() or None
 
-        has_activity = _to_flag(family_classification.get("has_activity"))
-        has_region = _to_flag(family_classification.get("has_region"))
-        has_investment = _to_flag(family_classification.get("has_investment"))
+        has_activity_options = _to_flag_options(family_classification.get("has_activity"))
+        has_region_options = _to_flag_options(family_classification.get("has_region"))
+        has_investment_options = _to_flag_options(family_classification.get("has_investment"))
+        family_activity_token = _normalized_token(family_classification.get("activity"))
+        family_region_token = _normalized_token(family_classification.get("region"))
+        family_investment_token = _normalized_token(family_classification.get("investment"))
+        family_has_hist_key = "hist" in family_classification
+        family_hist_options = _to_flag_options(family_classification.get("hist"))
 
-        if has_activity != requested_has_activity:
+        if has_activity_options is None or requested_has_activity not in has_activity_options:
             continue
-        if has_region != requested_has_region:
+        if has_region_options is None or requested_has_region not in has_region_options:
             continue
-        if has_investment != requested_has_investment:
+        if has_investment_options is None or requested_has_investment not in has_investment_options:
             continue
+
+        if requested_has_activity == 1 and requested_activity_token is not None:
+            if family_activity_token is not None and family_activity_token != requested_activity_token:
+                continue
+        if requested_has_region == 1 and requested_region_token is not None:
+            if family_region_token is not None and family_region_token != requested_region_token:
+                continue
+        if requested_has_investment == 1 and requested_investment_token is not None:
+            if family_investment_token is not None and family_investment_token != requested_investment_token:
+                continue
 
         family_calc_mode = family_classification.get("calc_mode")
         family_calc_mode_normalized = (
@@ -181,9 +232,22 @@ def find_family_by_classification(
             if family_frequency_normalized != requested_frequency:
                 continue
 
+        if has_hist_dimension:
+            if requested_hist is None:
+                if family_has_hist_key:
+                    continue
+            elif family_hist_options is None or requested_hist not in family_hist_options:
+                continue
+
         score = 0
         if requested_indicator is not None and indicator_value == requested_indicator:
             score += 100
+        if requested_activity_token is not None and family_activity_token == requested_activity_token:
+            score += 20
+        if requested_region_token is not None and family_region_token == requested_region_token:
+            score += 30
+        if requested_investment_token is not None and family_investment_token == requested_investment_token:
+            score += 20
         if family_calc_mode not in (None, ""):
             score += 1
         if family_price not in (None, ""):
@@ -191,6 +255,12 @@ def find_family_by_classification(
         if family_seasonality not in (None, ""):
             score += 1
         if family_frequency not in (None, ""):
+            score += 1
+        if (
+            requested_hist is not None
+            and family_hist_options is not None
+            and requested_hist in family_hist_options
+        ):
             score += 1
 
         candidates.append(

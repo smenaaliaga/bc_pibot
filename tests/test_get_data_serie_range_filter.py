@@ -1,4 +1,5 @@
 import orchestrator.data.get_data_serie as gds
+import pandas as pd
 
 
 def test_get_series_from_redis_fallback_applies_range_filter(monkeypatch):
@@ -35,3 +36,56 @@ def test_get_series_from_redis_fallback_applies_range_filter(monkeypatch):
     assert [row["date"] for row in result["observations"]] == ["2024-01-01", "2024-12-01"]
     assert result["meta"]["firstdate"] == "2024-01-01"
     assert result["meta"]["lastdate"] == "2024-12-31"
+
+
+def test_normalize_observations_empty_returns_expected_columns():
+    df = gds._normalize_observations([])
+
+    assert list(df.columns) == ["date", "value", "status"]
+    assert df.empty
+
+
+def test_get_series_api_rest_bcch_empty_obs_returns_placeholder(monkeypatch):
+    monkeypatch.setattr(gds, "_ensure_redis_client", lambda: None)
+
+    class _FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "Codigo": 0,
+                "Series": {
+                    "seriesId": "F032.PIB.MINERIA.LOS_LAGOS.Q",
+                    "descripEsp": "PIB Minería, Región de Los Lagos",
+                    "Obs": [],
+                },
+            }
+
+    monkeypatch.setattr(gds.requests, "get", lambda *args, **kwargs: _FakeResponse())
+
+    result = gds.get_series_api_rest_bcch(
+        series_id="F032.PIB.MINERIA.LOS_LAGOS.Q",
+        target_frequency="Q",
+        agg="sum",
+    )
+
+    assert isinstance(result, dict)
+    assert result.get("meta", {}).get("descripEsp") == "PIB Minería, Región de Los Lagos"
+    assert result.get("observations") == [
+        {
+            "date": "",
+            "value": None,
+            "status": "",
+            "pct": None,
+            "yoy_pct": None,
+        }
+    ]
+
+
+def test_resample_empty_dataframe_returns_empty_without_error():
+    df = pd.DataFrame(columns=["date", "value", "status"])
+
+    result = gds._resample(df, target_freq="Q", agg="sum", original_freq="M")
+
+    assert result.empty
