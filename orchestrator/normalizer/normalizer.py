@@ -299,13 +299,13 @@ REGION_TERMS = {
         "los ríos", "los rios", "región de los ríos", "región los ríos",
         "región xiv", "xiv región", "región 14", "región n°14",
         "región nro 14", "decimocuarta región", "14va región",
-        "14a región", "14m región","xiv"
+        "14a región", "14m región","xiv","rios"
     ],
     "los_lagos": [
         "los lagos", "región de los lagos", "región los lagos",
         "región x", "x región", "región 10", "región n°10",
         "región nro 10", "décima región", "decima región", "10ma región",
-        "10a región", "10m región","x"
+        "10a región", "10m región","x" 'lagos'
     ],
     "aysen": [
         "aysén", "aysen", "región de aysén",
@@ -363,9 +363,29 @@ INVESTMENT_TERMS = {
 
 # Mapa de períodos implícitos a convertir
 PERIOD_LATEST_TERMS = [
-    "última", "ultima", "último", "ultimo", "reciente", "recientemente",
-    "último dato", "ultima cifra", "última cifra", "último dato disponible",
-    "cifra más reciente", "última publicación", "data más reciente",
+    "última", "ultima", "último", "ultimo", "ultimos", "últimos", "ultimas", "últimas",
+    "reciente", "recientemente", "más reciente", "mas reciente", "lo más reciente", "lo mas reciente",
+    "último dato", "ultimo dato", "último dato disponible", "ultimo dato disponible",
+    "ultima cifra", "última cifra", "ultima observacion", "última observación",
+    "última publicación", "ultima publicacion", "último registro", "ultimo registro",
+    "dato más reciente", "dato mas reciente", "cifra más reciente", "cifra mas reciente",
+    "valor más reciente", "valor mas reciente", "último valor", "ultimo valor",
+    "mas nuevo", "más nuevo", "al día", "al dia", "vigente", "actual",
+    "dato vigente", "dato actual", "ultima lectura", "última lectura",
+]
+
+PERIOD_LATEST_REGEX_PATTERNS = [
+    r"\bultim[oa]s?\b",
+    r"\breciente(s)?\b",
+    r"\bmas\s+reciente(s)?\b",
+    r"\bultimo\s+dato(s)?\b",
+    r"\bultimo\s+dato\s+disponible\b",
+    r"\bdato\s+disponible\b",
+    r"\bultima\s+cifra\b",
+    r"\bcifra\s+mas\s+reciente\b",
+    r"\bultimo\s+registro\b",
+    r"\bultima\s+lectura\b",
+    r"\bal\s+dia\b",
 ]
 
 # Números de meses y trimestres para conversión
@@ -444,6 +464,61 @@ def _normalize_text(text: str) -> str:
         text = text.replace(accented, unaccented)
     
     return text
+
+
+def _has_explicit_year(text: str) -> bool:
+    return bool(re.search(r"\b20\d{2}\b", _normalize_text(text)))
+
+
+def _contains_latest_reference(text: str) -> bool:
+    normalized = _normalize_text(text)
+    if not normalized:
+        return False
+
+    if any(term in normalized for term in PERIOD_LATEST_TERMS):
+        return True
+
+    return any(re.search(pattern, normalized) for pattern in PERIOD_LATEST_REGEX_PATTERNS)
+
+
+def _detect_latest_granularity_from_text(text: str) -> Optional[str]:
+    normalized = _normalize_text(text)
+    if not normalized or not _contains_latest_reference(normalized):
+        return None
+
+    if _has_explicit_year(normalized):
+        return None
+
+    if re.search(r"\btrimestre(s)?\b|\b[tq]\s*[1-4]\b|\b[tq][1-4]\b", normalized):
+        return "q"
+    if re.search(r"\bmes(es)?\b|\bmensual(es)?\b", normalized):
+        return "m"
+    if re.search(r"\bano(s)?\b|\banual(es)?\b", normalized):
+        return "a"
+    return None
+
+
+def _infer_relative_latest_granularity(raw_values: List[str], frequency: Optional[str]) -> Optional[str]:
+    default_frequency = str(frequency or "").strip().lower()
+    if default_frequency not in {"m", "q", "a"}:
+        default_frequency = None
+
+    has_latest_without_explicit_year = False
+    for raw in raw_values:
+        if not raw:
+            continue
+
+        inferred_from_text = _detect_latest_granularity_from_text(raw)
+        if inferred_from_text:
+            return inferred_from_text
+
+        if _contains_latest_reference(raw) and not _has_explicit_year(raw):
+            has_latest_without_explicit_year = True
+
+    if has_latest_without_explicit_year:
+        return default_frequency
+
+    return None
 
 
 def _similarity_ratio(a: str, b: str) -> float:
@@ -839,11 +914,9 @@ def normalize_period(period_value: Optional[str]) -> Tuple[Optional[str], List[s
     period_normalized = _normalize_text(period_value)
 
     # Caso 1: Términos implícitos (última, reciente, etc.)
-    for latest_term in PERIOD_LATEST_TERMS:
-        if _fuzzy_match(period_normalized, [latest_term], threshold=0.8):
-            # Usar fecha actual como fecha de último dato
-            today = datetime.now()
-            return _format_month_start(today), []
+    if _contains_latest_reference(period_normalized):
+        today = datetime.now()
+        return _format_month_start(today), []
 
     # Caso 2: Año explícito (ej: "2024") o implícito (año actual)
     year_match = re.search(r'\b(20\d{2})\b', period_normalized)
@@ -1257,6 +1330,10 @@ def _infer_frequency_from_period_for_point(raw_values: List[str]) -> Optional[st
     if not valid_values:
         return None
 
+    relative_granularity = _infer_relative_latest_granularity(valid_values, None)
+    if relative_granularity in {"m", "q", "a"}:
+        return relative_granularity
+
     if any(_has_quarter_reference(raw) for raw in valid_values):
         return "q"
 
@@ -1330,6 +1407,19 @@ def _resolve_period_value(
     - range  -> [fecha_inicio, fecha_fin]
     """
     candidate_dates: List[str] = []
+    req_form_norm = (req_form or "").strip().lower()
+    relative_latest_granularity = _infer_relative_latest_granularity(raw_values, frequency)
+    if relative_latest_granularity:
+        now = datetime.now()
+        if relative_latest_granularity == "q":
+            prev_quarter = _previous_quarter_anchor(now)
+            return [_format_quarter_start(prev_quarter), _format_quarter_end(prev_quarter)]
+        if relative_latest_granularity == "a":
+            prev_year = _previous_year_anchor(now)
+            return [_format_year_start(prev_year), f"{prev_year.year:04d}-12-31"]
+        prev_month = _previous_month_anchor(now)
+        return [_format_month_start(prev_month), _format_month_end(prev_month)]
+
     is_quarterly_context = (frequency == "q") or any(_has_quarter_reference(raw) for raw in raw_values if raw)
     has_year_only_reference = False
 
@@ -1370,8 +1460,6 @@ def _resolve_period_value(
         base_period = base_normalized.get("period")
         if base_period:
             candidate_dates.append(base_period)
-
-    req_form_norm = (req_form or "").strip().lower()
 
     if not candidate_dates:
         if req_form_norm == "latest":
