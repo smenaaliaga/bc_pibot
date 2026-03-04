@@ -1,4 +1,4 @@
-"""
+﻿"""
 main.py
 -------
 Punto de entrada del sistema.
@@ -118,6 +118,27 @@ def main() -> None:
         warmup_models(preload_catalog=preload_catalog)
     except Exception as e:
         logger.warning(f"Warmup de modelos adicionales falló: {e}")
+
+    preload_series_updates = os.getenv("PRELOAD_SERIES_UPDATES_ON_START", "1").lower() in {"1", "true", "yes", "on"}
+    try:
+        from orchestrator.data.get_data_serie import preload_series_updates_index, start_series_updates_scheduler
+    except Exception as e:
+        logger.warning(f"No se pudo importar SearchSeries updates: {e}")
+    else:
+        if preload_series_updates:
+            try:
+                series_updates = preload_series_updates_index(force=True)
+                logger.info("SearchSeries precargado | series_con_updatedAt=%s", len(series_updates))
+            except Exception as e:
+                logger.warning(f"Precarga de SearchSeries falló: {e}")
+        try:
+            if start_series_updates_scheduler():
+                logger.info(
+                    "Scheduler diario SearchSeries activo | hora=%s",
+                    os.getenv("SERIES_UPDATES_DAILY_AT", "09:10"),
+                )
+        except Exception as e:
+            logger.warning(f"No se pudo iniciar scheduler diario de SearchSeries: {e}")
 
     orch = None
     graph = None

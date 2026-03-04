@@ -46,6 +46,8 @@ import json
 import re
 import datetime
 import os
+import threading
+import time
 from typing import Optional, Dict, Any, List
 
 import pandas as pd
@@ -238,6 +240,320 @@ def _make_cache_key(
     freq = (target_frequency or "orig").upper()
     agg = (agg or "avg").lower()
     return f"bcch:series:{series_id}:{fdate}:{ldate}:{freq}:{agg}"
+
+
+# ---------------------------------------------------------------------------
+# Metadatos de actualización de series (SearchSeries)
+# ---------------------------------------------------------------------------
+
+SERIES_UPDATES_ENABLED = os.getenv("SERIES_UPDATES_ENABLED", "1").lower() in {"1", "true", "yes", "y", "on"}
+SERIES_UPDATES_TIMEOUT_SECONDS = float(os.getenv("SERIES_UPDATES_TIMEOUT_SECONDS", "15"))
+SERIES_UPDATES_TIMEOUT_SECONDS_QUARTERLY = float(
+    os.getenv("SERIES_UPDATES_TIMEOUT_SECONDS_QUARTERLY", str(SERIES_UPDATES_TIMEOUT_SECONDS))
+)
+SERIES_UPDATES_RETRY_ATTEMPTS = max(1, int(os.getenv("SERIES_UPDATES_RETRY_ATTEMPTS", "3")))
+SERIES_UPDATES_RETRY_BACKOFF_SECONDS = max(0.0, float(os.getenv("SERIES_UPDATES_RETRY_BACKOFF_SECONDS", "1.5")))
+SERIES_UPDATES_REFRESH_SECONDS = int(os.getenv("SERIES_UPDATES_REFRESH_SECONDS", "3600"))
+SERIES_UPDATES_DAILY_ENABLED = os.getenv("SERIES_UPDATES_DAILY_ENABLED", "1").lower() in {"1", "true", "yes", "y", "on"}
+SERIES_UPDATES_DAILY_AT = os.getenv("SERIES_UPDATES_DAILY_AT", "09:10").strip()
+SERIES_UPDATES_SCHEDULER_CHECK_INTERVAL_SECONDS = max(
+    5,
+    int(os.getenv("SERIES_UPDATES_SCHEDULER_CHECK_INTERVAL_SECONDS", "30")),
+)
+SERIES_UPDATES_FREQUENCIES = tuple(
+    part.strip().upper()
+    for part in os.getenv("SERIES_UPDATES_FREQUENCIES", "MONTHLY,QUARTERLY,ANNUAL").split(",")
+    if part.strip()
+)
+
+_series_updates_lock = threading.Lock()
+_series_updates_index: Dict[str, datetime.date] = {}
+_series_updates_loaded_at: Optional[datetime.datetime] = None
+_series_updates_scheduler_lock = threading.Lock()
+_series_updates_scheduler_thread: Optional[threading.Thread] = None
+
+
+def _parse_source_date(value: Any) -> Optional[datetime.date]:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    for fmt in ("%d-%m-%Y", "%Y-%m-%d"):
+        try:
+            return datetime.datetime.strptime(text, fmt).date()
+        except Exception:
+            continue
+    try:
+        parsed = dateparser.parse(text)
+    except Exception:
+        parsed = None
+    if parsed is None:
+        return None
+    if isinstance(parsed, datetime.datetime):
+        return parsed.date()
+    return parsed
+
+
+def _parse_cache_created_at(value: Any) -> Optional[datetime.datetime]:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    normalized = text.replace("Z", "+00:00")
+    try:
+        parsed = datetime.datetime.fromisoformat(normalized)
+    except Exception:
+        try:
+            parsed = dateparser.parse(text)
+        except Exception:
+            parsed = None
+    if not isinstance(parsed, datetime.datetime):
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=datetime.timezone.utc)
+    return parsed.astimezone(datetime.timezone.utc)
+
+
+def _fetch_search_series_updates(frequency_code: str) -> Dict[str, datetime.date]:
+    if not BCCH_USER or not BCCH_PASS:
+        logger.warning("[series_updates] BCCH_USER/BCCH_PASS no configurados; no se puede consultar SearchSeries.")
+        return {}
+
+    freq_normalized = str(frequency_code or "").strip().upper()
+    timeout_seconds = (
+        SERIES_UPDATES_TIMEOUT_SECONDS_QUARTERLY
+        if freq_normalized == "QUARTERLY"
+        else SERIES_UPDATES_TIMEOUT_SECONDS
+    )
+
+    params = {
+        "user": BCCH_USER,
+        "pass": BCCH_PASS,
+        "frequency": freq_normalized,
+        "function": "SearchSeries",
+    }
+    response = requests.get(
+        BCCH_BASE,
+        params=params,
+        headers={"Accept": "application/json"},
+        timeout=timeout_seconds,
+    )
+    response.raise_for_status()
+    payload = response.json() if response is not None else {}
+    if not isinstance(payload, dict):
+        return {}
+
+    infos = payload.get("SeriesInfos")
+    if not isinstance(infos, list):
+        return {}
+
+    updates: Dict[str, datetime.date] = {}
+    for item in infos:
+        if not isinstance(item, dict):
+            continue
+        series_id = str(item.get("seriesId") or "").strip()
+        if not series_id:
+            continue
+        updated_date = _parse_source_date(item.get("updatedAt"))
+        if updated_date is None:
+            continue
+        previous = updates.get(series_id)
+        if previous is None or updated_date > previous:
+            updates[series_id] = updated_date
+
+    logger.info(
+        "[series_updates] SearchSeries frequency=%s | entries=%s",
+        freq_normalized,
+        len(updates),
+    )
+    return updates
+
+
+def _fetch_search_series_updates_with_retry(frequency_code: str) -> Dict[str, datetime.date]:
+    last_timeout_exc: Optional[Exception] = None
+    freq_normalized = str(frequency_code or "").strip().upper()
+
+    for attempt in range(1, SERIES_UPDATES_RETRY_ATTEMPTS + 1):
+        try:
+            return _fetch_search_series_updates(freq_normalized)
+        except requests.exceptions.Timeout as exc:
+            last_timeout_exc = exc
+            if attempt >= SERIES_UPDATES_RETRY_ATTEMPTS:
+                break
+            backoff_seconds = SERIES_UPDATES_RETRY_BACKOFF_SECONDS * (2 ** (attempt - 1))
+            logger.warning(
+                "[series_updates] Timeout SearchSeries (%s) intento=%s/%s; reintentando en %.1fs",
+                freq_normalized,
+                attempt,
+                SERIES_UPDATES_RETRY_ATTEMPTS,
+                backoff_seconds,
+            )
+            if backoff_seconds > 0:
+                time.sleep(backoff_seconds)
+
+    if last_timeout_exc is not None:
+        raise last_timeout_exc
+    return {}
+
+
+def preload_series_updates_index(force: bool = False) -> Dict[str, str]:
+    global _series_updates_index
+    global _series_updates_loaded_at
+
+    if not SERIES_UPDATES_ENABLED:
+        return {}
+
+    now_utc = datetime.datetime.now(datetime.timezone.utc)
+    with _series_updates_lock:
+        if (
+            not force
+            and _series_updates_loaded_at is not None
+            and (now_utc - _series_updates_loaded_at).total_seconds() < SERIES_UPDATES_REFRESH_SECONDS
+            and _series_updates_index
+        ):
+            return {series_id: value.isoformat() for series_id, value in _series_updates_index.items()}
+
+        merged: Dict[str, datetime.date] = {}
+        successful_freqs: List[str] = []
+        failed_freqs: List[str] = []
+        for freq in SERIES_UPDATES_FREQUENCIES:
+            try:
+                freq_updates = _fetch_search_series_updates_with_retry(freq)
+                successful_freqs.append(freq)
+            except Exception as exc:
+                logger.warning("[series_updates] Error consultando SearchSeries (%s): %s", freq, exc)
+                failed_freqs.append(freq)
+                continue
+            for series_id, updated_date in freq_updates.items():
+                previous = merged.get(series_id)
+                if previous is None or updated_date > previous:
+                    merged[series_id] = updated_date
+
+        if merged:
+            _series_updates_index = merged
+            _series_updates_loaded_at = now_utc
+            logger.info(
+                "[series_updates] Índice actualizado | series=%s | ok=%s | failed=%s",
+                len(_series_updates_index),
+                ",".join(successful_freqs) if successful_freqs else "-",
+                ",".join(failed_freqs) if failed_freqs else "-",
+            )
+        elif failed_freqs:
+            logger.warning(
+                "[series_updates] Índice no actualizado; todas las frecuencias fallaron | failed=%s",
+                ",".join(failed_freqs),
+            )
+        elif _series_updates_loaded_at is None:
+            _series_updates_loaded_at = now_utc
+
+        return {series_id: value.isoformat() for series_id, value in _series_updates_index.items()}
+
+
+def _parse_daily_hhmm(value: str) -> Optional[datetime.time]:
+    text = str(value or "").strip()
+    if not text or ":" not in text:
+        return None
+    hh_text, mm_text = text.split(":", 1)
+    try:
+        hour = int(hh_text)
+        minute = int(mm_text)
+    except Exception:
+        return None
+    if hour < 0 or hour > 23 or minute < 0 or minute > 59:
+        return None
+    return datetime.time(hour=hour, minute=minute)
+
+
+def _series_updates_scheduler_loop(target_time: datetime.time) -> None:
+    while True:
+        try:
+            now_local = datetime.datetime.now().astimezone()
+            next_run = now_local.replace(
+                hour=target_time.hour,
+                minute=target_time.minute,
+                second=0,
+                microsecond=0,
+            )
+            if next_run <= now_local:
+                next_run += datetime.timedelta(days=1)
+
+            sleep_seconds = max(0.0, (next_run - now_local).total_seconds())
+            logger.info("[series_updates] Scheduler diario activo | próxima_ejecución=%s", next_run.isoformat())
+
+            while sleep_seconds > 0:
+                chunk = min(float(SERIES_UPDATES_SCHEDULER_CHECK_INTERVAL_SECONDS), sleep_seconds)
+                time.sleep(chunk)
+                sleep_seconds -= chunk
+
+            try:
+                series_updates = preload_series_updates_index(force=True)
+                logger.info(
+                    "[series_updates] Scheduler diario ejecutado | hora=%s | series_con_updatedAt=%s",
+                    target_time.strftime("%H:%M"),
+                    len(series_updates),
+                )
+            except Exception as exc:
+                logger.warning("[series_updates] Scheduler diario falló: %s", exc)
+        except Exception as exc:
+            logger.warning("[series_updates] Scheduler diario en error de ciclo: %s", exc)
+            time.sleep(60)
+
+
+def start_series_updates_scheduler() -> bool:
+    global _series_updates_scheduler_thread
+
+    if not SERIES_UPDATES_ENABLED or not SERIES_UPDATES_DAILY_ENABLED:
+        return False
+
+    target_time = _parse_daily_hhmm(SERIES_UPDATES_DAILY_AT)
+    if target_time is None:
+        logger.warning(
+            "[series_updates] SERIES_UPDATES_DAILY_AT inválido (%r). Formato esperado HH:MM",
+            SERIES_UPDATES_DAILY_AT,
+        )
+        return False
+
+    with _series_updates_scheduler_lock:
+        if _series_updates_scheduler_thread is not None and _series_updates_scheduler_thread.is_alive():
+            return True
+        _series_updates_scheduler_thread = threading.Thread(
+            target=_series_updates_scheduler_loop,
+            args=(target_time,),
+            name="series-updates-daily-scheduler",
+            daemon=True,
+        )
+        _series_updates_scheduler_thread.start()
+
+    logger.info("[series_updates] Scheduler diario iniciado | hora=%s", target_time.strftime("%H:%M"))
+    return True
+
+
+def _get_series_source_updated_date(series_id: str) -> Optional[datetime.date]:
+    if not SERIES_UPDATES_ENABLED:
+        return None
+    sid = str(series_id or "").strip()
+    if not sid:
+        return None
+    preload_series_updates_index(force=False)
+    return _series_updates_index.get(sid)
+
+
+def _is_cached_series_stale(series_id: str, cached_payload: Dict[str, Any]) -> bool:
+    if not SERIES_UPDATES_ENABLED:
+        return False
+    if not isinstance(cached_payload, dict):
+        return False
+
+    source_updated = _get_series_source_updated_date(series_id)
+    if source_updated is None:
+        return False
+
+    meta = cached_payload.get("meta")
+    meta = meta if isinstance(meta, dict) else {}
+    cache_created_at = _parse_cache_created_at(meta.get("cache_created_at"))
+    if cache_created_at is None:
+        # Cache legacy sin timestamp: forzar refresh para registrar metadata de caché.
+        return True
+
+    return source_updated > cache_created_at.date()
 
 
 # ---------------------------------------------------------------------------
@@ -658,6 +974,9 @@ def get_series_api_rest_bcch(
                 f"[get_series_api_rest_bcch] Filas con variaciones calculadas: {len(df_enriched)}"
             )
 
+        cache_created_at = datetime.datetime.now(datetime.timezone.utc)
+        source_updated = _get_series_source_updated_date(series_id)
+
         meta = {
             "series_id": series.get("seriesId", series_id),
             "descripEsp": series.get("descripEsp", ""),
@@ -671,7 +990,10 @@ def get_series_api_rest_bcch(
             "firstdate": "primer dato disponible",
             "lastdate": target_date or "último dato disponible",
             "target_date": target_date or "auto",
+            "cache_created_at": cache_created_at.isoformat(),
         }
+        if source_updated is not None:
+            meta["source_updated_at"] = source_updated.isoformat()
 
         observations = []
         for _, row in df_enriched.iterrows():
@@ -929,10 +1251,28 @@ def get_series_from_redis(
         if "source_url" not in meta_ref:
             meta_ref["source_provider"] = "BCCh SieteRestWS"
             meta_ref["source_url"] = f"{BCCH_BASE}?{urlencode({'function': 'GetSeries', 'timeseries': series_id})}"
+        if "source_updated_at" not in meta_ref:
+            source_updated = _get_series_source_updated_date(series_id)
+            if source_updated is not None:
+                meta_ref["source_updated_at"] = source_updated.isoformat()
     except Exception as e:
         logger.error(
             f"[get_series_from_redis] Error parseando JSON desde Redis | key='{cache_key}' | error={e}"
         )
+        if not use_fallback:
+            return None
+        return _fetch_fallback_and_filter()
+
+    if _is_cached_series_stale(series_id, data):
+        logger.info(
+            "[get_series_from_redis] Cache stale detectado | series_id='%s' | key='%s' | refrescando desde API",
+            series_id,
+            cache_key,
+        )
+        try:
+            client.delete(cache_key)
+        except Exception:
+            logger.debug("[get_series_from_redis] No se pudo borrar key stale en Redis", exc_info=True)
         if not use_fallback:
             return None
         return _fetch_fallback_and_filter()
