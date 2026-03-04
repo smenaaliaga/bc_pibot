@@ -1,7 +1,7 @@
 from orchestrator.normalizer.normalizer import normalize_entities
 
 
-def test_pib_no_minero_is_not_normalized():
+def test_pib_no_minero_normalizes_outside_contribution_mode():
     entities = {
         "indicator": ["pib"],
         "activity": ["no minero"],
@@ -9,6 +9,19 @@ def test_pib_no_minero_is_not_normalized():
     }
 
     normalized = normalize_entities(entities, calc_mode="yoy", req_form="range")
+
+    assert normalized["indicator"] == ["pib"]
+    assert normalized["activity"] == ["no_mineria"]
+
+
+def test_pib_no_minero_is_not_normalized_in_contribution_mode():
+    entities = {
+        "indicator": ["pib"],
+        "activity": ["no minero"],
+        "period": ["durante el 2024"],
+    }
+
+    normalized = normalize_entities(entities, calc_mode="contribution", req_form="range")
 
     assert normalized["indicator"] == ["pib"]
     assert normalized["activity"] == []

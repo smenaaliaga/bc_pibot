@@ -202,6 +202,7 @@ ACTIVITY_TERMS_PIB = {
     "agropecuario": ["agro", "agropecuario", "agropecuaria"],
     "pesca": ["pesca", "pesquero"],
     "mineria": ["mineria", "minería", "minero", "minera"],
+    "no_mineria": ["no minero", "no minería", "no mineria"],
     "industria": [
         "industria", "industrial", "manufacturera", "industria manufacturera",
         "manufactura"
@@ -1117,6 +1118,7 @@ def normalize_frequency(frequency_value: Optional[str]) -> Optional[str]:
 
 def normalize_activity(activity_value: Optional[str],
                        indicator: Optional[str],
+                       calc_mode: Optional[str] = None,
                        region_value: Optional[str] = None,
                        regional_pib_context: Optional[bool] = None) -> Tuple[Optional[str], List[str]]:
     """
@@ -1134,9 +1136,9 @@ def normalize_activity(activity_value: Optional[str],
     if not activity_value:
         return None, []
 
-    # Bloqueo explícito: "no minero" no existe para PIB en catálogo.
+    # Bloqueo explícito solo para contribuciones PIB: "no minero" no existe en ese contexto.
     activity_normalized = _normalize_text(activity_value)
-    if indicator == "pib" and "no" in set(activity_normalized.split()):
+    if indicator == "pib" and calc_mode == "contribution" and "no" in set(activity_normalized.split()):
         if re.search(r"\bminer(?:o|a|ia)\b", activity_normalized):
             return None, [activity_value]
 
@@ -1362,6 +1364,7 @@ def normalize_ner_entities(ner_output: Dict[str, Any],
     normalized_activity, failed_activity = normalize_activity(
         activity_raw,
         normalized_indicator,
+        calc_mode=calc_mode,
         region_value=normalized_region,
     )
     normalized_period, failed_period = normalize_period(period_raw)
@@ -1454,6 +1457,7 @@ def _normalize_multiple_values(
             normalized_value = normalize_activity(
                 raw,
                 base_normalized.get("indicator"),
+                calc_mode=calc_mode,
                 region_value=base_normalized.get("region"),
             )[0]
         elif entity_key == "region":
@@ -2160,6 +2164,7 @@ def normalize_entities(
             normalized_activity, _ = normalize_activity(
                 raw_activity,
                 final_indicator,
+                calc_mode=calc_mode,
                 region_value=final_region,
                 regional_pib_context=final_is_regional_pib,
             )

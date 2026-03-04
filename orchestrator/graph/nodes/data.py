@@ -382,7 +382,7 @@ def make_data_node(memory_adapter: Any):
         investment_ent = _first_non_empty(normalized.get("investment"))
         period_ent = _coerce_period(normalized.get("period"))
         period_values = period_ent if isinstance(period_ent, list) else []
-        period_reference_year = _extract_year(period_values[-1]) if period_values else None
+        period_reference_year = _extract_year(period_values[0]) if period_values else None
         
         # REGLAS DE NEGOCIO PARA TRASLADAR !
         activity_cls_resolved = activity_cls
