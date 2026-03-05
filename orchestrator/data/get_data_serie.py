@@ -1164,7 +1164,18 @@ def get_series_from_redis(
     fd = None if firstdate in (None, "", "auto") else firstdate
     ld = None if lastdate in (None, "", "auto") else lastdate
 
-    def _fetch_fallback_and_filter() -> Optional[Dict[str, Any]]:
+    def _parse_date_str_local(value: Optional[str]) -> Optional[datetime.date]:
+        if not isinstance(value, str):
+            return None
+        cleaned = value.strip()
+        if not cleaned:
+            return None
+        try:
+            return datetime.date.fromisoformat(cleaned)
+        except Exception:
+            return None
+
+    def _fetch_fallback_and_filter(reason: str) -> Optional[Dict[str, Any]]:
         fallback_data = get_series_api_rest_bcch(
             series_id=series_id,
             target_date=ld,
@@ -1173,13 +1184,13 @@ def get_series_from_redis(
         )
         if not isinstance(fallback_data, dict):
             return fallback_data
+        fallback_meta = fallback_data.get("meta", {}) or {}
+        fallback_meta["cache_resolution"] = reason
+        fallback_data["meta"] = fallback_meta
         if not fd and not ld:
             return fallback_data
 
         observations = fallback_data.get("observations", []) or []
-
-        def _parse_date_str_local(value: str) -> datetime.date:
-            return datetime.date.fromisoformat(value)
 
         fd_date = _parse_date_str_local(fd) if fd else None
         ld_date = _parse_date_str_local(ld) if ld else None
@@ -1205,8 +1216,35 @@ def get_series_from_redis(
             meta["firstdate"] = fd
         if ld:
             meta["lastdate"] = ld
+        meta["cache_resolution"] = reason
         fallback_data["meta"] = meta
         return fallback_data
+
+    def _range_covered_by_cache(observations: List[Dict[str, Any]]) -> bool:
+        if not fd and not ld:
+            return True
+
+        parsed_dates: List[datetime.date] = []
+        for row in observations:
+            if not isinstance(row, dict):
+                continue
+            parsed = _parse_date_str_local(str(row.get("date", "")))
+            if parsed is not None:
+                parsed_dates.append(parsed)
+
+        if not parsed_dates:
+            return False
+
+        first_available = min(parsed_dates)
+        last_available = max(parsed_dates)
+        fd_date = _parse_date_str_local(fd) if fd else None
+        ld_date = _parse_date_str_local(ld) if ld else None
+
+        if fd_date and fd_date < first_available:
+            return False
+        if ld_date and ld_date > last_available:
+            return False
+        return True
 
     # Cache siempre con fechas auto (serie completa); fd/ld solo para filtro posterior
     cache_key = _make_cache_key(series_id, None, None, target_frequency, agg)
@@ -1221,7 +1259,7 @@ def get_series_from_redis(
             "[get_series_from_redis] Redis no disponible; "
             "usando fallback a get_series_api_rest_bcch."
         )
-        return _fetch_fallback_and_filter() if use_fallback else None
+        return _fetch_fallback_and_filter("redis_unavailable") if use_fallback else None
 
     try:
         raw = client.get(cache_key)
@@ -1232,7 +1270,7 @@ def get_series_from_redis(
         _redis_client = None  # forzar reintento en próximas peticiones
         if not use_fallback:
             return None
-        return _fetch_fallback_and_filter()
+        return _fetch_fallback_and_filter("redis_read_error")
     if raw is None:
         logger.info(
             f"[get_series_from_redis] Clave no encontrada en Redis | key='{cache_key}'"
@@ -1240,7 +1278,7 @@ def get_series_from_redis(
         if not use_fallback:
             return None
         # Poblar Redis llamando a la API
-        return _fetch_fallback_and_filter()
+        return _fetch_fallback_and_filter("cache_miss")
 
     try:
         data = json.loads(raw)
@@ -1261,7 +1299,7 @@ def get_series_from_redis(
         )
         if not use_fallback:
             return None
-        return _fetch_fallback_and_filter()
+        return _fetch_fallback_and_filter("cache_parse_error")
 
     if _is_cached_series_stale(series_id, data):
         logger.info(
@@ -1275,9 +1313,10 @@ def get_series_from_redis(
             logger.debug("[get_series_from_redis] No se pudo borrar key stale en Redis", exc_info=True)
         if not use_fallback:
             return None
-        return _fetch_fallback_and_filter()
+        return _fetch_fallback_and_filter("cache_stale")
 
     obs = data.get("observations", [])
+    cache_has_requested_coverage = _range_covered_by_cache(obs)
 
     # Recalcular flags de posición según el target_date (ld)
     try:
@@ -1315,6 +1354,8 @@ def get_series_from_redis(
     except Exception:
         pass
     if not fd and not ld:
+        meta_full = data.setdefault("meta", {})
+        meta_full["cache_resolution"] = "cache_covered"
         # Log simple de lectura completa
         try:
             sample_redis_all = ", ".join(
@@ -1360,12 +1401,26 @@ def get_series_from_redis(
         filtered_obs.append(o)
 
     data["observations"] = filtered_obs
+
+    if use_fallback and (not filtered_obs or not cache_has_requested_coverage):
+        logger.info(
+            "[get_series_from_redis] Rango solicitado no cubierto por cache | "
+            "series_id='%s' | key='%s' | fd='%s' | ld='%s' | filtered_rows=%s | refrescando desde API",
+            series_id,
+            cache_key,
+            fd,
+            ld,
+            len(filtered_obs),
+        )
+        return _fetch_fallback_and_filter("cache_missing_period")
+
     # Actualizar meta para reflejar el nuevo rango
     meta = data.get("meta", {})
     if fd:
         meta["firstdate"] = fd
     if ld:
         meta["lastdate"] = ld
+    meta["cache_resolution"] = "cache_covered"
     data["meta"] = meta
 
     logger.info(
