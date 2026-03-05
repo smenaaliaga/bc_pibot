@@ -1357,9 +1357,536 @@
     ]
   },
 
+  "Producto interno bruto por región, contribución porcentual respecto de igual periodo del año anterior, series empalmadas, referencia 2018": {
+    "classification": {
+      "indicator": "pib",
+      "calc_mode": "contribution",
+      "seasonality": "nsa",
+      "frequency": "a",
+      "price": "enc",
+      "has_activity": 0,
+      "has_region": 1,
+      "has_investment": 0
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONALC",
+    "series": [
+      {"id": "F035.PIB.V12.R.CLP.2018.Z.Z.Z.15.0.A", "short_title": "Región de Arica y Parinacota", "classification": {"region": "arica_parinacota"}, "long_title": "PIB para la Región de Arica y Parinacota"},
+      {"id": "F035.PIB.V12.R.CLP.2018.Z.Z.Z.01.0.A", "short_title": "Región de Tarapacá", "classification": {"region": "tarapaca"}, "long_title": "PIB para la Región de Tarapacá"},
+      {"id": "F035.PIB.V12.R.CLP.2018.Z.Z.Z.02.0.A", "short_title": "Región de Antofagasta", "classification": {"region": "antofagasta"}, "long_title": "PIB para la Región de Antofagasta"},
+      {"id": "F035.PIB.V12.R.CLP.2018.Z.Z.Z.03.0.A", "short_title": "Región de Atacama", "classification": {"region": "atacama"}, "long_title": "PIB para la Región de Atacama"},
+      {"id": "F035.PIB.V12.R.CLP.2018.Z.Z.Z.04.0.A", "short_title": "Región de Coquimbo", "classification": {"region": "coquimbo"}, "long_title": "PIB para la Región de Coquimbo"},
+      {"id": "F035.PIB.V12.R.CLP.2018.Z.Z.Z.05.0.A", "short_title": "Región de Valparaíso", "classification": {"region": "valparaiso"}, "long_title": "PIB para la Región de Valparaíso"},
+      {"id": "F035.PIB.V12.R.CLP.2018.Z.Z.Z.13.0.A", "short_title": "Región Metropolitana de Santiago", "classification": {"region": "metropolitana"}, "long_title": "PIB para la Región Metropolitana de Santiago"},
+      {"id": "F035.PIB.V12.R.CLP.2018.Z.Z.Z.06.0.A", "short_title": "Región del Libertador General Bernardo OHiggins", "classification": {"region": "ohiggins"}, "long_title": "PIB para la Región del Libertador General Bernardo OHiggins"},
+      {"id": "F035.PIB.V12.R.CLP.2018.Z.Z.Z.07.0.A", "short_title": "Región del Maule", "classification": {"region": "maule"}, "long_title": "PIB para la Región del Maule"},
+      {"id": "F035.PIB.V12.R.CLP.2018.Z.Z.Z.16.0.A", "short_title": "Región de Ñuble", "classification": {"region": "nuble"}, "long_title": "PIB para la Región de Ñuble"},
+      {"id": "F035.PIB.V12.R.CLP.2018.Z.Z.Z.08.0.A", "short_title": "Región del Biobío", "classification": {"region": "biobio"}, "long_title": "PIB para la Región del Biobío"},
+      {"id": "F035.PIB.V12.R.CLP.2018.Z.Z.Z.09.0.A", "short_title": "Región de La Araucanía", "classification": {"region": "araucania"}, "long_title": "PIB para la Región de La Araucanía"},
+      {"id": "F035.PIB.V12.R.CLP.2018.Z.Z.Z.14.0.A", "short_title": "Región de Los Ríos", "classification": {"region": "los_rios"}, "long_title": "PIB para la Región de Los Ríos"},
+      {"id": "F035.PIB.V12.R.CLP.2018.Z.Z.Z.10.0.A", "short_title": "Región de Los Lagos", "classification": {"region": "los_lagos"}, "long_title": "PIB para la Región de Los Lagos"},
+      {"id": "F035.PIB.V12.R.CLP.2018.Z.Z.Z.11.0.A", "short_title": "Región de Aysén del General Carlos Ibáñez del Campo", "classification": {"region": "aysen"}, "long_title": "PIB para la Región de Aysén del General Carlos Ibáñez del Campo"},
+      {"id": "F035.PIB.V12.R.CLP.2018.Z.Z.Z.12.0.A", "short_title": "Región de Magallanes y de la Antártica Chilena", "classification": {"region": "magallanes"}, "long_title": "PIB para la Región de Magallanes y de la Antártica Chilena"},
+      {"id": "F035.PCF.V12.R.CLP.2018.Z.Z.Z.Z.0.A", "short_title": "Subtotal regionalizado", "classification": {}, "long_title": "Subtotal regionalizado"},
+      {"id": "F035.PIB.V12.R.CLP.2018.Z.Z.Z.99.0.A", "short_title": "Extrarregional", "classification": {}, "long_title": "Extrarregional"},
+      {"id": "F035.PIB.V12.R.CLP.2018.Z.Z.Z.Z.0.A", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "Producto Interno Bruto"}
+    ]
+  },
 
+  "PIB anual por actividad económica, Región de Arica y Parinacota, contribución porcentual respecto de igual periodo del año anterior, series empalmadas, referencia 2018": {
+    "classification": {
+      "indicator": "pib",
+      "calc_mode": "contribution",
+      "seasonality": "nsa",
+      "frequency": "a",
+      "price": "enc",
+      "has_activity": 1,
+      "has_region": 1,
+      "has_investment": 0,
+      "region": "arica_parinacota"
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_CONT_PB_XV_ACT",
+    "series": [
+      {"id": "F035.PIB.V12.R.CLP.2018.01.Z.Z.15.0.A", "short_title": "Agropecuario-silvícola", "classification": {"activity": "agropecuario"}, "long_title": "Contribución año/año del sector Agropecuario-silvícola en el PIB de la Región de Arica y Parinacota"},
+      {"id": "F035.PIB.V12.R.CLP.2018.02.04.Z.15.0.A", "short_title": "Pesca", "classification": {"activity": "pesca"}, "long_title": "Contribución año/año del sector Pesca en el PIB de la Región de Arica y Parinacota"},
+      {"id": "F035.PIB.V12.R.CLP.2018.03.Z.Z.15.0.A", "short_title": "Minería", "classification": {"activity": "mineria"}, "long_title": "Contribución año/año del sector Minería en el PIB de la Región de Arica y Parinacota"},
+      {"id": "F035.PIB.V12.R.CLP.2018.04.Z.Z.15.0.A", "short_title": "Industria manufacturera", "classification": {"activity": "industria"}, "long_title": "Contribución año/año del sector Industria manufacturera en el PIB de la Región de Arica y Parinacota"},
+      {"id": "F035.PIB.V12.R.CLP.2018.05.Z.Z.15.0.A", "short_title": "Electricidad, gas, agua y gestión de desechos", "classification": {"activity": "electricidad"}, "long_title": "Contribución año/año del sector Electricidad, gas, agua y gestión de desechos en el PIB de la Región de Arica y Parinacota"},
+      {"id": "F035.PIB.V12.R.CLP.2018.06.Z.Z.15.0.A", "short_title": "Construcción", "classification": {"activity": "construccion"}, "long_title": "Contribución año/año del sector Construcción en el PIB de la Región de Arica y Parinacota"},
+      {"id": "F035.PIB.V12.R.CLP.2018.COM.Z.Z.15.0.A", "short_title": "Comercio", "classification": {"activity": "comercio"}, "long_title": "Contribución año/año del sector Comercio en el PIB de la Región de Arica y Parinacota"},
+      {"id": "F035.PIB.V12.R.CLP.2018.RH.Z.Z.15.0.A", "short_title": "Restaurantes y hoteles", "classification": {"activity": "restaurantes"}, "long_title": "Contribución año/año del sector Restaurantes y hoteles en el PIB de la Región de Arica y Parinacota"},
+      {"id": "F035.PIB.V12.R.CLP.2018.08.Z.Z.15.0.A", "short_title": "Transporte, información y comunicaciones", "classification": {"activity": "transporte"}, "long_title": "Contribución año/año del sector Transporte, información y comunicaciones en el PIB de la Región de Arica y Parinacota"},
+      {"id": "F035.PIB.V12.R.CLP.2018.09.21.Z.15.0.A", "short_title": "Servicios financieros y empresariales", "classification": {"activity": "servicios_financieros"}, "long_title": "Contribución año/año del sector Servicios financieros y empresariales en el PIB de la Región de Arica y Parinacota"},
+      {"id": "F035.PIB.V12.R.CLP.2018.10.Z.Z.15.0.A", "short_title": "Servicios de vivienda e inmobiliarios", "classification": {"activity": "servicio_viviendas"}, "long_title": "Contribución año/año del sector Servicios de vivienda e inmobiliarios en el PIB de la Región de Arica y Parinacota"},
+      {"id": "F035.PIB.V12.R.CLP.2018.11.Z.Z.15.0.A", "short_title": "Servicios personales", "classification": {"activity": "servicio_personales"}, "long_title": "Contribución año/año del sector Servicios personales en el PIB de la Región de Arica y Parinacota"},
+      {"id": "F035.PIB.V12.R.CLP.2018.12.Z.Z.15.0.A", "short_title": "Administración pública", "classification": {"activity": "admin_publica"}, "long_title": "Contribución año/año del sector Administración pública en el PIB de la Región de Arica y Parinacota"},
+      {"id": "F035.PIB.V12.R.CLP.2018.CONT.Z.Z.15.0.A", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "Contribución año/año del PIB de la Región de Arica y Parinacota"}
+    ]
+  },
 
+  "PIB anual por actividad económica, Región de Tarapacá, contribución porcentual respecto de igual periodo del año anterior, series empalmadas, referencia 2018": {
+    "classification": {
+      "indicator": "pib",
+      "calc_mode": "contribution",
+      "seasonality": "nsa",
+      "frequency": "a",
+      "price": "enc",
+      "has_activity": 1,
+      "has_region": 1,
+      "has_investment": 0,
+      "region": "tarapaca"
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_CONT_PB_I_ACT",
+    "series": [
+      {"id": "F035.PIB.V12.R.CLP.2018.01.21.Z.01.0.A", "short_title": "Agropecuario-silvícola", "classification": {"activity": "agropecuario"}, "long_title": "Contribución año/año del sector Agropecuario-silvícola en el PIB de la Región de Tarapacá"},
+      {"id": "F035.PIB.V12.R.CLP.2018.02.04.Z.01.0.A", "short_title": "Pesca", "classification": {"activity": "pesca"}, "long_title": "Contribución año/año del sector Pesca en el PIB de la Región de Tarapacá"},
+      {"id": "F035.PIB.V12.R.CLP.2018.03.21.Z.01.0.A", "short_title": "Minería", "classification": {"activity": "mineria"}, "long_title": "Contribución año/año del sector Minería en el PIB de la Región de Tarapacá"},
+      {"id": "F035.PIB.V12.R.CLP.2018.04.21.Z.01.0.A", "short_title": "Industria manufacturera", "classification": {"activity": "industria"}, "long_title": "Contribución año/año del sector Industria manufacturera en el PIB de la Región de Tarapacá"},
+      {"id": "F035.PIB.V12.R.CLP.2018.05.21.Z.01.0.A", "short_title": "Electricidad, gas, agua y gestión de desechos", "classification": {"activity": "electricidad"}, "long_title": "Contribución año/año del sector Electricidad, gas, agua y gestión de desechos en el PIB de la Región de Tarapacá"},
+      {"id": "F035.PIB.V12.R.CLP.2018.06.21.Z.01.0.A", "short_title": "Construcción", "classification": {"activity": "construccion"}, "long_title": "Contribución año/año del sector Construcción en el PIB de la Región de Tarapacá"},
+      {"id": "F035.PIB.V12.R.CLP.2018.COM.21.Z.01.0.A", "short_title": "Comercio", "classification": {"activity": "comercio"}, "long_title": "Contribución año/año del sector Comercio en el PIB de la Región de Tarapacá"},
+      {"id": "F035.PIB.V12.R.CLP.2018.RH.21.Z.01.0.A", "short_title": "Restaurantes y hoteles", "classification": {"activity": "restaurantes"}, "long_title": "Contribución año/año del sector Restaurantes y hoteles en el PIB de la Región de Tarapacá"},
+      {"id": "F035.PIB.V12.R.CLP.2018.08.Z.Z.01.0.A", "short_title": "Transporte, información y comunicaciones", "classification": {"activity": "transporte"}, "long_title": "Contribución año/año del sector Transporte, información y comunicaciones en el PIB de la Región de Tarapacá"},
+      {"id": "F035.PIB.V12.R.CLP.2018.09.21.Z.01.0.A", "short_title": "Servicios financieros y empresariales", "classification": {"activity": "servicios_financieros"}, "long_title": "Contribución año/año del sector Servicios financieros y empresariales en el PIB de la Región de Tarapacá"},
+      {"id": "F035.PIB.V12.R.CLP.2018.10.Z.Z.01.0.A", "short_title": "Servicios de vivienda e inmobiliarios", "classification": {"activity": "servicio_viviendas"}, "long_title": "Contribución año/año del sector Servicios de vivienda e inmobiliarios en el PIB de la Región de Tarapacá"},
+      {"id": "F035.PIB.V12.R.CLP.2018.11.Z.Z.01.0.A", "short_title": "Servicios personales", "classification": {"activity": "servicio_personales"}, "long_title": "Contribución año/año del sector Servicios personales en el PIB de la Región de Tarapacá"},
+      {"id": "F035.PIB.V12.R.CLP.2018.12.Z.Z.01.0.A", "short_title": "Administración pública", "classification": {"activity": "admin_publica"}, "long_title": "Contribución año/año del sector Administración pública en el PIB de la Región de Tarapacá"},
+      {"id": "F035.PIB.V12.R.CLP.2018.CONT.Z.Z.01.0.A", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "Contribución año/año del PIB de la Región de Tarapacá"}
+    ]
+  },
 
+  "PIB anual por actividad económica, Región de Antofagasta, contribución porcentual respecto de igual periodo del año anterior, series empalmadas, referencia 2018": {
+    "classification": {
+      "indicator": "pib",
+      "calc_mode": "contribution",
+      "seasonality": "nsa",
+      "frequency": "a",
+      "price": "enc",
+      "has_activity": 1,
+      "has_region": 1,
+      "has_investment": 0,
+      "region": "antofagasta"
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_CONT_PB_II_ACT",
+    "series": [
+      {"id": "F035.PIB.V12.R.CLP.2018.01.Z.Z.02.0.A", "short_title": "Agropecuario-silvícola", "classification": {"activity": "agropecuario"}, "long_title": "Contribución año/año del sector Agropecuario-silvícola en el PIB de la Región de Antofagasta"},
+      {"id": "F035.PIB.V12.R.CLP.2018.02.04.Z.02.0.A", "short_title": "Pesca", "classification": {"activity": "pesca"}, "long_title": "Contribución año/año del sector Pesca en el PIB de la Región de Antofagasta"},
+      {"id": "F035.PIB.V12.R.CLP.2018.03.Z.Z.02.0.A", "short_title": "Minería", "classification": {"activity": "mineria"}, "long_title": "Contribución año/año del sector Minería en el PIB de la Región de Antofagasta"},
+      {"id": "F035.PIB.V12.R.CLP.2018.04.Z.Z.02.0.A", "short_title": "Industria manufacturera", "classification": {"activity": "industria"}, "long_title": "Contribución año/año del sector Industria manufacturera en el PIB de la Región de Antofagasta"},
+      {"id": "F035.PIB.V12.R.CLP.2018.05.Z.Z.02.0.A", "short_title": "Electricidad, gas, agua y gestión de desechos", "classification": {"activity": "electricidad"}, "long_title": "Contribución año/año del sector Electricidad, gas, agua y gestión de desechos en el PIB de la Región de Antofagasta"},
+      {"id": "F035.PIB.V12.R.CLP.2018.06.Z.Z.02.0.A", "short_title": "Construcción", "classification": {"activity": "construccion"}, "long_title": "Contribución año/año del sector Construcción en el PIB de la Región de Antofagasta"},
+      {"id": "F035.PIB.V12.R.CLP.2018.COM.Z.Z.02.0.A", "short_title": "Comercio", "classification": {"activity": "comercio"}, "long_title": "Contribución año/año del sector Comercio en el PIB de la Región de Antofagasta"},
+      {"id": "F035.PIB.V12.R.CLP.2018.RH.Z.Z.02.0.A", "short_title": "Restaurantes y hoteles", "classification": {"activity": "restaurantes"}, "long_title": "Contribución año/año del sector Restaurantes y hoteles en el PIB de la Región de Antofagasta"},
+      {"id": "F035.PIB.V12.R.CLP.2018.08.Z.Z.02.0.A", "short_title": "Transporte, información y comunicaciones", "classification": {"activity": "transporte"}, "long_title": "Contribución año/año del sector Transporte, información y comunicaciones en el PIB de la Región de Antofagasta"},
+      {"id": "F035.PIB.V12.R.CLP.2018.09.21.Z.02.0.A", "short_title": "Servicios financieros y empresariales", "classification": {"activity": "servicios_financieros"}, "long_title": "Contribución año/año del sector Servicios financieros y empresariales en el PIB de la Región de Antofagasta"},
+      {"id": "F035.PIB.V12.R.CLP.2018.10.Z.Z.02.0.A", "short_title": "Servicios de vivienda e inmobiliarios", "classification": {"activity": "servicio_viviendas"}, "long_title": "Contribución año/año del sector Servicios de vivienda e inmobiliarios en el PIB de la Región de Antofagasta"},
+      {"id": "F035.PIB.V12.R.CLP.2018.11.Z.Z.02.0.A", "short_title": "Servicios personales", "classification": {"activity": "servicio_personales"}, "long_title": "Contribución año/año del sector Servicios personales en el PIB de la Región de Antofagasta"},
+      {"id": "F035.PIB.V12.R.CLP.2018.12.Z.Z.02.0.A", "short_title": "Administración pública", "classification": {"activity": "admin_publica"}, "long_title": "Contribución año/año del sector Administración pública en el PIB de la Región de Antofagasta"},
+      {"id": "F035.PIB.V12.R.CLP.2018.CONT.Z.Z.02.0.A", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "Contribución año/año del PIB de la Región de Antofagasta"}
+    ]
+  },
+
+  "PIB anual por actividad económica, Región de Atacama, contribución porcentual respecto de igual periodo del año anterior, series empalmadas, referencia 2018": {
+    "classification": {
+      "indicator": "pib",
+      "calc_mode": "contribution",
+      "seasonality": "nsa",
+      "frequency": "a",
+      "price": "enc",
+      "has_activity": 1,
+      "has_region": 1,
+      "has_investment": 0,
+      "region": "atacama"
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_CONT_PB_III_ACT",
+    "series": [
+      {"id": "F035.PIB.V12.R.CLP.2018.01.Z.Z.03.0.A", "short_title": "Agropecuario-silvícola", "classification": {"activity": "agropecuario"}, "long_title": "Contribución año/año del sector Agropecuario-silvícola en el PIB de la Región de Atacama"},
+      {"id": "F035.PIB.V12.R.CLP.2018.02.04.Z.03.0.A", "short_title": "Pesca", "classification": {"activity": "pesca"}, "long_title": "Contribución año/año del sector Pesca en el PIB de la Región de Atacama"},
+      {"id": "F035.PIB.V12.R.CLP.2018.03.Z.Z.03.0.A", "short_title": "Minería", "classification": {"activity": "mineria"}, "long_title": "Contribución año/año del sector Minería en el PIB de la Región de Atacama"},
+      {"id": "F035.PIB.V12.R.CLP.2018.04.Z.Z.03.0.A", "short_title": "Industria manufacturera", "classification": {"activity": "industria"}, "long_title": "Contribución año/año del sector Industria manufacturera en el PIB de la Región de Atacama"},
+      {"id": "F035.PIB.V12.R.CLP.2018.05.Z.Z.03.0.A", "short_title": "Electricidad, gas, agua y gestión de desechos", "classification": {"activity": "electricidad"}, "long_title": "Contribución año/año del sector Electricidad, gas, agua y gestión de desechos en el PIB de la Región de Atacama"},
+      {"id": "F035.PIB.V12.R.CLP.2018.06.Z.Z.03.0.A", "short_title": "Construcción", "classification": {"activity": "construccion"}, "long_title": "Contribución año/año del sector Construcción en el PIB de la Región de Atacama"},
+      {"id": "F035.PIB.V12.R.CLP.2018.COM.Z.Z.03.0.A", "short_title": "Comercio", "classification": {"activity": "comercio"}, "long_title": "Contribución año/año del sector Comercio en el PIB de la Región de Atacama"},
+      {"id": "F035.PIB.V12.R.CLP.2018.RH.Z.Z.03.0.A", "short_title": "Restaurantes y hoteles", "classification": {"activity": "restaurantes"}, "long_title": "Contribución año/año del sector Restaurantes y hoteles en el PIB de la Región de Atacama"},
+      {"id": "F035.PIB.V12.R.CLP.2018.08.Z.Z.03.0.A", "short_title": "Transporte, información y comunicaciones", "classification": {"activity": "transporte"}, "long_title": "Contribución año/año del sector Transporte, información y comunicaciones en el PIB de la Región de Atacama"},
+      {"id": "F035.PIB.V12.R.CLP.2018.09.21.Z.03.0.A", "short_title": "Servicios financieros y empresariales", "classification": {"activity": "servicios_financieros"}, "long_title": "Contribución año/año del sector Servicios financieros y empresariales en el PIB de la Región de Atacama"},
+      {"id": "F035.PIB.V12.R.CLP.2018.10.Z.Z.03.0.A", "short_title": "Servicios de vivienda e inmobiliarios", "classification": {"activity": "servicio_viviendas"}, "long_title": "Contribución año/año del sector Servicios de vivienda e inmobiliarios en el PIB de la Región de Atacama"},
+      {"id": "F035.PIB.V12.R.CLP.2018.11.Z.Z.03.0.A", "short_title": "Servicios personales", "classification": {"activity": "servicio_personales"}, "long_title": "Contribución año/año del sector Servicios personales en el PIB de la Región de Atacama"},
+      {"id": "F035.PIB.V12.R.CLP.2018.12.Z.Z.03.0.A", "short_title": "Administración pública", "classification": {"activity": "admin_publica"}, "long_title": "Contribución año/año del sector Administración pública en el PIB de la Región de Atacama"},
+      {"id": "F035.PIB.V12.R.CLP.2018.CONT.Z.Z.03.0.A", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "Contribución año/año del PIB de la Región de Atacama"}
+    ]
+  },
+
+  "PIB anual por actividad económica, Región de Coquimbo, contribución porcentual respecto de igual periodo del año anterior, series empalmadas, referencia 2018": {
+    "classification": {
+      "indicator": "pib",
+      "calc_mode": "contribution",
+      "seasonality": "nsa",
+      "frequency": "a",
+      "price": "enc",
+      "has_activity": 1,
+      "has_region": 1,
+      "has_investment": 0,
+      "region": "coquimbo"
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_CONT_PB_IV_ACT",
+    "series": [
+      {"id": "F035.PIB.V12.R.CLP.2018.01.Z.Z.04.0.A", "short_title": "Agropecuario-silvícola", "classification": {"activity": "agropecuario"}, "long_title": "Contribución año/año del sector Agropecuario-silvícola en el PIB de Región de Coquimbo"},
+      {"id": "F035.PIB.V12.R.CLP.2018.02.04.Z.04.0.A", "short_title": "Pesca", "classification": {"activity": "pesca"}, "long_title": "Contribución año/año del sector Pesca en el PIB de Región de Coquimbo"},
+      {"id": "F035.PIB.V12.R.CLP.2018.03.Z.Z.04.0.A", "short_title": "Minería", "classification": {"activity": "mineria"}, "long_title": "Contribución año/año del sector Minería en el PIB de Región de Coquimbo"},
+      {"id": "F035.PIB.V12.R.CLP.2018.04.Z.Z.04.0.A", "short_title": "Industria manufacturera", "classification": {"activity": "industria"}, "long_title": "Contribución año/año del sector Industria manufacturera en el PIB de Región de Coquimbo"},
+      {"id": "F035.PIB.V12.R.CLP.2018.05.Z.Z.04.0.A", "short_title": "Electricidad, gas, agua y gestión de desechos", "classification": {"activity": "electricidad"}, "long_title": "Contribución año/año del sector Electricidad, gas, agua y gestión de desechos en el PIB de Región de Coquimbo"},
+      {"id": "F035.PIB.V12.R.CLP.2018.06.Z.Z.04.0.A", "short_title": "Construcción", "classification": {"activity": "construccion"}, "long_title": "Contribución año/año del sector Construcción en el PIB de Región de Coquimbo"},
+      {"id": "F035.PIB.V12.R.CLP.2018.COM.Z.Z.04.0.A", "short_title": "Comercio", "classification": {"activity": "comercio"}, "long_title": "Contribución año/año del sector Comercio en el PIB de Región de Coquimbo"},
+      {"id": "F035.PIB.V12.R.CLP.2018.RH.Z.Z.04.0.A", "short_title": "Restaurantes y hoteles", "classification": {"activity": "restaurantes"}, "long_title": "Contribución año/año del sector Restaurantes y hoteles en el PIB de Región de Coquimbo"},
+      {"id": "F035.PIB.V12.R.CLP.2018.08.Z.Z.04.0.A", "short_title": "Transporte, información y comunicaciones", "classification": {"activity": "transporte"}, "long_title": "Contribución año/año del sector Transporte, información y comunicaciones en el PIB de Región de Coquimbo"},
+      {"id": "F035.PIB.V12.R.CLP.2018.09.21.Z.04.0.A", "short_title": "Servicios financieros y empresariales", "classification": {"activity": "servicios_financieros"}, "long_title": "Contribución año/año del sector Servicios financieros y empresariales en el PIB de Región de Coquimbo"},
+      {"id": "F035.PIB.V12.R.CLP.2018.10.Z.Z.04.0.A", "short_title": "Servicios de vivienda e inmobiliarios", "classification": {"activity": "servicio_viviendas"}, "long_title": "Contribución año/año del sector Servicios de vivienda e inmobiliarios en el PIB de Región de Coquimbo"},
+      {"id": "F035.PIB.V12.R.CLP.2018.11.Z.Z.04.0.A", "short_title": "Servicios personales", "classification": {"activity": "servicio_personales"}, "long_title": "Contribución año/año del sector Servicios personales en el PIB de Región de Coquimbo"},
+      {"id": "F035.PIB.V12.R.CLP.2018.12.Z.Z.04.0.A", "short_title": "Administración pública", "classification": {"activity": "admin_publica"}, "long_title": "Contribución año/año del sector Administración pública en el PIB de Región de Coquimbo"},
+      {"id": "F035.PIB.V12.R.CLP.2018.CONT.Z.Z.04.0.A", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "Contribución año/año del PIB de Región de Coquimbo"}
+    ]
+  },
+
+  "PIB anual por actividad económica, Región de Valparaíso, contribución porcentual respecto de igual periodo del año anterior, series empalmadas, referencia 2018": {
+    "classification": {
+      "indicator": "pib",
+      "calc_mode": "contribution",
+      "seasonality": "nsa",
+      "frequency": "a",
+      "price": "enc",
+      "has_activity": 1,
+      "has_region": 1,
+      "has_investment": 0,
+      "region": "valparaiso"
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_CONT_PB_V_ACT",
+    "series": [
+      {"id": "F035.PIB.V12.R.CLP.2018.01.Z.Z.05.0.A", "short_title": "Agropecuario-silvícola", "classification": {"activity": "agropecuario"}, "long_title": "Contribución año/año del sector Agropecuario-silvícola en el PIB de Región de Valparaíso"},
+      {"id": "F035.PIB.V12.R.CLP.2018.02.04.Z.05.0.A", "short_title": "Pesca", "classification": {"activity": "pesca"}, "long_title": "Contribución año/año del sector Pesca en el PIB de Región de Valparaíso"},
+      {"id": "F035.PIB.V12.R.CLP.2018.03.Z.Z.05.0.A", "short_title": "Minería", "classification": {"activity": "mineria"}, "long_title": "Contribución año/año del sector Minería en el PIB de Región de Valparaíso"},
+      {"id": "F035.PIB.V12.R.CLP.2018.04.Z.Z.05.0.A", "short_title": "Industria manufacturera", "classification": {"activity": "industria"}, "long_title": "Contribución año/año del sector Industria manufacturera en el PIB de Región de Valparaíso"},
+      {"id": "F035.PIB.V12.R.CLP.2018.05.Z.Z.05.0.A", "short_title": "Electricidad, gas, agua y gestión de desechos", "classification": {"activity": "electricidad"}, "long_title": "Contribución año/año del sector Electricidad, gas, agua y gestión de desechos en el PIB de Región de Valparaíso"},
+      {"id": "F035.PIB.V12.R.CLP.2018.06.Z.Z.05.0.A", "short_title": "Construcción", "classification": {"activity": "construccion"}, "long_title": "Contribución año/año del sector Construcción en el PIB de Región de Valparaíso"},
+      {"id": "F035.PIB.V12.R.CLP.2018.COM.Z.Z.05.0.A", "short_title": "Comercio", "classification": {"activity": "comercio"}, "long_title": "Contribución año/año del sector Comercio en el PIB de Región de Valparaíso"},
+      {"id": "F035.PIB.V12.R.CLP.2018.RH.Z.Z.05.0.A", "short_title": "Restaurantes y hoteles", "classification": {"activity": "restaurantes"}, "long_title": "Contribución año/año del sector Restaurantes y hoteles en el PIB de Región de Valparaíso"},
+      {"id": "F035.PIB.V12.R.CLP.2018.08.Z.Z.05.0.A", "short_title": "Transporte, información y comunicaciones", "classification": {"activity": "transporte"}, "long_title": "Contribución año/año del sector Transporte, información y comunicaciones en el PIB de Región de Valparaíso"},
+      {"id": "F035.PIB.V12.R.CLP.2018.09.21.Z.05.0.A", "short_title": "Servicios financieros y empresariales", "classification": {"activity": "servicios_financieros"}, "long_title": "Contribución año/año del sector Servicios financieros y empresariales en el PIB de Región de Valparaíso"},
+      {"id": "F035.PIB.V12.R.CLP.2018.10.Z.Z.05.0.A", "short_title": "Servicios de vivienda e inmobiliarios", "classification": {"activity": "servicio_viviendas"}, "long_title": "Contribución año/año del sector Servicios de vivienda e inmobiliarios en el PIB de Región de Valparaíso"},
+      {"id": "F035.PIB.V12.R.CLP.2018.11.Z.Z.05.0.A", "short_title": "Servicios personales", "classification": {"activity": "servicio_personales"}, "long_title": "Contribución año/año del sector Servicios personales en el PIB de Región de Valparaíso"},
+      {"id": "F035.PIB.V12.R.CLP.2018.12.Z.Z.05.0.A", "short_title": "Administración pública", "classification": {"activity": "admin_publica"}, "long_title": "Contribución año/año del sector Administración pública en el PIB de Región de Valparaíso"},
+      {"id": "F035.PIB.V12.R.CLP.2018.CONT.Z.Z.05.0.A", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "Contribución año/año del PIB de Región de Valparaíso"}
+    ]
+  },
+
+  "PIB anual por actividad económica, Región Metropolitana de Santiago, contribución porcentual respecto de igual periodo del año anterior, series empalmadas, referencia 2018": {
+    "classification": {
+      "indicator": "pib",
+      "calc_mode": "contribution",
+      "seasonality": "nsa",
+      "frequency": "a",
+      "price": "enc",
+      "has_activity": 1,
+      "has_region": 1,
+      "has_investment": 0,
+      "region": "metropolitana"
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_CONT_PB_XIII_ACT",
+    "series": [
+      {"id": "F035.PIB.V12.R.CLP.2018.01.Z.Z.13.0.A", "short_title": "Agropecuario-silvícola", "classification": {"activity": "agropecuario"}, "long_title": "Contribución año/año del sector Agropecuario-silvícola en el PIB de Región Metropolitana de Santiago"},
+      {"id": "F035.PIB.V12.R.CLP.2018.02.04.Z.13.0.A", "short_title": "Pesca", "classification": {"activity": "pesca"}, "long_title": "Contribución año/año del sector Pesca en el PIB de Región Metropolitana de Santiago"},
+      {"id": "F035.PIB.V12.R.CLP.2018.03.Z.Z.13.0.A", "short_title": "Minería", "classification": {"activity": "mineria"}, "long_title": "Contribución año/año del sector Minería en el PIB de Región Metropolitana de Santiago"},
+      {"id": "F035.PIB.V12.R.CLP.2018.04.Z.Z.13.0.A", "short_title": "Industria manufacturera", "classification": {"activity": "industria"}, "long_title": "Contribución año/año del sector Industria manufacturera en el PIB de Región Metropolitana de Santiago"},
+      {"id": "F035.PIB.V12.R.CLP.2018.05.Z.Z.13.0.A", "short_title": "Electricidad, gas, agua y gestión de desechos", "classification": {"activity": "electricidad"}, "long_title": "Contribución año/año del sector Electricidad, gas, agua y gestión de desechos en el PIB de Región Metropolitana de Santiago"},
+      {"id": "F035.PIB.V12.R.CLP.2018.06.Z.Z.13.0.A", "short_title": "Construcción", "classification": {"activity": "construccion"}, "long_title": "Contribución año/año del sector Construcción en el PIB de Región Metropolitana de Santiago"},
+      {"id": "F035.PIB.V12.R.CLP.2018.COM.Z.Z.13.0.A", "short_title": "Comercio", "classification": {"activity": "comercio"}, "long_title": "Contribución año/año del sector Comercio en el PIB de Región Metropolitana de Santiago"},
+      {"id": "F035.PIB.V12.R.CLP.2018.RH.Z.Z.13.0.A", "short_title": "Restaurantes y hoteles", "classification": {"activity": "restaurantes"}, "long_title": "Contribución año/año del sector Restaurantes y hoteles en el PIB de Región Metropolitana de Santiago"},
+      {"id": "F035.PIB.V12.R.CLP.2018.08.Z.Z.13.0.A", "short_title": "Transporte, información y comunicaciones", "classification": {"activity": "transporte"}, "long_title": "Contribución año/año del sector Transporte, información y comunicaciones en el PIB de Región Metropolitana de Santiago"},
+      {"id": "F035.PIB.V12.R.CLP.2018.09.21.Z.13.0.A", "short_title": "Servicios financieros y empresariales", "classification": {"activity": "servicios_financieros"}, "long_title": "Contribución año/año del sector Servicios financieros y empresariales en el PIB de Región Metropolitana de Santiago"},
+      {"id": "F035.PIB.V12.R.CLP.2018.10.Z.Z.13.0.A", "short_title": "Servicios de vivienda e inmobiliarios", "classification": {"activity": "servicio_viviendas"}, "long_title": "Contribución año/año del sector Servicios de vivienda e inmobiliarios en el PIB de Región Metropolitana de Santiago"},
+      {"id": "F035.PIB.V12.R.CLP.2018.11.Z.Z.13.0.A", "short_title": "Servicios personales", "classification": {"activity": "servicio_personales"}, "long_title": "Contribución año/año del sector Servicios personales en el PIB de Región Metropolitana de Santiago"},
+      {"id": "F035.PIB.V12.R.CLP.2018.12.Z.Z.13.0.A", "short_title": "Administración pública", "classification": {"activity": "admin_publica"}, "long_title": "Contribución año/año del sector Administración pública en el PIB de Región Metropolitana de Santiago"},
+      {"id": "F035.PIB.V12.R.CLP.2018.CONT.Z.Z.13.0.A", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "Contribución año/año del PIB de Región Metropolitana de Santiago"}
+    ]
+  },
+
+  "PIB anual por actividad económica, Región del Libertador General Bernardo O'Higgins, contribución porcentual respecto de igual periodo del año anterior, series empalmadas, referencia 2018": {
+    "classification": {
+      "indicator": "pib",
+      "calc_mode": "contribution",
+      "seasonality": "nsa",
+      "frequency": "a",
+      "price": "enc",
+      "has_activity": 1,
+      "has_region": 1,
+      "has_investment": 0,
+      "region": "ohiggins"
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_CONT_PB_VI_ACT",
+    "series": [
+      {"id": "F035.PIB.V12.R.CLP.2018.01.Z.Z.06.0.A", "short_title": "Agropecuario-silvícola", "classification": {"activity": "agropecuario"}, "long_title": "Contribución año/año del sector Agropecuario-silvícola en el PIB de Región del Libertador General Bernardo O'Higgins"},
+      {"id": "F035.PIB.V12.R.CLP.2018.02.04.Z.06.0.A", "short_title": "Pesca", "classification": {"activity": "pesca"}, "long_title": "Contribución año/año del sector Pesca en el PIB de Región del Libertador General Bernardo O'Higgins"},
+      {"id": "F035.PIB.V12.R.CLP.2018.03.Z.Z.06.0.A", "short_title": "Minería", "classification": {"activity": "mineria"}, "long_title": "Contribución año/año del sector Minería en el PIB de Región del Libertador General Bernardo O'Higgins"},
+      {"id": "F035.PIB.V12.R.CLP.2018.04.Z.Z.06.0.A", "short_title": "Industria manufacturera", "classification": {"activity": "industria"}, "long_title": "Contribución año/año del sector Industria manufacturera en el PIB de Región del Libertador General Bernardo O'Higgins"},
+      {"id": "F035.PIB.V12.R.CLP.2018.05.Z.Z.06.0.A", "short_title": "Electricidad, gas, agua y gestión de desechos", "classification": {"activity": "electricidad"}, "long_title": "Contribución año/año del sector Electricidad, gas, agua y gestión de desechos en el PIB de Región del Libertador General Bernardo O'Higgins"},
+      {"id": "F035.PIB.V12.R.CLP.2018.06.Z.Z.06.0.A", "short_title": "Construcción", "classification": {"activity": "construccion"}, "long_title": "Contribución año/año del sector Construcción en el PIB de Región del Libertador General Bernardo O'Higgins"},
+      {"id": "F035.PIB.V12.R.CLP.2018.COM.Z.Z.06.0.A", "short_title": "Comercio", "classification": {"activity": "comercio"}, "long_title": "Contribución año/año del sector Comercio en el PIB de Región del Libertador General Bernardo O'Higgins"},
+      {"id": "F035.PIB.V12.R.CLP.2018.RH.Z.Z.06.0.A", "short_title": "Restaurantes y hoteles", "classification": {"activity": "restaurantes"}, "long_title": "Contribución año/año del sector Restaurantes y hoteles en el PIB de Región del Libertador General Bernardo O'Higgins"},
+      {"id": "F035.PIB.V12.R.CLP.2018.08.Z.Z.06.0.A", "short_title": "Transporte, información y comunicaciones", "classification": {"activity": "transporte"}, "long_title": "Contribución año/año del sector Transporte, información y comunicaciones en el PIB de Región del Libertador General Bernardo O'Higgins"},
+      {"id": "F035.PIB.V12.R.CLP.2018.09.21.Z.06.0.A", "short_title": "Servicios financieros y empresariales", "classification": {"activity": "servicios_financieros"}, "long_title": "Contribución año/año del sector Servicios financieros y empresariales en el PIB de Región del Libertador General Bernardo O'Higgins"},
+      {"id": "F035.PIB.V12.R.CLP.2018.10.Z.Z.06.0.A", "short_title": "Servicios de vivienda e inmobiliarios", "classification": {"activity": "servicio_viviendas"}, "long_title": "Contribución año/año del sector Servicios de vivienda e inmobiliarios en el PIB de Región del Libertador General Bernardo O'Higgins"},
+      {"id": "F035.PIB.V12.R.CLP.2018.11.Z.Z.06.0.A", "short_title": "Servicios personales", "classification": {"activity": "servicio_personales"}, "long_title": "Contribución año/año del sector Servicios personales en el PIB de Región del Libertador General Bernardo O'Higgins"},
+      {"id": "F035.PIB.V12.R.CLP.2018.12.Z.Z.06.0.A", "short_title": "Administración pública", "classification": {"activity": "admin_publica"}, "long_title": "Contribución año/año del sector Administración pública en el PIB de Región del Libertador General Bernardo O'Higgins"},
+      {"id": "F035.PIB.V12.R.CLP.2018.CONT.Z.Z.06.0.A", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "Contribución año/año del PIB de Región del Libertador General Bernardo O'Higgins"}
+    ]
+  },
+
+  "PIB anual por actividad económica, Región del Maule, contribución porcentual respecto de igual periodo del año anterior, series empalmadas, referencia 2018": {
+    "classification": {
+      "indicator": "pib",
+      "calc_mode": "contribution",
+      "seasonality": "nsa",
+      "frequency": "a",
+      "price": "enc",
+      "has_activity": 1,
+      "has_region": 1,
+      "has_investment": 0,
+      "region": "maule"
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_CONT_PB_VII_ACT",
+    "series": [
+      {"id": "F035.PIB.V12.R.CLP.2018.01.Z.Z.07.0.A", "short_title": "Agropecuario-silvícola", "classification": {"activity": "agropecuario"}, "long_title": "Contribución año/año del sector Agropecuario-silvícola en el PIB de Región del Maule"},
+      {"id": "F035.PIB.V12.R.CLP.2018.02.04.Z.07.0.A", "short_title": "Pesca", "classification": {"activity": "pesca"}, "long_title": "Contribución año/año del sector Pesca en el PIB de Región del Maule"},
+      {"id": "F035.PIB.V12.R.CLP.2018.03.Z.Z.07.0.A", "short_title": "Minería", "classification": {"activity": "mineria"}, "long_title": "Contribución año/año del sector Minería en el PIB de Región del Maule"},
+      {"id": "F035.PIB.V12.R.CLP.2018.04.Z.Z.07.0.A", "short_title": "Industria manufacturera", "classification": {"activity": "industria"}, "long_title": "Contribución año/año del sector Industria manufacturera en el PIB de Región del Maule"},
+      {"id": "F035.PIB.V12.R.CLP.2018.05.Z.Z.07.0.A", "short_title": "Electricidad, gas, agua y gestión de desechos", "classification": {"activity": "electricidad"}, "long_title": "Contribución año/año del sector Electricidad, gas, agua y gestión de desechos en el PIB de Región del Maule"},
+      {"id": "F035.PIB.V12.R.CLP.2018.06.Z.Z.07.0.A", "short_title": "Construcción", "classification": {"activity": "construccion"}, "long_title": "Contribución año/año del sector Construcción en el PIB de Región del Maule"},
+      {"id": "F035.PIB.V12.R.CLP.2018.COM.Z.Z.07.0.A", "short_title": "Comercio", "classification": {"activity": "comercio"}, "long_title": "Contribución año/año del sector Comercio en el PIB de Región del Maule"},
+      {"id": "F035.PIB.V12.R.CLP.2018.RH.Z.Z.07.0.A", "short_title": "Restaurantes y hoteles", "classification": {"activity": "restaurantes"}, "long_title": "Contribución año/año del sector Restaurantes y hoteles en el PIB de Región del Maule"},
+      {"id": "F035.PIB.V12.R.CLP.2018.08.Z.Z.07.0.A", "short_title": "Transporte, información y comunicaciones", "classification": {"activity": "transporte"}, "long_title": "Contribución año/año del sector Transporte, información y comunicaciones en el PIB de Región del Maule"},
+      {"id": "F035.PIB.V12.R.CLP.2018.09.21.Z.07.0.A", "short_title": "Servicios financieros y empresariales", "classification": {"activity": "servicios_financieros"}, "long_title": "Contribución año/año del sector Servicios financieros y empresariales en el PIB de Región del Maule"},
+      {"id": "F035.PIB.V12.R.CLP.2018.10.Z.Z.07.0.A", "short_title": "Servicios de vivienda e inmobiliarios", "classification": {"activity": "servicio_viviendas"}, "long_title": "Contribución año/año del sector Servicios de vivienda e inmobiliarios en el PIB de Región del Maule"},
+      {"id": "F035.PIB.V12.R.CLP.2018.11.Z.Z.07.0.A", "short_title": "Servicios personales", "classification": {"activity": "servicio_personales"}, "long_title": "Contribución año/año del sector Servicios personales en el PIB de Región del Maule"},
+      {"id": "F035.PIB.V12.R.CLP.2018.12.Z.Z.07.0.A", "short_title": "Administración pública", "classification": {"activity": "admin_publica"}, "long_title": "Contribución año/año del sector Administración pública en el PIB de Región del Maule"},
+      {"id": "F035.PIB.V12.R.CLP.2018.CONT.Z.Z.07.0.A", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "Contribución año/año del PIB de Región del Maule"}
+    ]
+  },
+
+  "PIB anual por actividad económica, Región de Ñuble, contribución porcentual respecto de igual periodo del año anterior, series empalmadas, referencia 2018": {
+    "classification": {
+      "indicator": "pib",
+      "calc_mode": "contribution",
+      "seasonality": "nsa",
+      "frequency": "a",
+      "price": "enc",
+      "has_activity": 1,
+      "has_region": 1,
+      "has_investment": 0,
+      "region": "nuble"
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_CONT_PB_XVI_ACT",
+    "series": [
+      {"id": "F035.PIB.V12.R.CLP.2018.01.Z.Z.16.0.A", "short_title": "Agropecuario-silvícola", "classification": {"activity": "agropecuario"}, "long_title": "Contribución año/año del sector Agropecuario-silvícola en el PIB de Región de Ñuble"},
+      {"id": "F035.PIB.V12.R.CLP.2018.02.04.Z.16.0.A", "short_title": "Pesca", "classification": {"activity": "pesca"}, "long_title": "Contribución año/año del sector Pesca en el PIB de Región de Ñuble"},
+      {"id": "F035.PIB.V12.R.CLP.2018.03.Z.Z.16.0.A", "short_title": "Minería", "classification": {"activity": "mineria"}, "long_title": "Contribución año/año del sector Minería en el PIB de Región de Ñuble"},
+      {"id": "F035.PIB.V12.R.CLP.2018.04.Z.Z.16.0.A", "short_title": "Industria manufacturera", "classification": {"activity": "industria"}, "long_title": "Contribución año/año del sector Industria manufacturera en el PIB de Región de Ñuble"},
+      {"id": "F035.PIB.V12.R.CLP.2018.05.Z.Z.16.0.A", "short_title": "Electricidad, gas, agua y gestión de desechos", "classification": {"activity": "electricidad"}, "long_title": "Contribución año/año del sector Electricidad, gas, agua y gestión de desechos en el PIB de Región de Ñuble"},
+      {"id": "F035.PIB.V12.R.CLP.2018.06.Z.Z.16.0.A", "short_title": "Construcción", "classification": {"activity": "construccion"}, "long_title": "Contribución año/año del sector Construcción en el PIB de Región de Ñuble"},
+      {"id": "F035.PIB.V12.R.CLP.2018.COM.Z.Z.16.0.A", "short_title": "Comercio", "classification": {"activity": "comercio"}, "long_title": "Contribución año/año del sector Comercio en el PIB de Región de Ñuble"},
+      {"id": "F035.PIB.V12.R.CLP.2018.RH.Z.Z.16.0.A", "short_title": "Restaurantes y hoteles", "classification": {"activity": "restaurantes"}, "long_title": "Contribución año/año del sector Restaurantes y hoteles en el PIB de Región de Ñuble"},
+      {"id": "F035.PIB.V12.R.CLP.2018.08.Z.Z.16.0.A", "short_title": "Transporte, información y comunicaciones", "classification": {"activity": "transporte"}, "long_title": "Contribución año/año del sector Transporte, información y comunicaciones en el PIB de Región de Ñuble"},
+      {"id": "F035.PIB.V12.R.CLP.2018.09.21.Z.16.0.A", "short_title": "Servicios financieros y empresariales", "classification": {"activity": "servicios_financieros"}, "long_title": "Contribución año/año del sector Servicios financieros y empresariales en el PIB de Región de Ñuble"},
+      {"id": "F035.PIB.V12.R.CLP.2018.10.Z.Z.16.0.A", "short_title": "Servicios de vivienda e inmobiliarios", "classification": {"activity": "servicio_viviendas"}, "long_title": "Contribución año/año del sector Servicios de vivienda e inmobiliarios en el PIB de Región de Ñuble"},
+      {"id": "F035.PIB.V12.R.CLP.2018.11.Z.Z.16.0.A", "short_title": "Servicios personales", "classification": {"activity": "servicio_personales"}, "long_title": "Contribución año/año del sector Servicios personales en el PIB de Región de Ñuble"},
+      {"id": "F035.PIB.V12.R.CLP.2018.12.Z.Z.16.0.A", "short_title": "Administración pública", "classification": {"activity": "admin_publica"}, "long_title": "Contribución año/año del sector Administración pública en el PIB de Región de Ñuble"},
+      {"id": "F035.PIB.V12.R.CLP.2018.CONT.Z.Z.16.0.A", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "Contribución año/año del PIB de Región de Ñuble"}
+    ]
+  },
+
+  "PIB anual por actividad económica, Región del Biobío, contribución porcentual respecto de igual periodo del año anterior, series empalmadas, referencia 2018": {
+    "classification": {
+      "indicator": "pib",
+      "calc_mode": "contribution",
+      "seasonality": "nsa",
+      "frequency": "a",
+      "price": "enc",
+      "has_activity": 1,
+      "has_region": 1,
+      "has_investment": 0,
+      "region": "biobio"
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_CONT_PB_VIII_ACT",
+    "series": [
+      {"id": "F035.PIB.V12.R.CLP.2018.01.Z.Z.08.0.A", "short_title": "Agropecuario-silvícola", "classification": {"activity": "agropecuario"}, "long_title": "Contribución año/año del sector Agropecuario-silvícola en el PIB de Región del Biobío"},
+      {"id": "F035.PIB.V12.R.CLP.2018.02.04.Z.08.0.A", "short_title": "Pesca", "classification": {"activity": "pesca"}, "long_title": "Contribución año/año del sector Pesca en el PIB de Región del Biobío"},
+      {"id": "F035.PIB.V12.R.CLP.2018.03.Z.Z.08.0.A", "short_title": "Minería", "classification": {"activity": "mineria"}, "long_title": "Contribución año/año del sector Minería en el PIB de Región del Biobío"},
+      {"id": "F035.PIB.V12.R.CLP.2018.04.Z.Z.08.0.A", "short_title": "Industria manufacturera", "classification": {"activity": "industria"}, "long_title": "Contribución año/año del sector Industria manufacturera en el PIB de Región del Biobío"},
+      {"id": "F035.PIB.V12.R.CLP.2018.05.Z.Z.08.0.A", "short_title": "Electricidad, gas, agua y gestión de desechos", "classification": {"activity": "electricidad"}, "long_title": "Contribución año/año del sector Electricidad, gas, agua y gestión de desechos en el PIB de Región del Biobío"},
+      {"id": "F035.PIB.V12.R.CLP.2018.06.Z.Z.08.0.A", "short_title": "Construcción", "classification": {"activity": "construccion"}, "long_title": "Contribución año/año del sector Construcción en el PIB de Región del Biobío"},
+      {"id": "F035.PIB.V12.R.CLP.2018.COM.Z.Z.08.0.A", "short_title": "Comercio", "classification": {"activity": "comercio"}, "long_title": "Contribución año/año del sector Comercio en el PIB de Región del Biobío"},
+      {"id": "F035.PIB.V12.R.CLP.2018.RH.Z.Z.08.0.A", "short_title": "Restaurantes y hoteles", "classification": {"activity": "restaurantes"}, "long_title": "Contribución año/año del sector Restaurantes y hoteles en el PIB de Región del Biobío"},
+      {"id": "F035.PIB.V12.R.CLP.2018.08.Z.Z.08.0.A", "short_title": "Transporte, información y comunicaciones", "classification": {"activity": "transporte"}, "long_title": "Contribución año/año del sector Transporte, información y comunicaciones en el PIB de Región del Biobío"},
+      {"id": "F035.PIB.V12.R.CLP.2018.09.21.Z.08.0.A", "short_title": "Servicios financieros y empresariales", "classification": {"activity": "servicios_financieros"}, "long_title": "Contribución año/año del sector Servicios financieros y empresariales en el PIB de Región del Biobío"},
+      {"id": "F035.PIB.V12.R.CLP.2018.10.Z.Z.08.0.A", "short_title": "Servicios de vivienda e inmobiliarios", "classification": {"activity": "servicio_viviendas"}, "long_title": "Contribución año/año del sector Servicios de vivienda e inmobiliarios en el PIB de Región del Biobío"},
+      {"id": "F035.PIB.V12.R.CLP.2018.11.Z.Z.08.0.A", "short_title": "Servicios personales", "classification": {"activity": "servicio_personales"}, "long_title": "Contribución año/año del sector Servicios personales en el PIB de Región del Biobío"},
+      {"id": "F035.PIB.V12.R.CLP.2018.12.Z.Z.08.0.A", "short_title": "Administración pública", "classification": {"activity": "admin_publica"}, "long_title": "Contribución año/año del sector Administración pública en el PIB de Región del Biobío"},
+      {"id": "F035.PIB.V12.R.CLP.2018.CONT.Z.Z.08.0.A", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "Contribución año/año del PIB de Región del Biobío"}
+    ]
+  },
+
+  "PIB anual por actividad económica, Región de La Araucanía, contribución porcentual respecto de igual periodo del año anterior, series empalmadas, referencia 2018": {
+    "classification": {
+      "indicator": "pib",
+      "calc_mode": "contribution",
+      "seasonality": "nsa",
+      "frequency": "a",
+      "price": "enc",
+      "has_activity": 1,
+      "has_region": 1,
+      "has_investment": 0,
+      "region": "araucania"
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_CONT_PB_IX_ACT",
+    "series": [
+      {"id": "F035.PIB.V12.R.CLP.2018.01.Z.Z.09.0.A", "short_title": "Agropecuario-silvícola", "classification": {"activity": "agropecuario"}, "long_title": "Contribución año/año del sector Agropecuario-silvícola en el PIB de Región de La Araucanía"},
+      {"id": "F035.PIB.V12.R.CLP.2018.02.04.Z.09.0.A", "short_title": "Pesca", "classification": {"activity": "pesca"}, "long_title": "Contribución año/año del sector Pesca en el PIB de Región de La Araucanía"},
+      {"id": "F035.PIB.V12.R.CLP.2018.03.Z.Z.09.0.A", "short_title": "Minería", "classification": {"activity": "mineria"}, "long_title": "Contribución año/año del sector Minería en el PIB de Región de La Araucanía"},
+      {"id": "F035.PIB.V12.R.CLP.2018.04.Z.Z.09.0.A", "short_title": "Industria manufacturera", "classification": {"activity": "industria"}, "long_title": "Contribución año/año del sector Industria manufacturera en el PIB de Región de La Araucanía"},
+      {"id": "F035.PIB.V12.R.CLP.2018.05.Z.Z.09.0.A", "short_title": "Electricidad, gas, agua y gestión de desechos", "classification": {"activity": "electricidad"}, "long_title": "Contribución año/año del sector Electricidad, gas, agua y gestión de desechos en el PIB de Región de La Araucanía"},
+      {"id": "F035.PIB.V12.R.CLP.2018.06.Z.Z.09.0.A", "short_title": "Construcción", "classification": {"activity": "construccion"}, "long_title": "Contribución año/año del sector Construcción en el PIB de Región de La Araucanía"},
+      {"id": "F035.PIB.V12.R.CLP.2018.COM.Z.Z.09.0.A", "short_title": "Comercio", "classification": {"activity": "comercio"}, "long_title": "Contribución año/año del sector Comercio en el PIB de Región de La Araucanía"},
+      {"id": "F035.PIB.V12.R.CLP.2018.RH.Z.Z.09.0.A", "short_title": "Restaurantes y hoteles", "classification": {"activity": "restaurantes"}, "long_title": "Contribución año/año del sector Restaurantes y hoteles en el PIB de Región de La Araucanía"},
+      {"id": "F035.PIB.V12.R.CLP.2018.08.Z.Z.09.0.A", "short_title": "Transporte, información y comunicaciones", "classification": {"activity": "transporte"}, "long_title": "Contribución año/año del sector Transporte, información y comunicaciones en el PIB de Región de La Araucanía"},
+      {"id": "F035.PIB.V12.R.CLP.2018.09.21.Z.09.0.A", "short_title": "Servicios financieros y empresariales", "classification": {"activity": "servicios_financieros"}, "long_title": "Contribución año/año del sector Servicios financieros y empresariales en el PIB de Región de La Araucanía"},
+      {"id": "F035.PIB.V12.R.CLP.2018.10.Z.Z.09.0.A", "short_title": "Servicios de vivienda e inmobiliarios", "classification": {"activity": "servicio_viviendas"}, "long_title": "Contribución año/año del sector Servicios de vivienda e inmobiliarios en el PIB de Región de La Araucanía"},
+      {"id": "F035.PIB.V12.R.CLP.2018.11.Z.Z.09.0.A", "short_title": "Servicios personales", "classification": {"activity": "servicio_personales"}, "long_title": "Contribución año/año del sector Servicios personales en el PIB de Región de La Araucanía"},
+      {"id": "F035.PIB.V12.R.CLP.2018.12.Z.Z.09.0.A", "short_title": "Administración pública", "classification": {"activity": "admin_publica"}, "long_title": "Contribución año/año del sector Administración pública en el PIB de Región de La Araucanía"},
+      {"id": "F035.PIB.V12.R.CLP.2018.CONT.Z.Z.09.0.A", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "Contribución año/año del PIB de Región de La Araucanía"}
+    ]
+  },
+
+  "PIB anual por actividad económica, Región de Los Ríos, contribución porcentual respecto de igual periodo del año anterior, series empalmadas, referencia 2018": {
+    "classification": {
+      "indicator": "pib",
+      "calc_mode": "contribution",
+      "seasonality": "nsa",
+      "frequency": "a",
+      "price": "enc",
+      "has_activity": 1,
+      "has_region": 1,
+      "has_investment": 0,
+      "region": "los_rios"
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_CONT_PB_XIV_ACT",
+    "series": [
+      {"id": "F035.PIB.V12.R.CLP.2018.01.Z.Z.14.0.A", "short_title": "Agropecuario-silvícola", "classification": {"activity": "agropecuario"}, "long_title": "Contribución año/año del sector Agropecuario-silvícola en el PIB de Región de Los Ríos"},
+      {"id": "F035.PIB.V12.R.CLP.2018.02.04.Z.14.0.A", "short_title": "Pesca", "classification": {"activity": "pesca"}, "long_title": "Contribución año/año del sector Pesca en el PIB de Región de Los Ríos"},
+      {"id": "F035.PIB.V12.R.CLP.2018.03.Z.Z.14.0.A", "short_title": "Minería", "classification": {"activity": "mineria"}, "long_title": "Contribución año/año del sector Minería en el PIB de Región de Los Ríos"},
+      {"id": "F035.PIB.V12.R.CLP.2018.04.Z.Z.14.0.A", "short_title": "Industria manufacturera", "classification": {"activity": "industria"}, "long_title": "Contribución año/año del sector Industria manufacturera en el PIB de Región de Los Ríos"},
+      {"id": "F035.PIB.V12.R.CLP.2018.05.Z.Z.14.0.A", "short_title": "Electricidad, gas, agua y gestión de desechos", "classification": {"activity": "electricidad"}, "long_title": "Contribución año/año del sector Electricidad, gas, agua y gestión de desechos en el PIB de Región de Los Ríos"},
+      {"id": "F035.PIB.V12.R.CLP.2018.06.Z.Z.14.0.A", "short_title": "Construcción", "classification": {"activity": "construccion"}, "long_title": "Contribución año/año del sector Construcción en el PIB de Región de Los Ríos"},
+      {"id": "F035.PIB.V12.R.CLP.2018.COM.Z.Z.14.0.A", "short_title": "Comercio", "classification": {"activity": "comercio"}, "long_title": "Contribución año/año del sector Comercio en el PIB de Región de Los Ríos"},
+      {"id": "F035.PIB.V12.R.CLP.2018.RH.Z.Z.14.0.A", "short_title": "Restaurantes y hoteles", "classification": {"activity": "restaurantes"}, "long_title": "Contribución año/año del sector Restaurantes y hoteles en el PIB de Región de Los Ríos"},
+      {"id": "F035.PIB.V12.R.CLP.2018.08.Z.Z.14.0.A", "short_title": "Transporte, información y comunicaciones", "classification": {"activity": "transporte"}, "long_title": "Contribución año/año del sector Transporte, información y comunicaciones en el PIB de Región de Los Ríos"},
+      {"id": "F035.PIB.V12.R.CLP.2018.09.21.Z.14.0.A", "short_title": "Servicios financieros y empresariales", "classification": {"activity": "servicios_financieros"}, "long_title": "Contribución año/año del sector Servicios financieros y empresariales en el PIB de Región de Los Ríos"},
+      {"id": "F035.PIB.V12.R.CLP.2018.10.Z.Z.14.0.A", "short_title": "Servicios de vivienda e inmobiliarios", "classification": {"activity": "servicio_viviendas"}, "long_title": "Contribución año/año del sector Servicios de vivienda e inmobiliarios en el PIB de Región de Los Ríos"},
+      {"id": "F035.PIB.V12.R.CLP.2018.11.Z.Z.14.0.A", "short_title": "Servicios personales", "classification": {"activity": "servicio_personales"}, "long_title": "Contribución año/año del sector Servicios personales en el PIB de Región de Los Ríos"},
+      {"id": "F035.PIB.V12.R.CLP.2018.12.Z.Z.14.0.A", "short_title": "Administración pública", "classification": {"activity": "admin_publica"}, "long_title": "Contribución año/año del sector Administración pública en el PIB de Región de Los Ríos"},
+      {"id": "F035.PIB.V12.R.CLP.2018.CONT.Z.Z.14.0.A", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "Contribución año/año del PIB de Región de Los Ríos"}
+    ]
+  },
+
+  "PIB anual por actividad económica, Región de Los Lagos, contribución porcentual respecto de igual periodo del año anterior, series empalmadas, referencia 2018": {
+    "classification": {
+      "indicator": "pib",
+      "calc_mode": "contribution",
+      "seasonality": "nsa",
+      "frequency": "a",
+      "price": "enc",
+      "has_activity": 1,
+      "has_region": 1,
+      "has_investment": 0,
+      "region": "los_lagos"
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_CONT_PB_X_ACT",
+    "series": [
+      {"id": "F035.PIB.V12.R.CLP.2018.01.Z.Z.10.0.A", "short_title": "Agropecuario-silvícola", "classification": {"activity": "agropecuario"}, "long_title": "Contribución año/año del sector Agropecuario-silvícola en el PIB de Región de Los Lagos"},
+      {"id": "F035.PIB.V12.R.CLP.2018.02.04.Z.10.0.A", "short_title": "Pesca", "classification": {"activity": "pesca"}, "long_title": "Contribución año/año del sector Pesca en el PIB de Región de Los Lagos"},
+      {"id": "F035.PIB.V12.R.CLP.2018.03.Z.Z.10.0.A", "short_title": "Minería", "classification": {"activity": "mineria"}, "long_title": "Contribución año/año del sector Minería en el PIB de Región de Los Lagos"},
+      {"id": "F035.PIB.V12.R.CLP.2018.04.Z.Z.10.0.A", "short_title": "Industria manufacturera", "classification": {"activity": "industria"}, "long_title": "Contribución año/año del sector Industria manufacturera en el PIB de Región de Los Lagos"},
+      {"id": "F035.PIB.V12.R.CLP.2018.05.Z.Z.10.0.A", "short_title": "Electricidad, gas, agua y gestión de desechos", "classification": {"activity": "electricidad"}, "long_title": "Contribución año/año del sector Electricidad, gas, agua y gestión de desechos en el PIB de Región de Los Lagos"},
+      {"id": "F035.PIB.V12.R.CLP.2018.06.Z.Z.10.0.A", "short_title": "Construcción", "classification": {"activity": "construccion"}, "long_title": "Contribución año/año del sector Construcción en el PIB de Región de Los Lagos"},
+      {"id": "F035.PIB.V12.R.CLP.2018.COM.Z.Z.10.0.A", "short_title": "Comercio", "classification": {"activity": "comercio"}, "long_title": "Contribución año/año del sector Comercio en el PIB de Región de Los Lagos"},
+      {"id": "F035.PIB.V12.R.CLP.2018.RH.Z.Z.10.0.A", "short_title": "Restaurantes y hoteles", "classification": {"activity": "restaurantes"}, "long_title": "Contribución año/año del sector Restaurantes y hoteles en el PIB de Región de Los Lagos"},
+      {"id": "F035.PIB.V12.R.CLP.2018.08.Z.Z.10.0.A", "short_title": "Transporte, información y comunicaciones", "classification": {"activity": "transporte"}, "long_title": "Contribución año/año del sector Transporte, información y comunicaciones en el PIB de Región de Los Lagos"},
+      {"id": "F035.PIB.V12.R.CLP.2018.09.21.Z.10.0.A", "short_title": "Servicios financieros y empresariales", "classification": {"activity": "servicios_financieros"}, "long_title": "Contribución año/año del sector Servicios financieros y empresariales en el PIB de Región de Los Lagos"},
+      {"id": "F035.PIB.V12.R.CLP.2018.10.Z.Z.10.0.A", "short_title": "Servicios de vivienda e inmobiliarios", "classification": {"activity": "servicio_viviendas"}, "long_title": "Contribución año/año del sector Servicios de vivienda e inmobiliarios en el PIB de Región de Los Lagos"},
+      {"id": "F035.PIB.V12.R.CLP.2018.11.Z.Z.10.0.A", "short_title": "Servicios personales", "classification": {"activity": "servicio_personales"}, "long_title": "Contribución año/año del sector Servicios personales en el PIB de Región de Los Lagos"},
+      {"id": "F035.PIB.V12.R.CLP.2018.12.Z.Z.10.0.A", "short_title": "Administración pública", "classification": {"activity": "admin_publica"}, "long_title": "Contribución año/año del sector Administración pública en el PIB de Región de Los Lagos"},
+      {"id": "F035.PIB.V12.R.CLP.2018.CONT.Z.Z.10.0.A", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "Contribución año/año del PIB de Región de Los Lagos"}
+    ]
+  },
+
+  "PIB anual por actividad económica, Región de Aysén del General Carlos Ibáñez del Campo, contribución porcentual respecto de igual periodo del año anterior, series empalmadas, referencia 2018": {
+    "classification": {
+      "indicator": "pib",
+      "calc_mode": "contribution",
+      "seasonality": "nsa",
+      "frequency": "a",
+      "price": "enc",
+      "has_activity": 1,
+      "has_region": 1,
+      "has_investment": 0,
+      "region": "aysen"
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_CONT_PB_XI_ACT",
+    "series": [
+      {"id": "F035.PIB.V12.R.CLP.2018.01.Z.Z.11.0.A", "short_title": "Agropecuario-silvícola", "classification": {"activity": "agropecuario"}, "long_title": "Contribución año/año del sector Agropecuario-silvícola en el PIB de Región de Aysén del General Carlos Ibáñez del Campo"},
+      {"id": "F035.PIB.V12.R.CLP.2018.02.04.Z.11.0.A", "short_title": "Pesca", "classification": {"activity": "pesca"}, "long_title": "Contribución año/año del sector Pesca en el PIB de Región de Aysén del General Carlos Ibáñez del Campo"},
+      {"id": "F035.PIB.V12.R.CLP.2018.03.Z.Z.11.0.A", "short_title": "Minería", "classification": {"activity": "mineria"}, "long_title": "Contribución año/año del sector Minería en el PIB de Región de Aysén del General Carlos Ibáñez del Campo"},
+      {"id": "F035.PIB.V12.R.CLP.2018.04.Z.Z.11.0.A", "short_title": "Industria manufacturera", "classification": {"activity": "industria"}, "long_title": "Contribución año/año del sector Industria manufacturera en el PIB de Región de Aysén del General Carlos Ibáñez del Campo"},
+      {"id": "F035.PIB.V12.R.CLP.2018.05.Z.Z.11.0.A", "short_title": "Electricidad, gas, agua y gestión de desechos", "classification": {"activity": "electricidad"}, "long_title": "Contribución año/año del sector Electricidad, gas, agua y gestión de desechos en el PIB de Región de Aysén del General Carlos Ibáñez del Campo"},
+      {"id": "F035.PIB.V12.R.CLP.2018.06.Z.Z.11.0.A", "short_title": "Construcción", "classification": {"activity": "construccion"}, "long_title": "Contribución año/año del sector Construcción en el PIB de Región de Aysén del General Carlos Ibáñez del Campo"},
+      {"id": "F035.PIB.V12.R.CLP.2018.COM.Z.Z.11.0.A", "short_title": "Comercio", "classification": {"activity": "comercio"}, "long_title": "Contribución año/año del sector Comercio en el PIB de Región de Aysén del General Carlos Ibáñez del Campo"},
+      {"id": "F035.PIB.V12.R.CLP.2018.RH.Z.Z.11.0.A", "short_title": "Restaurantes y hoteles", "classification": {"activity": "restaurantes"}, "long_title": "Contribución año/año del sector Restaurantes y hoteles en el PIB de Región de Aysén del General Carlos Ibáñez del Campo"},
+      {"id": "F035.PIB.V12.R.CLP.2018.08.Z.Z.11.0.A", "short_title": "Transporte, información y comunicaciones", "classification": {"activity": "transporte"}, "long_title": "Contribución año/año del sector Transporte, información y comunicaciones en el PIB de Región de Aysén del General Carlos Ibáñez del Campo"},
+      {"id": "F035.PIB.V12.R.CLP.2018.09.21.Z.11.0.A", "short_title": "Servicios financieros y empresariales", "classification": {"activity": "servicios_financieros"}, "long_title": "Contribución año/año del sector Servicios financieros y empresariales en el PIB de Región de Aysén del General Carlos Ibáñez del Campo"},
+      {"id": "F035.PIB.V12.R.CLP.2018.10.Z.Z.11.0.A", "short_title": "Servicios de vivienda e inmobiliarios", "classification": {"activity": "servicio_viviendas"}, "long_title": "Contribución año/año del sector Servicios de vivienda e inmobiliarios en el PIB de Región de Aysén del General Carlos Ibáñez del Campo"},
+      {"id": "F035.PIB.V12.R.CLP.2018.11.Z.Z.11.0.A", "short_title": "Servicios personales", "classification": {"activity": "servicio_personales"}, "long_title": "Contribución año/año del sector Servicios personales en el PIB de Región de Aysén del General Carlos Ibáñez del Campo"},
+      {"id": "F035.PIB.V12.R.CLP.2018.12.Z.Z.11.0.A", "short_title": "Administración pública", "classification": {"activity": "admin_publica"}, "long_title": "Contribución año/año del sector Administración pública en el PIB de Región de Aysén del General Carlos Ibáñez del Campo"},
+      {"id": "F035.PIB.V12.R.CLP.2018.CONT.Z.Z.11.0.A", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "Contribución año/año del PIB de Región de Aysén del General Carlos Ibáñez del Campo"}
+    ]
+  },
+
+  "PIB anual por actividad económica, Región de Magallanes y de la Antártica Chilena, contribución porcentual respecto de igual periodo del año anterior, series empalmadas, referencia 2018": {
+    "classification": {
+      "indicator": "pib",
+      "calc_mode": "contribution",
+      "seasonality": "nsa",
+      "frequency": "a",
+      "price": "enc",
+      "has_activity": 1,
+      "has_region": 1,
+      "has_investment": 0,
+      "region": "magallanes"
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_CONT_PB_XII_ACT",
+    "series": [
+      {"id": "F035.PIB.V12.R.CLP.2018.01.Z.Z.12.0.A", "short_title": "Agropecuario-silvícola", "classification": {"activity": "agropecuario"}, "long_title": "Contribución año/año del sector Agropecuario-silvícola en el PIB de Región de Magallanes y de la Antártica Chilena"},
+      {"id": "F035.PIB.V12.R.CLP.2018.02.04.Z.12.0.A", "short_title": "Pesca", "classification": {"activity": "pesca"}, "long_title": "Contribución año/año del sector Pesca en el PIB de Región de Magallanes y de la Antártica Chilena"},
+      {"id": "F035.PIB.V12.R.CLP.2018.03.Z.Z.12.0.A", "short_title": "Minería", "classification": {"activity": "mineria"}, "long_title": "Contribución año/año del sector Minería en el PIB de Región de Magallanes y de la Antártica Chilena"},
+      {"id": "F035.PIB.V12.R.CLP.2018.04.Z.Z.12.0.A", "short_title": "Industria manufacturera", "classification": {"activity": "industria"}, "long_title": "Contribución año/año del sector Industria manufacturera en el PIB de Región de Magallanes y de la Antártica Chilena"},
+      {"id": "F035.PIB.V12.R.CLP.2018.05.Z.Z.12.0.A", "short_title": "Electricidad, gas, agua y gestión de desechos", "classification": {"activity": "electricidad"}, "long_title": "Contribución año/año del sector Electricidad, gas, agua y gestión de desechos en el PIB de Región de Magallanes y de la Antártica Chilena"},
+      {"id": "F035.PIB.V12.R.CLP.2018.06.Z.Z.12.0.A", "short_title": "Construcción", "classification": {"activity": "construccion"}, "long_title": "Contribución año/año del sector Construcción en el PIB de Región de Magallanes y de la Antártica Chilena"},
+      {"id": "F035.PIB.V12.R.CLP.2018.COM.Z.Z.12.0.A", "short_title": "Comercio", "classification": {"activity": "comercio"}, "long_title": "Contribución año/año del sector Comercio en el PIB de Región de Magallanes y de la Antártica Chilena"},
+      {"id": "F035.PIB.V12.R.CLP.2018.RH.Z.Z.12.0.A", "short_title": "Restaurantes y hoteles", "classification": {"activity": "restaurantes"}, "long_title": "Contribución año/año del sector Restaurantes y hoteles en el PIB de Región de Magallanes y de la Antártica Chilena"},
+      {"id": "F035.PIB.V12.R.CLP.2018.08.Z.Z.12.0.A", "short_title": "Transporte, información y comunicaciones", "classification": {"activity": "transporte"}, "long_title": "Contribución año/año del sector Transporte, información y comunicaciones en el PIB de Región de Magallanes y de la Antártica Chilena"},
+      {"id": "F035.PIB.V12.R.CLP.2018.09.21.Z.12.0.A", "short_title": "Servicios financieros y empresariales", "classification": {"activity": "servicios_financieros"}, "long_title": "Contribución año/año del sector Servicios financieros y empresariales en el PIB de Región de Magallanes y de la Antártica Chilena"},
+      {"id": "F035.PIB.V12.R.CLP.2018.10.Z.Z.12.0.A", "short_title": "Servicios de vivienda e inmobiliarios", "classification": {"activity": "servicio_viviendas"}, "long_title": "Contribución año/año del sector Servicios de vivienda e inmobiliarios en el PIB de Región de Magallanes y de la Antártica Chilena"},
+      {"id": "F035.PIB.V12.R.CLP.2018.11.Z.Z.12.0.A", "short_title": "Servicios personales", "classification": {"activity": "servicio_personales"}, "long_title": "Contribución año/año del sector Servicios personales en el PIB de Región de Magallanes y de la Antártica Chilena"},
+      {"id": "F035.PIB.V12.R.CLP.2018.12.Z.Z.12.0.A", "short_title": "Administración pública", "classification": {"activity": "admin_publica"}, "long_title": "Contribución año/año del sector Administración pública en el PIB de Región de Magallanes y de la Antártica Chilena"},
+      {"id": "F035.PIB.V12.R.CLP.2018.CONT.Z.Z.12.0.A", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "Contribución año/año del PIB de Región de Magallanes y de la Antártica Chilena"}
+    ]
+  },
   "PIB anual por región, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
     "classification": {
       "indicator": "pib",
