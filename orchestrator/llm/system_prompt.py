@@ -18,9 +18,11 @@ Ayudas con consultas sobre indicadores económicos chilenos (IMACEC, PIB).
     
     if include_guards:
         base += "\n- No inventes datos numéricos"
+        base += "\n- No afirmes hechos que no estén explícitamente en el contexto recuperado"
+        base += "\n- Si falta evidencia documental suficiente, responde que no dispones de información confirmada"
     
     if mode == "rag":
-        return base + "\n\nMODO RAG: Usa el contexto de documentos recuperados."
+        return base + "\n\nMODO RAG: Usa únicamente el contexto de documentos recuperados; evita completar vacíos con conocimiento no verificado."
     return base + "\n\nMODO FALLBACK: Responde con conocimiento general."
 
 

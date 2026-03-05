@@ -390,7 +390,7 @@ def make_data_node(memory_adapter: Any):
 
         if (
             calc_mode_cls == "contribution"
-            and activity_cls in (None, "none")
+            and investment_cls == "specific"
             and investment_cls in (None, "none")
             and region_cls in (None, "none")
         ):
@@ -411,6 +411,15 @@ def make_data_node(memory_adapter: Any):
 
         hist = 1 if indicator_ent == "pib" and str(frequency_ent or "").strip().lower() == "a" and period_reference_year is not None and period_reference_year < 1996 else None
         monthly_frequency_note: Optional[str] = None
+        
+        
+        if (
+            calc_mode_cls == "contribution"
+            and investment_cls == "specific"
+            and investment_ent == "demanda_interna"
+        ):
+            investment_cls = "general"
+        
         
         logger.info("[DATA_NODE] =========================================================")
         logger.info("[DATA_NODE] calc_mode=%s", calc_mode_cls)
@@ -782,18 +791,18 @@ def make_data_node(memory_adapter: Any):
                 latest_series_obs = selected_series_obs
 
                 row_title = str(series.get("short_title") or series_id).strip()
-                series_activity = (
-                    (series.get("classification") or {}).get("activity")
-                    if isinstance(series, dict)
-                    else None
-                )
+                series_cls = (series.get("classification") or {}) if isinstance(series, dict) else {}
+                series_activity = series_cls.get("activity")
+                series_investment = series_cls.get("investment")
                 series_activity_normalized = str(series_activity).strip().lower() if series_activity not in (None, "") else None
+                series_investment_normalized = str(series_investment).strip().lower() if series_investment not in (None, "") else None
 
                 observations.append(
                     {
                         "series_id": series_id,
                         "title": row_title,
                         "activity": series_activity_normalized,
+                        "investment": series_investment_normalized,
                         "date": latest_series_obs.get("date"),
                         "value": latest_series_obs.get("value"),
                     }
@@ -1216,6 +1225,7 @@ def make_data_node(memory_adapter: Any):
                 "result": observations,
                 "all_series_data": observations_all or None,
                 "source_url": target_series_url,
+                "question": question,
             }
 
             collected: List[str] = []

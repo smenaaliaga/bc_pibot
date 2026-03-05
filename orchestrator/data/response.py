@@ -104,37 +104,10 @@ def build_no_series_message(
     normalized_activity: Optional[str] = None,
     indicator_label: Optional[str] = None,
 ) -> str:
-    question_text = re.sub(r"\s+", " ", str(question or "")).strip()
-    activity_text = str(requested_activity or "").strip()
-    indicator_text = str(indicator_label or "").strip()
-    normalized_activity_text = str(normalized_activity or "").strip()
-
-    if activity_text.lower() in {"", "none", "null", "[]"}:
-        activity_text = ""
-    if indicator_text.upper() in {"", "NONE", "NULL", "[]"}:
-        indicator_text = ""
-    if normalized_activity_text.lower() in {"", "none", "null", "[]"}:
-        normalized_activity_text = ""
-
-    activity_detail = ""
-    if (
-        activity_text
-        and normalized_activity_text
-        and activity_text.lower() != normalized_activity_text.lower()
-    ):
-        activity_detail = f" (normalizada como '{normalized_activity_text}')"
-
-    if activity_text and indicator_text:
-        intro = (
-            f"No encontré una serie para la actividad '{activity_text}' "
-            f"en el indicador {indicator_text}{activity_detail}."
-        )
-    elif activity_text:
-        intro = f"No encontré una serie para la actividad '{activity_text}'{activity_detail}."
-    else:
-        intro = "No encontré una serie que coincida con tu consulta."
-
-    return f"{intro} Puedes explorar más series directamente en la BDE: {BDE_SERIES_URL}."
+    return (
+        "No encontré una serie que coincida con tu consulta. "
+        f"Puedes explorar más series directamente en la BDE: 🔗 {BDE_SERIES_URL}."
+    )
 
 
 def format_period_labels(date_str: Optional[str], freq: str) -> list[str]:
@@ -274,6 +247,7 @@ def specific_response(
     used_latest_fallback_for_point: bool = False,
     source_urls: List[str],
     intro_llm_temperature: float = 0.7,
+    question: Optional[str] = None,
 ) -> Iterable[str]:
     sections = ResponseSections(
         introduction=_specific_intro(
@@ -297,6 +271,7 @@ def specific_response(
             all_series_data=all_series_data,
             used_latest_fallback_for_point=used_latest_fallback_for_point,
             intro_llm_temperature=intro_llm_temperature,
+            question=question,
         ),
         metadata=_metadata_block(series_id, series_title),
         table=_specific_table(
@@ -361,6 +336,7 @@ def specific_point_response(
     used_latest_fallback_for_point: bool = False,
     source_urls: List[str],
     intro_llm_temperature: float = 0.7,
+    question: Optional[str] = None,
 ) -> Iterable[str]:
     sections = ResponseSections(
         introduction=_specific_intro(
@@ -384,6 +360,7 @@ def specific_point_response(
             all_series_data=all_series_data,
             used_latest_fallback_for_point=used_latest_fallback_for_point,
             intro_llm_temperature=intro_llm_temperature,
+            question=question,
         ),
         metadata=_metadata_block(series_id, series_title),
         table=_specific_table(
@@ -478,6 +455,7 @@ def _specific_intro(
     all_series_data: Optional[List[Dict[str, Any]]],
     used_latest_fallback_for_point: bool = False,
     intro_llm_temperature: float = 0.7,
+    question: Optional[str] = None,
 ) -> Iterable[str]:
     if req_form in {"latest", "point", "specific_point"} and is_contribution:
         yield _build_latest_contribution_intro(
@@ -490,6 +468,7 @@ def _specific_intro(
             component_context_val=component_context_val,
             is_specific_activity=is_specific_activity,
             used_latest_fallback_for_point=used_latest_fallback_for_point,
+            question=question,
         )
         yield "\n\n"
         return
@@ -505,6 +484,7 @@ def _specific_intro(
             display_period_label=display_period_label,
             is_contribution=is_contribution,
             all_series_data=all_series_data,
+            question=question,
         )
         yield "\n\n"
         return
@@ -597,6 +577,7 @@ def _build_latest_contribution_intro(
     component_context_val: Optional[str] = None,
     is_specific_activity: bool = False,
     used_latest_fallback_for_point: bool = False,
+    question: Optional[str] = None,
 ) -> str:
     def _is_aggregate_indicator_row(series: Dict[str, Any]) -> bool:
         activity_value = str(series.get("activity") or "").strip().lower()
@@ -615,6 +596,8 @@ def _build_latest_contribution_intro(
         if title_value in {"subtotal regionalizado", "extrarregional"}:
             return True
         if not has_dimension and title_value in {"pib", "imacec", "producto interno bruto"}:
+            return True
+        if investment_value == "demanda_interna" and title_value == "demanda interna":
             return True
         return False
 
@@ -697,9 +680,12 @@ def _build_latest_contribution_intro(
                 continue
             activity_value = str(series.get("activity") or "").strip().lower()
             title_value = str(series.get("title") or "").strip().lower()
+            investment_value = str(series.get("investment") or "").strip().lower()
             if activity_value in {"total", "imacec", "pib"}:
                 return series
             if title_value in {"pib", "imacec", "producto interno bruto"}:
+                return series
+            if investment_value == "demanda_interna" and title_value == "demanda interna":
                 return series
 
         for series in rows:
@@ -725,8 +711,22 @@ def _build_latest_contribution_intro(
         format_period_labels(base_row.get("date") if isinstance(base_row, dict) else None, str(freq or ""))[0]
     )
     comparison_phrase = _comparison_phrase(freq)
-    requested_subject = _indicator_with_period(indicator_raw, period_text)
-    observed_subject = _indicator_with_period(indicator_raw, observed_period_text)
+
+    # Detectar si el agregado es "Demanda interna" para ajustar el sujeto
+    aggregate_title_norm = str(base_row.get("title") or "").strip().lower() if isinstance(base_row, dict) else ""
+    is_demanda_interna_aggregate = aggregate_title_norm == "demanda interna"
+
+    if is_demanda_interna_aggregate:
+        def _di_subject(period_label: str) -> str:
+            p = str(period_label or "").strip()
+            if p.lower().startswith("el "):
+                return f"la Demanda interna del {p[3:]}"
+            return f"la Demanda interna de {p}" if p else "la Demanda interna"
+        requested_subject = _di_subject(period_text)
+        observed_subject = _di_subject(observed_period_text)
+    else:
+        requested_subject = _indicator_with_period(indicator_raw, period_text)
+        observed_subject = _indicator_with_period(indicator_raw, observed_period_text)
 
     first_sentence = (
         f"De acuerdo con la información publicada en la BDE, {requested_subject} "
@@ -825,23 +825,70 @@ def _build_latest_contribution_intro(
     if not candidates:
         return first_sentence
 
-    top_sector = max(candidates, key=lambda series: float(series.get("value") or 0.0))
-    sector_name = str(
-        top_sector.get("title")
-        or top_sector.get("activity")
-        or top_sector.get("region")
-        or top_sector.get("investment")
-        or ""
-    ).strip()
-    sector_name = sector_name.replace("_", " ")
-    if not sector_name:
-        return first_sentence
+    # ---------- LLM-based analysis ----------
+    def _build_candidates_table() -> str:
+        lines: List[str] = []
+        for c in candidates:
+            name = str(
+                c.get("title") or c.get("activity") or c.get("region") or c.get("investment") or ""
+            ).strip().replace("_", " ")
+            val = _percentage_es(c.get("value"))
+            lines.append(f"- {name}: {val}")
+        return "\n".join(lines)
 
-    sector_phrase = _sector_phrase(sector_name)
-    second_sentence = (
-        f"La mayor contribución provino {_prepend_de(sector_phrase)}, con {_percentage_es(top_sector.get('value'))}."
+    def _deterministic_top_sentence() -> str:
+        top_sector = max(candidates, key=lambda s: float(s.get("value") or 0.0))
+        name = str(
+            top_sector.get("title") or top_sector.get("activity")
+            or top_sector.get("region") or top_sector.get("investment") or ""
+        ).strip().replace("_", " ")
+        if not name:
+            return ""
+        return (
+            f"La mayor contribución provino {_prepend_de(_sector_phrase(name))}, "
+            f"con {_percentage_es(top_sector.get('value'))}."
+        )
+
+    user_question = str(question or "").strip()
+    if not user_question:
+        fallback = _deterministic_top_sentence()
+        return f"{first_sentence} {fallback}" if fallback else first_sentence
+
+    candidates_table = _build_candidates_table()
+    llm_prompt = (
+        "Eres un analista económico del Banco Central de Chile.\n"
+        f"El usuario preguntó: \"{user_question}\"\n\n"
+        f"Contexto: {first_sentence}\n\n"
+        f"Componentes disponibles (contribución al {indicator_raw}):\n{candidates_table}\n\n"
+        "Instrucciones ESTRICTAS:\n"
+        "- El texto de 'Contexto' YA se le mostró al usuario. NUNCA repitas, parafrasees ni resumas ese contexto. "
+        "No menciones de nuevo el indicador, el período ni el porcentaje total. Comienza DIRECTAMENTE con el análisis de los componentes.\n"
+        "- Responde ÚNICAMENTE lo que el usuario preguntó. NO agregues información que no fue solicitada.\n"
+        "- DISTINCIÓN SEMÁNTICA CLAVE entre 'menos aportó' y 'restó':\n"
+        "  * 'la que MENOS APORTÓ al crecimiento' = la de MENOR contribución POSITIVA (valor positivo más bajo). NO son las negativas.\n"
+        "  * 'la que RESTÓ / DETRAJO del crecimiento' = la de contribución NEGATIVA.\n"
+        "  Respeta esta diferencia rigurosamente.\n"
+        "- Si pregunta qué actividad explicó el crecimiento, menciona SOLO la(s) de contribución positiva relevante(s). No menciones las negativas a menos que se pida.\n"
+        "- Si pregunta cuál 'menos aportó', indica la de menor valor positivo (ej: 0,1%), NO las de valor negativo.\n"
+        "- Si pregunta qué restó o detrajo del crecimiento, menciona SOLO las de contribución negativa.\n"
+        "- Si pregunta por las N principales, lista exactamente N, ordenadas.\n"
+        "- Usa formato de porcentajes con coma decimal (ej: 1,2%).\n"
+        "- Responde en español, de forma concisa (1-2 oraciones máximo).\n"
+        "- NO inventes datos; usa solo los valores del listado anterior.\n"
     )
-    return f"{first_sentence} {second_sentence}"
+
+    try:
+        llm = build_llm(streaming=False, temperature=0.3, mode="fallback")
+        raw_response = llm.generate(llm_prompt, history=[], intent_info=None)
+        llm_text = str(raw_response or "").strip()
+        if llm_text and "(error generando)" not in llm_text.lower():
+            logger.info("[CONTRIBUTION_INTRO] LLM analysis OK (%d chars)", len(llm_text))
+            return f"{first_sentence} {llm_text}"
+    except Exception as exc:
+        logger.warning("[CONTRIBUTION_INTRO] LLM analysis failed: %s", exc)
+
+    fallback = _deterministic_top_sentence()
+    return f"{first_sentence} {fallback}" if fallback else first_sentence
 
 
 def _build_latest_intro_fallback(
@@ -855,6 +902,7 @@ def _build_latest_intro_fallback(
     display_period_label: str,
     is_contribution: bool,
     all_series_data: Optional[List[Dict[str, Any]]],
+    question: Optional[str] = None,
 ) -> str:
     def _clean_text(value: Any) -> str:
         text = str(value or "").strip()
@@ -1052,6 +1100,63 @@ def _build_latest_intro_fallback(
         indicator_norm,
         generic_indicator,
     )
+
+    # ---------- LLM-based analysis for non-contribution breakdowns ----------
+    user_question = str(question or "").strip()
+    if user_question and isinstance(all_series_data, list) and all_series_data:
+        variation_candidates: List[Tuple[str, str]] = []
+        for series in all_series_data:
+            if not isinstance(series, dict):
+                continue
+            series_name = str(
+                series.get("title") or series.get("activity")
+                or series.get("region") or series.get("investment") or ""
+            ).strip().replace("_", " ")
+            series_name_norm = series_name.lower().strip()
+            if series_name_norm in {"total", "pib", "imacec", "producto interno bruto", "pib a costo de factores", ""}:
+                continue
+            var_val = series.get("comparison_value")
+            if var_val is None:
+                var_val = series.get("yoy") if series.get("yoy") is not None else series.get("prev_period")
+            try:
+                var_pct = f"{float(var_val):.1f}%".replace(".", ",")
+            except (TypeError, ValueError):
+                continue
+            variation_candidates.append((series_name, var_pct))
+
+        if variation_candidates:
+            candidates_text = "\n".join(f"- {n}: {v}" for n, v in variation_candidates)
+            llm_prompt = (
+                "Eres un analista económico del Banco Central de Chile.\n"
+                f"El usuario preguntó: \"{user_question}\"\n\n"
+                f"Contexto: {base_text}\n\n"
+                f"Componentes del desglose del {generic_indicator} (variación %):\n{candidates_text}\n\n"
+                "Instrucciones ESTRICTAS:\n"
+                "- El texto de 'Contexto' YA se le mostró al usuario. NUNCA repitas, parafrasees ni resumas ese contexto. "
+                "No menciones de nuevo el indicador, el período ni el porcentaje total. Comienza DIRECTAMENTE con el análisis de los componentes.\n"
+                "- Responde ÚNICAMENTE lo que el usuario preguntó. NO agregues información que no fue solicitada.\n"
+                "- DISTINCIÓN SEMÁNTICA CLAVE entre 'menos aportó/creció' y 'restó/cayó':\n"
+                "  * 'la que MENOS CRECIÓ / MENOS APORTÓ' = la de MENOR variación POSITIVA (valor positivo más bajo). NO son las negativas.\n"
+                "  * 'la que CAYÓ / RESTÓ / SE CONTRAJO' = la de variación NEGATIVA.\n"
+                "  Respeta esta diferencia rigurosamente.\n"
+                "- Si pregunta qué actividad explicó el crecimiento, menciona SOLO la(s) de variación positiva relevante(s). No menciones las negativas a menos que se pida.\n"
+                "- Si pregunta cuál 'menos creció' o 'menos aportó', indica la de menor valor positivo (ej: 0,1%), NO las de valor negativo.\n"
+                "- Si pregunta qué cayó o restó al crecimiento, menciona SOLO las de variación negativa.\n"
+                "- Si pregunta por las N principales, lista exactamente N, ordenadas.\n"
+                "- Usa formato de porcentajes con coma decimal (ej: 1,2%).\n"
+                "- Responde en español, de forma concisa (1-2 oraciones máximo).\n"
+                "- NO inventes datos; usa solo los valores del listado anterior.\n"
+            )
+            try:
+                llm = build_llm(streaming=False, temperature=0.3, mode="fallback")
+                raw_response = llm.generate(llm_prompt, history=[], intent_info=None)
+                llm_text = str(raw_response or "").strip()
+                if llm_text and "(error generando)" not in llm_text.lower():
+                    logger.info("[FALLBACK_INTRO] LLM analysis OK (%d chars)", len(llm_text))
+                    return f"{base_text} {llm_text}"
+            except Exception as exc:
+                logger.warning("[FALLBACK_INTRO] LLM analysis failed: %s", exc)
+
     if top_variation_sentence:
         return f"{base_text} {top_variation_sentence}"
 
@@ -1196,7 +1301,7 @@ def _build_range_prompt(
     llm_prompt_parts.append("INSTRUCCIÓN DE INTRODUCCIÓN (OBLIGATORIA):")
     llm_prompt_parts.append(
         "La primera oración debe seguir esta estructura y el LLM puede complementar el cierre: "
-        f"'La variación {freq_label} de la {series_desc} {comparison_text}, según los datos de la BDE, es ...'."
+        f"'La variación {freq_label} para {series_desc} {comparison_text}, según los datos de la BDE, es ...'."
     )
     llm_prompt_parts.append("NO uses la palabra 'interanual'.")
     llm_prompt_parts.append(
@@ -1317,7 +1422,7 @@ def _build_latest_prompt(
     llm_prompt_parts.append("INSTRUCCIÓN DE INTRODUCCIÓN (OBLIGATORIA):")
     llm_prompt_parts.append(
         "La primera oración debe seguir esta estructura y el LLM puede complementar el cierre: "
-        f"'La variación {freq_label} de la {series_desc} {comparison_text}, según los datos de la BDE, es ...'."
+        f"'La variación {freq_label} para {series_desc} {comparison_text}, según los datos de la BDE, es ...'."
     )
     llm_prompt_parts.append("NO uses la palabra 'interanual'.")
     llm_prompt_parts.append(
@@ -2206,7 +2311,7 @@ def _specific_table(
                 "region": "Región",
                 "investment": "Componente",
             }.get(dimension_key, "Serie")
-            yield f"{header_label} | Valor* | Variación\n"
+            yield f"{header_label} | Valor * | Variación\n"
             yield "----------|-------|----------\n"
 
             max_row = None
@@ -2242,7 +2347,7 @@ def _specific_table(
             yield "\n"
             yield "_Tasa de variación porcentual_\n"
         else:
-            yield "Periodo | Valor | Variación\n"
+            yield "Periodo | Valor * | Variación\n"
             yield "--------|-------|----------\n"
             for row in obs_to_show:
                 date_str = row.get("date", "")
@@ -2251,11 +2356,9 @@ def _specific_table(
                 labels = format_period_labels(date_str, freq)
                 period_label = labels[1] if use_short_annual_label else labels[0]
                 value_formatted = format_value(value)
-                if value_formatted != "--":
-                    value_formatted = f"{value_formatted} *"
                 yield f"{period_label} | {value_formatted} | {format_percentage(var_value)}\n"
     else:
-        yield "Periodo | Valor | Variación\n"
+        yield "Periodo | Valor * | Variación\n"
         yield "--------|-------|----------\n"
         for row in obs_to_show:
             date_str = row.get("date", "")
@@ -2264,8 +2367,6 @@ def _specific_table(
             labels = format_period_labels(date_str, freq)
             period_label = labels[1] if use_short_annual_label else labels[0]
             value_formatted = format_value(value)
-            if value_formatted != "--":
-                value_formatted = f"{value_formatted} *"
             yield f"{period_label} | {value_formatted} | {format_percentage(var_value)}\n"
     yield "\n"
 

@@ -49,7 +49,7 @@ def test_specific_response_range_single_period_avoids_redundant_from_to(monkeypa
     assert "una variación de 2,6%" in output
 
 
-def test_specific_response_table_value_includes_asterisk(monkeypatch):
+def test_specific_response_table_uses_asterisk_in_value_header(monkeypatch):
     class _FakeLLM:
         def stream(self, prompt, history=None, intent_info=None):
             yield "texto de prueba"
@@ -93,8 +93,8 @@ def test_specific_response_table_value_includes_asterisk(monkeypatch):
     )
 
     normalized_output = output.replace("\\", "").replace(" ", "")
-    assert "3.731*" in normalized_output
-    assert "3ertrimestre2025|3.731*|-6,5%" in normalized_output
+    assert "Periodo|Valor*|Variación" in normalized_output
+    assert "3ertrimestre2025|3.731|-6,5%" in normalized_output
 
 
 def test_specific_response_contribution_announces_missing_requested_period(monkeypatch):
@@ -222,7 +222,8 @@ def test_specific_response_original_general_renders_breakdown_table_with_max_gro
         )
     )
 
-    assert "Actividad | Valor* | Variación" in output
+    normalized_output = output.replace("\\", "").replace(" ", "")
+    assert "Actividad|Valor*|Variación" in normalized_output
     assert "**Comercio** | **250**" in output
     assert "**4,2%**" in output
 

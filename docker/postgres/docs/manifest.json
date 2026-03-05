@@ -14,7 +14,9 @@
       "topic": "pib",
       "version": "2025.12.07",
       "tags": ["pib", "metodologia"],
-      "preferred_filename": "cder2018_chunks.json"
+      "preferred_filename": "cder2018_chunks.json",
+      "link": "https://www.bcentral.cl/documents/33528/3434019/CompilacionReferencia2018.pdf/fa19a03f-5ca2-e6da-f367-ee2fd5ee6fb5",
+      "docname": "Compilación de Referencia 2018"
     },
     {
       "id": "cuentas_ref18",
@@ -22,7 +24,9 @@
       "topic": "pib",
       "version": "2025.12.03",
       "tags": ["pib", "fuentes"],
-      "preferred_filename": "cuentas_ref18_chunks.json"
+      "preferred_filename": "cuentas_ref18_chunks.json",
+      "link": "https://www.bcentral.cl/documents/33528/3900200/Cuentas_Nacionales_metodos_fuentes_ref18.pdf.pdf/178a16b7-84f0-7386-e377-96ebc5b9e884",
+      "docname": "Cuentas Nacionales - Métodos y Fuentes de información"
     },
     {
       "id": "contrib_sectorial_trimestral",
@@ -30,7 +34,9 @@
       "topic": "pib",
       "version": "2025.12.07",
       "tags": ["pib", "crecimiento"],
-      "preferred_filename": "contrib_sectorial_chunks.json"
+      "preferred_filename": "contrib_sectorial_chunks.json",
+      "link": "https://www.bcentral.cl/documents/33528/133329/bcch_archivo_096491_es.pdf/38479df5-3e43-068c-4949-a359d33f62e6",
+      "docname": "Contribución Sectorial al Crecimiento Trimestral"
     },
     {
       "id": "glosario_bcch",
@@ -38,7 +44,10 @@
       "topic": "metodologia",
       "version": "2025.12.07",
       "tags": ["glosario", "metodologia"],
-      "preferred_filename": "glosario_chunks.json"
+      "preferred_filename": "glosario_chunks.json",
+      "link": "https://si3.bcentral.cl/estadisticas/Principal1/enlaces/aplicaciones/index.html",
+      "docname": "Glosario económico"
+
     },
     {
       "id": "pib_regional",
@@ -46,7 +55,9 @@
       "topic": "pib",
       "version": "2025.12.07",
       "tags": ["pib", "regional"],
-      "preferred_filename": "pib_regional_chunks.json"
+      "preferred_filename": "pib_regional_chunks.json",
+      "link": "https://www.bcentral.cl/documents/33528/133381/Producto_Interno_Bruto_Regional_2022.pdf/79f39eff-4537-a291-f9c7-0dd05464a977",
+      "docname": "Producto Interno Bruto Regional: Métodos y Fuentes de Información"
     },
     {
       "id": "imacec_metodologia",
@@ -54,6 +65,8 @@
       "topic": "imacec",
       "version": "2025.12.03",
       "tags": ["imacec", "metodologia"],
-      "preferred_filename": "imacec_chunks.json"
+      "preferred_filename": "imacec_chunks.json",
+      "link": "https://si3.bcentral.cl/estadisticas/Principal1/Metodologias/CCNN/imacec/Imacec.pdf",
+      "docname": "Índice Mensual de Actividad Económica - IMACEC"
     }  ]
 }

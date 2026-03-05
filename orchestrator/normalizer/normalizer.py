@@ -222,7 +222,7 @@ ACTIVITY_TERMS_PIB = {
         "comunicaciones", "servicios de información y comunicaciones",
         "servicios de información", "comunicaciones y servicios de información"
     ],
-    "servicio_financieros": ["servicios financieros", "financieros", "finanzas"],
+    "servicios_financieros": ["servicios financieros", "financieros", "finanzas"],
     "servicios_empresariales": [
         "servicios empresariales", "servicios de empresas",
         "servicios profesionales", "empresariales", "empresas", 

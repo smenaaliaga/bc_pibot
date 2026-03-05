@@ -36,6 +36,27 @@ def _chunk_logs_enabled() -> bool:
     return os.getenv("STREAM_CHUNK_LOGS", "0").lower() in ("1", "true", "yes", "on")
 
 
+def _rag_min_docs() -> int:
+    try:
+        return max(0, int(os.getenv("RAG_MIN_DOCS", "1")))
+    except Exception:
+        return 1
+
+
+def _rag_min_context_chars() -> int:
+    try:
+        return max(0, int(os.getenv("RAG_MIN_CONTEXT_CHARS", "250")))
+    except Exception:
+        return 250
+
+
+def _safe_no_evidence_reply() -> str:
+    return (
+        "No cuento con evidencia documental suficiente en este momento para responder con precisión. "
+        "Si quieres, puedo intentar con otra formulación de la pregunta o con más contexto específico."
+    )
+
+
 def _build_system_prompt(mode: GuardrailMode = "rag") -> str:
     """Construye el prompt del sistema basado en el modo."""
     base = """Eres el asistente económico del Banco Central de Chile (PIBot).
@@ -45,7 +66,9 @@ Ayudas con consultas sobre indicadores económicos chilenos (IMACEC, PIB).
 - Responde de forma clara y concisa
 - Usa los datos proporcionados cuando estén disponibles
 - Si no tienes información, indícalo claramente
-- No inventes datos numéricos"""
+- No inventes datos numéricos
+- No afirmes hechos que no estén explícitamente en el contexto recuperado
+- Si no hay evidencia suficiente, declara incertidumbre en vez de completar vacíos"""
     
     if mode == "rag":
         return base + "\n\nMODO RAG: Usa el contexto de documentos recuperados para responder consultas metodológicas."
@@ -73,6 +96,59 @@ def _first_entity_value(entity: Any) -> str:
     return ""
 
 
+def _first_non_empty_text(value: Any) -> str:
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    if isinstance(value, list):
+        for item in value:
+            if isinstance(item, str) and item.strip():
+                return item.strip()
+    return ""
+
+
+def _extract_doc_reference(doc: Any) -> Optional[Dict[str, str]]:
+    metadata = getattr(doc, "metadata", None)
+    if not isinstance(metadata, dict):
+        return None
+
+    link = _first_non_empty_text(
+        metadata.get("link")
+        or metadata.get("source_url")
+        or metadata.get("url")
+    )
+    docname = _first_non_empty_text(
+        metadata.get("docname")
+        or metadata.get("document_name")
+        or metadata.get("title")
+        or metadata.get("source")
+    )
+    if not link:
+        return None
+    if not docname:
+        docname = "documento"
+    return {"docname": docname, "link": link}
+
+
+def _collect_doc_references(docs: Any, max_items: int = 3) -> List[Dict[str, str]]:
+    if not isinstance(docs, list):
+        return []
+
+    references: List[Dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for doc in docs:
+        ref = _extract_doc_reference(doc)
+        if not ref:
+            continue
+        key = (ref.get("docname", "").strip().lower(), ref.get("link", "").strip().lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        references.append(ref)
+        if len(references) >= max_items:
+            break
+    return references
+
+
 class LLMAdapter:
     """Chat generation adapter using LangChain (streaming when available)."""
 
@@ -91,13 +167,27 @@ class LLMAdapter:
         self._chat = None
         self._retriever = retriever
         self.mode: GuardrailMode = mode
+        self._last_rag_sources: List[Dict[str, str]] = []
+        self._rag_context_sufficient: bool = True
+        self._rag_context_chars: int = 0
+        self._rag_docs_count: int = 0
         if ChatOpenAI is not None:
             try:
                 self._chat = ChatOpenAI(model=self.model, temperature=self.temperature, streaming=self.streaming)
             except Exception:
                 self._chat = None
 
+    def get_last_rag_sources(self) -> List[Dict[str, str]]:
+        return [dict(item) for item in self._last_rag_sources if isinstance(item, dict)]
+
+    def rag_context_is_sufficient(self) -> bool:
+        return bool(self._rag_context_sufficient)
+
     def _build_messages(self, question: str, history: List[Dict[str, str]], intent_info: Optional[Dict[str, Any]]):
+        self._last_rag_sources = []
+        self._rag_context_sufficient = True
+        self._rag_context_chars = 0
+        self._rag_docs_count = 0
         system_content = _build_system_prompt(mode=self.mode)
         if intent_info:
             try:
@@ -168,6 +258,7 @@ class LLMAdapter:
                 except Exception:
                     pass
                 if docs:
+                    self._last_rag_sources = _collect_doc_references(docs, max_items=3)
                     context_chunks = []
                     max_chars = int(os.getenv("RAG_CONTEXT_MAX_CHARS", "8000"))
                     current = 0
@@ -182,14 +273,24 @@ class LLMAdapter:
                         context_chunks.append(snippet)
                         current += len(snippet)
                     context = "\n\n".join(context_chunks)
+                    self._rag_docs_count = len(docs)
+                    self._rag_context_chars = len(context)
+                    self._rag_context_sufficient = (
+                        self._rag_docs_count >= _rag_min_docs()
+                        and self._rag_context_chars >= _rag_min_context_chars()
+                    )
                     if context.strip():
                         system_content += (
                             "\nContexto de base de conocimiento (RAG):\n"
                             f"{context}\nResponde citando este contexto y evita inventar información fuera de estas referencias."
                         )
                 else:
+                    self._rag_docs_count = 0
+                    self._rag_context_chars = 0
+                    self._rag_context_sufficient = False
                     system_content += "\nNo se recuperó contexto RAG relevante; si la respuesta depende de fuentes, indica que no dispones de datos y evita especular."
             except Exception as exc:
+                self._rag_context_sufficient = False
                 logger.debug("Failed to fetch RAG context: %s", exc)
 
         if history:
@@ -229,6 +330,16 @@ class LLMAdapter:
             return
         try:
             msgs = self._build_messages(question, history, intent_info)
+            if self.mode == "rag" and not self._rag_context_sufficient:
+                logger.info(
+                    "[LLM_GUARDRAIL] Respuesta segura por evidencia insuficiente | docs=%s chars=%s min_docs=%s min_chars=%s",
+                    self._rag_docs_count,
+                    self._rag_context_chars,
+                    _rag_min_docs(),
+                    _rag_min_context_chars(),
+                )
+                yield _safe_no_evidence_reply()
+                return
             # If streaming is disabled, do a single invoke to avoid SSE parsing issues
             if self._chat is not None and not self.streaming:
                 out = self._chat.invoke(msgs)

@@ -51,6 +51,7 @@ def stream_data_flow(
     all_series_data = payload.get("all_series_data")  # Lista con todas las series (para contribución con activity=none)
     source_url = payload.get("source_url")  # URL de la fuente
     series_title = payload.get("series_title")
+    user_question = payload.get("question") or ""
     source_urls = normalize_sources(source_url)
     used_latest_fallback_for_point = bool(payload.get("used_latest_fallback_for_point"))
     intro_llm_temperature = payload.get("intro_llm_temperature", 0.7)
@@ -327,6 +328,7 @@ def stream_data_flow(
             used_latest_fallback_for_point=used_latest_fallback_for_point,
             source_urls=source_urls,
             intro_llm_temperature=intro_llm_temperature_value,
+            question=user_question,
         )
         if effective_req_form == "specific_point"
         else specific_response(
@@ -353,6 +355,7 @@ def stream_data_flow(
             used_latest_fallback_for_point=used_latest_fallback_for_point,
             source_urls=source_urls,
             intro_llm_temperature=intro_llm_temperature_value,
+            question=user_question,
         )
     )
 
