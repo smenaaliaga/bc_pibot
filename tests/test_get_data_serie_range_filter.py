@@ -1,3 +1,5 @@
+import json
+
 import orchestrator.data.get_data_serie as gds
 import pandas as pd
 
@@ -36,6 +38,87 @@ def test_get_series_from_redis_fallback_applies_range_filter(monkeypatch):
     assert [row["date"] for row in result["observations"]] == ["2024-01-01", "2024-12-01"]
     assert result["meta"]["firstdate"] == "2024-01-01"
     assert result["meta"]["lastdate"] == "2024-12-31"
+
+
+def test_get_series_from_redis_uses_cache_when_requested_period_is_covered(monkeypatch):
+    cached_payload = {
+        "meta": {"cache_created_at": "2026-03-03T00:00:00+00:00"},
+        "observations": [
+            {"date": "2024-01-01", "value": 100.0},
+            {"date": "2024-12-01", "value": 110.0},
+        ],
+        "observations_raw": [],
+    }
+
+    class _FakeRedisClient:
+        def get(self, key):
+            return json.dumps(cached_payload)
+
+    monkeypatch.setattr(gds, "_ensure_redis_client", lambda: _FakeRedisClient())
+
+    def _should_not_call_api(**kwargs):
+        raise AssertionError("No debería consultar API cuando el periodo está cubierto en cache")
+
+    monkeypatch.setattr(gds, "get_series_api_rest_bcch", _should_not_call_api)
+
+    result = gds.get_series_from_redis(
+        series_id="F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        firstdate="2024-01-01",
+        lastdate="2024-12-31",
+        target_frequency="M",
+        agg="avg",
+        use_fallback=True,
+    )
+
+    assert result is not None
+    assert [row["date"] for row in result["observations"]] == ["2024-01-01", "2024-12-01"]
+    assert result["meta"]["cache_resolution"] == "cache_covered"
+
+
+def test_get_series_from_redis_refetches_when_requested_period_is_not_covered(monkeypatch):
+    cached_payload = {
+        "meta": {"cache_created_at": "2026-03-03T00:00:00+00:00"},
+        "observations": [
+            {"date": "2024-01-01", "value": 100.0},
+            {"date": "2024-12-01", "value": 110.0},
+        ],
+        "observations_raw": [],
+    }
+
+    class _FakeRedisClient:
+        def get(self, key):
+            return json.dumps(cached_payload)
+
+    monkeypatch.setattr(gds, "_ensure_redis_client", lambda: _FakeRedisClient())
+
+    api_calls = {"count": 0}
+
+    def _fake_api(*, series_id, target_date=None, target_frequency=None, agg="avg"):
+        api_calls["count"] += 1
+        return {
+            "meta": {"series_id": series_id},
+            "observations": [
+                {"date": "2027-01-01", "value": 140.0},
+                {"date": "2027-12-01", "value": 160.0},
+            ],
+            "observations_raw": [],
+        }
+
+    monkeypatch.setattr(gds, "get_series_api_rest_bcch", _fake_api)
+
+    result = gds.get_series_from_redis(
+        series_id="F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+        firstdate="2027-01-01",
+        lastdate="2027-12-31",
+        target_frequency="M",
+        agg="avg",
+        use_fallback=True,
+    )
+
+    assert result is not None
+    assert api_calls["count"] == 1
+    assert [row["date"] for row in result["observations"]] == ["2027-01-01", "2027-12-01"]
+    assert result["meta"]["cache_resolution"] == "cache_missing_period"
 
 
 def test_normalize_observations_empty_returns_expected_columns():

@@ -276,10 +276,19 @@ def make_intent_node(memory_adapter: Any, intent_store: Any = None, predict_with
             prev_intent_raw, prev_predict_raw = _extract_previous_turn_payload(intent_store, session_id, current_turn_id)
             prev_root = _predict_payload_root(prev_predict_raw)
             prev_norm = _as_dict(prev_root.get("entities_normalized"))
+            indicator_missing = _is_empty_value(current_norm.get("indicator"))
+            explicit_indicator = _has_explicit_indicator(payload_root)
 
             is_first_turn = bool(current_turn_id in (None, 0, 1))
             if is_first_turn or (not prev_intent_raw and not prev_predict_raw):
-                decision = "fallback"
+                if normalized_intent == "value" and explicit_indicator and not indicator_missing:
+                    decision = "data"
+                    context_label = "standalone"
+                elif normalized_intent == "method" and explicit_indicator and not indicator_missing:
+                    decision = "rag"
+                    context_label = "standalone"
+                else:
+                    decision = "fallback"
             else:
                 if macro_label in (0, "0") or normalized_intent in {"", "none", "other"}:
                     prev_macro = _label(_as_dict(prev_intent_raw.get("macro")).get("label") if isinstance(prev_intent_raw.get("macro"), dict) else prev_intent_raw.get("macro"))
@@ -289,9 +298,7 @@ def make_intent_node(memory_adapter: Any, intent_store: Any = None, predict_with
                     if normalized_intent in {"", "none", "other"} and not _is_empty_value(prev_intent):
                         normalized_intent = _normalize_intent_label(prev_intent)
 
-                indicator_missing = _is_empty_value(current_norm.get("indicator"))
                 prev_indicator = _first_non_empty(prev_norm.get("indicator"))
-                explicit_indicator = _has_explicit_indicator(payload_root)
 
                 if normalized_intent == "value":
                     region_label = str(_label(current_intents.get("region")) or "").strip().lower()

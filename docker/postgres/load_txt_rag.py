@@ -15,7 +15,10 @@ from dotenv import load_dotenv  # type: ignore
 
 load_dotenv()
 
-from langchain_text_splitters import RecursiveCharacterTextSplitter  # type: ignore
+try:
+    from langchain_text_splitters.character import RecursiveCharacterTextSplitter  # type: ignore
+except Exception:
+    RecursiveCharacterTextSplitter = None  # type: ignore[assignment]
 from langdetect import detect as _langdetect  # type: ignore
 from langchain_openai import OpenAIEmbeddings  # type: ignore
 from langchain_postgres import PGVector as PGVectorCls  # type: ignore
@@ -323,15 +326,33 @@ def purge_collection(dsn: str, collection: str) -> None:
 
 def fetch_existing_doc_hashes(dsn: str, collection: str) -> Dict[str, str]:
     ensure_psycopg_available()
-    sql_query = """
-        SELECT e.metadata->>'doc_id' AS doc_id, e.metadata->>'doc_hash' AS doc_hash
-        FROM langchain_pg_embedding e
-        JOIN langchain_pg_collection c ON e.collection_id = c.uuid
-        WHERE c.name = %s
-    """
+
+    def _metadata_column_name(cur) -> str:
+        cur.execute(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = 'langchain_pg_embedding'
+              AND column_name IN ('metadata', 'cmetadata')
+            """
+        )
+        names = {str(row[0]) for row in cur.fetchall() if row and row[0]}
+        if "metadata" in names:
+            return "metadata"
+        if "cmetadata" in names:
+            return "cmetadata"
+        return "metadata"
+
     with psycopg.connect(dsn) as conn:
         with conn.cursor() as cur:
             try:
+                metadata_column = _metadata_column_name(cur)
+                sql_query = f"""
+                    SELECT e.{metadata_column}->>'doc_id' AS doc_id, e.{metadata_column}->>'doc_hash' AS doc_hash
+                    FROM langchain_pg_embedding e
+                    JOIN langchain_pg_collection c ON e.collection_id = c.uuid
+                    WHERE c.name = %s
+                """
                 cur.execute(sql_query, (collection,))
             except psycopg_errors.UndefinedTable:
                 logging.warning(
@@ -343,16 +364,34 @@ def fetch_existing_doc_hashes(dsn: str, collection: str) -> Dict[str, str]:
 
 def delete_doc_chunks(dsn: str, collection: str, doc_id: str) -> None:
     ensure_psycopg_available()
-    sql_delete = """
-        DELETE FROM langchain_pg_embedding e
-        USING langchain_pg_collection c
-        WHERE e.collection_id = c.uuid
-          AND c.name = %s
-          AND e.metadata->>'doc_id' = %s
-    """
+
+    def _metadata_column_name(cur) -> str:
+        cur.execute(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = 'langchain_pg_embedding'
+              AND column_name IN ('metadata', 'cmetadata')
+            """
+        )
+        names = {str(row[0]) for row in cur.fetchall() if row and row[0]}
+        if "metadata" in names:
+            return "metadata"
+        if "cmetadata" in names:
+            return "cmetadata"
+        return "metadata"
+
     with psycopg.connect(dsn) as conn:
         with conn.cursor() as cur:
             try:
+                metadata_column = _metadata_column_name(cur)
+                sql_delete = f"""
+                    DELETE FROM langchain_pg_embedding e
+                    USING langchain_pg_collection c
+                    WHERE e.collection_id = c.uuid
+                      AND c.name = %s
+                      AND e.{metadata_column}->>'doc_id' = %s
+                """
                 cur.execute(sql_delete, (collection, doc_id))
             except psycopg_errors.UndefinedTable:
                 logging.warning(
