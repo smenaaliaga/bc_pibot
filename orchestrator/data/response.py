@@ -2579,9 +2579,21 @@ def _specific_attachments(
     is_contribution: bool,
     all_series_data: Optional[List[Dict[str, Any]]],
 ) -> Iterable[str]:
-    if req_form not in {"range", "specific_point"} and obs_to_show and not (is_contribution and all_series_data):
-        first_row = obs_to_show[0]
-        var_value = first_row.get("yoy") if "yoy" in first_row else first_row.get("prev_period")
-        var_label = "Variación anual" if "yoy" in first_row else "Variación período anterior"
-        var_key = "yoy" if "yoy" in first_row else "prev_period"
-        yield from generate_csv_marker(first_row, series_id, var_value, var_label, var_key)
+    if not obs_to_show:
+        return
+
+    first_row = obs_to_show[0]
+    if "yoy" in first_row:
+        var_value = first_row.get("yoy")
+        var_label = "Variación anual"
+        var_key = "yoy"
+    elif "prev_period" in first_row:
+        var_value = first_row.get("prev_period")
+        var_label = "Variación período anterior"
+        var_key = "prev_period"
+    else:
+        var_value = first_row.get("value")
+        var_label = "Valor"
+        var_key = "comparison_value"
+
+    yield from generate_csv_marker(first_row, series_id, var_value, var_label, var_key)
