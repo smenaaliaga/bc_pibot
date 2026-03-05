@@ -1582,5 +1582,27 @@
       {"id": "F033.FKF.V12.R.Z.2018.0.T", "short_title": "Formación bruta de capital fijo", "classification": {"investment": "inversion_fijo"}, "long_title": "Contribución año/año de Formación bruta de capital fijo"},
       {"id": "F033.VAX.V12.R.Z.2018.0.T", "short_title": "Variación de existencias", "classification": {}, "long_title": "Contribución año/año de Variación de existencias"}
     ]
+  },
+  "Gasto del PIB volumen a precios del año anterior encadenado, referencia 2018, información histórica (miles de millones de pesos encadenados)": {
+    "classification": {
+      "indicator": "pib",
+      "calc_mode": "original",
+      "seasonality": "nsa",
+      "frequency": "a",
+      "price": "enc",
+      "has_activity": 0,
+      "has_region": 0,
+      "has_investment": [1, 0],
+      "hist": 1
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN_HIST18_ENC",
+    "series": [
+      {"id": "F033.DDI.FLU.R.CLP.HIST18.0.A", "short_title": "Demanda Interna", "classification": {"investment": "demanda_interna"}, "long_title": "Demanda Interna"},
+      {"id": "F033.FKF.FLU.R.CLP.HIST18.0.A", "short_title": "Formación bruta de capital fijo", "classification": {"investment": "inversion_fijo"}, "long_title": "Formación bruta de capital fijo"},
+      {"id": "F033.DIR.FLU.R.CLP.HIST18.0.A", "short_title": "Resto demanda interna", "classification": {"investment": "resto_demanda_interna"}, "long_title": "Resto demanda interna"},
+      {"id": "F033.XBS.FLU.R.CLP.HIST18.0.A", "short_title": "Exportaciones de bienes y servicios", "classification": {"investment": "exportacion"}, "long_title": "Exportaciones de bienes y servicios"},
+      {"id": "F033.IBS.FLU.R.CLP.HIST18.0.A", "short_title": "Importaciones de bienes y servicios", "classification": {"investment": "importacion"}, "long_title": "Importaciones de bienes y servicios"},
+      {"id": "F032.PIB.FLU.R.CLP.HIST18.Z.Z.0.A", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "Producto Interno Bruto"}
+    ]
   }
 }
