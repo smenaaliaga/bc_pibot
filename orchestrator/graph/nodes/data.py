@@ -1,17 +1,17 @@
 """Nodo DATA del grafo PIBot — orquesta la obtención de datos económicos.
 
 Flujo principal (``data_node``):
-  1. Extrae entidades y clasificación del estado del grafo.
-  2. Aplica las reglas de negocio (``_business_rules``).
-  3. Busca la familia y serie objetivo en el catálogo (``_series_lookup``).
-  4. Obtiene las observaciones según la rama correspondiente (``_fetch``).
-  5. Construye el payload y lo envía al flujo de respuesta (streaming).
+    1. Extrae entidades y clasificación del estado del grafo.
+    2. Aplica las reglas de negocio (``_business_rules``).
+    3. Busca la familia y serie objetivo en el catálogo (``catalog_lookup``).
+    4. Obtiene las observaciones según la rama correspondiente (``_fetch``).
+    5. Construye el payload y lo envía al flujo de respuesta (streaming).
 
 Módulos internos:
-  - ``_helpers``: utilidades puras (parsing, coerción, URL).
-  - ``_business_rules``: reglas de dominio sobre entidades.
-  - ``_series_lookup``: búsqueda de familia y serie en catálogo.
-  - ``_fetch``: obtención de datos desde Redis (3 ramas).
+    - ``_helpers``: utilidades puras (parsing, coerción, URL).
+    - ``_business_rules``: reglas de dominio sobre entidades.
+    - ``catalog_lookup``: búsqueda de familia y serie en catálogo.
+    - ``_fetch``: obtención de datos desde Redis (3 ramas).
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ from orchestrator.data._helpers import (
     first_non_empty,
 )
 from orchestrator.data._business_rules import ResolvedEntities, apply_business_rules
-from orchestrator.data._series_lookup import lookup_series
+from orchestrator.catalog.catalog_lookup import lookup_series
 from orchestrator.data._fetch import (
     fetch_contribution,
     fetch_general_breakdown,

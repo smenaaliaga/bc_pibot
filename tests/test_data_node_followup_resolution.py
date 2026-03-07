@@ -1,6 +1,6 @@
 import types
 
-import orchestrator.catalog.series_search as series_search
+import orchestrator.catalog.catalog_lookup as series_search
 import orchestrator.graph.nodes.data as data_module
 from orchestrator.graph.nodes.data import make_data_node
 
@@ -93,8 +93,13 @@ def test_data_node_prefers_followup_normalized_from_predict_raw(monkeypatch):
     assert result["output"] == "ok"
 
 
-def test_data_node_pib_aggregate_preserves_requested_seasonality_for_family_search(monkeypatch):
+def test_data_node_pib_aggregate_omits_seasonality_for_family_search(monkeypatch):
+    """La familia base de PIB no tiene seasonality a nivel de familia
+    (está por serie), así que la búsqueda de familia siempre omite
+    seasonality para PIB agregado sin contribución.  La selección de
+    serie dentro de la familia sigue filtrando por seasonality."""
     captured = {}
+    captured_eq = {}
 
     def fake_find_family_by_classification(*args, **kwargs):
         captured["seasonality"] = kwargs.get("seasonality")
@@ -103,6 +108,10 @@ def test_data_node_pib_aggregate_preserves_requested_seasonality_for_family_sear
             "family_name": "PIB aggregate test family",
             "source_url": "https://example.test/family",
         }
+
+    def fake_select(family_series, eq, fallback_to_first=True):
+        captured_eq.update(eq)
+        return family_series[0]
 
     monkeypatch.setattr(
         series_search,
@@ -117,7 +126,7 @@ def test_data_node_pib_aggregate_preserves_requested_seasonality_for_family_sear
     monkeypatch.setattr(
         series_search,
         "select_target_series_by_classification",
-        lambda family_series, eq, fallback_to_first=True: family_series[0],
+        fake_select,
     )
 
     monkeypatch.setattr(
@@ -165,8 +174,11 @@ def test_data_node_pib_aggregate_preserves_requested_seasonality_for_family_sear
         }
     )
 
-    assert captured["seasonality"] == "sa"
+    # Familia se busca SIN seasonality (la familia PIB base no la tiene)
+    assert captured["seasonality"] is None
     assert captured["frequency"] is None
+    # Pero la serie se selecciona CON seasonality="sa"
+    assert captured_eq.get("seasonality") == "sa"
     assert result["output"] == "ok"
 
 

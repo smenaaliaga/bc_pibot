@@ -1,6 +1,6 @@
 import json
 
-from orchestrator.catalog.series_search import find_family_by_classification
+from orchestrator.catalog.catalog_lookup import find_family_by_classification
 
 
 def test_sparse_hist_family_matches_when_hist_requested(tmp_path):
