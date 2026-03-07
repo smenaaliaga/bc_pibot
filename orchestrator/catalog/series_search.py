@@ -201,12 +201,17 @@ def find_family_by_classification(
                 continue
 
         family_calc_mode = family_classification.get("calc_mode")
-        family_calc_mode_normalized = (
-            str(family_calc_mode).strip().lower() if family_calc_mode not in (None, "") else None
-        )
         if requested_calc_mode is not None:
-            if family_calc_mode_normalized != requested_calc_mode:
-                continue
+            if isinstance(family_calc_mode, list):
+                family_calc_modes = {str(v).strip().lower() for v in family_calc_mode}
+                if requested_calc_mode not in family_calc_modes:
+                    continue
+            else:
+                family_calc_mode_normalized = (
+                    str(family_calc_mode).strip().lower() if family_calc_mode not in (None, "") else None
+                )
+                if family_calc_mode_normalized != requested_calc_mode:
+                    continue
 
         family_price = family_classification.get("price")
         family_price_normalized = (

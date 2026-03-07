@@ -67,9 +67,7 @@ def lookup_series(ent: ResolvedEntities) -> SeriesLookupResult:
         and ent.investment_cls in (None, "none")
     )
 
-    family_calc_mode = (
-        "contribution" if ent.calc_mode_cls == "contribution" else "original"
-    )
+    family_calc_mode = ent.calc_mode_cls or "original"
 
     # Estacionalidad: para PIB agregado sin contribución se omite salvo que
     # el usuario la haya solicitado explícitamente.
@@ -118,9 +116,7 @@ def lookup_series(ent: ResolvedEntities) -> SeriesLookupResult:
     # --- Seleccionar serie objetivo -------------------------------------------
     series_eq: Dict[str, Any] = {
         "indicator": ent.indicator_ent,
-        "calc_mode": (
-            ent.calc_mode_cls if ent.calc_mode_cls == "contribution" else "original"
-        ),
+        "calc_mode": ent.calc_mode_cls or "original",
         "seasonality": ent.seasonality_ent,
         "activity": ent.activity_ent,
         "region": ent.region_ent,

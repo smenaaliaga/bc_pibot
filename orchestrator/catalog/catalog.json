@@ -2,7 +2,7 @@
   "IMACEC, volumen a precios del año anterior encadenado, series empalmadas (promedio 2018=100)": {
     "classification": {
       "indicator": "imacec",
-      "calc_mode": "original",
+      "calc_mode": ["original", "prev_period", "yoy"],
       "seasonality": "nsa",
       "frequency": null,
       "price": null,
@@ -51,7 +51,7 @@
   "IMACEC, volumen a precios del año anterior encadenado, desestacionalizado, series empalmadas (promedio 2018=100)": {
     "classification": {
       "indicator": "imacec",
-      "calc_mode": "original",
+      "calc_mode": ["original", "prev_period", "yoy"],
       "seasonality": "sa",
       "frequency": null,
       "price": null,
@@ -100,7 +100,7 @@
   "PIB, referencia 2018 (miles de millones de pesos)": {
     "classification": {
       "indicator": "pib",
-      "calc_mode": "original",
+      "calc_mode": ["original", "prev_period", "yoy"],
       "price": null,
       "has_activity": 0,
       "has_region": 0,
@@ -116,7 +116,7 @@
   "PIB por clase de actividad económica, a precios corrientes, series empalmadas, referencia 2018 (miles de millones de pesos)": {
     "classification": {
       "indicator": "pib",
-      "calc_mode": "original",
+      "calc_mode": ["original", "prev_period", "yoy"],
       "seasonality": "nsa",
       "price": "co",
       "has_activity": 1,
@@ -205,7 +205,7 @@
   "PIB por clase de actividad económica, a precios corrientes, series empalmadas, desestacionalizado, referencia 2018 (miles de millones de pesos)": {
     "classification": {
       "indicator": "pib",
-      "calc_mode": "original",
+      "calc_mode": ["original", "prev_period", "yoy"],
       "seasonality": "sa",
       "price": "co",
       "has_activity": 1,
@@ -250,7 +250,7 @@
   "PIB por actividad económica, volumen a precios año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
     "classification": {
       "indicator": "pib",
-      "calc_mode": "original",
+      "calc_mode": ["original", "prev_period", "yoy"],
       "seasonality": "nsa",
       "price": "enc",
       "has_activity": 1,
@@ -380,7 +380,7 @@
   "PIB por clase de actividad económica, volumen a precios del año anterior encadenado, series empalmadas, desestacionalizado, referencia 2018 (miles de millones de pesos encadenados)": {
     "classification": {
       "indicator": "pib",
-      "calc_mode": "original",
+      "calc_mode": ["original", "prev_period", "yoy"],
       "seasonality": "sa",
       "price": "enc",
       "has_activity": 1,
@@ -510,7 +510,7 @@
   "Gasto del producto interno bruto, a precios corrientes, series empalmadas, referencia 2018 (miles de millones de pesos)": {
     "classification": {
       "indicator": "pib ################################ REVISAR ################################ ",
-      "calc_mode": "original",
+      "calc_mode": ["original", "prev_period", "yoy"],
       "seasonality": "nsa ################################ REVISAR ################################ ",
       "price": "co",
       "has_activity": 0,
@@ -540,7 +540,7 @@
   "Gasto del producto interno bruto, a precios corrientes, series empalmadas, desestacionalizado, referencia 2018 (miles de millones de pesos)": {
     "classification": {
       "indicator": "pib ################################ REVISAR ################################ ",
-      "calc_mode": "original",
+      "calc_mode": ["original", "prev_period", "yoy"],
       "seasonality": "sa ################################ REVISAR ################################ ",
       "price": "co",
       "has_activity": 0,
@@ -555,7 +555,7 @@
   "PIB trimestral por región, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
     "classification": {
       "indicator": "pib",
-      "calc_mode": "original",
+      "calc_mode": ["original", "prev_period", "yoy"],
       "seasonality": "nsa",
       "frequency": "q",
       "price": "enc",
@@ -589,7 +589,7 @@
   "PIB por actividad económica, Región  de Arica y Parinacota, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
     "classification": {
       "indicator": "pib",
-      "calc_mode": "original",
+      "calc_mode": ["original", "prev_period", "yoy"],
       "seasonality": "nsa",
       "frequency": "q",
       "price": "enc",
@@ -612,7 +612,7 @@
   "PIB por actividad económica, Región de Tarapacá, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
     "classification": {
       "indicator": "pib",
-      "calc_mode": "original",
+      "calc_mode": ["original", "prev_period", "yoy"],
       "seasonality": "nsa",
       "frequency": "q",
       "price": "enc",
@@ -635,7 +635,7 @@
   "PIB por actividad económica, Región de Antofagasta, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
     "classification": {
       "indicator": "pib",
-      "calc_mode": "original",
+      "calc_mode": ["original", "prev_period", "yoy"],
       "seasonality": "nsa",
       "frequency": "q",
       "price": "enc",
@@ -658,7 +658,7 @@
   "PIB por actividad económica, Región de Atacama, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
     "classification": {
       "indicator": "pib",
-      "calc_mode": "original",
+      "calc_mode": ["original", "prev_period", "yoy"],
       "seasonality": "nsa",
       "frequency": "q",
       "price": "enc",
@@ -681,7 +681,7 @@
   "PIB por actividad económica, Región de Coquimbo, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
     "classification": {
       "indicator": "pib",
-      "calc_mode": "original",
+      "calc_mode": ["original", "prev_period", "yoy"],
       "seasonality": "nsa",
       "frequency": "q",
       "price": "enc",
@@ -704,7 +704,7 @@
   "PIB por actividad económica, Región de Valparaíso, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
     "classification": {
       "indicator": "pib",
-      "calc_mode": "original",
+      "calc_mode": ["original", "prev_period", "yoy"],
       "seasonality": "nsa",
       "frequency": "q",
       "price": "enc",
@@ -727,7 +727,7 @@
   "PIB por actividad económica, Región Metropolitana de Santiago, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
     "classification": {
       "indicator": "pib",
-      "calc_mode": "original",
+      "calc_mode": ["original", "prev_period", "yoy"],
       "seasonality": "nsa",
       "frequency": "q",
       "price": "enc",
@@ -750,7 +750,7 @@
   "PIB por actividad económica, Región del Libertador General Bernardo O Higgins, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
     "classification": {
       "indicator": "pib",
-      "calc_mode": "original",
+      "calc_mode": ["original", "prev_period", "yoy"],
       "seasonality": "nsa",
       "frequency": "q",
       "price": "enc",
@@ -773,7 +773,7 @@
   "PIB por actividad económica, Región del Maule, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
     "classification": {
       "indicator": "pib",
-      "calc_mode": "original",
+      "calc_mode": ["original", "prev_period", "yoy"],
       "seasonality": "nsa",
       "frequency": "q",
       "price": "enc",
@@ -796,7 +796,7 @@
   "PIB por actividad económica, Región de Ñuble, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
     "classification": {
       "indicator": "pib",
-      "calc_mode": "original",
+      "calc_mode": ["original", "prev_period", "yoy"],
       "seasonality": "nsa",
       "frequency": "q",
       "price": "enc",
@@ -819,7 +819,7 @@
   "PIB por actividad económica, Región del Biobío, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
     "classification": {
       "indicator": "pib",
-      "calc_mode": "original",
+      "calc_mode": ["original", "prev_period", "yoy"],
       "seasonality": "nsa",
       "frequency": "q",
       "price": "enc",
@@ -842,7 +842,7 @@
   "PIB por actividad económica, Región de La Araucanía, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
     "classification": {
       "indicator": "pib",
-      "calc_mode": "original",
+      "calc_mode": ["original", "prev_period", "yoy"],
       "seasonality": "nsa",
       "frequency": "q",
       "price": "enc",
@@ -865,7 +865,7 @@
   "PIB por actividad económica, Región de Los Ríos, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
     "classification": {
       "indicator": "pib",
-      "calc_mode": "original",
+      "calc_mode": ["original", "prev_period", "yoy"],
       "seasonality": "nsa",
       "frequency": "q",
       "price": "enc",
@@ -888,7 +888,7 @@
   "PIB por actividad económica, Región de Los Lagos, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
     "classification": {
       "indicator": "pib",
-      "calc_mode": "original",
+      "calc_mode": ["original", "prev_period", "yoy"],
       "seasonality": "nsa",
       "frequency": "q",
       "price": "enc",
@@ -911,7 +911,7 @@
   "PIB por actividad económica, Región de Aysén del General Carlos Ibáñez del Campo, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
     "classification": {
       "indicator": "pib",
-      "calc_mode": "original",
+      "calc_mode": ["original", "prev_period", "yoy"],
       "seasonality": "nsa",
       "frequency": "q",
       "price": "enc",
@@ -934,7 +934,7 @@
   "PIB por actividad económica, Región de Magallanes y de la Antártica Chilena, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
     "classification": {
       "indicator": "pib",
-      "calc_mode": "original",
+      "calc_mode": ["original", "prev_period", "yoy"],
       "seasonality": "nsa",
       "frequency": "q",
       "price": "enc",
@@ -1890,7 +1890,7 @@
   "PIB anual por región, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
     "classification": {
       "indicator": "pib",
-      "calc_mode": "original",
+      "calc_mode": ["original", "prev_period", "yoy"],
       "seasonality": "nsa",
       "frequency": "a",
       "price": "enc",
@@ -1929,7 +1929,7 @@
   "Gasto del producto interno bruto, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {
     "classification": {
       "indicator": "pib",
-      "calc_mode": "original",
+      "calc_mode": ["original", "prev_period", "yoy"],
       "seasonality": "nsa",
       "price": "enc",
       "has_activity": 0,
@@ -2055,7 +2055,7 @@
   "Gasto del producto interno bruto, volumen a precios del año anterior encadenado, series empalmadas, desestacionalizado, referencia 2018 (miles de millones de pesos encadenados)": {
     "classification": {
       "indicator": "pib",
-      "calc_mode": "original",
+      "calc_mode": ["original", "prev_period", "yoy"],
       "seasonality": "sa",
       "price": "enc",
       "has_activity": 0,
@@ -2113,7 +2113,7 @@
   "Gasto del PIB volumen a precios del año anterior encadenado, referencia 2018, información histórica (miles de millones de pesos encadenados)": {
     "classification": {
       "indicator": "pib",
-      "calc_mode": "original",
+      "calc_mode": ["original", "prev_period", "yoy"],
       "seasonality": "nsa",
       "frequency": "a",
       "price": "enc",
