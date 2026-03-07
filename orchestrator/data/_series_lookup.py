@@ -73,9 +73,7 @@ def lookup_series(ent: ResolvedEntities) -> SeriesLookupResult:
     # el usuario la haya solicitado explícitamente.
     requested_seasonality = str(ent.seasonality_ent or "").strip().lower()
     has_requested_seasonality = requested_seasonality not in {"", "none", "null"}
-    if is_pib_aggregate and ent.calc_mode_cls != "contribution":
-        family_seasonality = None
-    elif is_pib_aggregate and not has_requested_seasonality:
+    if is_pib_aggregate and ent.calc_mode_cls != "contribution" and not has_requested_seasonality:
         family_seasonality = None
     else:
         family_seasonality = ent.seasonality_ent
@@ -102,6 +100,40 @@ def lookup_series(ent: ResolvedEntities) -> SeriesLookupResult:
         hist=ent.hist,
     )
 
+    # PIB agregado no-contribution: en catalogo la estacionalidad puede estar
+    # definida a nivel de serie (no de familia). Si no hay match por family
+    # seasonality, reintentar sin ese filtro para no perder la familia correcta.
+    if (
+        not isinstance(result.family_dict, dict)
+        and is_pib_aggregate
+        and str(ent.calc_mode_cls or "").strip().lower() != "contribution"
+        and has_requested_seasonality
+    ):
+        result.family_dict = find_family_by_classification(
+            "orchestrator/catalog/catalog.json",
+            indicator=ent.indicator_ent,
+            activity_value=(
+                ent.activity_ent if ent.activity_ent is not None
+                else ent.activity_cls_resolved
+            ),
+            region_value=(
+                ent.region_ent if ent.region_ent is not None else ent.region_cls
+            ),
+            investment_value=(
+                ent.investment_ent if ent.investment_ent is not None
+                else ent.investment_cls
+            ),
+            calc_mode=family_calc_mode,
+            price=family_price,
+            seasonality=None,
+            frequency=family_frequency,
+            hist=ent.hist,
+        )
+        logger.info(
+            "[DATA_NODE] fallback family lookup (sin seasonality) | matched=%s",
+            isinstance(result.family_dict, dict),
+        )
+
     if isinstance(result.family_dict, dict):
         result.family_series = family_to_series_rows(result.family_dict)
         result.source_url = result.family_dict.get("source_url")
@@ -114,9 +146,11 @@ def lookup_series(ent: ResolvedEntities) -> SeriesLookupResult:
     logger.info("[DATA_NODE] =========================================================")
 
     # --- Seleccionar serie objetivo -------------------------------------------
+    # Solo incluir dimensiones de seleccion de serie (nivel fila de serie).
+    # calc_mode/frequency se usan para elegir familia; al reusarlas aqui pueden
+    # bloquear matches cuando vienen como lista o null en el catalogo.
     series_eq: Dict[str, Any] = {
         "indicator": ent.indicator_ent,
-        "calc_mode": ent.calc_mode_cls or "original",
         "seasonality": ent.seasonality_ent,
         "activity": ent.activity_ent,
         "region": ent.region_ent,
@@ -146,11 +180,18 @@ def lookup_series(ent: ResolvedEntities) -> SeriesLookupResult:
                 series_eq.pop("activity", None)
                 series_eq["indicator"] = indicator_norm
 
-    if ent.calc_mode_cls == "contribution":
-        series_eq["frequency"] = ent.frequency_ent
-
     if ent.activity_cls_resolved == "specific" and ent.activity_ent is None:
         series_eq["activity"] = "__missing_specific_activity__"
+
+    # Consultas agregadas (sin actividad especifica): no forzar filtro activity,
+    # ya que para IMACEC/PIB la serie principal suele venir solo con indicator.
+    if (
+        str(ent.calc_mode_cls or "").strip().lower() != "contribution"
+        and ent.activity_cls_resolved in (None, "none", "general")
+        and ent.region_cls in (None, "none")
+        and ent.investment_cls in (None, "none")
+    ):
+        series_eq.pop("activity", None)
 
     result.target_series = select_target_series_by_classification(
         result.family_series,

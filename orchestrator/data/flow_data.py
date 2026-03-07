@@ -14,6 +14,36 @@ from orchestrator.data.response import (
 logger = logging.getLogger(__name__)
 
 
+def _count_rows(rows: Any) -> int:
+    if isinstance(rows, list):
+        return len(rows)
+    if rows:
+        return 1
+    return 0
+
+
+def _preview_rows(rows: Any, *, max_items: int = 2) -> list[dict[str, Any]]:
+    if isinstance(rows, dict):
+        rows = [rows]
+    if not isinstance(rows, list):
+        return []
+    preview: list[dict[str, Any]] = []
+    for row in rows[:max_items]:
+        if isinstance(row, dict):
+            preview.append(
+                {
+                    "date": row.get("date"),
+                    "value": row.get("value"),
+                    "yoy": row.get("yoy"),
+                    "prev_period": row.get("prev_period"),
+                    "title": row.get("title"),
+                }
+            )
+        else:
+            preview.append({"raw": str(row)})
+    return preview
+
+
 def stream_data_flow(
     payload: Dict[str, Any],
     session_id: Optional[str] = None,
@@ -33,6 +63,23 @@ def stream_data_flow(
             }
         session_id: Identificador de sesión (opcional)
     """
+    logger.info(
+        "[STREAM_DATA_FLOW][PAYLOAD] resumen=%s",
+        {
+            "intent": payload.get("intent"),
+            "series": payload.get("series"),
+            "parsed_point": payload.get("parsed_point"),
+            "parsed_range": payload.get("parsed_range"),
+            "reference_period": payload.get("reference_period"),
+            "result_count": _count_rows(payload.get("result")),
+            "all_series_count": _count_rows(payload.get("all_series_data")),
+            "source_url": payload.get("source_url"),
+        },
+    )
+    logger.info(
+        "[STREAM_DATA_FLOW][PAYLOAD] result_preview=%s",
+        _preview_rows(payload.get("result"), max_items=2),
+    )
     
     # Extraer datos del payload
     series_id = payload.get("series")

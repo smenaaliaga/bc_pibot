@@ -188,6 +188,68 @@ def _log_resolved_entities(ent: ResolvedEntities, entities: List[Dict[str, Any]]
     logger.info("[DATA_NODE] =========================================================")
 
 
+def _preview_observations(rows: Any, *, max_items: int = 2) -> List[Dict[str, Any]]:
+    """Entrega una vista compacta de observaciones para logging didactico."""
+    if isinstance(rows, dict):
+        rows = [rows]
+    if not isinstance(rows, list):
+        return []
+
+    preview: List[Dict[str, Any]] = []
+    keep_keys = {
+        "date",
+        "value",
+        "yoy",
+        "prev_period",
+        "title",
+        "activity",
+        "region",
+        "investment",
+    }
+    for row in rows[:max_items]:
+        if isinstance(row, dict):
+            preview.append({k: row.get(k) for k in row.keys() if k in keep_keys})
+        else:
+            preview.append({"raw": str(row)})
+    return preview
+
+
+def _log_payload_snapshot(payload: Dict[str, Any]) -> None:
+    """Log didactico del payload para inspeccion previa al streaming."""
+    result_rows = payload.get("result")
+    all_series_rows = payload.get("all_series_data")
+    classification = payload.get("classification")
+
+    result_count = len(result_rows) if isinstance(result_rows, list) else (1 if result_rows else 0)
+    all_series_count = len(all_series_rows) if isinstance(all_series_rows, list) else 0
+
+    summary = {
+        "intent": payload.get("intent"),
+        "series": payload.get("series"),
+        "series_title": payload.get("series_title"),
+        "parsed_point": payload.get("parsed_point"),
+        "parsed_range": payload.get("parsed_range"),
+        "reference_period": payload.get("reference_period"),
+        "used_latest_fallback_for_point": payload.get("used_latest_fallback_for_point"),
+        "result_count": result_count,
+        "all_series_count": all_series_count,
+        "source_url": payload.get("source_url"),
+    }
+
+    logger.info("[DATA_NODE][PAYLOAD] resumen=%s", summary)
+    logger.info("[DATA_NODE][PAYLOAD] classification=%s", classification)
+    if result_count:
+        logger.info(
+            "[DATA_NODE][PAYLOAD] result_preview=%s",
+            _preview_observations(result_rows, max_items=2),
+        )
+    if all_series_count:
+        logger.info(
+            "[DATA_NODE][PAYLOAD] all_series_preview=%s",
+            _preview_observations(all_series_rows, max_items=2),
+        )
+
+
 # ---------------------------------------------------------------------------
 # Respuesta cuando no se encuentra serie
 # ---------------------------------------------------------------------------
@@ -517,6 +579,8 @@ def make_data_node(memory_adapter: Any):
             "source_url": target_series_url,
             "question": question,
         }
+
+        _log_payload_snapshot(payload)
 
         return _stream_response(
             payload=payload,
