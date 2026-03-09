@@ -498,12 +498,15 @@ class SeriesLookupResult:
             self.family_series = []
 
 
+_EMPTY_CLS_VALUES = (None, "none", "", {}, [], ())
+
+
 def _is_aggregate_request(ent: ResolvedEntities) -> bool:
     """Retorna True cuando no hay desglose de actividad/region/inversion."""
     return (
-        ent.activity_cls_resolved in (None, "none", "general")
-        and ent.region_cls in (None, "none")
-        and ent.investment_cls in (None, "none")
+        ent.activity_cls_resolved in (*_EMPTY_CLS_VALUES, "general")
+        and ent.region_cls in _EMPTY_CLS_VALUES
+        and ent.investment_cls in _EMPTY_CLS_VALUES
     )
 
 
@@ -549,19 +552,35 @@ def lookup_series(ent: ResolvedEntities) -> SeriesLookupResult:
         family_seasonality = ent.seasonality_ent
 
     # --- Buscar familia -------------------------------------------------------
+    # "general" y "none" en los cls significan "sin desglose" → tratar como
+    # ausencia de dimensión para que has_activity/region/investment == 0.
+    _NO_BREAKDOWN = _EMPTY_CLS_VALUES + ("general",)
+
+    _activity_fallback = (
+        ent.activity_cls_resolved
+        if ent.activity_cls_resolved not in _NO_BREAKDOWN
+        else None
+    )
+    _region_fallback = (
+        ent.region_cls if ent.region_cls not in _NO_BREAKDOWN else None
+    )
+    _investment_fallback = (
+        ent.investment_cls if ent.investment_cls not in _NO_BREAKDOWN else None
+    )
+
     result.family_dict = find_family_by_classification(
         "orchestrator/catalog/catalog.json",
         indicator=ent.indicator_ent,
         activity_value=(
             ent.activity_ent if ent.activity_ent is not None
-            else ent.activity_cls_resolved
+            else _activity_fallback
         ),
         region_value=(
-            ent.region_ent if ent.region_ent is not None else ent.region_cls
+            ent.region_ent if ent.region_ent is not None else _region_fallback
         ),
         investment_value=(
             ent.investment_ent if ent.investment_ent is not None
-            else ent.investment_cls
+            else _investment_fallback
         ),
         calc_mode=family_calc_mode,
         price=family_price,
@@ -618,6 +637,10 @@ def lookup_series(ent: ResolvedEntities) -> SeriesLookupResult:
         and _is_aggregate_request(ent)
     ):
         series_eq.pop("activity", None)
+
+    # Series históricas solo existen en nsa; no filtrar por seasonality.
+    if ent.hist == 1:
+        series_eq.pop("seasonality", None)
 
     result.target_series = select_target_series_by_classification(
         result.family_series,

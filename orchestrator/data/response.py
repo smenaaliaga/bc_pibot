@@ -269,8 +269,21 @@ def _format_observations_context(
     if not observations:
         return "No se obtuvieron observaciones."
 
-    def _format_obs_list(obs_list: list, indent: str = "  ") -> List[str]:
-        """Formatea una lista de observaciones como líneas de texto."""
+    # Límites para evitar overflow de contexto
+    max_obs_per_freq = int(os.getenv("DATA_RESPONSE_MAX_OBS_PER_FREQ", "50"))
+    max_series = int(os.getenv("DATA_RESPONSE_MAX_SERIES", "20"))
+
+    def _format_obs_list(obs_list: list, indent: str = "  ") -> Tuple[List[str], bool]:
+        """Formatea una lista de observaciones como líneas de texto.
+        
+        Returns:
+            Tupla de (líneas formateadas, fue_truncado)
+        """
+        truncated = False
+        if len(obs_list) > max_obs_per_freq:
+            obs_list = obs_list[-max_obs_per_freq:]
+            truncated = True
+        
         lines: List[str] = []
         for obs in obs_list:
             date = obs.get("date", "")
@@ -283,10 +296,15 @@ def _format_observations_context(
             if pct is not None:
                 line += f" | var. período ant.={pct}%"
             lines.append(line)
-        return lines
+        return lines, truncated
 
     parts: List[str] = []
-    for series_id, entry in observations.items():
+    series_items = list(observations.items())
+    if len(series_items) > max_series:
+        parts.append(f"NOTA: Mostrando {max_series} de {len(series_items)} series disponibles (límite de contexto).\n")
+        series_items = series_items[:max_series]
+    
+    for series_id, entry in series_items:
         meta = entry.get("meta") or {}
         obs_raw = entry.get("observations")
 
@@ -319,12 +337,18 @@ def _format_observations_context(
                 if not sub:
                     parts.append("    (sin observaciones)")
                 else:
-                    parts.extend(_format_obs_list(sub, indent="    "))
+                    formatted_lines, was_truncated = _format_obs_list(sub, indent="    ")
+                    parts.extend(formatted_lines)
+                    if was_truncated:
+                        parts.append(f"    (mostrando últimas {max_obs_per_freq} observaciones)")
         elif isinstance(obs_raw, list):
             if not obs_raw:
                 parts.append("  (sin observaciones)")
             else:
-                parts.extend(_format_obs_list(obs_raw))
+                formatted_lines, was_truncated = _format_obs_list(obs_raw)
+                parts.extend(formatted_lines)
+                if was_truncated:
+                    parts.append(f"  (mostrando últimas {max_obs_per_freq} observaciones)")
         else:
             parts.append("  (sin observaciones)")
 

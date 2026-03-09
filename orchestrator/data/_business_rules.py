@@ -103,6 +103,11 @@ def _rule_imacec_default_activity(ent: ResolvedEntities) -> None:
         ent.activity_ent = "imacec"
 
 
+def _is_empty_cls(value) -> bool:
+    """True si el valor de clasificación representa ausencia de desglose."""
+    return value in (None, "none", "general", "", {}, [], ())
+
+
 def _rule_assign_price(ent: ResolvedEntities) -> None:
     """Determina si se requiere el parámetro de precio para la búsqueda de series.
 
@@ -111,9 +116,9 @@ def _rule_assign_price(ent: ResolvedEntities) -> None:
     """
     if (
         ent.indicator_ent == "pib"
-        and ent.activity_cls == "none"
-        and ent.region_cls == "none"
-        and ent.investment_cls == "none"
+        and _is_empty_cls(ent.activity_cls)
+        and _is_empty_cls(ent.region_cls)
+        and _is_empty_cls(ent.investment_cls)
     ):
         ent.price = None
     else:
