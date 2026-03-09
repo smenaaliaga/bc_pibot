@@ -221,28 +221,43 @@ def find_family_by_classification(
                     continue
 
         family_price = family_classification.get("price")
-        family_price_normalized = (
-            str(family_price).strip().lower() if family_price not in (None, "") else None
-        )
         if requested_price is not None:
-            if family_price_normalized != requested_price:
-                continue
+            if isinstance(family_price, list):
+                family_prices = {str(v).strip().lower() for v in family_price}
+                if requested_price not in family_prices:
+                    continue
+            else:
+                family_price_normalized = (
+                    str(family_price).strip().lower() if family_price not in (None, "") else None
+                )
+                if family_price_normalized != requested_price:
+                    continue
 
         family_seasonality = family_classification.get("seasonality")
-        family_seasonality_normalized = (
-            str(family_seasonality).strip().lower() if family_seasonality not in (None, "") else None
-        )
         if requested_seasonality is not None:
-            if family_seasonality_normalized != requested_seasonality:
-                continue
+            if isinstance(family_seasonality, list):
+                family_seasonalities = {str(v).strip().lower() for v in family_seasonality}
+                if requested_seasonality not in family_seasonalities:
+                    continue
+            else:
+                family_seasonality_normalized = (
+                    str(family_seasonality).strip().lower() if family_seasonality not in (None, "") else None
+                )
+                if family_seasonality_normalized != requested_seasonality:
+                    continue
 
         family_frequency = family_classification.get("frequency")
-        family_frequency_normalized = (
-            str(family_frequency).strip().lower() if family_frequency not in (None, "") else None
-        )
         if requested_frequency is not None:
-            if family_frequency_normalized != requested_frequency:
-                continue
+            if isinstance(family_frequency, list):
+                family_frequencies = {str(v).strip().lower() for v in family_frequency}
+                if requested_frequency not in family_frequencies:
+                    continue
+            else:
+                family_frequency_normalized = (
+                    str(family_frequency).strip().lower() if family_frequency not in (None, "") else None
+                )
+                if family_frequency_normalized != requested_frequency:
+                    continue
 
         if has_hist_dimension:
             if requested_hist is None:

@@ -90,6 +90,13 @@ def _extract_entities_from_state(
         else {}
     )
 
+    normalized_source = (
+        "predict_raw.interpretation.entities_normalized"
+        if normalized_from_predict
+        else "classification.normalized"
+    )
+    logger.info("[DATA_NODE] normalized_entities source=%s data=%s", normalized_source, normalized)
+
     # Extraer valores de entidades
     period_ent = coerce_period(normalized.get("period"))
 
@@ -108,6 +115,8 @@ def _extract_entities_from_state(
         investment_cls=investment_cls,
         req_form_cls=req_form_cls,
     )
+
+    logger.info("[DATA_NODE] resolved entities (pre-rules)=%s", asdict(ent))
 
     return question, entities, ent
 
@@ -315,6 +324,7 @@ def make_data_node(memory_adapter: Any):
 
         # 2. Aplicar reglas de negocio
         apply_business_rules(ent)
+        logger.info("[DATA_NODE] resolved entities (post-rules)=%s", asdict(ent))
         logger.info("[DATA_NODE] indicator=%s freq=%s activity=%s req_form=%s",
                     ent.indicator_ent, ent.frequency_ent, ent.activity_ent, ent.req_form_cls)
 

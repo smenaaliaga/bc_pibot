@@ -24,6 +24,10 @@ from orchestrator.data._helpers import build_target_series_url
 
 logger = logging.getLogger(__name__)
 
+_BDE_SERIES_BROWSER_URL = (
+    "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A"
+)
+
 
 # ===========================================================================
 # Formateo de períodos y mensajes informativos
@@ -128,6 +132,10 @@ def build_no_series_message(
 
     parts.append(
         "Puedes reformular tu pregunta o consultar el catálogo de series disponibles."
+    )
+
+    parts.append(
+        f"Tambien puedes buscar y ver series en 🔗 [Catalogo BDE]({_BDE_SERIES_BROWSER_URL})."
     )
 
     return " ".join(parts)

@@ -113,16 +113,22 @@ def _rule_assign_price(ent: ResolvedEntities) -> None:
 
     Para PIB agregado (sin actividad, región ni inversión) el precio es None;
     en los demás casos se usa "enc" (encadenado).
+    
+    TEMPORAL: Mientras el modelo no clasifique correctamente, siempre se usa "enc".
     """
-    if (
-        ent.indicator_ent == "pib"
-        and _is_empty_cls(ent.activity_cls)
-        and _is_empty_cls(ent.region_cls)
-        and _is_empty_cls(ent.investment_cls)
-    ):
-        ent.price = None
-    else:
-        ent.price = "enc"
+    # TODO: Reactivar esta lógica cuando el modelo pueda clasificar correctamente
+    # if (
+    #     ent.indicator_ent == "pib"
+    #     and _is_empty_cls(ent.activity_cls)
+    #     and _is_empty_cls(ent.region_cls)
+    #     and _is_empty_cls(ent.investment_cls)
+    # ):
+    #     ent.price = None
+    # else:
+    #     ent.price = "enc"
+    
+    # TEMPORAL: Siempre usar "enc" hasta que el modelo clasifique correctamente
+    ent.price = "enc"
 
 
 def _rule_pib_hist_flag(ent: ResolvedEntities) -> None:

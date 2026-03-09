@@ -101,7 +101,7 @@
     "classification": {
       "indicator": "pib",
       "calc_mode": ["original", "prev_period", "yoy"],
-      "price": null,
+      "price": ["enc", "co"],
       "has_activity": 0,
       "has_region": 0,
       "has_investment": 0
