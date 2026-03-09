@@ -7,20 +7,17 @@ import pandas as pd
 def test_get_series_from_redis_fallback_applies_range_filter(monkeypatch):
     monkeypatch.setattr(gds, "_ensure_redis_client", lambda: None)
 
-    def _fake_api(*, series_id, target_date=None, target_frequency=None, agg="avg"):
+    def _fake_api(*, series_id, target_frequency=None, agg="avg"):
         return {
             "meta": {
                 "series_id": series_id,
-                "firstdate": "primer dato disponible",
-                "lastdate": target_date or "último dato disponible",
             },
             "observations": [
-                {"date": "1996-01-01", "value": 42.0},
-                {"date": "2024-01-01", "value": 100.0},
-                {"date": "2024-12-01", "value": 110.0},
-                {"date": "2026-01-01", "value": 120.0},
+                {"date": "1996-01-31", "value": 42.0},
+                {"date": "2024-01-31", "value": 100.0},
+                {"date": "2024-12-31", "value": 110.0},
+                {"date": "2026-01-31", "value": 120.0},
             ],
-            "observations_raw": [],
         }
 
     monkeypatch.setattr(gds, "get_series_api_rest_bcch", _fake_api)
@@ -35,19 +32,18 @@ def test_get_series_from_redis_fallback_applies_range_filter(monkeypatch):
     )
 
     assert result is not None
-    assert [row["date"] for row in result["observations"]] == ["2024-01-01", "2024-12-01"]
-    assert result["meta"]["firstdate"] == "2024-01-01"
-    assert result["meta"]["lastdate"] == "2024-12-31"
+    assert [row["date"] for row in result["observations"]] == ["2024-01-31", "2024-12-31"]
+    assert result["meta"]["period_start"] == "2024-01-31"
+    assert result["meta"]["period_end"] == "2024-12-31"
 
 
 def test_get_series_from_redis_uses_cache_when_requested_period_is_covered(monkeypatch):
     cached_payload = {
         "meta": {"cache_created_at": "2026-03-03T00:00:00+00:00"},
         "observations": [
-            {"date": "2024-01-01", "value": 100.0},
-            {"date": "2024-12-01", "value": 110.0},
+            {"date": "2024-01-31", "value": 100.0},
+            {"date": "2024-12-31", "value": 110.0},
         ],
-        "observations_raw": [],
     }
 
     class _FakeRedisClient:
@@ -71,7 +67,7 @@ def test_get_series_from_redis_uses_cache_when_requested_period_is_covered(monke
     )
 
     assert result is not None
-    assert [row["date"] for row in result["observations"]] == ["2024-01-01", "2024-12-01"]
+    assert [row["date"] for row in result["observations"]] == ["2024-01-31", "2024-12-31"]
     assert result["meta"]["cache_resolution"] == "cache_covered"
 
 
@@ -79,10 +75,9 @@ def test_get_series_from_redis_refetches_when_requested_period_is_not_covered(mo
     cached_payload = {
         "meta": {"cache_created_at": "2026-03-03T00:00:00+00:00"},
         "observations": [
-            {"date": "2024-01-01", "value": 100.0},
-            {"date": "2024-12-01", "value": 110.0},
+            {"date": "2024-01-31", "value": 100.0},
+            {"date": "2024-12-31", "value": 110.0},
         ],
-        "observations_raw": [],
     }
 
     class _FakeRedisClient:
@@ -93,15 +88,14 @@ def test_get_series_from_redis_refetches_when_requested_period_is_not_covered(mo
 
     api_calls = {"count": 0}
 
-    def _fake_api(*, series_id, target_date=None, target_frequency=None, agg="avg"):
+    def _fake_api(*, series_id, target_frequency=None, agg="avg"):
         api_calls["count"] += 1
         return {
             "meta": {"series_id": series_id},
             "observations": [
-                {"date": "2027-01-01", "value": 140.0},
-                {"date": "2027-12-01", "value": 160.0},
+                {"date": "2027-01-31", "value": 140.0},
+                {"date": "2027-12-31", "value": 160.0},
             ],
-            "observations_raw": [],
         }
 
     monkeypatch.setattr(gds, "get_series_api_rest_bcch", _fake_api)
@@ -117,14 +111,14 @@ def test_get_series_from_redis_refetches_when_requested_period_is_not_covered(mo
 
     assert result is not None
     assert api_calls["count"] == 1
-    assert [row["date"] for row in result["observations"]] == ["2027-01-01", "2027-12-01"]
+    assert [row["date"] for row in result["observations"]] == ["2027-01-31", "2027-12-31"]
     assert result["meta"]["cache_resolution"] == "cache_missing_period"
 
 
 def test_normalize_observations_empty_returns_expected_columns():
     df = gds._normalize_observations([])
 
-    assert list(df.columns) == ["date", "value", "status"]
+    assert list(df.columns) == ["date", "value"]
     assert df.empty
 
 
@@ -155,15 +149,7 @@ def test_get_series_api_rest_bcch_empty_obs_returns_placeholder(monkeypatch):
 
     assert isinstance(result, dict)
     assert result.get("meta", {}).get("descripEsp") == "PIB Minería, Región de Los Lagos"
-    assert result.get("observations") == [
-        {
-            "date": "",
-            "value": None,
-            "status": "",
-            "pct": None,
-            "yoy_pct": None,
-        }
-    ]
+    assert result.get("observations") == []
 
 
 def test_resample_empty_dataframe_returns_empty_without_error():

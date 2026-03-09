@@ -34,8 +34,6 @@ class ResolvedEntities:
     region_ent: Optional[str] = None
     investment_ent: Optional[str] = None
     period_ent: List[Any] = field(default_factory=list)
-    period_values: List[Any] = field(default_factory=list)
-    period_reference_year: Optional[int] = None
 
     # Clasificaciones del agente
     calc_mode_cls: Any = None
@@ -48,7 +46,6 @@ class ResolvedEntities:
     # Campos derivados por reglas
     price: Optional[str] = None
     hist: Optional[int] = None
-    monthly_frequency_note: Optional[str] = None
 
 
 def apply_business_rules(ent: ResolvedEntities) -> ResolvedEntities:
@@ -125,11 +122,13 @@ def _rule_assign_price(ent: ResolvedEntities) -> None:
 
 def _rule_pib_hist_flag(ent: ResolvedEntities) -> None:
     """Activa la búsqueda en series históricas si PIB anual y año < 1996."""
+    from orchestrator.data._helpers import extract_year
+    ref_year = extract_year(ent.period_ent[0]) if ent.period_ent else None
     if (
         ent.indicator_ent == "pib"
         and str(ent.frequency_ent or "").strip().lower() == "a"
-        and ent.period_reference_year is not None
-        and ent.period_reference_year < 1996
+        and ref_year is not None
+        and ref_year < 1996
     ):
         ent.hist = 1
 
@@ -154,24 +153,16 @@ def _rule_redirect_pib_monthly_to_quarterly(ent: ResolvedEntities) -> None:
         return
 
     requested_month_label = None
-    if ent.period_values:
-        requested_month_label = format_period_labels(str(ent.period_values[-1]), "m")[0]
+    if ent.period_ent:
+        requested_month_label = format_period_labels(str(ent.period_ent[-1]), "m")[0]
         if requested_month_label == "--":
             requested_month_label = None
 
     if str(ent.calc_mode_cls or "").strip().lower() == "contribution":
-        ent.monthly_frequency_note = (
-            "Las contribuciones al PIB no se calculan de forma mensual; "
-            "sin embargo, te comparto la última contribución trimestral disponible."
-        )
+        logger.warning("[DATA_NODE] PIB contribución mensual no existe; redirigiendo a trimestral")
     else:
-        ent.monthly_frequency_note = (
-            "El PIB no se calcula de forma mensual; "
-            "sin embargo, te comparto el último trimestre disponible."
-        )
-    logger.warning("[DATA_NODE] %s", ent.monthly_frequency_note)
+        logger.warning("[DATA_NODE] PIB mensual no existe; redirigiendo a trimestral")
 
     ent.frequency_ent = "q"
     ent.req_form_cls = "latest"
     ent.period_ent = []
-    ent.period_values = []

@@ -6,6 +6,7 @@ dependen de estado ni de servicios externos.
 
 from __future__ import annotations
 
+import calendar
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -45,6 +46,38 @@ def extract_year(value: Any) -> Optional[int]:
         return int(match.group(0))
     except Exception:
         return None
+
+
+# ---------------------------------------------------------------------------
+# Conversión a fin de periodo
+# ---------------------------------------------------------------------------
+
+def to_period_end_str(date_str: Optional[str], freq: Optional[str]) -> Optional[str]:
+    """Convierte una fecha ISO de inicio-de-periodo al último día del periodo.
+
+    >>> to_period_end_str("2026-01-01", "M")
+    '2026-01-31'
+    """
+    if not date_str or not freq:
+        return date_str
+    try:
+        parts = str(date_str).strip()[:10].split("-")
+        if len(parts) != 3:
+            return date_str
+        year, month, day = int(parts[0]), int(parts[1]), int(parts[2])
+        freq_up = freq.upper()
+        if freq_up == "M":
+            _, last_day = calendar.monthrange(year, month)
+            return f"{year:04d}-{month:02d}-{last_day:02d}"
+        if freq_up in ("Q", "T"):
+            quarter_end_month = ((month - 1) // 3 + 1) * 3
+            _, last_day = calendar.monthrange(year, quarter_end_month)
+            return f"{year:04d}-{quarter_end_month:02d}-{last_day:02d}"
+        if freq_up == "A":
+            return f"{year:04d}-12-31"
+        return date_str
+    except Exception:
+        return date_str
 
 
 # ---------------------------------------------------------------------------

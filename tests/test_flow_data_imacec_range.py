@@ -11,19 +11,19 @@ def test_stream_data_flow_keeps_imacec_annual_single_year_as_range(monkeypatch):
     monkeypatch.setattr(flow_data, "specific_response", fake_specific_response)
 
     payload = {
-        "intent": "value",
         "classification": {
-            "indicator": "imacec",
-            "seasonality": "nsa",
-            "frequency": "a",
+            "indicator_ent": "imacec",
+            "seasonality_ent": "nsa",
+            "frequency_ent": "a",
             "req_form_cls": "range",
             "calc_mode_cls": "yoy",
+            "period_ent": ["2025-01-01", "2025-12-31"],
         },
         "series": "SERIE.IMACEC.TEST",
-        "parsed_point": None,
-        "parsed_range": ("2025-01-01", "2025-12-31"),
+        "family_name": "IMACEC test family",
+        "family_series": [{"id": "SERIE.IMACEC.TEST", "title": "IMACEC"}],
+        "family_source_url": "https://example.test/family",
         "result": [{"date": "2025-12-31", "value": 1.36, "yoy": 2.3}],
-        "source_url": "https://example.test/family",
     }
 
     chunks = list(flow_data.stream_data_flow(payload, session_id="s1"))
@@ -42,19 +42,19 @@ def test_stream_data_flow_converts_non_imacec_annual_single_year_range_to_point(
     monkeypatch.setattr(flow_data, "specific_response", fake_specific_response)
 
     payload = {
-        "intent": "value",
         "classification": {
-            "indicator": "pib",
-            "seasonality": "nsa",
-            "frequency": "a",
+            "indicator_ent": "pib",
+            "seasonality_ent": "nsa",
+            "frequency_ent": "a",
             "req_form_cls": "range",
             "calc_mode_cls": "yoy",
+            "period_ent": ["2025-01-01", "2025-12-31"],
         },
         "series": "SERIE.PIB.TEST",
-        "parsed_point": None,
-        "parsed_range": ("2025-01-01", "2025-12-31"),
+        "family_name": "PIB test family",
+        "family_series": [{"id": "SERIE.PIB.TEST", "title": "PIB"}],
+        "family_source_url": "https://example.test/family",
         "result": [{"date": "2025-12-31", "value": 110.0, "yoy": 2.0}],
-        "source_url": "https://example.test/family",
     }
 
     chunks = list(flow_data.stream_data_flow(payload, session_id="s2"))
@@ -75,23 +75,23 @@ def test_stream_data_flow_latest_contribution_uses_reference_period_over_parsed_
     monkeypatch.setattr(flow_data, "specific_response", fake_specific_response)
 
     payload = {
-        "intent": "value",
         "classification": {
-            "indicator": "pib",
-            "seasonality": "nsa",
-            "frequency": "q",
+            "indicator_ent": "pib",
+            "seasonality_ent": "nsa",
+            "frequency_ent": "q",
             "req_form_cls": "latest",
             "calc_mode_cls": "contribution",
+            "period_ent": ["2025-12-31"],
         },
         "series": "SERIE.PIB.TEST",
-        "parsed_point": "2025-12-31",
-        "reference_period": "2025-09-30",
+        "family_name": "PIB test family",
+        "family_series": [{"id": "SERIE.PIB.TEST", "title": "PIB"}],
+        "family_source_url": "https://example.test/family",
         "result": [{"date": "2025-09-30", "value": 1.6}],
         "all_series_data": [
             {"date": "2025-09-30", "value": 1.6},
             {"date": "2025-09-30", "value": 0.5},
         ],
-        "source_url": "https://example.test/family",
     }
 
     chunks = list(flow_data.stream_data_flow(payload, session_id="s3"))
@@ -112,21 +112,21 @@ def test_stream_data_flow_regional_pib_includes_region_in_indicator_name(monkeyp
     monkeypatch.setattr(flow_data, "specific_response", fake_specific_response)
 
     payload = {
-        "intent": "value",
         "classification": {
-            "indicator": "pib",
-            "seasonality": "nsa",
-            "frequency": "q",
+            "indicator_ent": "pib",
+            "seasonality_ent": "nsa",
+            "frequency_ent": "q",
             "req_form_cls": "point",
             "calc_mode_cls": "yoy",
-            "region": "specific",
-            "region_value": "magallanes",
+            "region_cls": "specific",
+            "region_ent": "magallanes",
+            "period_ent": ["2025-07-01", "2025-09-30"],
         },
         "series": "SERIE.PIB.MAGALLANES.TEST",
-        "parsed_point": "2025-09-30",
-        "parsed_range": ("2025-07-01", "2025-09-30"),
+        "family_name": "PIB test family",
+        "family_series": [{"id": "SERIE.PIB.MAGALLANES.TEST", "title": "PIB Magallanes"}],
+        "family_source_url": "https://example.test/family",
         "result": [{"date": "2025-09-30", "value": 110.0, "yoy": 4.9}],
-        "source_url": "https://example.test/family",
     }
 
     chunks = list(flow_data.stream_data_flow(payload, session_id="s4"))

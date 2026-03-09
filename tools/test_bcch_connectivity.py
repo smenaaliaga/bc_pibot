@@ -22,7 +22,7 @@ if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
 from config import BCCH_PASS, BCCH_USER
-from orchestrator.data.get_series import get_series_api_rest_bcch
+from orchestrator.data.get_data_serie import get_series_api_rest_bcch
 
 _DEFAULTS_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "series", "config_default.json"))
 _DOMAIN_KEYS = {"IMACEC": "IMACEC", "PIB": "PIB_TOTAL", "PIB_REGIONAL": "PIB_REGIONAL"}
@@ -68,14 +68,12 @@ def main() -> int:
             target_frequency = default_freq
 
     year = args.year
-    target_date = f"{year}-12-31"
 
     print(
-        f"Consultando {series_id} | dominio={domain} | target_date={target_date} | freq={target_frequency or 'orig'}"
+        f"Consultando {series_id} | dominio={domain} | year={year} | freq={target_frequency or 'orig'}"
     )
     data = get_series_api_rest_bcch(
         series_id=series_id,
-        target_date=target_date,
         target_frequency=target_frequency,
         agg=args.agg,
     )
@@ -85,7 +83,7 @@ def main() -> int:
     print(
         "Resultado: filas={rows} freq={freq} serie={sid} descripcion={desc}".format(
             rows=len(observations),
-            freq=meta.get("freq_effective"),
+            freq=meta.get("original_frequency"),
             sid=meta.get("series_id"),
             desc=meta.get("descripEsp", ""),
         )

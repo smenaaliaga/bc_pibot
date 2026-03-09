@@ -637,6 +637,34 @@ def _caller_info_for_log(skip_filename_suffix: str = "get_series.py") -> Dict[st
 # Utilidades para fechas y frecuencias
 # ---------------------------------------------------------------------------
 
+import calendar as _calendar
+
+
+def _to_period_end(d: datetime.date, freq: str) -> datetime.date:
+    """Convierte una fecha de inicio-de-periodo al último día del periodo."""
+    freq = (freq or "").upper()
+    if freq == "M":
+        _, last_day = _calendar.monthrange(d.year, d.month)
+        return d.replace(day=last_day)
+    if freq in ("Q", "T"):
+        quarter_end_month = ((d.month - 1) // 3 + 1) * 3
+        _, last_day = _calendar.monthrange(d.year, quarter_end_month)
+        return datetime.date(d.year, quarter_end_month, last_day)
+    if freq == "A":
+        return datetime.date(d.year, 12, 31)
+    return d
+
+
+def _to_period_end_str(date_str: Optional[str], freq: Optional[str]) -> Optional[str]:
+    """Wrapper que acepta y retorna strings ISO."""
+    if not date_str or not freq:
+        return date_str
+    try:
+        d = datetime.date.fromisoformat(str(date_str).strip())
+        return _to_period_end(d, freq).isoformat()
+    except Exception:
+        return date_str
+
 
 def _infer_freq_from_code(series_id: str) -> str:
     if not series_id:
@@ -804,7 +832,6 @@ def _compute_variations(df: pd.DataFrame, freq: str) -> pd.DataFrame:
 
 def get_series_api_rest_bcch(
     series_id: str,
-    target_date: Optional[str] = None,
     target_frequency: Optional[str] = None,
     agg: str = "avg",
 ) -> Dict[str, Any]:
@@ -817,8 +844,6 @@ def get_series_api_rest_bcch(
         Identificador de la serie BCCh (ej: "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M").
         Para IMACEC, PIB y PIB regional, normalmente se obtienen desde los JSON
         de configuración por defecto (config_default.json).
-    target_date : str, opcional
-        Fecha de referencia (YYYY-MM-DD) para calcular flags de posición; la serie se trae completa.
     target_frequency : str, opcional
         Frecuencia objetivo: "D", "M", "Q" o "A". Si None, se mantiene la original.
     agg : str
@@ -833,9 +858,6 @@ def get_series_api_rest_bcch(
     global _redis_client
     if not BCCH_USER or not BCCH_PASS:
         raise RuntimeError("BCCH_USER/BCCH_PASS no configurados (.env)")
-
-    # Ignorar firstdate: siempre traemos la serie completa. target_date se usa solo para flags.
-    target_date = None if target_date in (None, "", "auto") else target_date
 
     params = {
         "user": BCCH_USER,
@@ -858,8 +880,6 @@ def get_series_api_rest_bcch(
         caller = _caller_info_for_log()
         args_summary = {
             "series_id": series_id,
-            "firstdate": "auto",  # siempre auto
-            "lastdate": target_date or "auto",
             "target_frequency": (target_frequency or None),
             "agg": agg,
         }
@@ -981,12 +1001,14 @@ def get_series_api_rest_bcch(
         observations = []
         for _, row in df_enriched.iterrows():
             d = row["date"]
+            d_date = d.date() if hasattr(d, "date") else d
+            d_end = _to_period_end(d_date, effective_freq)
             v = row["value"]
             pct = row.get("pct", None)
             yoy = row.get("yoy_pct", None)
             observations.append(
                 {
-                    "date": d.strftime("%Y-%m-%d"),
+                    "date": d_end.strftime("%Y-%m-%d"),
                     "value": None if pd.isna(v) else float(v),
                     "pct": None if pd.isna(pct) else float(pct),
                     "yoy_pct": None if pd.isna(yoy) else float(yoy),
@@ -998,9 +1020,8 @@ def get_series_api_rest_bcch(
             "observations": observations,
         }
 
-    # --- Verificación de lastdate vs rango disponible (primera y última fecha) ---
+    # --- Rango de fechas disponibles ---
     try:
-        # Fechas disponibles en las observaciones devueltas
         first_available_str = None
         last_available_str = None
         if observations:
@@ -1009,56 +1030,16 @@ def get_series_api_rest_bcch(
                 first_available_str = min(dates_iter)
                 last_available_str = max(dates_iter)
 
-        # Clasificar la posición de lastdate respecto del rango disponible
-        lastdate_position = "unknown"
-        is_auto = target_date in (None, "", "auto")
-        if is_auto:
-            lastdate_position = "auto"
-        elif first_available_str and last_available_str:
-            try:
-                d_first = dateparser.parse(first_available_str).date()
-                d_latest = dateparser.parse(last_available_str).date()
-                d_req = dateparser.parse(target_date).date()  # type: ignore[arg-type]
-                if d_req > d_latest:
-                    lastdate_position = "gt_latest"
-                elif d_req == d_latest:
-                    lastdate_position = "eq_latest"
-                elif d_req >= d_first and d_req < d_latest:
-                    lastdate_position = "within_range"
-                elif d_req < d_first:
-                    lastdate_position = "lt_first"
-            except Exception:
-                # Fallback lexicográfico si el parse falla
-                if str(target_date) > str(last_available_str):
-                    lastdate_position = "gt_latest"
-                elif str(target_date) == str(last_available_str):
-                    lastdate_position = "eq_latest"
-                elif str(first_available_str) <= str(target_date) < str(last_available_str):
-                    lastdate_position = "within_range"
-                elif str(target_date) < str(first_available_str):
-                    lastdate_position = "lt_first"
-
-        # Booleans derivados
-        lastdate_ge_latest = lastdate_position in {"eq_latest", "gt_latest"}
-        lastdate_lt_first = lastdate_position == "lt_first"
-        lastdate_within_range = lastdate_position == "within_range"
-
-        # Anotar en meta
         meta_ref = result.setdefault("meta", {})
         meta_ref["first_available_date"] = first_available_str or ""
         meta_ref["last_available_date"] = last_available_str or ""
-        meta_ref["lastdate_position"] = lastdate_position
-        meta_ref["lastdate_ge_latest"] = bool(lastdate_ge_latest)
-        meta_ref["lastdate_within_range"] = bool(lastdate_within_range)
-        meta_ref["lastdate_lt_first"] = bool(lastdate_lt_first)
 
         logger.info(
-            "[get_series_api_rest_bcch] lastdate check | "
-            f"first_available={first_available_str} last_available={last_available_str} "
-            f"requested={target_date or 'auto'} position={lastdate_position}"
+            "[get_series_api_rest_bcch] available range | "
+            f"first_available={first_available_str} last_available={last_available_str}"
         )
     except Exception as _e_lastchk:
-        logger.debug(f"[get_series_api_rest_bcch] No se pudo verificar lastdate vs último dato: {_e_lastchk}")
+        logger.debug(f"[get_series_api_rest_bcch] No se pudo calcular rango disponible: {_e_lastchk}")
 
     # --- Log de salida a test/log.text ---
     try:
@@ -1067,7 +1048,7 @@ def get_series_api_rest_bcch(
         )
         _append_test_log(
             (
-                f"source=api | serie={series_id} | rango=auto→{target_date or 'auto'} | "
+                f"source=api | serie={series_id} | "
                 f"freq={meta.get('original_frequency', '')} | agg={agg} | rows={len(observations)} | sample=[{sample_api}]"
             )
         )
@@ -1145,6 +1126,12 @@ def get_series_from_redis(
     fd = None if firstdate in (None, "", "auto") else firstdate
     ld = None if lastdate in (None, "", "auto") else lastdate
 
+    # Ajustar fd/ld al último día del periodo para que coincida con las fechas
+    # de observación (que ahora usan fin de periodo).
+    _eff_freq = (target_frequency or _infer_freq_from_code(series_id) or "").upper()
+    fd = _to_period_end_str(fd, _eff_freq) if fd else fd
+    ld = _to_period_end_str(ld, _eff_freq) if ld else ld
+
     def _parse_date_str_local(value: Optional[str]) -> Optional[datetime.date]:
         if not isinstance(value, str):
             return None
@@ -1159,7 +1146,6 @@ def get_series_from_redis(
     def _fetch_fallback_and_filter(reason: str) -> Optional[Dict[str, Any]]:
         fallback_data = get_series_api_rest_bcch(
             series_id=series_id,
-            target_date=ld,
             target_frequency=target_frequency,
             agg=agg,
         )
@@ -1194,9 +1180,9 @@ def get_series_from_redis(
         fallback_data["observations"] = filtered_observations
         meta = fallback_data.get("meta", {}) or {}
         if fd:
-            meta["firstdate"] = fd
+            meta["period_start"] = fd
         if ld:
-            meta["lastdate"] = ld
+            meta["period_end"] = ld
         meta["cache_resolution"] = reason
         fallback_data["meta"] = meta
         return fallback_data
@@ -1299,7 +1285,7 @@ def get_series_from_redis(
     obs = data.get("observations", [])
     cache_has_requested_coverage = _range_covered_by_cache(obs)
 
-    # Recalcular flags de posición según el target_date (ld)
+    # Recalcular rango disponible y posición del periodo solicitado
     try:
         first_available_str = None
         last_available_str = None
@@ -1309,11 +1295,13 @@ def get_series_from_redis(
                 first_available_str = min(dates_iter)
                 last_available_str = max(dates_iter)
 
-        lastdate_position = data.get("meta", {}).get("lastdate_position", "unknown")
-        if ld:
+        lastdate_position = "unknown"
+        if not ld:
+            lastdate_position = "auto"
+        elif first_available_str and last_available_str:
             try:
-                d_first = dateparser.parse(first_available_str).date() if first_available_str else None
-                d_latest = dateparser.parse(last_available_str).date() if last_available_str else None
+                d_first = dateparser.parse(first_available_str).date()
+                d_latest = dateparser.parse(last_available_str).date()
                 d_req = dateparser.parse(ld).date()
                 if d_latest and d_req > d_latest:
                     lastdate_position = "gt_latest"
@@ -1330,8 +1318,6 @@ def get_series_from_redis(
         meta_ref["first_available_date"] = first_available_str or meta_ref.get("first_available_date", "")
         meta_ref["last_available_date"] = last_available_str or meta_ref.get("last_available_date", "")
         meta_ref["lastdate_position"] = lastdate_position
-        if ld:
-            meta_ref["target_date"] = ld
     except Exception:
         pass
     if not fd and not ld:
@@ -1398,9 +1384,9 @@ def get_series_from_redis(
     # Actualizar meta para reflejar el nuevo rango
     meta = data.get("meta", {})
     if fd:
-        meta["firstdate"] = fd
+        meta["period_start"] = fd
     if ld:
-        meta["lastdate"] = ld
+        meta["period_end"] = ld
     meta["cache_resolution"] = "cache_covered"
     data["meta"] = meta
 
@@ -1528,7 +1514,6 @@ def fetch_series_with_calc(
 
     data = get_series_api_rest_bcch(
         series_id=series_id,
-        target_date=lastdate,
         target_frequency=freq,
         agg=agg,
     )
@@ -1560,8 +1545,8 @@ def fetch_series_with_calc(
             "calc_type": calc_type_norm,
             "metric_selected": metric_key,
             # Reflejar el rango solicitado en meta
-            "firstdate": firstdate or (data.get("meta", {}).get("firstdate")),
-            "lastdate": lastdate or (data.get("meta", {}).get("lastdate")),
+            "period_start": firstdate or (data.get("meta", {}).get("period_start")),
+            "period_end": lastdate or (data.get("meta", {}).get("period_end")),
         },
         "observations": obs_out,
     }
@@ -1640,9 +1625,9 @@ def format_series_openai(data: Dict[str, Any], calc_type: str = "ORIGINAL") -> D
         if not obs:
             return {"columns": ["date", "yoy_pct"], "rows": []}
 
-        # Determinar año objetivo desde meta.lastdate o último dato
+        # Determinar año objetivo desde meta.period_end o último dato
         meta = data.get("meta", {})
-        lastdate = meta.get("lastdate")
+        lastdate = meta.get("period_end")
         try:
             curr_year = int(str(lastdate).split("-")[0]) if lastdate else max(int(o.get("date","0000-01-01").split("-")[0]) for o in obs)
         except Exception:

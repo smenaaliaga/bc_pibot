@@ -88,8 +88,8 @@ def test_data_node_prefers_followup_normalized_from_predict_raw(monkeypatch):
     )
 
     assert captured["indicator"] == "pib"
-    assert result["data_classification"]["indicator"] == "pib"
-    assert payload_holder["payload"]["classification"]["indicator"] == "pib"
+    assert result["data_classification"]["indicator_ent"] == "pib"
+    assert payload_holder["payload"]["classification"]["indicator_ent"] == "pib"
     assert result["output"] == "ok"
 
 
@@ -371,6 +371,9 @@ def test_data_node_annual_range_uses_latest_complete_year_when_requested_year_in
 
     def fake_stream_data_flow(payload, session_id=""):
         payload_holder["payload"] = payload
+        note = payload["classification"].get("incomplete_frequency_note")
+        if note:
+            yield f"{note} "
         yield "ok"
 
     monkeypatch.setattr(data_module.flow_data, "stream_data_flow", fake_stream_data_flow)
@@ -407,7 +410,7 @@ def test_data_node_annual_range_uses_latest_complete_year_when_requested_year_in
     assert "Como la información de 2025 aún no está completa" in result["output"]
     assert result["output"].endswith("ok")
     assert payload_holder["payload"]["classification"]["req_form_cls"] == "point"
-    assert payload_holder["payload"]["parsed_point"] == "2024-12-31"
+    assert payload_holder["payload"]["classification"]["period_ent"] == ["2024-12-31", "2024-12-31"]
     assert payload_holder["payload"]["result"][0]["date"] == "2024-12-31"
 
 
@@ -501,6 +504,9 @@ def test_data_node_monthly_pib_falls_back_to_latest_quarter(monkeypatch):
     )
 
     def fake_stream_data_flow(payload, session_id=""):
+        note = payload["classification"].get("monthly_frequency_note")
+        if note:
+            yield f"{note} "
         yield "ok"
 
     monkeypatch.setattr(data_module.flow_data, "stream_data_flow", fake_stream_data_flow)
@@ -610,7 +616,7 @@ def test_data_node_range_uses_latest_obs_without_metadata_flag(monkeypatch):
 
     assert "No hay datos disponibles" not in result["output"]
     assert payload_holder["payload"]["classification"]["req_form_cls"] == "point"
-    assert payload_holder["payload"]["parsed_point"] == "2026-03-31"
+    assert payload_holder["payload"]["classification"]["period_ent"][-1] == "2026-03-31"
     assert result["output"].endswith("ok")
 
 
@@ -689,7 +695,7 @@ def test_data_node_forces_imacec_frequency_to_monthly(monkeypatch):
 
     assert captured_fetch["req_form"] == "point"
     assert captured_fetch["frequency"] == "m"
-    assert payload_holder["payload"]["classification"]["frequency"] == "m"
+    assert payload_holder["payload"]["classification"]["frequency_ent"] == "m"
     assert payload_holder["payload"]["classification"]["req_form_cls"] == "point"
     assert result["output"].endswith("ok")
 
@@ -779,9 +785,7 @@ def test_data_node_contribution_aligns_period_with_target_series_date(monkeypatc
 
     payload = payload_holder["payload"]
     assert payload["classification"]["req_form_cls"] == "point"
-    assert payload["parsed_point"] == "2025-12-31"
-    assert payload["parsed_range"] == ("2025-10-01", "2025-12-31")
-    assert payload["used_latest_fallback_for_point"] is True
+    assert payload["classification"]["period_ent"] == ["2025-10-01", "2025-12-31"]
     assert all(str(row.get("date")) == "2025-09-30" for row in payload["result"])
     assert result["output"].endswith("ok")
 
@@ -959,7 +963,6 @@ def test_data_node_latest_contribution_uses_target_series_latest_date(monkeypatc
 
     payload = payload_holder["payload"]
     assert payload["classification"]["req_form_cls"] == "latest"
-    assert payload["reference_period"] == "2025-09-30"
     assert all(str(row.get("date")) == "2025-09-30" for row in payload["all_series_data"])
     assert str(payload["result"][0].get("date")) == "2025-09-30"
     assert result["output"].endswith("ok")
@@ -1312,9 +1315,8 @@ def test_data_node_original_general_collects_family_series_and_keeps_target(monk
 
     payload = payload_holder["payload"]
     assert payload["classification"]["calc_mode_cls"] == "original"
-    assert payload["classification"]["activity_cls"] == "general"
+    assert payload["classification"]["activity_cls_resolved"] == "general"
     assert payload["series"] == "SERIE.PIB.TARGET"
-    assert payload["reference_period"] == "2025-09-30"
     assert len(payload.get("all_series_data") or []) == 3
     assert str(payload["result"][0].get("series_id")) == "SERIE.PIB.TARGET"
     assert str(payload["result"][0].get("date")) == "2025-09-30"
@@ -1403,9 +1405,8 @@ def test_data_node_yoy_general_collects_family_series_and_keeps_target(monkeypat
 
     payload = payload_holder["payload"]
     assert payload["classification"]["calc_mode_cls"] == "yoy"
-    assert payload["classification"]["activity_cls"] == "general"
+    assert payload["classification"]["activity_cls_resolved"] == "general"
     assert payload["series"] == "SERIE.IMACEC.TARGET"
-    assert payload["reference_period"] == "2025-09-30"
     assert len(payload.get("all_series_data") or []) == 2
     assert str(payload["result"][0].get("series_id")) == "SERIE.IMACEC.TARGET"
     assert payload["all_series_data"][0].get("yoy") is not None

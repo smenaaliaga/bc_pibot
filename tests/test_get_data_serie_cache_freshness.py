@@ -25,7 +25,6 @@ def test_get_series_from_redis_uses_cache_when_source_not_newer(monkeypatch):
         "observations": [
             {"date": "2026-02-01", "value": 111.0},
         ],
-        "observations_raw": [],
     }
     fake_client = _FakeRedisClient(json.dumps(cached_payload))
     monkeypatch.setattr(gds, "_ensure_redis_client", lambda: fake_client)
@@ -55,6 +54,7 @@ def test_get_series_from_redis_uses_cache_when_source_not_newer(monkeypatch):
 
 
 def test_get_series_from_redis_refetches_when_source_updated_after_cache(monkeypatch):
+    monkeypatch.setattr(gds, "SERIES_UPDATES_ENABLED", True)
     cached_payload = {
         "meta": {
             "cache_created_at": "2026-03-01T00:00:00+00:00",
@@ -62,7 +62,6 @@ def test_get_series_from_redis_refetches_when_source_updated_after_cache(monkeyp
         "observations": [
             {"date": "2026-02-01", "value": 100.0},
         ],
-        "observations_raw": [],
     }
     fake_client = _FakeRedisClient(json.dumps(cached_payload))
     monkeypatch.setattr(gds, "_ensure_redis_client", lambda: fake_client)
@@ -74,14 +73,13 @@ def test_get_series_from_redis_refetches_when_source_updated_after_cache(monkeyp
 
     api_calls = {"count": 0}
 
-    def _fake_api(*, series_id, target_date=None, target_frequency=None, agg="avg"):
+    def _fake_api(*, series_id, target_frequency=None, agg="avg"):
         api_calls["count"] += 1
         return {
             "meta": {"series_id": series_id},
             "observations": [
-                {"date": "2026-03-01", "value": 222.0},
+                {"date": "2026-03-31", "value": 222.0},
             ],
-            "observations_raw": [],
         }
 
     monkeypatch.setattr(gds, "get_series_api_rest_bcch", _fake_api)
