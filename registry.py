@@ -52,7 +52,7 @@ except Exception as exc:
     SeriesInterpreter = None  # type: ignore
     logger.warning("SeriesInterpreter import skipped: %s", exc)
 from catalog.catalog_service import CatalogService
-from api.bde_client import BDEClient
+from orchestrator.api.bde_client import BDEClient
 
 _init_lock = threading.Lock()
 
@@ -69,7 +69,6 @@ def _resolve_path(env_name: str, override: Optional[str], default: str) -> str:
 def _load_intent_router(path: str) -> Optional[Any]:
     with _init_lock:
         if IntentRouter is None:
-            logger.debug("IntentRouter unavailable; returning None")
             return None
         try:
             return IntentRouter(model_path=path)
@@ -87,7 +86,6 @@ def _load_intent_router(path: str) -> Optional[Any]:
 def _load_series_interpreter(path: str) -> Optional[Any]:
     with _init_lock:
         if SeriesInterpreter is None:
-            logger.debug("SeriesInterpreter unavailable; returning None")
             return None
         try:
             return SeriesInterpreter(model_path=path)
@@ -120,9 +118,7 @@ def get_series_interpreter(path: Optional[str] = None) -> Optional[Any]:
 def get_catalog_service(catalog_path: str = "catalog/series_catalog.json") -> CatalogService:
     """Devuelve una CatalogService cacheada (singleton por ruta)."""
     try:
-        service = CatalogService(catalog_path)
-        logger.info(f"CatalogService inicializado desde '{catalog_path}'")
-        return service
+        return CatalogService(catalog_path)
     except Exception as e:
         logger.error(f"Error cargando CatalogService desde '{catalog_path}': {e}", exc_info=True)
         raise
@@ -166,21 +162,11 @@ def warmup_models(
         catalog_path: Ruta al archivo del catálogo
         preload_catalog: Si True, precarga el catálogo en el almacén del BDEClient
     """
-    router = get_intent_router(intent_router_path)
-    interpreter = get_series_interpreter(series_interpreter_path)
-    catalog = get_catalog_service(catalog_path)
-    bde = get_bde_client()
-    try:
-        logger.info(
-            "Singletons cargados: router=%s | interpreter=%s | catalog=%s | bde=%s",
-            getattr(router, "model_path", "<desconocido>") if router else "<none>",
-            getattr(interpreter, "model_path", "<desconocido>") if interpreter else "<none>",
-            catalog_path,
-            "BDEClient",
-        )
-    except Exception:
-        # Evitar que un fallo de logging bloquee el warmup
-        pass
+    get_intent_router(intent_router_path)
+    get_series_interpreter(series_interpreter_path)
+    get_catalog_service(catalog_path)
+    if preload_catalog:
+        get_bde_client()
     
     if preload_catalog:
         preload_catalog_in_bde(catalog_path)

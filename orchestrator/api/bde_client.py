@@ -2,7 +2,7 @@ import json
 import os
 import logging
 from pathlib import Path
-from typing import List, Dict, Iterable
+from typing import List, Dict, Any
 import requests
 
 logger = logging.getLogger(__name__)
@@ -13,16 +13,16 @@ class BDEClient:
 
     - Almacén persistente: `data_store/timeseries.json`, mapeando `series_id -> payload completo`
     - Carga el almacén completo en memoria al iniciar y sirve desde allí
-    - Si una serie falta o está vacía, intenta local y luego BDE, y persiste en el almacén
+    - Si una serie falta o está vacía, consulta BDE y persiste en el almacén
     """
 
     def __init__(self):
-        # Ruta del almacén único
-        base_store = Path(__file__).resolve().parent.parent / "data_store"
+        # Ruta del almacén único en la raíz del proyecto (../.. desde orchestrator/api)
+        base_store = Path(__file__).resolve().parents[2] / "data_store"
         base_store.mkdir(parents=True, exist_ok=True)
         self._store_path = base_store / "timeseries.json"
         # Mapa en memoria: series_id -> payload (BDE-like)
-        self._store: Dict[str, Dict] = {}
+        self._store: Dict[str, Any] = {}
         if self._store_path.exists():
             try:
                 with self._store_path.open("r", encoding="utf-8") as f:
@@ -32,7 +32,7 @@ class BDEClient:
                 self._store = {}
 
     def fetch_series(self, series_id: str) -> List[Dict]:
-        """Obtiene serie desde almacén único, local, o BDE y persiste al almacén.
+        """Obtiene serie desde almacén único o BDE y persiste al almacén.
 
         Args:
             series_id: ID de la serie (e.g., "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M")
@@ -52,34 +52,9 @@ class BDEClient:
         # Mostrar URL que se usaría para BDE
         bde_url = self._build_bde_url(series_id)
         
-        # 2) Intentar carga local si existe archivo con ese nombre
-        fname = f"{series_id}.json"
-        path = os.path.join(os.path.dirname(__file__), "..", "sample_data", fname)
-        path = os.path.abspath(path)
-        if os.path.exists(path):
-            logger.info(f"Loading local sample series: {path}")
-            print(f"   Loading from local file: {fname}")
-            with open(path, "r", encoding="utf-8") as f:
-                local_payload = json.load(f)
-            obs = self._extract_obs(local_payload)
-            # Persistimos el payload local tal cual
-            self._persist_store(series_id, local_payload)
-            return obs
-        
-        # Si no existe localmente, intentar desde BDE API
-        # print(f"   Fetching from BDE API...")
+        # 2) Obtener desde BDE API
         logger.info(f"Fetching series from BDE API: {bde_url}")
-        try:
-            bde_timeout = int(os.getenv("BDE_TIMEOUT_SEC", "15"))
-            r = requests.get(bde_url, timeout=bde_timeout)
-            r.raise_for_status()
-            if not r.text.strip():
-                logger.warning("BDE API returned empty response. Check credentials (BC_PIBOT_BDE_USER, BC_PIBOT_BDE_PASS)")
-                return []
-            bde_payload = r.json()
-        except Exception as e:
-            logger.error(f"Failed to fetch series from BDE: {e}")
-            raise
+        bde_payload = self._fetch_raw_bde_payload(bde_url)
         obs = self._extract_obs(bde_payload)
         # Persistimos el payload BDE tal cual
         self._persist_store(series_id, bde_payload)
@@ -123,7 +98,6 @@ class BDEClient:
         
         if not bde_user or not bde_pass:
             logger.warning("BDE credentials not configured. Set BDE_USER and BDE_PASS in .env")
-            print(f"   WARNING: BDE credentials not set (user='{bde_user}', pass='{bde_pass}')")
         
         params = {
             "user": bde_user,
@@ -134,10 +108,9 @@ class BDEClient:
         
         query_string = "&".join(f"{k}={v}" for k, v in params.items())
         url = f"{bde_base_url}?{query_string}"
-        # print(f"BDE URL: {url}")
         return url
 
-    def _persist_store(self, series_id: str, payload: Dict) -> None:
+    def _persist_store(self, series_id: str, payload: Any) -> None:
         # Persiste en memoria y en disco el payload completo (tal cual fuente)
         self._store[series_id] = payload
         try:
@@ -147,19 +120,18 @@ class BDEClient:
         except Exception as e:
             logger.warning(f"Could not persist store to {self._store_path}: {e}")
     
-    def _fetch_from_bde(self, url: str) -> List[Dict]:
-        """Realiza request a la API del BDE."""
+    def _fetch_raw_bde_payload(self, url: str) -> Dict:
+        """Realiza request a la API del BDE y devuelve el payload crudo."""
         try:
             bde_timeout = int(os.getenv("BDE_TIMEOUT_SEC", "15"))
             r = requests.get(url, timeout=bde_timeout)
             r.raise_for_status()
             
             if not r.text.strip():
-                logger.warning("BDE API returned empty response. Check credentials (BC_PIBOT_BDE_USER, BC_PIBOT_BDE_PASS)")
-                return []
+                logger.warning("BDE API returned empty response. Check credentials (BDE_USER, BDE_PASS)")
+                return {}
             
-            payload = r.json()
-            return self._extract_obs(payload)
+            return r.json()
         except Exception as e:
             logger.error(f"Failed to fetch series from BDE: {e}")
             raise
@@ -196,7 +168,7 @@ class BDEClient:
                                 "date": obs["indexDateString"],
                                 "value": float(obs["value"])
                             })
-                    logger.info(f"Extracted {len(normalized)} observations from BDE format")
+                    logger.debug("Extracted %s observations from BDE format", len(normalized))
                     return normalized
         
         logger.warning("Unexpected payload shape; returning empty list.")
