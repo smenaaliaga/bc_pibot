@@ -1145,6 +1145,20 @@ def get_series_from_redis(
         except Exception:
             return None
 
+    def _to_compare_date(value: Optional[str]) -> Optional[datetime.date]:
+        """Normaliza fecha observada al fin de período para comparaciones de rango.
+
+        Esto evita excluir datos legacy guardados como inicio de período
+        (p.ej. 2025-01-01 para mensual) cuando el filtro usa fin de período
+        (p.ej. 2025-01-31).
+        """
+        parsed = _parse_date_str_local(value)
+        if parsed is None:
+            return None
+        if _eff_freq:
+            return _to_period_end(parsed, _eff_freq)
+        return parsed
+
     def _fetch_fallback_and_filter(reason: str) -> Optional[Dict[str, Any]]:
         fallback_data = get_series_api_rest_bcch(
             series_id=series_id,
@@ -1170,7 +1184,7 @@ def get_series_from_redis(
             if not row_date_raw:
                 continue
             try:
-                row_date = _parse_date_str_local(str(row_date_raw))
+                row_date = _to_compare_date(str(row_date_raw))
             except Exception:
                 continue
             if fd_date and row_date < fd_date:
@@ -1197,7 +1211,7 @@ def get_series_from_redis(
         for row in observations:
             if not isinstance(row, dict):
                 continue
-            parsed = _parse_date_str_local(str(row.get("date", "")))
+            parsed = _to_compare_date(str(row.get("date", "")))
             if parsed is not None:
                 parsed_dates.append(parsed)
 
@@ -1239,6 +1253,7 @@ def get_series_from_redis(
         _redis_client = None  # forzar reintento en próximas peticiones
         if not use_fallback:
             return None
+        
         return _fetch_fallback_and_filter("redis_read_error")
     if raw is None:
         logger.info(
@@ -1285,6 +1300,17 @@ def get_series_from_redis(
         return _fetch_fallback_and_filter("cache_stale")
 
     obs = data.get("observations", [])
+
+    # Normalizar fechas legacy (inicio de período) al fin de período para
+    # mantener consistencia con el filtrado por fd/ld y con metadatos period_*.
+    if isinstance(obs, list):
+        for row in obs:
+            if not isinstance(row, dict):
+                continue
+            d_cmp = _to_compare_date(str(row.get("date", "")))
+            if d_cmp is not None:
+                row["date"] = d_cmp.isoformat()
+
     cache_has_requested_coverage = _range_covered_by_cache(obs)
 
     # Recalcular rango disponible y posición del periodo solicitado
@@ -1360,7 +1386,7 @@ def get_series_from_redis(
     for o in obs:
         if not isinstance(o, dict):
             continue
-        d = _parse_date_str(str(o.get("date", "")))
+        d = _to_compare_date(str(o.get("date", "")))
         if d is None:
             continue
         if fd_date and d < fd_date:

@@ -115,6 +115,47 @@ def test_get_series_from_redis_refetches_when_requested_period_is_not_covered(mo
     assert result["meta"]["cache_resolution"] == "cache_missing_period"
 
 
+def test_get_series_from_redis_normalizes_legacy_monthly_dates_before_filter(monkeypatch):
+    """Si cache legacy trae fechas al inicio de mes, no debe perder enero."""
+    cached_payload = {
+        "meta": {"cache_created_at": "2026-03-03T00:00:00+00:00"},
+        "observations": [
+            {"date": "2025-01-01", "value": 70.0},
+            {"date": "2025-02-01", "value": 75.0},
+            {"date": "2025-12-01", "value": 99.0},
+        ],
+    }
+
+    class _FakeRedisClient:
+        def get(self, key):
+            return json.dumps(cached_payload)
+
+    monkeypatch.setattr(gds, "_ensure_redis_client", lambda: _FakeRedisClient())
+
+    def _should_not_call_api(**kwargs):
+        raise AssertionError("No debería consultar API cuando cache legacy cubre el periodo")
+
+    monkeypatch.setattr(gds, "get_series_api_rest_bcch", _should_not_call_api)
+
+    result = gds.get_series_from_redis(
+        series_id="F032.IMC.IND.Z.Z.EP18.03.Z.0.M",
+        firstdate="2025-01-01",
+        lastdate="2025-12-31",
+        target_frequency="M",
+        agg="sum",
+        use_fallback=True,
+    )
+
+    assert result is not None
+    assert [row["date"] for row in result["observations"]] == [
+        "2025-01-31",
+        "2025-02-28",
+        "2025-12-31",
+    ]
+    assert result["meta"]["period_start"] == "2025-01-31"
+    assert result["meta"]["period_end"] == "2025-12-31"
+
+
 def test_normalize_observations_empty_returns_expected_columns():
     df = gds._normalize_observations([])
 
