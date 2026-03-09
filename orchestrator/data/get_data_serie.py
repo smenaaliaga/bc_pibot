@@ -20,10 +20,9 @@ Funciones principales
        {
          "meta": {...},
          "observations": [
-            {"date": "YYYY-MM-DD", "value": x, "status": "...", "pct": ..., "yoy_pct": ...},
+            {"date": "YYYY-MM-DD", "value": x, "pct": ..., "yoy_pct": ...},
             ...
-         ],
-         "observations_raw": [...]
+         ]
        }
 
    La clave de Redis incluye:
@@ -572,7 +571,7 @@ def _summarize_arg(name: str, val: _Any):
             if "observations" in val and isinstance(val["observations"], list):
                 out["observations_len"] = len(val["observations"])  # type: ignore[index]
             if "meta" in val and isinstance(val["meta"], dict):
-                out["meta_freq"] = (val.get("meta", {}) or {}).get("freq_effective")
+                out["meta_freq"] = (val.get("meta", {}) or {}).get("original_frequency")
             return out
         if isinstance(val, list):
             return {"type": "list", "len": len(val)}
@@ -715,22 +714,21 @@ def _normalize_observations(obs: List[Dict[str, Any]]) -> pd.DataFrame:
             {
                 "date": d,
                 "value": v,
-                "status": o.get("statusCode", ""),
             }
         )
 
     if not rows:
-        return pd.DataFrame(columns=["date", "value", "status"])
+        return pd.DataFrame(columns=["date", "value"])
 
     df = pd.DataFrame(rows)
-    for col in ("date", "value", "status"):
+    for col in ("date", "value"):
         if col not in df.columns:
             df[col] = None
 
     df = df.dropna(subset=["value", "date"]).sort_values("date")
 
     if df.empty:
-        return pd.DataFrame(columns=["date", "value", "status"])
+        return pd.DataFrame(columns=["date", "value"])
 
     # Asegurar que la columna 'date' sea datetime para permitir resampleo
     df["date"] = pd.to_datetime(df["date"])
@@ -830,8 +828,7 @@ def get_series_api_rest_bcch(
     --------
     dict con claves:
         - "meta": {...}
-        - "observations": lista de dicts con date, value, status, pct, yoy_pct
-        - "observations_raw": observaciones tal como vinieron del BCCh
+        - "observations": lista de dicts con date, value, pct, yoy_pct
     """
     global _redis_client
     if not BCCH_USER or not BCCH_PASS:
@@ -933,15 +930,6 @@ def get_series_api_rest_bcch(
             f"descripEsp='{series.get('descripEsp', '')}'"
         )
 
-        observations_raw = [
-            {
-                "indexDateString": o.get("indexDateString", ""),
-                "value": o.get("value", None),
-                "status": o.get("statusCode", ""),
-            }
-            for o in obs
-        ]
-
         df = _normalize_observations(obs)
         original_freq = _infer_freq_from_code(series_id)
 
@@ -983,13 +971,8 @@ def get_series_api_rest_bcch(
             "descripIng": series.get("descripIng", ""),
             "source_provider": "BCCh SieteRestWS",
             "source_url": f"{BCCH_BASE}?{urlencode(params_public)}",
-            "original_frequency": original_freq,
-            "target_frequency": target_frequency or original_freq,
-            "freq_effective": effective_freq,
             "agg": agg,
-            "firstdate": "primer dato disponible",
-            "lastdate": target_date or "último dato disponible",
-            "target_date": target_date or "auto",
+            "original_frequency": original_freq,
             "cache_created_at": cache_created_at.isoformat(),
         }
         if source_updated is not None:
@@ -1005,7 +988,6 @@ def get_series_api_rest_bcch(
                 {
                     "date": d.strftime("%Y-%m-%d"),
                     "value": None if pd.isna(v) else float(v),
-                    "status": "",  # status original se pierde en el remuestreo
                     "pct": None if pd.isna(pct) else float(pct),
                     "yoy_pct": None if pd.isna(yoy) else float(yoy),
                 }
@@ -1014,7 +996,6 @@ def get_series_api_rest_bcch(
         result = {
             "meta": meta,
             "observations": observations,
-            "observations_raw": observations_raw,
         }
 
     # --- Verificación de lastdate vs rango disponible (primera y última fecha) ---
@@ -1087,7 +1068,7 @@ def get_series_api_rest_bcch(
         _append_test_log(
             (
                 f"source=api | serie={series_id} | rango=auto→{target_date or 'auto'} | "
-                f"freq={meta.get('freq_effective', '')} | agg={agg} | rows={len(observations)} | sample=[{sample_api}]"
+                f"freq={meta.get('original_frequency', '')} | agg={agg} | rows={len(observations)} | sample=[{sample_api}]"
             )
         )
     except Exception as _e:
@@ -1364,7 +1345,7 @@ def get_series_from_redis(
             _append_test_log(
                 (
                     f"source=redis | serie={series_id} | rango=cache | "
-                    f"freq={data.get('meta', {}).get('freq_effective', '')} | agg={agg} | "
+                    f"freq={data.get('meta', {}).get('original_frequency', '')} | agg={agg} | "
                     f"rows={len(obs)} | sample=[{sample_redis_all}]"
                 )
             )
@@ -1435,7 +1416,7 @@ def get_series_from_redis(
         _append_test_log(
             (
                 f"source=redis | serie={series_id} | rango={fd or 'auto'}→{ld or 'auto'} | "
-                f"freq={data.get('meta', {}).get('freq_effective', '')} | agg={agg} | "
+                f"freq={data.get('meta', {}).get('original_frequency', '')} | agg={agg} | "
                 f"rows={len(filtered_obs)} | sample=[{sample_redis}]"
             )
         )
@@ -1583,7 +1564,6 @@ def fetch_series_with_calc(
             "lastdate": lastdate or (data.get("meta", {}).get("lastdate")),
         },
         "observations": obs_out,
-        "observations_raw": data.get("observations_raw", []),
     }
 
     # Logging a test/log con resumen
@@ -1593,7 +1573,7 @@ def fetch_series_with_calc(
     _append_test_log(
         (
             f"serie={series_id} | rango={firstdate or 'auto'}→{lastdate or 'auto'} | "
-            f"freq={freq or data.get('meta', {}).get('freq_effective', '')} | "
+            f"freq={freq or data.get('meta', {}).get('original_frequency', '')} | "
             f"calc={calc_type_norm} | rows={len(obs_out)} | sample=[{sample}]"
         )
     )
@@ -1793,7 +1773,7 @@ def build_year_comparison_table(data: Dict[str, Any], year: int) -> Dict[str, An
     """
     obs = data.get('observations', []) or []
     prev_year = year - 1
-    freq = (data.get('meta', {}) or {}).get('freq_effective', 'M').upper()
+    freq = (data.get('meta', {}) or {}).get('original_frequency', 'M').upper()
 
     from typing import Tuple
     def _quarter_and_label(dt: datetime.date) -> Tuple[str, str]:
@@ -1885,7 +1865,7 @@ def build_year_comparison_table_text(data: Dict[str, Any], year: int) -> str:
     """
     prev_year = year - 1
     table = build_year_comparison_table(data, year)
-    freq = str(table.get("frequency") or (data.get("meta", {}) or {}).get("freq_effective") or "M").upper()
+    freq = str(table.get("frequency") or (data.get("meta", {}) or {}).get("original_frequency") or "M").upper()
     if freq in {"Q", "T"}:
         period_label = "Trimestre"
     elif freq == "M":
