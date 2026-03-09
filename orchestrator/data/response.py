@@ -220,9 +220,38 @@ cuando presentes datos.
 """
 
 
-def _build_system_prompt() -> str:
+_CONTRIBUTION_PROMPT = """\
+
+Reglas adicionales para consultas de contribución:
+- Cuando se presentan múltiples series de una familia de contribuciones, analiza TODAS \
+las series para identificar cuál tiene mayor o menor contribución al crecimiento.
+- Ordena las actividades económicas de mayor a menor contribución según su valor.
+- Indica el valor de contribución (en puntos porcentuales) de cada actividad relevante.
+- El valor de cada serie representa los puntos porcentuales de contribución al crecimiento total.
+
+REGLAS ESTRICTAS sobre el lenguaje de contribución (OBLIGATORIO):
+1. "Mayor contribución" = la actividad con el valor POSITIVO más alto.
+2. "Menor contribución" = la actividad con el valor POSITIVO más bajo (pero aún > 0). \
+JAMÁS uses una actividad con valor negativo como respuesta a "menor contribución".
+3. Las actividades con valores NEGATIVOS no "contribuyen" al crecimiento: son \
+"detractoras" o tienen "contribución negativa". NUNCA las llames "menor contribución".
+4. Si la pregunta pide "menor contribución", responde EXCLUSIVAMENTE con la actividad \
+que tiene el valor positivo más pequeño. Por separado, menciona las actividades \
+con contribución negativa como "detractoras del crecimiento".
+
+Ejemplo: si los datos son Servicios=1.33, Comercio=-0.39, Resto=0.08, Impuestos=-1.07:
+- "Mayor contribución" → Servicios (1.33 pp)
+- "Menor contribución" → Resto de bienes (0.08 pp), porque es el positivo más bajo
+- Comercio y Impuestos son DETRACTORAS (valores negativos), NO son "menor contribución"
+"""
+
+
+def _build_system_prompt(*, calc_mode: Optional[str] = None) -> str:
     """Retorna el system prompt base. Punto de extensión para reglas futuras."""
-    return _SYSTEM_PROMPT
+    prompt = _SYSTEM_PROMPT
+    if str(calc_mode or "").strip().lower() == "contribution":
+        prompt += _CONTRIBUTION_PROMPT
+    return prompt
 
 
 # ---------------------------------------------------------------------------
@@ -338,7 +367,8 @@ def _build_messages(payload: Dict[str, Any]) -> list:
     family_name = payload.get("family_name", "")
     series_id = payload.get("series", "")
 
-    system_content = _build_system_prompt()
+    calc_mode = classification.get("calc_mode_cls")
+    system_content = _build_system_prompt(calc_mode=calc_mode)
 
     # Contexto de clasificación
     cls_text = _format_classification_context(classification)

@@ -334,6 +334,7 @@ def make_data_node(memory_adapter: Any):
             )
 
         # 5. Cargar observaciones
+        is_contribution = str(ent.calc_mode_cls or "").strip().lower() == "contribution"
         _cls_vals = [
             str(ent.activity_cls or "").strip().lower(),
             str(ent.region_cls or "").strip().lower(),
@@ -341,7 +342,10 @@ def make_data_node(memory_adapter: Any):
         ]
         all_none = all(v in ("none", "", "{}") for v in _cls_vals)
         any_specific = any(v == "specific" for v in _cls_vals)
-        if all_none or any_specific:
+        if is_contribution:
+            series_to_load = sl.family_series
+            logger.info("[DATA_NODE][STEP-5] Familia completa por contribución (%d series)", len(series_to_load or []))
+        elif all_none or any_specific:
             series_to_load = [{"id": sl.target_series_id}]
             logger.info("[DATA_NODE][STEP-5] Solo serie target (all_none=%s any_specific=%s)", all_none, any_specific)
         else:
