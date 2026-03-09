@@ -170,10 +170,8 @@ def main() -> None:
     #     logger.warning(f"Predictor no disponible: {e}")
 
     # Warm-up de modelos (router + interpreter) para evitar recargas en reruns
-    # Leer PRELOAD_CATALOG de variables de entorno (default: False)
-    preload_catalog = os.getenv("PRELOAD_CATALOG", "0").lower() in {"1", "true", "yes", "on"}
     try:
-        warmup_models(preload_catalog=preload_catalog)
+        warmup_models()
     except Exception as e:
         logger.warning(f"Warmup de modelos adicionales falló: {e}")
 
