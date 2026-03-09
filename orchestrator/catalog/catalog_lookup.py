@@ -541,7 +541,18 @@ def lookup_series(ent: ResolvedEntities) -> SeriesLookupResult:
     # Para PIB agregado (sin desglose) la familia base no tiene frequency
     # a nivel de clasificación; el resampleo se hace al cargar observaciones.
     # Para familias con desglose (regionales, etc.) la frecuencia SÍ importa.
-    if is_pib_aggregate and ent.calc_mode_cls != "contribution":
+    #
+    # Las familias de volumen de PIB por actividad a nivel nacional (sin
+    # región ni inversión) tampoco llevan frequency en la clasificación;
+    # los datos trimestrales se re-muestrean a anual en load_observations.
+    # Solo las familias de contribución y las regionales separan Q / A.
+    _is_pib_no_freq = (
+        ent.indicator_ent == "pib"
+        and str(ent.calc_mode_cls or "").strip().lower() != "contribution"
+        and ent.region_cls in _EMPTY_CLS_VALUES
+        and ent.investment_cls in _EMPTY_CLS_VALUES
+    )
+    if _is_pib_no_freq:
         family_frequency = None
 
     family_calc_mode = ent.calc_mode_cls or "original"
