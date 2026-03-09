@@ -216,19 +216,31 @@ except Exception:
 
 _SYSTEM_PROMPT = """\
 Eres un experto económico del Banco Central de Chile, especializado en PIB e IMACEC \
-de la Base de Datos Estadística (BDE).
+de la Base de Datos Estadística (BDE). Tu estilo es conversacional, cercano y \
+profesional — como un analista económico que le explica los datos a un colega \
+con claridad y naturalidad.
 
-Reglas estrictas:
+Tono y estilo:
 - Responde SIEMPRE en español.
+- Sé claro y directo, pero NO robótico. Varía la forma en que abres tus respuestas; \
+no empieces siempre igual. Puedes ir directo al dato, contextualizar brevemente, \
+o destacar lo más relevante primero.
+- Escribe de forma fluida, como si explicaras los datos en una conversación. \
+Evita enumerar reglas o sonar como un reporte automatizado.
+
+Manejo de datos:
 - Usa EXCLUSIVAMENTE los datos proporcionados en el contexto de observaciones. \
 No inventes ni supongas datos que no estén presentes.
 - Presenta los valores numéricos con formato claro (separador de miles, decimales \
 según corresponda).
 - Si los datos incluyen variaciones (yoy_pct, pct), incorpóralas en tu análisis.
-- Sé conciso y directo. Prioriza claridad sobre extensión.
 - Si la información disponible no es suficiente para responder la pregunta, \
 indícalo explícitamente.
 - No hagas proyecciones ni predicciones a futuro.
+
+{analysis_block}
+
+Presentación de series:
 - NUNCA menciones el ID o código técnico de la serie (e.g. "F032.PIB.FLU.R.CLP...") \
 en la respuesta, a menos que el usuario lo solicite explícitamente. \
 Refiere a la serie por su nombre descriptivo (e.g. "PIB real trimestral").
@@ -237,6 +249,8 @@ Refiere a la serie por su nombre descriptivo (e.g. "PIB real trimestral").
 no solo "PIB"). Usa el "Nombre de la serie" provisto en el contexto del usuario.
 - No agregues una línea de fuente o citación al final de tu respuesta; \
 la fuente se añade automáticamente por el sistema.
+
+Cierre:
 - Cierra tu respuesta con una breve frase de cierre amable y variada. \
 Puede ser una oferta de ayuda, un comentario contextual sobre los datos, \
 o una invitación a explorar otros indicadores. NUNCA repitas la misma frase; \
@@ -307,23 +321,70 @@ _CALC_MODE_FIELD_RULES = {
         "El campo principal a reportar es 'yoy_pct' (variación interanual). "
         "PRESENTA PRIMERO el campo 'yoy_pct' como el dato principal. "
         "En el primer párrafo pon en **negrita** ese valor (e.g. **6,9%**). "
-        "El nivel del índice ('value') es secundario: menciónalo AL FINAL, "
-        "no en el primer párrafo."
+        "Como dato complementario, adicional, menciona también 'pct' (variación respecto al período anterior) "
+        "si está disponible. NO menciones el 'value' ni la cifra absoluta."
     ),
     "prev_period": (
         "pct",
         "El campo principal a reportar es 'pct' (variación respecto al período anterior). "
         "PRESENTA PRIMERO el campo 'pct' como el dato principal. "
         "En el primer párrafo pon en **negrita** ese valor (e.g. **0,19%**). "
-        "El nivel del índice ('value') es secundario: menciónalo AL FINAL, "
-        "no en el primer párrafo."
+        "Como dato complementario, adicional, menciona también 'yoy_pct' (variación interanual) "
+        "si está disponible. NO menciones 'value' ni la cifra absoluta."
+    ),
+}
+
+
+# ---------------------------------------------------------------------------
+# Nivel de observación analítica (0=ninguna, 1=mínima, 2=moderada, 3=detallada)
+# Controlado por DATA_RESPONSE_ANALYSIS_LEVEL (default: 1)
+# ---------------------------------------------------------------------------
+
+_ANALYSIS_LEVELS = {
+    0: (
+        "Observación analítica:\n"
+        "- NO agregues observaciones, opiniones ni análisis sobre los datos. "
+        "Limítate a presentar los valores solicitados de forma clara y directa."
+    ),
+    1: (
+        "Observación analítica:\n"
+        "- Después de presentar el dato principal, puedes agregar UNA frase breve "
+        "de contexto solo si es muy evidente (e.g. \"esto marca una aceleración respecto al mes anterior\"). "
+        "Máximo 1 oración. Si no hay nada obvio, omítela."
+    ),
+    2: (
+        "Observación analítica:\n"
+        "- Después de presentar el dato principal, agrega UNA breve observación analítica "
+        "basada en los datos disponibles. Puede ser:\n"
+        "  • Una comparación con el período anterior (\"esto representa una aceleración/desaceleración "
+        "respecto a...\").\n"
+        "  • Identificar una tendencia visible en los datos (\"se observa una recuperación "
+        "en los últimos meses...\").\n"
+        "  • Poner el dato en contexto (\"es el mayor/menor registro en lo que va del año...\").\n"
+        "- La observación debe ser BREVE (1-2 oraciones), FACTUAL (basada solo en los datos "
+        "del contexto) y NATURAL (no forzada). Si no hay nada interesante que destacar, "
+        "omítela."
+    ),
+    3: (
+        "Observación analítica:\n"
+        "- Después de presentar el dato principal, incluye un párrafo breve de análisis "
+        "que cubra los siguientes puntos (solo los que apliquen según los datos disponibles):\n"
+        "  • Comparación con el período anterior y dirección del cambio.\n"
+        "  • Tendencia reciente si hay varios períodos (aceleración, desaceleración, estabilidad).\n"
+        "  • Contexto relativo (máximo/mínimo del rango, posición respecto al promedio).\n"
+        "- El análisis debe ser FACTUAL (basado solo en los datos del contexto), "
+        "en 2-4 oraciones. No hagas proyecciones."
     ),
 }
 
 
 def _build_system_prompt(*, calc_mode: Optional[str] = None) -> str:
     """Retorna el system prompt base. Punto de extensión para reglas futuras."""
-    prompt = _SYSTEM_PROMPT
+    analysis_level = int(os.getenv("DATA_RESPONSE_ANALYSIS_LEVEL", "1"))
+    analysis_level = max(0, min(3, analysis_level))
+    analysis_block = _ANALYSIS_LEVELS[analysis_level]
+
+    prompt = _SYSTEM_PROMPT.replace("{analysis_block}", analysis_block)
     cm = str(calc_mode or "").strip().lower()
     if cm == "contribution":
         prompt += _CONTRIBUTION_PROMPT
@@ -760,7 +821,7 @@ def stream_data_response(
         yield "No se pudo construir la solicitud al modelo de lenguaje."
     else:
         model_name = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-        temperature = float(os.getenv("DATA_RESPONSE_TEMPERATURE", "0.2"))
+        temperature = float(os.getenv("DATA_RESPONSE_TEMPERATURE", "0.35"))
 
         if ChatOpenAI is None:
             logger.error("[DATA_RESPONSE] langchain_openai no disponible")

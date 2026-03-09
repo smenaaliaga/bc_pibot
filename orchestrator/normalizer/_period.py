@@ -284,12 +284,17 @@ def extract_quarter_dates(text: str, reference_year: Optional[int] = None) -> Li
     if not q_tokens:
         return []
 
-    year_fallback = reference_year if reference_year is not None else reference_now().year
+    now = reference_now()
+    year_fallback = reference_year if reference_year is not None else now.year
+    current_quarter = ((now.month - 1) // 3) + 1
     dates: List[str] = []
     for qi, q in q_tokens:
         ry = next((y for idx, y in y_tokens if idx > qi), None)
         ly = next((y for idx, y in reversed(y_tokens) if idx < qi), None)
         y = ry if ry is not None else (ly if ly is not None else year_fallback)
+        # Si el trimestre aún no ha ocurrido este año, asumir el año anterior
+        if y == now.year and ry is None and ly is None and q > current_quarter:
+            y -= 1
         d = f"{y:04d}-{QUARTERS_START_MONTH[q]:02d}-01"
         if d not in dates:
             dates.append(d)
@@ -326,11 +331,16 @@ def extract_month_dates(text: str, reference_year: Optional[int] = None) -> List
     if not m_tokens:
         return []
 
-    year_fallback = reference_year if reference_year is not None else reference_now().year
+    now = reference_now()
+    year_fallback = reference_year if reference_year is not None else now.year
     if not y_tokens:
         dates: List[str] = []
         for _, mn in m_tokens:
-            d = f"{year_fallback:04d}-{mn:02d}-01"
+            y = year_fallback
+            # Si el mes aún no ha ocurrido este año, asumir el año anterior
+            if y == now.year and mn > now.month:
+                y -= 1
+            d = f"{y:04d}-{mn:02d}-01"
             if d not in dates:
                 dates.append(d)
         return dates
@@ -627,10 +637,14 @@ def normalize_single_period(text: str) -> Tuple[Optional[str], List[str]]:
         return fmt_month_start(reference_now()), []
 
     year_m = re.search(r"\b((?:19|20)\d{2})\b", n)
-    year = int(year_m.group(1)) if year_m else reference_now().year
+    now = reference_now()
+    year = int(year_m.group(1)) if year_m else now.year
 
     for name, num in MONTHS.items():
         if name in n:
+            # Si no hay año explícito y el mes está en el futuro, asumir año anterior
+            if not year_m and year == now.year and num > now.month:
+                year -= 1
             return f"{year:04d}-{num:02d}-01", []
 
     qm = re.search(r"(?:t|trimestre)\s*([1-4])", n)

@@ -352,6 +352,9 @@ SPANISH_NUMBER_WORDS: Dict[str, int] = {
 GENERIC_INDICATOR_TERMS: List[str] = [
     "economia", "actividad economica", "economico", "economica",
     "economia chilena", "crecimiento económico",
+    # Referencias a fuentes de datos (no son indicadores específicos)
+    "bde", "bc", "banco central", "bcentral", "banco de españa",
+    "banco central de chile", "bcch",
 ]
 
 # ─── Zona horaria de referencia ────────────────────────────────────────────────

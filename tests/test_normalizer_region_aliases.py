@@ -111,3 +111,55 @@ def test_normalize_entities_infers_pib_when_investment_present_without_indicator
     )
 
     assert normalized["indicator"] == ["pib"]
+
+
+def test_normalize_entities_treats_unknown_indicator_as_generic_imacec_case():
+    entities = {
+        "indicator": ["foo"],
+        "seasonality": [],
+        "frequency": [],
+        "activity": ["mineria"],
+        "region": [],
+        "investment": [],
+        "period": [],
+    }
+
+    normalized = normalize_entities(
+        entities,
+        calc_mode="prev_period",
+        req_form="latest",
+        intents={
+            "activity": {"label": "specific"},
+            "region": {"label": "none"},
+            "investment": {"label": "none"},
+        },
+    )
+
+    assert normalized["indicator"] == ["imacec"]
+    assert normalized["frequency"] == ["m"]
+
+
+def test_normalize_entities_treats_bde_as_generic_imacec_case():
+    entities = {
+        "indicator": ["BDE"],
+        "seasonality": [],
+        "frequency": [],
+        "activity": ["mineria"],
+        "region": [],
+        "investment": [],
+        "period": [],
+    }
+
+    normalized = normalize_entities(
+        entities,
+        calc_mode="prev_period",
+        req_form="latest",
+        intents={
+            "activity": {"label": "specific"},
+            "region": {"label": "none"},
+            "investment": {"label": "none"},
+        },
+    )
+
+    assert normalized["indicator"] == ["imacec"]
+    assert normalized["frequency"] == ["m"]

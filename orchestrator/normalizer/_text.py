@@ -106,8 +106,17 @@ def best_vocab_key(
 # ─── Helpers de clasificación ──────────────────────────────────────────────────
 
 def is_generic_indicator(value: Optional[str]) -> bool:
-    """``True`` si *value* es vacío o refiere genéricamente a la economía."""
+    """``True`` si *value* es vacío o no representa explícitamente IMACEC/PIB."""
     if not value:
         return True
+
     norm = normalize_text(value)
-    return any(fuzzy_match(norm, [t], threshold=0.72) for t in GENERIC_INDICATOR_TERMS)
+
+    # Únicos indicadores explícitos soportados por el flujo actual.
+    if fuzzy_match(norm, ["imacec"], threshold=0.72):
+        return False
+    if fuzzy_match(norm, ["pib", "producto interno bruto"], threshold=0.72):
+        return False
+
+    # Cualquier otro valor se considera genérico para forzar inferencia.
+    return True
