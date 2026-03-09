@@ -18,7 +18,7 @@ from langgraph.types import StreamWriter
 
 from orchestrator.data.response import handle_no_series, stream_data_response
 from ..state import AgentState, _clone_entities, _emit_stream_chunk
-from orchestrator.data._helpers import coerce_period, extract_year, first_non_empty, build_target_series_url, to_period_end_str, has_full_quarterly_year
+from orchestrator.data._helpers import coerce_period, extract_year, first_non_empty, to_period_end_str, has_full_quarterly_year
 from orchestrator.data._business_rules import ResolvedEntities, apply_business_rules
 from orchestrator.catalog.catalog_lookup import lookup_series
 
@@ -373,21 +373,11 @@ def make_data_node(memory_adapter: Any):
                                 o.pop("pct", None)
                                 o.pop("yoy_pct", None)
 
-        # 6. Construir URL de la serie
-        target_url = build_target_series_url(
-            source_url=sl.source_url,
-            series_id=sl.target_series_id,
-            period=ent.period_ent,
-            req_form=str(ent.req_form_cls or ""),
-            frequency=str(ent.frequency_ent or ""),
-            calc_mode=str(ent.calc_mode_cls or ""),
-        )
-        
-
-        # 7. Construir payload y hacer streaming de la respuesta LLM
+        # 6. Construir payload y hacer streaming de la respuesta LLM
         payload = {
             "question": question,
             "classification": asdict(ent),
+            "price": ent.price,
             "observations": observations,
             "family_name": sl.family_name,
             "series": sl.target_series_id,
@@ -406,12 +396,6 @@ def make_data_node(memory_adapter: Any):
                 fallback = "Ocurrió un problema al generar la respuesta."
                 collected.append(fallback)
                 _emit_stream_chunk(fallback, writer)
-
-        # Agregar URL de la serie al final de la respuesta
-        if target_url:
-            url_footer = f"\n\n[Consultar serie en la BDE]({target_url})"
-            collected.append(url_footer)
-            _emit_stream_chunk(url_footer, writer)
 
         ent_dict = asdict(ent)
         pv = ent.period_ent or []

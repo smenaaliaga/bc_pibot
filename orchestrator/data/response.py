@@ -20,6 +20,7 @@ from dataclasses import asdict
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from langgraph.types import StreamWriter
+from orchestrator.data._helpers import build_target_series_url
 
 logger = logging.getLogger(__name__)
 
@@ -215,8 +216,29 @@ según corresponda).
 - Si la información disponible no es suficiente para responder la pregunta, \
 indícalo explícitamente.
 - No hagas proyecciones ni predicciones a futuro.
-- Cita la fuente como "Banco Central de Chile — Base de Datos Estadística" \
-cuando presentes datos.
+- NUNCA menciones el ID o código técnico de la serie (e.g. "F032.PIB.FLU.R.CLP...") \
+en la respuesta, a menos que el usuario lo solicite explícitamente. \
+Refiere a la serie por su nombre descriptivo (e.g. "PIB real trimestral").
+- No agregues una línea de fuente o citación al final de tu respuesta; \
+la fuente se añade automáticamente por el sistema.
+
+Regla de disponibilidad de datos:
+- Si el contexto incluye una ALERTA DE DISPONIBILIDAD indicando que el período \
+solicitado por el usuario aún no tiene datos publicados, debes comenzar tu respuesta \
+indicando de forma natural y amable que aún no hay datos disponibles para ese período. \
+Luego presenta el último dato publicado disponible como referencia. \
+Ejemplo: "Aún no se han publicado datos de IMACEC para febrero de 2026. \
+Sin embargo, el último dato disponible corresponde a enero de 2026, donde...".
+
+Reglas para PIB con datos anuales y trimestrales:
+- Cuando los datos incluyen observaciones agrupadas por frecuencia (Anual y Trimestral), \
+analiza AMBAS frecuencias.
+- Si existe una NOTA indicando que un año NO tiene los 4 trimestres completos, \
+indica explícitamente que el dato anual de ese año no está disponible porque \
+la serie aún no tiene los 4 trimestres publicados. Luego presenta los \
+trimestres disponibles de ese año.
+- Cuando el usuario pregunta por el crecimiento de un año y solo hay trimestres parciales, \
+presenta cada trimestre disponible con su variación interanual.
 """
 
 
@@ -319,7 +341,7 @@ def _format_observations_context(
             or "?"
         )
 
-        header = f"Serie: {title} ({series_id}) | Frecuencia: {freq}"
+        header = f"Serie: {title} | Frecuencia: {freq}"
         parts.append(header)
 
         note = meta.get("incomplete_annual_note")
@@ -452,6 +474,61 @@ def _pick_latest_observation(
 
 
 # ---------------------------------------------------------------------------
+# Detección de desfase entre período solicitado y datos disponibles
+# ---------------------------------------------------------------------------
+
+def _detect_period_mismatch(
+    classification: Dict[str, Any],
+    observations: Dict[str, Dict[str, Any]],
+) -> Optional[str]:
+    """Detecta si el período solicitado no tiene datos y genera un aviso legible.
+
+    Compara el inicio del período pedido (``period_ent[0]``) con la
+    ``last_available_date`` de la primera serie.  Si el período solicitado
+    es posterior al último dato disponible, retorna un texto de alerta
+    para inyectar en el prompt del LLM.
+    """
+    period_ent = classification.get("period_ent")
+    if not period_ent or not isinstance(period_ent, list) or len(period_ent) == 0:
+        return None
+
+    requested_start = str(period_ent[0]).strip()[:10]
+    if not requested_start:
+        return None
+
+    # Tomar last_available_date de la primera serie
+    last_avail: Optional[str] = None
+    for entry in observations.values():
+        meta = entry.get("meta")
+        if isinstance(meta, dict):
+            last_avail = str(meta.get("last_available_date") or "").strip()[:10]
+            break
+
+    if not last_avail:
+        return None
+
+    # Solo alertar si el período pedido empieza después de lo disponible
+    if requested_start <= last_avail:
+        return None
+
+    freq = str(classification.get("frequency_ent") or "").strip().lower()
+    requested_label = format_period_labels(requested_start, freq)[0]
+    available_label = format_period_labels(last_avail, freq)[0]
+
+    indicator = str(classification.get("indicator_ent") or "").strip().upper()
+    if indicator in {"", "NONE", "NULL"}:
+        indicator = "la serie"
+
+    return (
+        f"ALERTA DE DISPONIBILIDAD: El usuario preguntó por {requested_label}, "
+        f"pero aún no hay datos publicados de {indicator} para ese período. "
+        f"El último dato disponible corresponde a {available_label} (fecha {last_avail}). "
+        f"Debes indicar esto al usuario de forma clara y amable, y luego presentar "
+        f"los datos del último período disponible."
+    )
+
+
+# ---------------------------------------------------------------------------
 # Construcción de mensajes LLM
 # ---------------------------------------------------------------------------
 
@@ -459,6 +536,7 @@ def _build_messages(payload: Dict[str, Any]) -> list:
     """Construye la lista de mensajes (system + user) para el LLM."""
     question = payload.get("question", "")
     classification = payload.get("classification") or {}
+    payload_price = str(payload.get("price") or "").strip().lower()
     observations = payload.get("observations") or {}
     family_name = payload.get("family_name", "")
     series_id = payload.get("series", "")
@@ -466,6 +544,19 @@ def _build_messages(payload: Dict[str, Any]) -> list:
 
     calc_mode = classification.get("calc_mode_cls")
     system_content = _build_system_prompt(calc_mode=calc_mode)
+
+    indicator = str(classification.get("indicator_ent") or "").strip().lower()
+    classification_price = str(classification.get("price") or "").strip().lower()
+    price = payload_price or classification_price
+    if indicator == "pib" and price in {"enc", "co"}:
+        if price == "enc":
+            unit_text = "miles de millones de pesos encadenados"
+        else:
+            unit_text = "miles de millones de pesos a precios corrientes"
+        system_content += (
+            "\n\nRegla de unidades para PIB: cuando reportes cifras de NIVEL del PIB "
+            f"(campo 'value', no variaciones yoy_pct/pct), indica explícitamente que están en {unit_text}."
+        )
 
     latest_hint = None
     if req_form == "latest":
@@ -487,17 +578,21 @@ def _build_messages(payload: Dict[str, Any]) -> list:
     # Contexto de datos
     obs_text = _format_observations_context(observations)
 
+    # Detección de desfase período solicitado vs disponible
+    period_mismatch_hint = _detect_period_mismatch(classification, observations)
+
     user_content = f"Pregunta del usuario: {question}\n\n"
+    if period_mismatch_hint:
+        user_content += f"{period_mismatch_hint}\n\n"
     if family_name:
         user_content += f"Familia de series: {family_name}\n"
-    if series_id:
-        user_content += f"Serie principal: {series_id}\n"
+    if indicator == "pib" and price in {"enc", "co"}:
+        user_content += f"Precio PIB solicitado: {price}\n"
     if latest_hint is not None:
-        latest_date, latest_value, latest_series_id = latest_hint
+        latest_date, latest_value, _latest_series_id = latest_hint
         user_content += (
             "Consulta latest detectada. Debes mencionar este ultimo valor observado "
-            f"en la respuesta: fecha={latest_date}, valor={latest_value}, "
-            f"serie={latest_series_id}.\n"
+            f"en la respuesta: fecha={latest_date}, valor={latest_value}.\n"
         )
     user_content += f"\nDatos disponibles:\n{obs_text}"
 
@@ -508,6 +603,29 @@ def _build_messages(payload: Dict[str, Any]) -> list:
         SystemMessage(content=system_content),
         HumanMessage(content=user_content),
     ]
+
+
+def _build_source_footer(payload: Dict[str, Any]) -> Optional[str]:
+    """Construye el footer de fuente con link directo a la serie en la BDE."""
+    classification = payload.get("classification") or {}
+    if not isinstance(classification, dict):
+        classification = {}
+
+    target_url = build_target_series_url(
+        source_url=str(payload.get("source_url") or ""),
+        series_id=str(payload.get("series") or ""),
+        period=classification.get("period_ent"),
+        req_form=str(classification.get("req_form_cls") or ""),
+        frequency=str(classification.get("frequency_ent") or ""),
+        calc_mode=str(classification.get("calc_mode_cls") or ""),
+    )
+    if not target_url:
+        return None
+
+    return (
+        f"\n\n**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)]({target_url}) "
+        "del Banco Central de Chile."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -533,34 +651,35 @@ def stream_data_response(
     """
     logger.info("[DATA_RESPONSE] payload recibido: %s", payload)
     messages = _build_messages(payload)
+    source_footer = _build_source_footer(payload)
     if not messages:
         yield "No se pudo construir la solicitud al modelo de lenguaje."
-        return
+    else:
+        model_name = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+        temperature = float(os.getenv("DATA_RESPONSE_TEMPERATURE", "0.2"))
 
-    model_name = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-    temperature = float(os.getenv("DATA_RESPONSE_TEMPERATURE", "0.2"))
+        if ChatOpenAI is None:
+            logger.error("[DATA_RESPONSE] langchain_openai no disponible")
+            yield "El servicio de generación de respuestas no está disponible."
+        else:
+            try:
+                chat = ChatOpenAI(
+                    model=model_name,
+                    temperature=temperature,
+                    streaming=True,
+                )
+            except Exception:
+                logger.exception("[DATA_RESPONSE] Error inicializando ChatOpenAI")
+                yield "Error al conectar con el modelo de lenguaje."
+            else:
+                try:
+                    for chunk in chat.stream(messages):
+                        text = getattr(chunk, "content", None) or ""
+                        if text:
+                            yield str(text)
+                except Exception:
+                    logger.exception("[DATA_RESPONSE] Error durante streaming")
+                    yield "Ocurrió un error al generar la respuesta."
 
-    if ChatOpenAI is None:
-        logger.error("[DATA_RESPONSE] langchain_openai no disponible")
-        yield "El servicio de generación de respuestas no está disponible."
-        return
-
-    try:
-        chat = ChatOpenAI(
-            model=model_name,
-            temperature=temperature,
-            streaming=True,
-        )
-    except Exception:
-        logger.exception("[DATA_RESPONSE] Error inicializando ChatOpenAI")
-        yield "Error al conectar con el modelo de lenguaje."
-        return
-
-    try:
-        for chunk in chat.stream(messages):
-            text = getattr(chunk, "content", None) or ""
-            if text:
-                yield str(text)
-    except Exception:
-        logger.exception("[DATA_RESPONSE] Error durante streaming")
-        yield "Ocurrió un error al generar la respuesta."
+    if source_footer:
+        yield source_footer
