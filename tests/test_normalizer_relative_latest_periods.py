@@ -312,3 +312,17 @@ def test_point_pib_hace_dos_trimestres_atras_uses_quarter_shift(monkeypatch):
 
     assert normalized["frequency"] == ["q"]
     assert normalized["period"] == ["2025-07-01", "2025-09-30"]
+
+
+def test_point_generic_activity_mayo_del_ano_pasado_infers_monthly(monkeypatch):
+    monkeypatch.setattr(normalizer_mod, "_reference_now", lambda: datetime(2026, 3, 3))
+    entities = {
+        "indicator": ["actividad economicas"],
+        "period": ["mayo del año pasado?"],
+    }
+
+    normalized = normalize_entities(entities, calc_mode="yoy", req_form="point")
+
+    assert normalized["indicator"] == ["imacec"]
+    assert normalized["frequency"] == ["m"]
+    assert normalized["period"] == ["2025-05-01", "2025-05-31"]

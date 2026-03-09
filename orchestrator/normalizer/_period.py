@@ -467,6 +467,11 @@ def _detect_granularity(text: str, require_latest: bool = False, require_current
 
     if re.search(_QUARTER_RE, n):
         return "q"
+    # Referencias como "mayo del ano pasado" deben clasificarse mensual
+    # antes de caer en la deteccion anual por la palabra "ano".
+    month_tokens = set(MONTHS.keys()) | set(MONTH_ALIASES.keys())
+    if any(tok in n.split() for tok in month_tokens):
+        return "m"
     if re.search(_MONTH_RE, n):
         return "m"
     if re.search(_YEAR_RE, n):
