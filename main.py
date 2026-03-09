@@ -17,14 +17,69 @@ import os
 import logging
 import datetime
 import json
+from urllib.parse import urlsplit, urlunsplit
 
 import streamlit as st
 from dotenv import load_dotenv
 
-from config import get_settings
+from config import get_settings, PREDICT_URL
 # from orchestrator.classifier.joint_bert_classifier import get_predictor
 from registry import warmup_models
 import app
+from orchestrator.utils.http_client import get_json
+
+
+def _health_url_from_predict_url(predict_url: str) -> str:
+    """Deriva la URL de health desde PREDICT_URL, forzando path '/health'."""
+    raw = str(predict_url or "").strip() or "http://localhost:8000/predict"
+    split = urlsplit(raw)
+    path = split.path or ""
+    if path.endswith("/predict"):
+        path = path[: -len("/predict")] + "/health"
+    else:
+        path = "/health"
+    return urlunsplit((split.scheme, split.netloc, path, "", ""))
+
+
+def _log_remote_model_health(logger: logging.LoggerAdapter) -> None:
+    """Consulta GET /health del modelo remoto y registra metadata útil."""
+    enabled = os.getenv("PREDICT_HEALTHCHECK_ON_START", "1").lower() in {"1", "true", "yes", "on"}
+    if not enabled:
+        return
+
+    health_url = _health_url_from_predict_url(PREDICT_URL)
+    timeout = float(os.getenv("PREDICT_HEALTH_TIMEOUT_SECONDS", "5"))
+    try:
+        payload = get_json(health_url, timeout=timeout)
+    except Exception as exc:
+        logger.warning("[MODEL_HEALTH] GET %s failed: %s", health_url, exc)
+        return
+
+    if not isinstance(payload, dict):
+        logger.warning("[MODEL_HEALTH] Unexpected payload type from %s: %s", health_url, type(payload).__name__)
+        return
+
+    # Log compacto para trazabilidad en arranque.
+    logger.info(
+        "[MODEL_HEALTH] status=%s model_loaded=%s router_loaded=%s device=%s source=%s",
+        payload.get("status"),
+        payload.get("model_loaded"),
+        payload.get("router_loaded"),
+        payload.get("device"),
+        payload.get("model_source"),
+    )
+    logger.info(
+        "[MODEL_HEALTH] model repo=%s revision=%s commit=%s",
+        payload.get("model_hf_repo_id"),
+        payload.get("model_hf_revision"),
+        payload.get("model_hf_commit"),
+    )
+    logger.info(
+        "[MODEL_HEALTH] router repo=%s revision=%s commit=%s",
+        payload.get("router_hf_repo_id"),
+        payload.get("router_hf_revision"),
+        payload.get("router_hf_commit"),
+    )
 
 
 def main() -> None:
@@ -100,6 +155,9 @@ def main() -> None:
     base_logger = logging.getLogger(__name__)
     logger = logging.LoggerAdapter(base_logger, extra={"session_id": "main"})
     logger.info("Inicializando aplicación Streamlit")
+
+    # Verificar estado del modelo remoto una vez al arranque inicial.
+    _log_remote_model_health(logger)
 
     settings = get_settings()
 

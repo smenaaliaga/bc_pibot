@@ -168,7 +168,6 @@ class BDEClient:
                                 "date": obs["indexDateString"],
                                 "value": float(obs["value"])
                             })
-                    logger.debug("Extracted %s observations from BDE format", len(normalized))
                     return normalized
         
         logger.warning("Unexpected payload shape; returning empty list.")

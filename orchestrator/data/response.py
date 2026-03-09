@@ -383,6 +383,74 @@ def _format_classification_context(
     return "\n".join(lines) if lines else ""
 
 
+def _normalize_req_form(value: Any) -> str:
+    """Normaliza req_form para comparar ramas como latest/point/range."""
+    if isinstance(value, dict):
+        value = value.get("label")
+    return str(value or "").strip().lower()
+
+
+def _iter_observations(obs_raw: Any) -> Iterable[Dict[str, Any]]:
+    """Itera observaciones sin importar si vienen planas o agrupadas por frecuencia."""
+    if isinstance(obs_raw, list):
+        for item in obs_raw:
+            if isinstance(item, dict):
+                yield item
+        return
+
+    if isinstance(obs_raw, dict):
+        for sub in obs_raw.values():
+            if not isinstance(sub, list):
+                continue
+            for item in sub:
+                if isinstance(item, dict):
+                    yield item
+
+
+def _pick_latest_observation(
+    observations: Dict[str, Dict[str, Any]],
+    *,
+    preferred_series_id: Optional[str],
+) -> Optional[Tuple[str, Any, str]]:
+    """Retorna (fecha, valor, series_id) de la observación más reciente."""
+    if not isinstance(observations, dict) or not observations:
+        return None
+
+    def _latest_from_entry(series_id: str, entry: Any) -> Optional[Tuple[str, Any, str]]:
+        if not isinstance(entry, dict):
+            return None
+
+        best_date = ""
+        best_value: Any = None
+        for obs in _iter_observations(entry.get("observations")):
+            date = str(obs.get("date") or "").strip()[:10]
+            if not date:
+                continue
+            if date >= best_date:
+                best_date = date
+                best_value = obs.get("value")
+
+        if not best_date:
+            return None
+        return best_date, best_value, series_id
+
+    preferred_id = str(preferred_series_id or "").strip()
+    if preferred_id and preferred_id in observations:
+        preferred_latest = _latest_from_entry(preferred_id, observations.get(preferred_id))
+        if preferred_latest is not None:
+            return preferred_latest
+
+    best: Optional[Tuple[str, Any, str]] = None
+    for sid, entry in observations.items():
+        candidate = _latest_from_entry(str(sid), entry)
+        if candidate is None:
+            continue
+        if best is None or candidate[0] >= best[0]:
+            best = candidate
+
+    return best
+
+
 # ---------------------------------------------------------------------------
 # Construcción de mensajes LLM
 # ---------------------------------------------------------------------------
@@ -394,9 +462,22 @@ def _build_messages(payload: Dict[str, Any]) -> list:
     observations = payload.get("observations") or {}
     family_name = payload.get("family_name", "")
     series_id = payload.get("series", "")
+    req_form = _normalize_req_form(classification.get("req_form_cls"))
 
     calc_mode = classification.get("calc_mode_cls")
     system_content = _build_system_prompt(calc_mode=calc_mode)
+
+    latest_hint = None
+    if req_form == "latest":
+        latest_hint = _pick_latest_observation(
+            observations,
+            preferred_series_id=str(series_id or "") or None,
+        )
+        if latest_hint is not None:
+            system_content += (
+                "\n\nRegla para consultas latest: menciona explicitamente el ultimo "
+                "valor observado (fecha y valor) provisto en el contexto de datos."
+            )
 
     # Contexto de clasificación
     cls_text = _format_classification_context(classification)
@@ -411,6 +492,13 @@ def _build_messages(payload: Dict[str, Any]) -> list:
         user_content += f"Familia de series: {family_name}\n"
     if series_id:
         user_content += f"Serie principal: {series_id}\n"
+    if latest_hint is not None:
+        latest_date, latest_value, latest_series_id = latest_hint
+        user_content += (
+            "Consulta latest detectada. Debes mencionar este ultimo valor observado "
+            f"en la respuesta: fecha={latest_date}, valor={latest_value}, "
+            f"serie={latest_series_id}.\n"
+        )
     user_content += f"\nDatos disponibles:\n{obs_text}"
 
     if SystemMessage is None or HumanMessage is None:
