@@ -226,23 +226,27 @@ Reglas adicionales para consultas de contribución:
 - Cuando se presentan múltiples series de una familia de contribuciones, analiza TODAS \
 las series para identificar cuál tiene mayor o menor contribución al crecimiento.
 - Ordena las actividades económicas de mayor a menor contribución según su valor.
-- Indica el valor de contribución (en puntos porcentuales) de cada actividad relevante.
-- El valor de cada serie representa los puntos porcentuales de contribución al crecimiento total.
+- Indica el valor de contribución de cada actividad relevante.
+- El valor de cada serie YA está expresado en porcentaje (puntos porcentuales). \
+Por ejemplo, un valor de 1.33 significa una contribución de 1,33 puntos porcentuales. \
+NO multipliques ni dividas el valor; preséntalo tal cual, redondeado a 2 decimales.
 
 REGLAS ESTRICTAS sobre el lenguaje de contribución (OBLIGATORIO):
-1. "Mayor contribución" = la actividad con el valor POSITIVO más alto.
-2. "Menor contribución" = la actividad con el valor POSITIVO más bajo (pero aún > 0). \
-JAMÁS uses una actividad con valor negativo como respuesta a "menor contribución".
-3. Las actividades con valores NEGATIVOS no "contribuyen" al crecimiento: son \
-"detractoras" o tienen "contribución negativa". NUNCA las llames "menor contribución".
-4. Si la pregunta pide "menor contribución", responde EXCLUSIVAMENTE con la actividad \
-que tiene el valor positivo más pequeño. Por separado, menciona las actividades \
-con contribución negativa como "detractoras del crecimiento".
+1. "Mayor contribución" / "más aportó" / "mayor aporte" = la actividad/región con el valor POSITIVO más alto.
+2. "Menor contribución" / "menos aportó" / "menor aporte" / "menos contribuyó" = la actividad/región \
+con el valor POSITIVO más bajo (pero aún > 0). \
+JAMÁS uses una actividad con valor negativo como respuesta a estas preguntas. \
+"Menos aportar" sigue siendo aportar: implica un valor positivo, solo que pequeño.
+3. Las actividades/regiones con valores NEGATIVOS no "aportan" ni "contribuyen" al crecimiento: son \
+"detractoras" o "restaron" al crecimiento. NUNCA las llames "menor contribución" ni "menos aportó".
+4. Si la pregunta pide "menor contribución", "menos aportó" o similar, responde EXCLUSIVAMENTE con \
+la actividad/región que tiene el valor positivo más pequeño. Por separado, menciona las que tienen \
+valores negativos como "detractoras del crecimiento" o que "restaron" al crecimiento.
 
-Ejemplo: si los datos son Servicios=1.33, Comercio=-0.39, Resto=0.08, Impuestos=-1.07:
-- "Mayor contribución" → Servicios (1.33 pp)
-- "Menor contribución" → Resto de bienes (0.08 pp), porque es el positivo más bajo
-- Comercio y Impuestos son DETRACTORAS (valores negativos), NO son "menor contribución"
+Ejemplo: si los datos son Metropolitana=1.33, Biobío=-0.26, Coquimbo=0.01, Tarapacá=-0.25:
+- "Más aportó" → Metropolitana (1,33 pp)
+- "Menos aportó" → Coquimbo (0,01 pp), porque es el positivo más bajo
+- Biobío y Tarapacá son DETRACTORAS (valores negativos), "restaron" al crecimiento. NO son las que "menos aportaron"
 """
 
 

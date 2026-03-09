@@ -357,6 +357,22 @@ def make_data_node(memory_adapter: Any):
             indicator=ent.indicator_ent,
         )
 
+        # Para contribuciones, pct y yoy_pct no tienen sentido: el valor ya
+        # representa puntos porcentuales de contribución al crecimiento.
+        if is_contribution:
+            for _entry in observations.values():
+                obs = _entry.get("observations")
+                if isinstance(obs, list):
+                    for o in obs:
+                        o.pop("pct", None)
+                        o.pop("yoy_pct", None)
+                elif isinstance(obs, dict):
+                    for sub in obs.values():
+                        if isinstance(sub, list):
+                            for o in sub:
+                                o.pop("pct", None)
+                                o.pop("yoy_pct", None)
+
         # 6. Construir URL de la serie
         target_url = build_target_series_url(
             source_url=sl.source_url,
