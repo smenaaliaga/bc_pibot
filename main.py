@@ -198,6 +198,15 @@ def main() -> None:
         except Exception as e:
             logger.warning(f"No se pudo iniciar scheduler diario de SearchSeries: {e}")
 
+    warm_redis = os.getenv("WARM_REDIS_CACHE_ON_START", "0").lower() in {"1", "true", "yes", "on"}
+    if warm_redis:
+        try:
+            from tools.warm_redis_cache import warm_cache_background
+            warm_workers = int(os.getenv("WARM_REDIS_CACHE_WORKERS", "8"))
+            warm_cache_background(workers=warm_workers, force=False)
+        except Exception as e:
+            logger.warning(f"No se pudo iniciar precalentamiento Redis: {e}")
+
     orch = None
     graph = None
     if build_graph:
