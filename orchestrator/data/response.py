@@ -236,37 +236,64 @@ def _format_observations_context(
     if not observations:
         return "No se obtuvieron observaciones."
 
+    def _format_obs_list(obs_list: list, indent: str = "  ") -> List[str]:
+        """Formatea una lista de observaciones como líneas de texto."""
+        lines: List[str] = []
+        for obs in obs_list:
+            date = obs.get("date", "")
+            value = obs.get("value", "")
+            yoy = obs.get("yoy_pct")
+            pct = obs.get("pct")
+            line = f"{indent}{date} | valor={value}"
+            if yoy is not None:
+                line += f" | var. interanual={yoy}%"
+            if pct is not None:
+                line += f" | var. período ant.={pct}%"
+            lines.append(line)
+        return lines
+
     parts: List[str] = []
     for series_id, entry in observations.items():
         meta = entry.get("meta") or {}
-        obs_list = entry.get("observations") or []
+        obs_raw = entry.get("observations")
 
         title = (
             meta.get("descripEsp")
             or meta.get("descripIng")
             or series_id
         )
-        freq = meta.get("original_frequency") or "?"
+        freq = (
+            meta.get("target_frequency")
+            or meta.get("original_frequency")
+            or "?"
+        )
 
         header = f"Serie: {title} ({series_id}) | Frecuencia: {freq}"
         parts.append(header)
 
-        if not obs_list:
+        note = meta.get("incomplete_annual_note")
+        if note:
+            parts.append(f"  NOTA: {note}")
+
+        # observations puede ser dict {"A": [...], "Q": [...]} o lista plana
+        if isinstance(obs_raw, dict):
+            for freq_key in ("A", "Q", "M"):
+                sub = obs_raw.get(freq_key)
+                if sub is None:
+                    continue
+                freq_label = {"A": "Anual", "Q": "Trimestral", "M": "Mensual"}.get(freq_key, freq_key)
+                parts.append(f"  [{freq_label}]")
+                if not sub:
+                    parts.append("    (sin observaciones)")
+                else:
+                    parts.extend(_format_obs_list(sub, indent="    "))
+        elif isinstance(obs_raw, list):
+            if not obs_raw:
+                parts.append("  (sin observaciones)")
+            else:
+                parts.extend(_format_obs_list(obs_raw))
+        else:
             parts.append("  (sin observaciones)")
-            continue
-
-        for obs in obs_list:
-            date = obs.get("date", "")
-            value = obs.get("value", "")
-            yoy = obs.get("yoy_pct")
-            pct = obs.get("pct")
-
-            line = f"  {date} | valor={value}"
-            if yoy is not None:
-                line += f" | var. interanual={yoy}%"
-            if pct is not None:
-                line += f" | var. período ant.={pct}%"
-            parts.append(line)
 
     return "\n".join(parts)
 

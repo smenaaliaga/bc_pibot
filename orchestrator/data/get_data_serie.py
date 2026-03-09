@@ -670,6 +670,8 @@ def _infer_freq_from_code(series_id: str) -> str:
     if not series_id:
         return "U"
     last = series_id.strip().split(".")[-1].upper()
+    if last == "T":
+        return "Q"  # T = Trimestral = Quarterly
     return last if last in {"D", "M", "Q", "A"} else "U"
 
 

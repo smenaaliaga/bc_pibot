@@ -18,7 +18,7 @@ from langgraph.types import StreamWriter
 
 from orchestrator.data.response import handle_no_series, stream_data_response
 from ..state import AgentState, _clone_entities, _emit_stream_chunk
-from orchestrator.data._helpers import coerce_period, extract_year, first_non_empty, build_target_series_url, to_period_end_str
+from orchestrator.data._helpers import coerce_period, extract_year, first_non_empty, build_target_series_url, to_period_end_str, has_full_quarterly_year
 from orchestrator.data._business_rules import ResolvedEntities, apply_business_rules
 from orchestrator.catalog.catalog_lookup import lookup_series
 
@@ -115,25 +115,53 @@ def _extract_entities_from_state(
 
 
 
+def _obs_to_list(obs_raw: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Normaliza observaciones crudas al formato compacto del payload."""
+    return [
+        {
+            "date": str(o.get("date", "")),
+            "value": o.get("value"),
+            "yoy_pct": o.get("yoy_pct"),
+            "pct": o.get("pct"),
+        }
+        for o in obs_raw
+        if isinstance(o, dict)
+    ]
+
+
 def load_observations(
     series_list: List[Dict[str, Any]],
     load_fn,
     period_values: Optional[List[Any]] = None,
     frequency: Optional[str] = None,
+    indicator: Optional[str] = None,
 ) -> Dict[str, Dict[str, Any]]:
     """Carga observaciones de cada serie y retorna dict indexado por series_id.
+
+    Para PIB con frecuencia anual, obtiene datos tanto anuales como
+    trimestrales.  Los años anuales sin los 4 trimestres completos se
+    eliminan de la lista anual y se señalan en meta.  Las observaciones
+    se agrupan por frecuencia: ``{"A": [...], "Q": [...]}``.
 
     Estructura retornada::
 
         {
             "<series_id>": {
                 "meta": { ... },
-                "observations": [
-                    {"date": "...", "value": ..., "yoy_pct": ..., "pct": ...},
-                    ...
-                ],
+                "observations": [...]             # caso normal (lista)
             },
-            ...
+        }
+
+    Para PIB anual::
+
+        {
+            "<series_id>": {
+                "meta": { ... },
+                "observations": {                 # dict con sub-llaves
+                    "A": [...],
+                    "Q": [...],
+                },
+            },
         }
     """
     firstdate = str(period_values[0]) if period_values else None
@@ -195,17 +223,77 @@ def load_observations(
 
         result[sid] = {
             "meta": meta,
-            "observations": [
-                {
-                    "date": str(o.get("date", "")),
-                    "value": o.get("value"),
-                    "yoy_pct": o.get("yoy_pct"),
-                    "pct": o.get("pct"),
-                }
-                for o in obs_raw
-                if isinstance(o, dict)
-            ],
+            "observations": _obs_to_list(obs_raw),
         }
+
+    # ------------------------------------------------------------------
+    # Post-proceso: para PIB anual, obtener también datos trimestrales
+    # y depurar años anuales incompletos.
+    # ------------------------------------------------------------------
+    is_pib_annual = (
+        str(indicator or "").strip().lower() == "pib"
+        and frequency
+        and frequency.strip().upper() == "A"
+    )
+    if is_pib_annual:
+        for sid in list(result.keys()):
+            entry = result[sid]
+            meta = entry.get("meta") or {}
+            obs = entry.get("observations") or []
+            orig = (meta.get("original_frequency") or "").upper()
+            # Fallback: si el cache reporta "U", inferir desde el sufijo de la serie
+            if orig not in ("Q", "T", "M"):
+                suffix = sid.strip().split(".")[-1].upper()
+                if suffix == "T":
+                    orig = "Q"
+            if orig not in ("Q", "T", "M"):
+                continue
+
+            # Años presentes en la lista anual
+            years = sorted({extract_year(o.get("date")) for o in obs if extract_year(o.get("date"))})
+            if not years:
+                continue
+
+            q_first = f"{min(years)}-01-01"
+            q_last = f"{max(years)}-12-31"
+
+            q_obs, q_meta = load_fn(
+                series_id=sid,
+                firstdate=q_first,
+                lastdate=q_last,
+                target_frequency="Q",
+                agg_mode="sum",
+                calc_mode=None,
+            )
+
+            # Remover años incompletos de la lista anual
+            removed_years: List[int] = []
+            clean_annual: List[Dict[str, Any]] = []
+            for o in obs:
+                y = extract_year(o.get("date"))
+                if y and has_full_quarterly_year(q_obs, y):
+                    clean_annual.append(o)
+                elif y:
+                    removed_years.append(y)
+
+            if removed_years:
+                meta["incomplete_annual_note"] = (
+                    f"Los años {', '.join(str(y) for y in removed_years)} no tienen "
+                    f"los 4 trimestres completos; ver datos trimestrales."
+                ) if len(removed_years) > 1 else (
+                    f"El año {removed_years[0]} no tiene los 4 trimestres "
+                    f"completos; ver datos trimestrales."
+                )
+                logger.info(
+                    "[load_observations] Años anuales incompletos removidos: %s para %s",
+                    removed_years, sid,
+                )
+
+            # Agrupar observaciones por frecuencia en un solo dict
+            result[sid]["observations"] = {
+                "A": clean_annual,
+                "Q": _obs_to_list(q_obs),
+            }
 
     return result
 
@@ -260,7 +348,10 @@ def make_data_node(memory_adapter: Any):
             series_to_load = sl.family_series
             logger.info("[DATA_NODE][STEP-5] Familia completa (%d series)", len(series_to_load or []))
 
-        observations = load_observations(series_to_load, _get_load_fn(), ent.period_ent, ent.frequency_ent)
+        observations = load_observations(
+            series_to_load, _get_load_fn(), ent.period_ent, ent.frequency_ent,
+            indicator=ent.indicator_ent,
+        )
 
         # 6. Construir URL de la serie
         target_url = build_target_series_url(
