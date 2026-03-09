@@ -37,6 +37,11 @@ _MONTH_NAMES = {
 
 _QUARTER_LABELS = {1: "1er trimestre", 2: "2do trimestre", 3: "3er trimestre", 4: "4to trimestre"}
 
+_SEASONALITY_LABELS = {
+    "sa": "desestacionalizado",
+    "nsa": "empalmado (no desestacionalizado)",
+}
+
 
 def format_period_labels(period_str: str, freq: str) -> Tuple[str, ...]:
     """Convierte una fecha ISO (YYYY-MM-DD) en una etiqueta de período legible.
@@ -219,8 +224,15 @@ indícalo explícitamente.
 - NUNCA menciones el ID o código técnico de la serie (e.g. "F032.PIB.FLU.R.CLP...") \
 en la respuesta, a menos que el usuario lo solicite explícitamente. \
 Refiere a la serie por su nombre descriptivo (e.g. "PIB real trimestral").
+- SIEMPRE menciona el nombre descriptivo completo de la serie consultada \
+(e.g. "IMACEC desestacionalizado", no solo "IMACEC"; "PIB real trimestral", \
+no solo "PIB"). Usa el "Nombre de la serie" provisto en el contexto del usuario.
 - No agregues una línea de fuente o citación al final de tu respuesta; \
 la fuente se añade automáticamente por el sistema.
+- Cierra tu respuesta con una breve frase de cierre amable y variada. \
+Puede ser una oferta de ayuda, un comentario contextual sobre los datos, \
+o una invitación a explorar otros indicadores. NUNCA repitas la misma frase; \
+sé creativo y natural cada vez.
 
 Regla de disponibilidad de datos:
 - Si el contexto incluye una ALERTA DE DISPONIBILIDAD indicando que el período \
@@ -274,11 +286,43 @@ adicional separado.
 """
 
 
+_CALC_MODE_FIELD_RULES = {
+    "original": (
+        "value",
+        "El campo principal a reportar es 'value' (nivel del indicador). "
+        "PRESENTA PRIMERO el campo 'value' como el dato principal. "
+        "En el primer párrafo pon en **negrita** ese valor (e.g. **72,48**). "
+        "Las variaciones (yoy_pct, pct) son secundarias y opcionales."
+    ),
+    "yoy": (
+        "yoy_pct",
+        "El campo principal a reportar es 'yoy_pct' (variación interanual). "
+        "PRESENTA PRIMERO el campo 'yoy_pct' como el dato principal. "
+        "En el primer párrafo pon en **negrita** ese valor (e.g. **6,9%**). "
+        "El nivel del índice ('value') es secundario: menciónalo AL FINAL, "
+        "no en el primer párrafo."
+    ),
+    "prev_period": (
+        "pct",
+        "El campo principal a reportar es 'pct' (variación respecto al período anterior). "
+        "PRESENTA PRIMERO el campo 'pct' como el dato principal. "
+        "En el primer párrafo pon en **negrita** ese valor (e.g. **0,19%**). "
+        "El nivel del índice ('value') es secundario: menciónalo AL FINAL, "
+        "no en el primer párrafo."
+    ),
+}
+
+
 def _build_system_prompt(*, calc_mode: Optional[str] = None) -> str:
     """Retorna el system prompt base. Punto de extensión para reglas futuras."""
     prompt = _SYSTEM_PROMPT
-    if str(calc_mode or "").strip().lower() == "contribution":
+    cm = str(calc_mode or "").strip().lower()
+    if cm == "contribution":
         prompt += _CONTRIBUTION_PROMPT
+    rule = _CALC_MODE_FIELD_RULES.get(cm)
+    if rule:
+        _, rule_text = rule
+        prompt += f"\n\nRegla de campo prioritario (calc_mode={cm}):\n{rule_text}"
     return prompt
 
 
@@ -405,6 +449,8 @@ def _format_classification_context(
     for key, label in relevant_keys:
         val = classification.get(key)
         if val not in (None, "", [], {}, "none", "null"):
+            if key == "seasonality_ent":
+                val = _SEASONALITY_LABELS.get(str(val).strip().lower(), val)
             lines.append(f"- {label}: {val}")
 
     return "\n".join(lines) if lines else ""
@@ -553,7 +599,10 @@ def _build_messages(payload: Dict[str, Any]) -> list:
     req_form = _normalize_req_form(classification.get("req_form_cls"))
 
     calc_mode = classification.get("calc_mode_cls")
+    cm = str(calc_mode or "").strip().lower()
     system_content = _build_system_prompt(calc_mode=calc_mode)
+
+    series_title = str(payload.get("series_title") or "").strip()
 
     indicator = str(classification.get("indicator_ent") or "").strip().lower()
     classification_price = str(classification.get("price") or "").strip().lower()
@@ -575,9 +624,10 @@ def _build_messages(payload: Dict[str, Any]) -> list:
             preferred_series_id=str(series_id or "") or None,
         )
         if latest_hint is not None:
+            _primary_field_name = _CALC_MODE_FIELD_RULES.get(cm, ("value",))[0]
             system_content += (
-                "\n\nRegla para consultas latest: menciona explicitamente el ultimo "
-                "valor observado (fecha y valor) provisto en el contexto de datos."
+                "\n\nRegla para consultas latest: menciona explícitamente el último "
+                f"dato observado (fecha y campo '{_primary_field_name}') provisto en el contexto de datos."
             )
 
     # Contexto de clasificación
@@ -594,15 +644,28 @@ def _build_messages(payload: Dict[str, Any]) -> list:
     user_content = f"Pregunta del usuario: {question}\n\n"
     if period_mismatch_hint:
         user_content += f"{period_mismatch_hint}\n\n"
+    if series_title:
+        user_content += f"Nombre de la serie: {series_title}\n"
     if family_name:
         user_content += f"Familia de series: {family_name}\n"
     if indicator == "pib" and price in {"enc", "co"}:
         user_content += f"Precio PIB solicitado: {price}\n"
     if latest_hint is not None:
         latest_date, latest_value, _latest_series_id = latest_hint
+        # Determinar campo prioritario según calc_mode
+        _primary_field = {"yoy": "yoy_pct", "prev_period": "pct"}.get(cm, "value")
+        _primary_value = latest_value
+        _entry = observations.get(str(_latest_series_id), {})
+        for _obs in _iter_observations(_entry.get("observations")):
+            if str(_obs.get("date", ""))[:10] == latest_date[:10]:
+                _primary_value = _obs.get(_primary_field, latest_value)
+                break
         user_content += (
-            "Consulta latest detectada. Debes mencionar este ultimo valor observado "
-            f"en la respuesta: fecha={latest_date}, valor={latest_value}.\n"
+            f"Consulta latest detectada. El último dato disponible es: "
+            f"fecha={latest_date}, {_primary_field}={_primary_value}. "
+            f"DEBES mencionar {_primary_field}={_primary_value} como el valor "
+            f"principal en el primer párrafo (en negrita). "
+            f"El nivel del índice (value={latest_value}) menciónalo al final si es relevante.\n"
         )
     user_content += f"\nDatos disponibles:\n{obs_text}"
 

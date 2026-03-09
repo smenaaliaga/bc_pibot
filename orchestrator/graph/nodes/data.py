@@ -381,6 +381,7 @@ def make_data_node(memory_adapter: Any):
             "observations": observations,
             "family_name": sl.family_name,
             "series": sl.target_series_id,
+            "series_title": sl.target_series_title,
             "source_url": sl.source_url,
         }
 
