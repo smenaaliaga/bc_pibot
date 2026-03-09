@@ -227,6 +227,60 @@ def extract_quarter_dates(text: str, reference_year: Optional[int] = None) -> Li
         if tok in {"1", "2", "3", "4"} and i + 1 < len(tokens) and _is_trimester_like(tokens[i + 1]):
             q_tokens.append((i, int(tok)))
 
+    # ── Second pass: expand coordinated ordinal lists ──────────────────
+    # Handles patterns like "primer y tercer trimestre", "1, 2 y 3 trimestre"
+    # by scanning backward from each detected q_token through connectors
+    # ("y", ",", "e") and noise articles ("el", "la", "del", etc.).
+    # Commas are stripped by the tokenizer, so adjacent ordinals are also handled.
+    _noise = {"el", "la", "los", "las", "del", "de", "al", "entre"}
+    _connectors = {"y", ",", "e"}
+    expanded: List[Tuple[int, int]] = []
+    q_positions = {pos for pos, _ in q_tokens}
+
+    def _try_parse_q(tok: str) -> Optional[int]:
+        q = _ordinal_word.get(tok)
+        if q is not None:
+            return q
+        pm = re.fullmatch(r"([1-4])(?:er|ro|do|to)?", tok)
+        if pm:
+            return int(pm.group(1))
+        if tok in {"1", "2", "3", "4"}:
+            return int(tok)
+        return ROMAN_QUARTERS.get(tok)
+
+    for qi, _qv in q_tokens:
+        scan = qi - 1
+        while scan >= 0:
+            tok_s = tokens[scan]
+            if tok_s in _noise:
+                scan -= 1
+                continue
+            # Adjacent ordinal (comma stripped by tokenizer)
+            adj_q = _try_parse_q(tok_s)
+            if adj_q is not None and scan not in q_positions:
+                expanded.append((scan, adj_q))
+                q_positions.add(scan)
+                scan -= 1
+                continue
+            if tok_s not in _connectors:
+                break
+            # Find the ordinal before the connector (skip noise)
+            prev_scan = scan - 1
+            while prev_scan >= 0 and tokens[prev_scan] in _noise:
+                prev_scan -= 1
+            if prev_scan < 0:
+                break
+            prev_tok = tokens[prev_scan]
+            prev_q: Optional[int] = _try_parse_q(prev_tok)
+            if prev_q is not None and prev_scan not in q_positions:
+                expanded.append((prev_scan, prev_q))
+                q_positions.add(prev_scan)
+                scan = prev_scan - 1
+            else:
+                break
+
+    q_tokens.extend(expanded)
+
     if not q_tokens:
         return []
 
