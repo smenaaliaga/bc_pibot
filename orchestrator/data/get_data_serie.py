@@ -52,10 +52,8 @@ from typing import Optional, Dict, Any, List
 import pandas as pd
 import requests
 from dateutil import parser as dateparser
-from urllib.parse import urlencode, unquote
-import inspect as _inspect
-import os as _os
-from config import LOG_EXPOSE_API_LINKS
+from urllib.parse import urlencode
+
 # import redis -> hacerlo opcional para no fallar en import
 try:
     import redis  # type: ignore
@@ -136,18 +134,7 @@ else:
         logger = get_logger(_DEF_LOGGER_NAME, level=LOG_LEVEL)
 
 # Eliminar lógica de duplicación de master: no agregar nuevos handlers
-try:
-    current_file = getattr(logger, '_session_log_path', None)
-    if not current_file:
-        # Intentar detectar baseFilename del handler
-        for h in logger.handlers:
-            if isinstance(h, logging.FileHandler):
-                current_file = getattr(h, 'baseFilename', None)
-                break
-    if current_file:
-        logger.info(f"[LOG_REUSE] Using single session log file {current_file} (get_series)")
-except Exception as _e_master:
-    logger.error(f"[LOG_REUSE] No se pudo confirmar handler único: {_e_master}")
+# (log reuse check eliminado — no aporta información útil)
 
 BCCH_BASE = "https://si3.bcentral.cl/SieteRestWS/SieteRestWS.ashx"
 
@@ -212,12 +199,11 @@ def _ensure_redis_client() -> Optional[Any]:
     if _redis_client is None:
         _redis_client = _get_redis_client()
         if _redis_client is not None:
-            logger.info("[redis] Cliente inicializado para cacheo de series.")
+            logger.debug("[redis] Cliente inicializado para cacheo de series.")
             _redis_status_logged = True
     elif not _redis_status_logged:
         try:
             _redis_client.ping()
-            logger.info("[redis] Cliente ya disponible para cacheo de series.")
         except Exception as _e:
             logger.warning(f"[redis] Cliente presente pero ping falló: {_e}")
         _redis_status_logged = True
@@ -586,7 +572,7 @@ def calc_trace(fn):
         try:
             args_summary = {f"arg{idx}": _summarize_arg(f"arg{idx}", a) for idx, a in enumerate(args)}
             args_summary.update({k: _summarize_arg(k, v) for k, v in kwargs.items()})
-            logger.info(f"[CALC_TRACE_ENTER] file=get_series.py func={fn.__name__} args={args_summary}")
+            logger.debug(f"[CALC_TRACE_ENTER] func={fn.__name__} args={args_summary}")
         except Exception:
             pass
         result = fn(*args, **kwargs)
@@ -603,37 +589,14 @@ def calc_trace(fn):
                 res_sum = {"type": "DataFrame", "shape": list(result.shape)}
             else:
                 res_sum = type(result).__name__
-            logger.info(f"[CALC_TRACE_EXIT] file=get_series.py func={fn.__name__} result={res_sum}")
+            logger.debug(f"[CALC_TRACE_EXIT] func={fn.__name__} result={res_sum}")
         except Exception:
             pass
         return result
     return _wrap
 
 
-def _caller_info_for_log(skip_filename_suffix: str = "get_series.py") -> Dict[str, Any]:
-    """Extrae archivo y función del primer frame fuera de este módulo para trazas.
 
-    Retorna dict con keys: file, func, module. Si no se encuentra, usa current.
-    """
-    try:
-        stack = _inspect.stack()
-        for fr in stack[1:]:
-            fname = _os.path.basename(fr.filename)
-            if not fname.endswith(skip_filename_suffix):
-                return {
-                    "file": fname,
-                    "func": fr.function,
-                    "module": _inspect.getmodule(fr.frame).__name__ if _inspect.getmodule(fr.frame) else None,
-                }
-        # Fallback: usar el primer frame
-        fr0 = stack[1]
-        return {
-            "file": _os.path.basename(fr0.filename),
-            "func": fr0.function,
-            "module": _inspect.getmodule(fr0.frame).__name__ if _inspect.getmodule(fr0.frame) else None,
-        }
-    except Exception:
-        return {"file": skip_filename_suffix, "func": "<unknown>", "module": None}
 # Utilidades para fechas y frecuencias
 # ---------------------------------------------------------------------------
 
@@ -874,55 +837,15 @@ def get_series_api_rest_bcch(
     # No se envían firstdate/lastdate: se trae la serie completa.
 
     headers = {"Accept": "application/json"}
-    log_params = {**params}
-    log_params["pass"] = "***"
 
-    # Construir URL de request para log (opcionalmente expuesta) con traza de origen
-    try:
-        caller = _caller_info_for_log()
-        args_summary = {
-            "series_id": series_id,
-            "target_frequency": (target_frequency or None),
-            "agg": agg,
-        }
-        url_masked = f"{BCCH_BASE}?{urlencode(log_params)}"
-        source_url = f"{BCCH_BASE}?{urlencode(params_public)}"
-        # URL expuesta: versión codificada y versión legible (sin %xx)
-        url_plain_encoded = f"{BCCH_BASE}?{urlencode(params)}"
-        url_plain_readable = unquote(url_plain_encoded)
-        # Etiqueta de dominio por inspección del series_id
-        sid_up = (series_id or "").upper()
-        if "PIB" in sid_up:
-            tag = "PIB"
-        elif "IMC" in sid_up or "IMACEC" in sid_up:
-            tag = "IMACEC"
-        else:
-            tag = "SERIE"
-        # Registrar siempre la versión enmascarada (sin credenciales)
-        logger.info(
-            f"[API_REQUEST_URL:{tag}] caller_file={caller.get('file')} caller_func={caller.get('func')} "
-            f"params={args_summary} url={url_masked}"
-        )
-        logger.info(
-            f"[API_SOURCE_URL:{tag}] caller_file={caller.get('file')} caller_func={caller.get('func')} "
-            f"url={source_url}"
-        )
-        # Opcional: exponer link plano completo sólo si está habilitado explícitamente
-        if LOG_EXPOSE_API_LINKS:
-            logger.info(
-                f"[API_REQUEST_URL_PLAIN:{tag}] caller_file={caller.get('file')} caller_func={caller.get('func')} "
-                f"params={args_summary} url={url_plain_readable}"
-            )
-
-    except Exception as _e_url:
-        logger.error(f"[API_REQUEST_URL_ERROR] No se pudo construir URL de log: {_e_url}")
+    # Log conciso de la llamada API
+    source_url = f"{BCCH_BASE}?{urlencode(params_public)}"
+    sid_up = (series_id or "").upper()
+    tag = "PIB" if "PIB" in sid_up else ("IMACEC" if ("IMC" in sid_up or "IMACEC" in sid_up) else "SERIE")
+    logger.info(f"[API_CALL:{tag}] {series_id} | freq={target_frequency or 'orig'} | url={source_url}")
 
     # Cache sin depender de fechas: siempre se guarda la serie completa para la combinación serie+freq+agg
     cache_key = _make_cache_key(series_id, None, None, target_frequency, agg)
-    logger.info(
-        f"[get_series_api_rest_bcch] Consultando serie de datos | "
-        f"series_id='{series_id}' | cache_key='{cache_key}' | params={log_params}"
-    )
 
     # --- Llamada a API BCCh ---
     with Phase(
@@ -947,42 +870,13 @@ def get_series_api_rest_bcch(
         series = data.get("Series", {})
         obs = series.get("Obs", [])
 
-        logger.info(
-            f"[get_series_api_rest_bcch] Observaciones recibidas: {len(obs)} | "
-            f"descripEsp='{series.get('descripEsp', '')}'"
-        )
-
         df = _normalize_observations(obs)
         original_freq = _infer_freq_from_code(series_id)
-
-        with Phase(
-            logger,
-            "Fase 3.1: Remuestreo",
-            {
-                "series_id": series_id,
-                "original_frequency": original_freq,
-                "target_frequency": target_frequency,
-                "agg": agg,
-            },
-        ):
-            df_out = _resample(df, target_frequency, agg, original_freq)
-            logger.info(
-                f"[get_series_api_rest_bcch] Filas salida remuestreo: {len(df_out)}"
-            )
+        df_out = _resample(df, target_frequency, agg, original_freq)
 
         # Determinar frecuencia efectiva al final del proceso
         effective_freq = (target_frequency or original_freq or "U").upper()
-
-        # Calcular variaciones
-        with Phase(
-            logger,
-            "Fase 3.2: Cálculo variaciones PCT / YOY_PCT",
-            {"series_id": series_id, "frequency": effective_freq},
-        ):
-            df_enriched = _compute_variations(df_out, effective_freq)
-            logger.info(
-                f"[get_series_api_rest_bcch] Filas con variaciones calculadas: {len(df_enriched)}"
-            )
+        df_enriched = _compute_variations(df_out, effective_freq)
 
         cache_created_at = datetime.datetime.now(datetime.timezone.utc)
         source_updated = _get_series_source_updated_date(series_id)
@@ -1036,26 +930,8 @@ def get_series_api_rest_bcch(
         meta_ref["first_available_date"] = first_available_str or ""
         meta_ref["last_available_date"] = last_available_str or ""
 
-        logger.info(
-            "[get_series_api_rest_bcch] available range | "
-            f"first_available={first_available_str} last_available={last_available_str}"
-        )
     except Exception as _e_lastchk:
         logger.debug(f"[get_series_api_rest_bcch] No se pudo calcular rango disponible: {_e_lastchk}")
-
-    # --- Log de salida a test/log.text ---
-    try:
-        sample_api = ", ".join(
-            f"{r['date']}={r['value']}" for r in observations[:5]
-        )
-        _append_test_log(
-            (
-                f"source=api | serie={series_id} | "
-                f"freq={meta.get('original_frequency', '')} | agg={agg} | rows={len(observations)} | sample=[{sample_api}]"
-            )
-        )
-    except Exception as _e:
-        logger.error(f"Fallo escribiendo log de test para API: {_e}")
 
     # --- Almacenar en Redis ---
     client = _ensure_redis_client()
@@ -1068,7 +944,7 @@ def get_series_api_rest_bcch(
                     client.expire(cache_key, int(REDIS_SERIES_TTL))
                 except Exception:
                     logger.warning(f"[get_series_api_rest_bcch] No se pudo aplicar TTL a key='{cache_key}'")
-            logger.info(
+            logger.debug(
                 f"[get_series_api_rest_bcch] Serie almacenada en Redis | key='{cache_key}'"
             )
         except Exception as e:
@@ -1076,11 +952,6 @@ def get_series_api_rest_bcch(
                 f"[get_series_api_rest_bcch] Error almacenando en Redis key='{cache_key}': {e}"
             )
             _redis_client = None  # permitir reintentos en llamadas futuras
-    else:
-        logger.info(
-            "[get_series_api_rest_bcch] Redis no disponible; no se cachea la serie."
-        )
-
     return result
 
 
@@ -1231,10 +1102,6 @@ def get_series_from_redis(
 
     # Cache siempre con fechas auto (serie completa); fd/ld solo para filtro posterior
     cache_key = _make_cache_key(series_id, None, None, target_frequency, agg)
-    logger.info(
-        f"[get_series_from_redis] Intentando recuperar serie desde Redis | "
-        f"series_id='{series_id}' | cache_key='{cache_key}'"
-    )
 
     client = _ensure_redis_client()
     if client is None:
@@ -1256,9 +1123,7 @@ def get_series_from_redis(
         
         return _fetch_fallback_and_filter("redis_read_error")
     if raw is None:
-        logger.info(
-            f"[get_series_from_redis] Clave no encontrada en Redis | key='{cache_key}'"
-        )
+        logger.debug(f"[get_series_from_redis] Cache miss | key='{cache_key}'")
         if not use_fallback:
             return None
         # Poblar Redis llamando a la API
@@ -1266,9 +1131,7 @@ def get_series_from_redis(
 
     try:
         data = json.loads(raw)
-        logger.info(
-            f"[get_series_from_redis] Cache hit | key='{cache_key}' | rows={len((data or {}).get('observations', []) or [])}"
-        )
+        logger.debug(f"[get_series_from_redis] Cache hit | key='{cache_key}'")
         meta_ref = data.setdefault("meta", {})
         if "source_url" not in meta_ref:
             meta_ref["source_provider"] = "BCCh SieteRestWS"
@@ -1351,20 +1214,6 @@ def get_series_from_redis(
     if not fd and not ld:
         meta_full = data.setdefault("meta", {})
         meta_full["cache_resolution"] = "cache_covered"
-        # Log simple de lectura completa
-        try:
-            sample_redis_all = ", ".join(
-                f"{r['date']}={r['value']}" for r in obs[:5]
-            )
-            _append_test_log(
-                (
-                    f"source=redis | serie={series_id} | rango=cache | "
-                    f"freq={data.get('meta', {}).get('original_frequency', '')} | agg={agg} | "
-                    f"rows={len(obs)} | sample=[{sample_redis_all}]"
-                )
-            )
-        except Exception as _e:
-            logger.error(f"Fallo escribiendo log de test para Redis(all): {_e}")
         return data
 
     # Filtrado por rango de fechas
@@ -1398,6 +1247,28 @@ def get_series_from_redis(
     data["observations"] = filtered_obs
 
     if use_fallback and (not filtered_obs or not cache_has_requested_coverage):
+        # Si el periodo solicitado es posterior al último disponible y la caché
+        # está fresca (no stale), la API tampoco tendrá esos datos.  Evitar
+        # la llamada de red y devolver directamente la caché con obs vacías
+        # para que el caller (load_observations) use el fallback local.
+        meta_ref = data.setdefault("meta", {})
+        _lastdate_pos = meta_ref.get("lastdate_position", "")
+        if _lastdate_pos == "gt_latest" and not _is_cached_series_stale(series_id, data):
+            logger.info(
+                "[get_series_from_redis] Rango posterior al disponible y cache fresca; "
+                "omitiendo llamada API | series_id='%s' | key='%s' | fd='%s' | ld='%s'",
+                series_id,
+                cache_key,
+                fd,
+                ld,
+            )
+            meta_ref["cache_resolution"] = "cache_beyond_available"
+            if fd:
+                meta_ref["period_start"] = fd
+            if ld:
+                meta_ref["period_end"] = ld
+            return data
+
         logger.info(
             "[get_series_from_redis] Rango solicitado no cubierto por cache | "
             "series_id='%s' | key='%s' | fd='%s' | ld='%s' | filtered_rows=%s | refrescando desde API",
@@ -1417,25 +1288,6 @@ def get_series_from_redis(
         meta["period_end"] = ld
     meta["cache_resolution"] = "cache_covered"
     data["meta"] = meta
-
-    logger.info(
-        f"[get_series_from_redis] Observaciones devueltas tras filtro: {len(filtered_obs)}"
-    )
-
-    # Log de lectura filtrada
-    try:
-        sample_redis = ", ".join(
-            f"{r['date']}={r['value']}" for r in filtered_obs[:5]
-        )
-        _append_test_log(
-            (
-                f"source=redis | serie={series_id} | rango={fd or 'auto'}→{ld or 'auto'} | "
-                f"freq={data.get('meta', {}).get('original_frequency', '')} | agg={agg} | "
-                f"rows={len(filtered_obs)} | sample=[{sample_redis}]"
-            )
-        )
-    except Exception as _e:
-        logger.error(f"Fallo escribiendo log de test para Redis(filtered): {_e}")
 
     return data
 
@@ -1540,10 +1392,13 @@ def fetch_series_with_calc(
     except Exception as _adj_e:
         logger.warning(f"No fue posible ajustar el rango para calc={calc_type_norm}: {_adj_e}")
 
-    data = get_series_api_rest_bcch(
+    data = get_series_from_redis(
         series_id=series_id,
+        firstdate=fd_fetch,
+        lastdate=ld_fetch,
         target_frequency=freq,
         agg=agg,
+        use_fallback=True,
     )
 
     obs_in = data.get("observations", [])
