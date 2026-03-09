@@ -534,11 +534,15 @@ def lookup_series(ent: ResolvedEntities) -> SeriesLookupResult:
 
     # --- Filtros de familia ---------------------------------------------------
     family_frequency = None if ent.indicator_ent == "imacec" else ent.frequency_ent
-    if ent.calc_mode_cls != "contribution":
-        family_frequency = None
     family_price = None if ent.indicator_ent == "imacec" else ent.price
 
     is_pib_aggregate = ent.indicator_ent == "pib" and _is_aggregate_request(ent)
+
+    # Para PIB agregado (sin desglose) la familia base no tiene frequency
+    # a nivel de clasificación; el resampleo se hace al cargar observaciones.
+    # Para familias con desglose (regionales, etc.) la frecuencia SÍ importa.
+    if is_pib_aggregate and ent.calc_mode_cls != "contribution":
+        family_frequency = None
 
     family_calc_mode = ent.calc_mode_cls or "original"
 
@@ -552,8 +556,11 @@ def lookup_series(ent: ResolvedEntities) -> SeriesLookupResult:
         family_seasonality = ent.seasonality_ent
 
     # --- Buscar familia -------------------------------------------------------
-    # "general" y "none" en los cls significan "sin desglose" → tratar como
-    # ausencia de dimensión para que has_activity/region/investment == 0.
+    # Para activity: "general" y "none" significan "sin desglose" → tratar
+    # como ausencia para que has_activity == 0.
+    # Para region/investment: "general" significa "dame TODAS las regiones/
+    # inversiones", es decir has_region/has_investment == 1.  Solo "none" y
+    # los vacíos implican ausencia.
     _NO_BREAKDOWN = _EMPTY_CLS_VALUES + ("general",)
 
     _activity_fallback = (
@@ -562,10 +569,10 @@ def lookup_series(ent: ResolvedEntities) -> SeriesLookupResult:
         else None
     )
     _region_fallback = (
-        ent.region_cls if ent.region_cls not in _NO_BREAKDOWN else None
+        ent.region_cls if ent.region_cls not in _EMPTY_CLS_VALUES else None
     )
     _investment_fallback = (
-        ent.investment_cls if ent.investment_cls not in _NO_BREAKDOWN else None
+        ent.investment_cls if ent.investment_cls not in _EMPTY_CLS_VALUES else None
     )
 
     result.family_dict = find_family_by_classification(

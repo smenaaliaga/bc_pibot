@@ -255,20 +255,22 @@ NO multipliques ni dividas el valor; preséntalo tal cual, redondeado a 2 decima
 
 REGLAS ESTRICTAS sobre el lenguaje de contribución (OBLIGATORIO):
 1. "Mayor contribución" / "más aportó" / "mayor aporte" = la actividad/región con el valor POSITIVO más alto.
-2. "Menor contribución" / "menos aportó" / "menor aporte" / "menos contribuyó" = la actividad/región \
-con el valor POSITIVO más bajo (pero aún > 0). \
-JAMÁS uses una actividad con valor negativo como respuesta a estas preguntas. \
-"Menos aportar" sigue siendo aportar: implica un valor positivo, solo que pequeño.
-3. Las actividades/regiones con valores NEGATIVOS no "aportan" ni "contribuyen" al crecimiento: son \
-"detractoras" o "restaron" al crecimiento. NUNCA las llames "menor contribución" ni "menos aportó".
-4. Si la pregunta pide "menor contribución", "menos aportó" o similar, responde EXCLUSIVAMENTE con \
-la actividad/región que tiene el valor positivo más pequeño. Por separado, menciona las que tienen \
-valores negativos como "detractoras del crecimiento" o que "restaron" al crecimiento.
 
-Ejemplo: si los datos son Metropolitana=1.33, Biobío=-0.26, Coquimbo=0.01, Tarapacá=-0.25:
-- "Más aportó" → Metropolitana (1,33 pp)
-- "Menos aportó" → Coquimbo (0,01 pp), porque es el positivo más bajo
-- Biobío y Tarapacá son DETRACTORAS (valores negativos), "restaron" al crecimiento. NO son las que "menos aportaron"
+2. "Menor contribución" / "menos aportó" / "menor aporte" / "menos contribuyó" SOLO se aplica a \
+actividades/regiones con valores POSITIVOS. Debes responder EXCLUSIVAMENTE con la que tiene el valor \
+positivo más pequeño (incluso si es cercano a cero). NUNCA uses una actividad con valor negativo para \
+responder estas preguntas, porque los negativos no "aportan" — "restan".
+
+3. Actividades/regiones con valores NEGATIVOS no "aportan" ni "contribuyen": son "detractoras" o \
+"restaron al crecimiento". SOLO menciónalas si preguntan explícitamente por ellas, o como contexto \
+adicional separado.
+
+4. EJEMPLO OBLIGATORIO:
+   Si los datos son: Metropolitana=1.33, Biobío=-0.26, Coquimbo=0.01, Tarapacá=-0.25
+   - Pregunta "¿Quién MÁS aportó?" → Respuesta: Metropolitana (1,33 pp)
+   - Pregunta "¿Quién MENOS aportó?" → Respuesta: Coquimbo (0,01 pp) [es el positivo más bajo]
+   - LUEGO menciona: "Sin embargo, Biobío y Tarapacá fueron detractoras del crecimiento (-0,26 y -0,25 pp respectivamente)."
+   - NUNCA digas "Menos aportó = Biobío" aunque sea un negativo más pequeño.
 """
 
 
@@ -295,7 +297,7 @@ def _format_observations_context(
     max_obs_per_freq = int(os.getenv("DATA_RESPONSE_MAX_OBS_PER_FREQ", "50"))
     max_series = int(os.getenv("DATA_RESPONSE_MAX_SERIES", "20"))
 
-    def _format_obs_list(obs_list: list, indent: str = "  ") -> Tuple[List[str], bool]:
+    def _format_obs_list(obs_list: list, indent: str = "  ", freq_code: str = "") -> Tuple[List[str], bool]:
         """Formatea una lista de observaciones como líneas de texto.
         
         Returns:
@@ -308,11 +310,12 @@ def _format_observations_context(
         
         lines: List[str] = []
         for obs in obs_list:
-            date = obs.get("date", "")
+            raw_date = obs.get("date", "")
+            date_label = format_period_labels(raw_date, freq_code)[0] if freq_code else raw_date
             value = obs.get("value", "")
             yoy = obs.get("yoy_pct")
             pct = obs.get("pct")
-            line = f"{indent}{date} | valor={value}"
+            line = f"{indent}{date_label} | valor={value}"
             if yoy is not None:
                 line += f" | var. interanual={yoy}%"
             if pct is not None:
@@ -359,7 +362,8 @@ def _format_observations_context(
                 if not sub:
                     parts.append("    (sin observaciones)")
                 else:
-                    formatted_lines, was_truncated = _format_obs_list(sub, indent="    ")
+                    _fc = {"A": "a", "Q": "q", "M": "m"}.get(freq_key, freq.lower() if freq else "")
+                    formatted_lines, was_truncated = _format_obs_list(sub, indent="    ", freq_code=_fc)
                     parts.extend(formatted_lines)
                     if was_truncated:
                         parts.append(f"    (mostrando últimas {max_obs_per_freq} observaciones)")
@@ -367,7 +371,8 @@ def _format_observations_context(
             if not obs_raw:
                 parts.append("  (sin observaciones)")
             else:
-                formatted_lines, was_truncated = _format_obs_list(obs_raw)
+                _fc = freq.lower() if freq and freq != "?" else ""
+                formatted_lines, was_truncated = _format_obs_list(obs_raw, freq_code=_fc)
                 parts.extend(formatted_lines)
                 if was_truncated:
                     parts.append(f"  (mostrando últimas {max_obs_per_freq} observaciones)")
@@ -488,6 +493,11 @@ def _detect_period_mismatch(
     es posterior al último dato disponible, retorna un texto de alerta
     para inyectar en el prompt del LLM.
     """
+    # Si el usuario pide "lo último disponible", no hay desfase posible
+    req_form = str(classification.get("req_form_cls") or "").strip().lower()
+    if req_form == "latest":
+        return None
+
     period_ent = classification.get("period_ent")
     if not period_ent or not isinstance(period_ent, list) or len(period_ent) == 0:
         return None

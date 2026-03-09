@@ -1898,7 +1898,7 @@
       "has_region": 1,
       "has_investment": 0
     },
-    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T",
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL",
     "series": [
       {"id": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.15.0.T", "short_title": "Región de Arica y Parinacota", "classification": {"region": "arica_parinacota"}, "long_title": "PIB para la Región de Arica y Parinacota"},
       {"id": "F035.PIB.FLU.R.CLP.2018.Z.Z.Z.01.0.T", "short_title": "Región de Tarapacá", "classification": {"region": "tarapaca"}, "long_title": "PIB para la Región de Tarapacá"},
