@@ -93,8 +93,8 @@ def test_get_series_from_redis_refetches_when_requested_period_is_not_covered(mo
         return {
             "meta": {"series_id": series_id},
             "observations": [
-                {"date": "2027-01-31", "value": 140.0},
-                {"date": "2027-12-31", "value": 160.0},
+                {"date": "2025-01-31", "value": 140.0},
+                {"date": "2025-12-31", "value": 160.0},
             ],
         }
 
@@ -102,8 +102,8 @@ def test_get_series_from_redis_refetches_when_requested_period_is_not_covered(mo
 
     result = gds.get_series_from_redis(
         series_id="F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
-        firstdate="2027-01-01",
-        lastdate="2027-12-31",
+        firstdate="2025-01-01",
+        lastdate="2025-12-31",
         target_frequency="M",
         agg="avg",
         use_fallback=True,
@@ -111,7 +111,7 @@ def test_get_series_from_redis_refetches_when_requested_period_is_not_covered(mo
 
     assert result is not None
     assert api_calls["count"] == 1
-    assert [row["date"] for row in result["observations"]] == ["2027-01-31", "2027-12-31"]
+    assert [row["date"] for row in result["observations"]] == ["2025-01-31", "2025-12-31"]
     assert result["meta"]["cache_resolution"] == "cache_missing_period"
 
 
