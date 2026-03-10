@@ -1248,26 +1248,33 @@ def get_series_from_redis(
 
     if use_fallback and (not filtered_obs or not cache_has_requested_coverage):
         # Si el periodo solicitado es posterior al último disponible y la caché
-        # está fresca (no stale), la API tampoco tendrá esos datos.  Evitar
+        # está fresca (no stale), y además está significativamente en el futuro
+        # (más de 180 días), la API tampoco tendrá esos datos.  Evitar
         # la llamada de red y devolver directamente la caché con obs vacías
         # para que el caller (load_observations) use el fallback local.
         meta_ref = data.setdefault("meta", {})
         _lastdate_pos = meta_ref.get("lastdate_position", "")
         if _lastdate_pos == "gt_latest" and not _is_cached_series_stale(series_id, data):
-            logger.info(
-                "[get_series_from_redis] Rango posterior al disponible y cache fresca; "
-                "omitiendo llamada API | series_id='%s' | key='%s' | fd='%s' | ld='%s'",
-                series_id,
-                cache_key,
-                fd,
-                ld,
-            )
-            meta_ref["cache_resolution"] = "cache_beyond_available"
-            if fd:
-                meta_ref["period_start"] = fd
-            if ld:
-                meta_ref["period_end"] = ld
-            return data
+            # Verificar si está significativamente en el futuro (>180 días = ~6 meses)
+            # para evitar la optimización en casos donde podría haber datos actualizados pronto
+            try:
+                if ld:
+                    ld_dt = datetime.date.fromisoformat(ld)
+                    today = datetime.date.today()
+                    days_ahead = (ld_dt - today).days
+                    if days_ahead > 180:  # Solo optimizar si el futuro es lejano
+                        logger.debug(
+                            "[get_series_from_redis] Rango muy futuro (%d días adelante) y cache fresca; "
+                            "omitiendo llamada API | series_id='%s'", days_ahead, series_id
+                        )
+                        meta_ref["cache_resolution"] = "cache_beyond_available"
+                        if fd:
+                            meta_ref["period_start"] = fd
+                        if ld:
+                            meta_ref["period_end"] = ld
+                        return data
+            except Exception:
+                pass
 
         logger.info(
             "[get_series_from_redis] Rango solicitado no cubierto por cache | "
@@ -1358,9 +1365,20 @@ def fetch_series_with_calc(
     )
 
     # Ajustar rango de fetch para garantizar cálculo (prefetch de períodos previos)
+    # PERO: si el periodo solicitado es futuro, la expansión no ayuda (API tampoco tiene datos futuros)
     fd_fetch, ld_fetch = firstdate, lastdate
+    is_future_dated = False
     try:
-        if firstdate:
+        if lastdate:
+            ld_dt = datetime.date.fromisoformat(lastdate)
+            today = datetime.date.today()
+            if ld_dt > today:
+                is_future_dated = True
+    except Exception:
+        pass
+    
+    try:
+        if firstdate and not is_future_dated:
             fd_dt = datetime.date.fromisoformat(firstdate)
             if calc_type_norm == "ypct":
                 # Necesita mismo período del año anterior

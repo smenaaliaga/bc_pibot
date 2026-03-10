@@ -11,6 +11,7 @@ Flujo principal (``data_node``):
 from __future__ import annotations
 
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict
 from typing import Any, Dict, List, Optional
 
@@ -181,11 +182,13 @@ def load_observations(
         lastdate = to_period_end_str(lastdate, frequency)
 
     result: Dict[str, Dict[str, Any]] = {}
-
-    for s in (series_list or []):
+    
+    # Función interna para cargar una serie (puede ejecutarse en paralelo)
+    def _load_single_series(s: Dict[str, Any]) -> tuple[str, Dict[str, Any]]:
+        """Carga observaciones de una serie. Retorna (series_id, resultado_dict)."""
         sid = s.get("id") if isinstance(s, dict) else None
         if not sid:
-            continue
+            return None, None
 
         target_freq = frequency.upper() if frequency else None
 
@@ -212,7 +215,7 @@ def load_observations(
                     agg_mode="sum",
                     calc_mode=None,
                 )
-                logger.info("[load_observations] Periodo posterior al disponible; usando last_available_date=%s", last_avail)
+                logger.debug("[load_observations] Periodo posterior al disponible; usando last_available_date=%s", last_avail)
             elif firstdate and first_avail and firstdate < first_avail:
                 obs_raw, meta = load_fn(
                     series_id=sid,
@@ -222,7 +225,7 @@ def load_observations(
                     agg_mode="sum",
                     calc_mode=None,
                 )
-                logger.info("[load_observations] Periodo anterior al disponible; usando first_available_date=%s", first_avail)
+                logger.debug("[load_observations] Periodo anterior al disponible; usando first_available_date=%s", first_avail)
 
         # Anotar frecuencia remuestreada si difiere de la original
         if meta and isinstance(meta, dict) and target_freq:
@@ -230,10 +233,35 @@ def load_observations(
             if orig and target_freq != orig:
                 meta["target_frequency"] = target_freq
 
-        result[sid] = {
+        return sid, {
             "meta": meta,
             "observations": _obs_to_list(obs_raw),
         }
+
+    # Cargar series en paralelo usando ThreadPoolExecutor
+    # Usar min(len(series_list), 4) workers para evitar overhead
+    num_workers = min(max(1, len(series_list or [])), 4)
+    
+    if num_workers > 1 and series_list:
+        # Modo paralelo para múltiples series
+        with ThreadPoolExecutor(max_workers=num_workers) as executor:
+            futures = {executor.submit(_load_single_series, s): s for s in (series_list or [])}
+            for future in as_completed(futures):
+                try:
+                    sid, data = future.result()
+                    if sid and data:
+                        result[sid] = data
+                except Exception as e:
+                    logger.warning("[load_observations] Error cargando serie en paralelo: %s", e)
+    else:
+        # Modo secuencial para una sola serie o lista vacía
+        for s in (series_list or []):
+            try:
+                sid, data = _load_single_series(s)
+                if sid and data:
+                    result[sid] = data
+            except Exception as e:
+                logger.warning("[load_observations] Error cargando serie: %s", e)
 
     # ------------------------------------------------------------------
     # Post-proceso: para PIB anual, obtener también datos trimestrales
