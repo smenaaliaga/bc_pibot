@@ -380,9 +380,19 @@ def make_data_node(memory_adapter: Any):
         ]
         all_none = all(v in ("none", "", "{}") for v in _cls_vals)
         any_specific = any(v == "specific" for v in _cls_vals)
+        activity_general_region_specific = (
+            str(ent.activity_cls_resolved or "").strip().lower() == "general"
+            and str(ent.region_cls or "").strip().lower() == "specific"
+        )
         if is_contribution:
             series_to_load = sl.family_series
             logger.info("[DATA_NODE][STEP-5] Familia completa por contribución (%d series)", len(series_to_load or []))
+        elif activity_general_region_specific:
+            series_to_load = sl.family_series
+            logger.info(
+                "[DATA_NODE][STEP-5] Familia completa por activity=general + region=specific (%d series)",
+                len(series_to_load or []),
+            )
         elif all_none or any_specific:
             series_to_load = [{"id": sl.target_series_id}]
             logger.info("[DATA_NODE][STEP-5] Solo serie target (all_none=%s any_specific=%s)", all_none, any_specific)

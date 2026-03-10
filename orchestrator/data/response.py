@@ -348,9 +348,11 @@ _ANALYSIS_LEVELS = {
     ),
     1: (
         "Observación analítica:\n"
-        "- Después de presentar el dato principal, puedes agregar UNA frase breve "
-        "de contexto solo si es muy evidente (e.g. \"esto marca una aceleración respecto al mes anterior\"). "
-        "Máximo 1 oración. Si no hay nada obvio, omítela."
+        "- Después de presentar el dato principal, puedes agregar UNA frase muy breve "
+        "de contexto SOLO si es evidente directamente en los datos "
+        "(e.g. \"aumentó respecto al mes anterior\", \"es el menor registro del trimestre\"). "
+        "NUNCA hagas interpretaciones amplias, especulaciones sobre motivos, o análisis sobre importancia. "
+        "Máximo 1 oración muy corta. Si no hay algo obvio y factual que destacar, omítela."
     ),
     2: (
         "Observación analítica:\n"
@@ -410,7 +412,7 @@ def _format_observations_context(
     max_obs_per_freq = int(os.getenv("DATA_RESPONSE_MAX_OBS_PER_FREQ", "50"))
     max_series = int(os.getenv("DATA_RESPONSE_MAX_SERIES", "20"))
 
-    logger.info("[DATA_RESPONSE] Formateando %d series para contexto LLM", len(observations))
+    logger.debug("[DATA_RESPONSE] Formateando %d series para contexto LLM", len(observations))
 
     def _format_obs_list(obs_list: list, indent: str = "  ", freq_code: str = "") -> Tuple[List[str], bool]:
         """Formatea una lista de observaciones como líneas de texto.
@@ -423,9 +425,6 @@ def _format_observations_context(
         if len(obs_list) > max_obs_per_freq:
             obs_list = obs_list[-max_obs_per_freq:]
             truncated = True
-        
-        logger.info("[DATA_RESPONSE] Formateando %d obs (original: %d, freq: %s, truncado: %s)",
-                    len(obs_list), original_len, freq_code, truncated)
         
         lines: List[str] = []
         for obs in obs_list:
@@ -456,15 +455,15 @@ def _format_observations_context(
         if isinstance(obs_raw, list) and obs_raw:
             first_date = obs_raw[0].get("date") if obs_raw else None
             last_date = obs_raw[-1].get("date") if obs_raw else None
-            logger.info("[DATA_RESPONSE] Serie %s: %d obs, desde %s hasta %s",
-                       series_id, len(obs_raw), first_date, last_date)
+            # logger.debug("[DATA_RESPONSE] Serie %s: %d obs, desde %s hasta %s",
+            #             series_id, len(obs_raw), first_date, last_date)
         elif isinstance(obs_raw, dict):
             for freq_key, sub in obs_raw.items():
                 if isinstance(sub, list) and sub:
                     first_date = sub[0].get("date") if sub else None
                     last_date = sub[-1].get("date") if sub else None
-                    logger.info("[DATA_RESPONSE] Serie %s [%s]: %d obs, desde %s hasta %s",
-                               series_id, freq_key, len(sub), first_date, last_date)
+                    # logger.debug("[DATA_RESPONSE] Serie %s [%s]: %d obs, desde %s hasta %s",
+                    #            series_id, freq_key, len(sub), first_date, last_date)
 
         title = (
             meta.get("descripEsp")
@@ -726,7 +725,7 @@ def _build_messages(payload: Dict[str, Any]) -> list:
 
     # Contexto de datos
     obs_text = _format_observations_context(observations)
-    logger.info("[DATA_RESPONSE] Contexto de observaciones generado: %d caracteres", len(obs_text))
+    logger.debug("[DATA_RESPONSE] Contexto de observaciones generado: %d caracteres", len(obs_text))
 
     # Detección de desfase período solicitado vs disponible
     period_mismatch_hint = _detect_period_mismatch(classification, observations)
@@ -759,7 +758,7 @@ def _build_messages(payload: Dict[str, Any]) -> list:
         )
     user_content += f"\nDatos disponibles:\n{obs_text}"
 
-    logger.info("[DATA_RESPONSE] User content generado: %d caracteres", len(user_content))
+    logger.debug("[DATA_RESPONSE] User content generado: %d caracteres", len(user_content))
 
     if SystemMessage is None or HumanMessage is None:
         return []

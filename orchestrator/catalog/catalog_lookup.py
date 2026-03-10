@@ -572,26 +572,27 @@ def lookup_series(ent: ResolvedEntities) -> SeriesLookupResult:
 
     family_calc_mode = ent.calc_mode_cls or "original"
 
-    # Estacionalidad: para PIB agregado sin contribución se omite siempre
-    # porque la familia base de PIB no tiene seasonality a nivel de familia
-    # (está definida por serie). La selección de serie vía series_eq sigue
-    # filtrando por seasonality correctamente.
-    if is_pib_aggregate and ent.calc_mode_cls != "contribution":
+    # Estacionalidad: para PIB agregado (sin desglose) sin contribución se
+    # omite porque la familia base de PIB no tiene seasonality a nivel de
+    # familia.  Pero si activity="general" (desglose por actividades), SÍ
+    # se filtra para distinguir nsa vs sa.
+    if (
+        is_pib_aggregate
+        and ent.calc_mode_cls != "contribution"
+        and ent.activity_cls_resolved != "general"
+    ):
         family_seasonality = None
     else:
         family_seasonality = ent.seasonality_ent
 
     # --- Buscar familia -------------------------------------------------------
-    # Para activity: "general" y "none" significan "sin desglose" → tratar
-    # como ausencia para que has_activity == 0.
-    # Para region/investment: "general" significa "dame TODAS las regiones/
-    # inversiones", es decir has_region/has_investment == 1.  Solo "none" y
-    # los vacíos implican ausencia.
-    _NO_BREAKDOWN = _EMPTY_CLS_VALUES + ("general",)
+    # "general" significa "dame TODAS las actividades/regiones/inversiones",
+    # es decir has_activity/has_region/has_investment == 1.
+    # Solo "none" y los vacíos implican ausencia (has_* == 0).
 
     _activity_fallback = (
         ent.activity_cls_resolved
-        if ent.activity_cls_resolved not in _NO_BREAKDOWN
+        if ent.activity_cls_resolved not in _EMPTY_CLS_VALUES
         else None
     )
     _region_fallback = (
