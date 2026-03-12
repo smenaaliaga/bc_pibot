@@ -1,0 +1,162 @@
+TRACE STREAMLIT-LIKE POST CHANGES
+========================================================================================
+session_id=streamlit-trace-20260312-165759-649585
+
+Pregunta 1: Explícame que es el PIB
+series=None
+classification=indicator=None frequency=None calc_mode=None activity=None activity_cls=None price=None
+Respuesta:
+El Producto Interno Bruto (PIB) es el valor total de los bienes y servicios finales producidos en una economía en un período determinado. En Chile, se calcula desde tres enfoques: 
+
+1. **Producción**: Mide el valor agregado generado en cada actividad económica.
+2. **Gasto**: Incluye el consumo, la inversión y las exportaciones netas.
+3. **Ingreso**: Analiza las remuneraciones, los excedentes de explotación e impuestos.
+
+El PIB es un indicador central para evaluar el crecimiento económico y la salud general de la economía.
+############################################################################################################################################
+
+Pregunta 2: cual es el valor del pib
+series=F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T
+classification=indicator=pib frequency=q calc_mode=original activity=None activity_cls=none price=enc
+Respuesta:
+El valor del PIB para el tercer trimestre de 2025 es **51.879,68** miles de millones de pesos encadenados. Este dato refleja un crecimiento interanual de 1,58%, aunque presenta una disminución de 2,19% respecto al trimestre anterior. 
+
+Si necesitas más información sobre otros indicadores o periodos, no dudes en preguntar.
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2?id5=SI&idSerie=F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T&cbFechaInicio=2015&cbFechaTermino=2025&cbFrecuencia=QUARTERLY&cbCalculo=PCT) del Banco Central de Chile.
+############################################################################################################################################
+
+Pregunta 3: Cuál es el PIB en pesos?
+series=F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T
+classification=indicator=pib frequency=q calc_mode=original activity=None activity_cls=none price=co
+Respuesta:
+El PIB a precios corrientes para el tercer trimestre de 2025 es de **81.906,24** miles de millones de pesos. Este valor representa un crecimiento interanual del 8,71%, aunque muestra una disminución del 1,16% en comparación con el período anterior. 
+
+Si necesitas más información sobre otros indicadores o períodos, no dudes en preguntar.
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2?id5=SI&idSerie=F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T&cbFechaInicio=2015&cbFechaTermino=2025&cbFrecuencia=QUARTERLY&cbCalculo=PCT) del Banco Central de Chile.
+############################################################################################################################################
+
+Pregunta 4: Cuánto es el PIB de Chile?
+series=None
+classification=indicator=None frequency=None calc_mode=None activity=None activity_cls=None price=None
+Respuesta:
+El PIB de Chile para el tercer trimestre de 2025 es de **51.879,68** miles de millones de pesos encadenados. Si necesitas información adicional o sobre otros períodos, no dudes en preguntar.
+############################################################################################################################################
+
+Pregunta 5: A cuánto asciende el PIB en Chile?
+series=F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T
+classification=indicator=pib frequency=q calc_mode=original activity=None activity_cls=none price=co
+Respuesta:
+El PIB a precios corrientes en Chile para el tercer trimestre de 2025 asciende a **81.906,24** miles de millones de pesos. Este valor muestra un crecimiento interanual de 8,71%, aunque presenta una ligera disminución de 1,16% en comparación con el período anterior. 
+
+Si necesitas más información sobre otros indicadores o algún detalle adicional, no dudes en preguntar.
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2?id5=SI&idSerie=F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T&cbFechaInicio=2015&cbFechaTermino=2025&cbFrecuencia=QUARTERLY&cbCalculo=PCT) del Banco Central de Chile.
+############################################################################################################################################
+
+Pregunta 6: cual es el ultimo valor del pib
+series=F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T
+classification=indicator=pib frequency=q calc_mode=original activity=None activity_cls=none price=enc
+Respuesta:
+El último valor del PIB corresponde al 3er trimestre de 2025, donde se registró un total de **51.879,68** miles de millones de pesos encadenados. Este dato muestra una variación interanual del 1,58%, aunque presenta una disminución del 2,19% en comparación con el trimestre anterior. 
+
+Si necesitas más información sobre otros indicadores, no dudes en preguntar.
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2?id5=SI&idSerie=F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T&cbFechaInicio=2015&cbFechaTermino=2025&cbFrecuencia=QUARTERLY&cbCalculo=PCT) del Banco Central de Chile.
+############################################################################################################################################
+
+Pregunta 7: cual es el pib a precios corrientes del ultimo trimestre
+series=F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T
+classification=indicator=pib frequency=q calc_mode=original activity=None activity_cls=none price=co
+Respuesta:
+Aún no se han publicado datos de PIB a precios corrientes para el cuarto trimestre de 2025. Sin embargo, el último dato disponible corresponde al tercer trimestre de 2025, donde el PIB a precios corrientes fue de **81.906,24** miles de millones de pesos. Este valor representa un crecimiento interanual del 8,71%, aunque tuvo una variación negativa del 1,16% en comparación con el trimestre anterior.
+
+Si necesitas más información o datos sobre otros períodos, no dudes en preguntar. ¡Estoy aquí para ayudarte!
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2?id5=SI&idSerie=F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T&cbFechaInicio=2015&cbFechaTermino=2025&cbFrecuencia=QUARTERLY&cbCalculo=PCT) del Banco Central de Chile.
+############################################################################################################################################
+
+Pregunta 8: cual es el pib a precios corrientes del primer trimestre del 2020
+series=F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T
+classification=indicator=pib frequency=q calc_mode=original activity=None activity_cls=none price=co
+Respuesta:
+El PIB a precios corrientes del primer trimestre de 2020 es **51.100,39** miles de millones de pesos. Este valor representa un crecimiento interanual del 5,31%. 
+
+Si necesitas más información sobre otros períodos o indicadores, no dudes en preguntar. ¡Estoy aquí para ayudar!
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2?id5=SI&idSerie=F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T&cbFechaInicio=2010&cbFechaTermino=2020&cbFrecuencia=QUARTERLY&cbCalculo=PCT) del Banco Central de Chile.
+############################################################################################################################################
+
+Pregunta 9: Cuánto pesa el consumo en el PIB?
+series=None
+classification=indicator=pib frequency=q calc_mode=contribution activity=None activity_cls=none price=enc
+Respuesta:
+La participacion del PIB por componentes del gasto requiere revisar las series publicadas. Las series las puedes revisar en el siguiente cuadro segun los datos de la BDE publicados por el Banco Central de Chile: https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN_EP18_03_ratio
+############################################################################################################################################
+
+Pregunta 10: Cuánto pesa la inversión en Chile?
+series=None
+classification=indicator=None frequency=None calc_mode=None activity=None activity_cls=None price=None
+Respuesta:
+La participación de la inversión en el PIB de Chile puede variar según el período y las condiciones económicas. Para obtener datos específicos y actualizados sobre el peso de la inversión en el PIB, te recomiendo consultar las series publicadas en la Base de Datos Estadísticos (BDE) del Banco Central de Chile. Puedes acceder a la información en el siguiente enlace: [BDE - Banco Central de Chile](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN_EP18_03_ratio).
+
+Si necesitas más información o un análisis específico, no dudes en preguntar. ¡Estoy aquí para ayudar!
+############################################################################################################################################
+
+Pregunta 11: Qué porcentaje del PIB son las exportaciones?
+series=None
+classification=indicator=None frequency=None calc_mode=None activity=None activity_cls=None price=None
+Respuesta:
+En el año 2018, las exportaciones representaron un **28,5%** del PIB de Chile. Este porcentaje puede variar en años posteriores, por lo que para obtener datos actualizados, te recomiendo consultar las series publicadas en la Base de Datos Estadísticos (BDE) del Banco Central de Chile.
+
+Si necesitas más información o datos sobre otros períodos, no dudes en preguntar. ¡Estoy aquí para ayudarte!
+############################################################################################################################################
+
+Pregunta 12: Cuál es el PIB PER capita
+series=F032.PIB.PP.Z.USD.2018.Z.Z.0.A
+classification=indicator=pib frequency=a calc_mode=original activity=pib_percapita activity_cls=specific price=None
+Respuesta:
+El PIB per cápita para el año 2024 es de **16.586,36** USD. Este valor representa una disminución del 2,44% en comparación con el año anterior. 
+
+Si necesitas más información sobre otros indicadores o datos, no dudes en preguntar. ¡Estoy aquí para ayudar!
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_ESTADIST_MACRO/MN_EST_MACRO_IV/PEM_ACTyDDA_IndMacA_2_2018?id5=SI&idSerie=F032.PIB.PP.Z.USD.2018.Z.Z.0.A&cbFechaInicio=2015&cbFechaTermino=2025&cbFrecuencia=ANNUAL&cbCalculo=PCT) del Banco Central de Chile.
+############################################################################################################################################
+
+Pregunta 13: ii. Cual es el PIB per capita del 2025
+series=F032.PIB.PP.Z.USD.2018.Z.Z.0.A
+classification=indicator=pib frequency=a calc_mode=original activity=pib_percapita activity_cls=specific price=None
+Respuesta:
+Aún no se han publicado datos de PIB per cápita para el año 2025. Sin embargo, el último dato disponible corresponde al año 2024, donde el PIB per cápita fue de **16.586,36** USD, con una variación interanual de -2,44%. 
+
+Si necesitas más información o deseas consultar otros indicadores, no dudes en decírmelo.
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_ESTADIST_MACRO/MN_EST_MACRO_IV/PEM_ACTyDDA_IndMacA_2_2018?id5=SI&idSerie=F032.PIB.PP.Z.USD.2018.Z.Z.0.A&cbFechaInicio=2015&cbFechaTermino=2025&cbFrecuencia=ANNUAL&cbCalculo=PCT) del Banco Central de Chile.
+############################################################################################################################################
+
+Pregunta 14: Cual es el PIB per capita 2024
+series=F032.PIB.PP.Z.USD.2018.Z.Z.0.A
+classification=indicator=pib frequency=a calc_mode=original activity=pib_percapita activity_cls=specific price=None
+Respuesta:
+Para el año 2024, el PIB per cápita es de **16.586,36** USD. Este valor muestra una variación interanual de -2,44%, lo que indica una disminución respecto al año anterior. 
+
+Si necesitas más información o datos sobre otros indicadores, no dudes en preguntar.
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_ESTADIST_MACRO/MN_EST_MACRO_IV/PEM_ACTyDDA_IndMacA_2_2018?id5=SI&idSerie=F032.PIB.PP.Z.USD.2018.Z.Z.0.A&cbFechaInicio=2014&cbFechaTermino=2024&cbFrecuencia=ANNUAL&cbCalculo=PCT) del Banco Central de Chile.
+############################################################################################################################################
+
+Pregunta 15: Cual es el PIB per capita entre 2022 y 2025
+series=F032.PIB.PP.Z.USD.2018.Z.Z.0.A
+classification=indicator=pib frequency=a calc_mode=original activity=pib_percapita activity_cls=specific price=None
+Respuesta:
+Para el PIB per cápita, el valor promedio anual entre 2022 y 2025 es el siguiente:
+
+- En 2022, **15.415,65** USD, con una variación interanual de -5,16%.
+- En 2023, **17.001,34** USD, con un aumento interanual de 10,29%.
+- En 2024, **16.586,36** USD, con una variación interanual de -2,44%.
+
+Lamentablemente, no hay datos disponibles para el año 2025, ya que aún no se han publicado. Si necesitas más información o datos sobre otros indicadores, no dudes en preguntar.
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_ESTADIST_MACRO/MN_EST_MACRO_IV/PEM_ACTyDDA_IndMacA_2_2018?id5=SI&idSerie=F032.PIB.PP.Z.USD.2018.Z.Z.0.A&cbFechaInicio=2015&cbFechaTermino=2025&cbFrecuencia=ANNUAL&cbCalculo=PCT) del Banco Central de Chile.
+############################################################################################################################################

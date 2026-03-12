@@ -113,6 +113,31 @@
       {"id": "F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T", "short_title": "PIB a precios corrientes", "classification": {"seasonality": "nsa", "price": "co"}, "long_title": "PIB a precios corrientes"}
     ]
   },
+  "PIB per capita, referencia 2018 (USD)": {
+    "classification": {
+      "indicator": "pib",
+      "activity": "pib_percapita",
+      "calc_mode": ["original", "prev_period", "yoy"],
+      "seasonality": "nsa",
+      "has_activity": 1,
+      "has_region": 0,
+      "has_investment": 0
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_ESTADIST_MACRO/MN_EST_MACRO_IV/PEM_ACTyDDA_IndMacA_2_2018",
+    "series": [
+      {
+        "id": "F032.PIB.PP.Z.USD.2018.Z.Z.0.A",
+        "short_title": "PIB per capita",
+        "classification": {
+          "indicator": "pib",
+          "activity": "pib_percapita",
+          "frequency": "a",
+          "seasonality": "nsa"
+        },
+        "long_title": "PIB per capita"
+      }
+    ]
+  },
   "PIB por clase de actividad económica, a precios corrientes, series empalmadas, referencia 2018 (miles de millones de pesos)": {
     "classification": {
       "indicator": "pib",

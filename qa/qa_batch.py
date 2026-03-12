@@ -14,11 +14,12 @@ import argparse
 import io
 import json
 import os
+import re
 import sys
 from contextlib import redirect_stderr, redirect_stdout
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -89,57 +90,166 @@ def _load_metadata_keys(metadata_path: Path) -> set[str]:
     return keys
 
 
-def _run_trace_silent(question: str) -> tuple[str, str]:
+def _split_event(raw_event: Any) -> tuple[str | None, Any]:
+    mode = None
+    payload = raw_event
+    if isinstance(raw_event, tuple):
+        if len(raw_event) == 2 and isinstance(raw_event[0], str):
+            mode, payload = raw_event
+        elif len(raw_event) == 3 and isinstance(raw_event[1], str):
+            mode, payload = raw_event[1], raw_event[2]
+    return mode, payload
+
+
+def _extract_field(value: Any, field: str):
+    if isinstance(value, dict):
+        for key, nested in value.items():
+            if key == field:
+                yield nested
+            else:
+                yield from _extract_field(nested, field)
+    elif isinstance(value, (list, tuple)):
+        for item in value:
+            yield from _extract_field(item, field)
+
+
+def _iter_strings(payload: Any):
+    if payload is None:
+        return
+    if isinstance(payload, str):
+        yield payload
+    elif isinstance(payload, (list, tuple)):
+        for item in payload:
+            yield from _iter_strings(item)
+
+
+def _strip_streamlit_markers(text: str) -> str:
+    collecting_csv = False
+    collecting_chart = False
+    collecting_followup = False
+    out_lines: list[str] = []
+
+    for line in text.splitlines(keepends=True):
+        ls = line.strip()
+        if ls == "##CSV_DOWNLOAD_START":
+            collecting_csv = True
+            continue
+        if ls == "##CSV_DOWNLOAD_END":
+            collecting_csv = False
+            continue
+        if ls == "##CHART_START":
+            collecting_chart = True
+            continue
+        if ls == "##CHART_END":
+            collecting_chart = False
+            continue
+        if ls == "##FOLLOWUP_START":
+            collecting_followup = True
+            continue
+        if ls == "##FOLLOWUP_END":
+            collecting_followup = False
+            continue
+
+        if collecting_csv or collecting_chart or collecting_followup:
+            continue
+
+        out_lines.append(line)
+
+    cleaned = "".join(out_lines)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.strip()
+
+
+def _normalize_streamlit_output(text: str) -> str:
+    if not text:
+        return ""
+    normalized = text.replace("\\*", "*")
+    return _strip_streamlit_markers(normalized)
+
+
+def _run_trace_silent(
+    *,
+    graph: Any,
+    question: str,
+    session_id: str,
+    checkpoint_ns: str,
+) -> tuple[str, str]:
     sink_out = io.StringIO()
     sink_err = io.StringIO()
     with redirect_stdout(sink_out), redirect_stderr(sink_err):
-        os.environ["USE_JOINTBERT_CLASSIFIER"] = "false"
-
-        from orchestrator.graph.agent_graph import build_graph  # type: ignore
-
-        formatter: Callable[[Any], str] | None = None
-        try:
-            from qa.qa import _format_final_response as formatter  # type: ignore
-        except Exception:
-            try:
-                from qa import _format_final_response as formatter  # type: ignore
-            except Exception:
-                formatter = None
-
-        graph = build_graph()
         state: dict[str, Any] = {
             "question": question,
             "history": [],
-            "context": {"session_id": f"qa-batch-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S-%f')}"},
+            "context": {"session_id": session_id},
         }
         cfg = {
             "configurable": {
-                "thread_id": state["context"]["session_id"],
-                "checkpoint_ns": "memory",
+                "thread_id": session_id,
+                "checkpoint_ns": checkpoint_ns,
             },
         }
 
         current_state: dict[str, Any] = dict(state)
-        for event in graph.stream(state, config=cfg, stream_mode="updates"):
-            if not isinstance(event, dict):
-                continue
-            for _, delta in event.items():
-                if isinstance(delta, dict):
-                    current_state.update(delta)
+        final_output_text = ""
+        seen_stream_chunk_count = 0
 
-        final_output = current_state.get("output")
-        response = formatter(final_output) if callable(formatter) else str(final_output or "")
+        for event in graph.stream(state, config=cfg, stream_mode=["updates", "custom"]):
+            mode, payload = _split_event(event)
+
+            if mode in (None, "updates", "values") and isinstance(payload, dict):
+                for _, delta in payload.items():
+                    if isinstance(delta, dict):
+                        current_state.update(delta)
+
+            for chunk_payload in _extract_field(payload, "stream_chunks"):
+                payload_items = chunk_payload
+                if isinstance(chunk_payload, (list, tuple)):
+                    start_idx = seen_stream_chunk_count
+                    if start_idx < 0 or start_idx > len(chunk_payload):
+                        start_idx = len(chunk_payload)
+                    payload_items = chunk_payload[start_idx:]
+                    seen_stream_chunk_count = len(chunk_payload)
+
+                for chunk_text in _iter_strings(payload_items):
+                    if chunk_text:
+                        final_output_text += chunk_text
+
+        final_output = str(current_state.get("output") or "")
+        response_raw = final_output_text or final_output
+        response = _normalize_streamlit_output(response_raw)
         metadata_key = str(current_state.get("metadata_key") or "").strip()
         return response, metadata_key
 
 
-def _render_blocks(questions: list[str], metadata_keys: set[str]) -> str:
+def _render_blocks(
+    *,
+    graph: Any,
+    questions: list[str],
+    metadata_keys: set[str],
+    metadata_enabled: bool,
+    checkpoint_ns: str,
+    isolate_session_per_question: bool,
+) -> str:
     blocks: list[str] = []
+    batch_session_id = f"qa-batch-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S-%f')}"
+
     for idx, question in enumerate(questions, start=1):
-        response, metadata_key = _run_trace_silent(question)
+        session_id = (
+            f"{batch_session_id}-{idx}"
+            if isolate_session_per_question
+            else batch_session_id
+        )
+        response, metadata_key = _run_trace_silent(
+            graph=graph,
+            question=question,
+            session_id=session_id,
+            checkpoint_ns=checkpoint_ns,
+        )
         response = response.strip()
         key_display = metadata_key or "N/A"
-        if metadata_key and metadata_key in metadata_keys:
+        if not metadata_enabled:
+            key_status = "metadata_q.json no disponible (flujo usa catalogo/estado del grafo)"
+        elif metadata_key and metadata_key in metadata_keys:
             key_status = "llave encontrada en metadata_q.json"
         else:
             key_status = "llave no encontrada en metadata_q.json"
@@ -160,6 +270,19 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Ejecuta preguntas QA en batch y guarda response.txt")
     parser.add_argument("--input", "-i", default=None, help="Archivo de preguntas (default: questions.txt o question.txt)")
     parser.add_argument("--output", "-o", default=DEFAULT_OUTPUT, help="Archivo de salida (default: response.txt)")
+    parser.add_argument(
+        "--isolate-session-per-question",
+        action="store_true",
+        help=(
+            "Usa session_id diferente por pregunta (legacy). "
+            "Por defecto se reutiliza la misma sesion para homologar Streamlit."
+        ),
+    )
+    parser.add_argument(
+        "--checkpoint-ns",
+        default=os.getenv("LANGGRAPH_CHECKPOINT_NS", "memory"),
+        help="Namespace de checkpoints LangGraph (default: LANGGRAPH_CHECKPOINT_NS o 'memory').",
+    )
     return parser.parse_args()
 
 
@@ -172,16 +295,32 @@ def main() -> None:
     if not questions:
         raise ValueError(f"El archivo {input_path} no contiene preguntas válidas")
 
-    if not METADATA_PATH.exists():
-        raise FileNotFoundError(f"No se encontró metadata_q.json en: {METADATA_PATH}")
-    metadata_keys = _load_metadata_keys(METADATA_PATH)
+    # Paridad con Streamlit: misma bandera de clasificacion remota/local.
+    os.environ["USE_JOINTBERT_CLASSIFIER"] = os.getenv("USE_JOINTBERT_CLASSIFIER_STREAMLIT", "false")
 
-    rendered = _render_blocks(questions, metadata_keys)
+    from orchestrator.graph.agent_graph import build_graph  # type: ignore
+
+    graph = build_graph()
+
+    metadata_enabled = METADATA_PATH.exists()
+    metadata_keys = _load_metadata_keys(METADATA_PATH) if metadata_enabled else set()
+
+    rendered = _render_blocks(
+        graph=graph,
+        questions=questions,
+        metadata_keys=metadata_keys,
+        metadata_enabled=metadata_enabled,
+        checkpoint_ns=str(args.checkpoint_ns or "memory"),
+        isolate_session_per_question=bool(args.isolate_session_per_question),
+    )
     output_path.write_text(rendered, encoding="utf-8")
 
     print(f"Preguntas procesadas: {len(questions)}")
     print(f"Entrada: {input_path}")
     print(f"Salida: {output_path}")
+    print(f"Session mode: {'isolated' if args.isolate_session_per_question else 'shared (streamlit-like)'}")
+    print(f"Checkpoint namespace: {args.checkpoint_ns}")
+    print(f"metadata_q.json: {'disponible' if metadata_enabled else 'no disponible'}")
 
 
 if __name__ == "__main__":

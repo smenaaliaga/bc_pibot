@@ -1,3 +1,59 @@
+¿Cuál fue el último IMACEC?
+¿Dónde está el crecimiento de Chile?
+Cual es el valor del ultimo pib
+Cual es el valor del PIB 
+¿Dónde está el crecimiento mensual de Chile?
+¿Cuál es la diferencia entre el IMACEC y el PIB?
+¿Qué distingue al IMACEC del PIB en términos de periodicidad y alcance?
+¿Cuándo se publica el IMACEC?
+¿Cómo se define el PIB según las cuentas nacionales chilenas?
+¿Como se mide el PIB?
+¿Cuánto pesa minería en el PIB?
+Cual es el PIB per capita 
+¿Cuál es la importancia del IMACEC en la economía chilena?
+¿Cuál es la diferencia entre el IMACEC original y el IMACEC desestacionalizado?
+¿Cómo influye la actividad minera en el IMACEC?
+¿Qué sectores suelen tener mayor peso en el IMACEC?
+¿Cuál es la metodología del cálculo real del PIB?
+¿Dónde puedo ver el crecimiento de mi región?
+¿Dónde puedo ver el crecimiento por comuna?
+¿Cómo ha cambiado el producto interno bruto o PIB en el tiempo en la región?
+¿Dónde puedo ver el crecimiento de mi región por actividad?
+¿Cuál fue el último producto interno bruto o PIB per cápita o por persona?
+¿Dónde puedo ver la Demanda o el consumo total y la inversión?
+¿Cuál es el valor de la demanda interna?
+¿Cuál es el valor de la inversión?
+¿Cuál es el valor del consumo?
+¿Dónde está el calendario de publicación del IMACEC?
+¿Qué día se puede ver el IMACEC?
+¿Cómo afecta el PIB a las personas?
+¿Por qué es importante el PIB para las personas comunes?
+¿Qué no mide el IMACEC?
+¿Qué aspectos económicos no están reflejados en el IMACEC?
+¿Cómo se mide el PIB regional?
+¿Cuál es el año de referencia para medir el IMACEC?
+¿Qué referencia tiene el PIB vigente?
+Cuando cambia el año de referencia para medir el PIB y el IMACEC
+¿Con qué frecuencia se publica el PIB y el IMACEC?
+¿Existe el PIB mensual?
+¿Cuál es la diferencia entre el PIB mensual y el IMACEC?
+¿Cuál fue el resultado del PIB del último trimestre?
+¿Cómo se estiman las exportaciones e importaciones en el PIB?
+¿Qué diferencia existe entre el PIB nominal y real?
+¿Qué son las series encadenadas y por qué se usan?
+¿Qué es la formación bruta de capital fijo y cómo se mide?
+¿Qué sectores tienen mayor peso en el PIB regional?
+¿Qué fuentes clave alimentan las estimaciones del PIB regional en Chile?
+¿Cuál fue el producto interno bruto o PIB de Chile desestacionalizado?
+¿Cuál fue el valor del PIB a precios encadenados del mes pasado?
+¿Por qué se publica el IMACEC mensualmente y no trimestralmente como el PIB?
+¿Cuánto pesa minería?
+¿Cuál es el propósito de una Compilación de Referencia (CdeR)?
+¿Qué es el efecto calendario en la actividad económica?
+Cual es el valor del PIB a precios corrientes del 2020
+Cual es el pib del cuarto trimestre
+cual es el pib de 1925
+cual es el pib per capita del 2029
 cual fue ultimo producto interno bruto o PIB
 cual es el valor del PIB
 Cual es el valor del producto interno bruto
@@ -8,11 +64,11 @@ cual es el pib de la región de tarapacá
 cual es el pib de la región de antofagasta
 cual es el pib de la región de atacama
 cual es el pib de la región de coquimbo
- cual es el pib de la región de valparaiso
+cual es el pib de la región de valparaiso
 cual es el pib de la región metropolitana
 cual es el pib de la región de ohhiggins
 cual es el pib de la región del maule
- cual es el pib de la región del ñuble
+cual es el pib de la región del ñuble
 cual es el pib de la región del bio bio
 cual es el pib de la región de la araucanía
 cual es el pib de la región de los ríos
@@ -20,21 +76,3 @@ cual es el pib de la región de los lagos
 cual es el pib de la región de aysén
 cual es el pib de la región de magallanes
 Cual es el valor del pib regional
-Como ha cambiado el producto interno bruto 
-cuales son los valores del pib por actividad economica 
-cuales son los valores del pib regional por actividad economica trimestral de la region de arica
-cuales son los valores del pib regional por actividad economica trimestral de la region de tarapaca
-cuales son los valores del pib regional por actividad economica trimestral de la region de antofagasta
-cuales son los valores del pib regional por actividad economica trimestral de la region de atacama
-cuales son los valores del pib regional por actividad economica trimestral de coquimbo
-cuales son los valores del pib regional por actividad economica trimestral de valparaiso
-cuales son los valores del pib regional por actividad economica trimestral de la region metropolitana
-cuales son los valores del pib regional por actividad economica trimestral de la region de ohhigins
-cuales son los valores del pib regional por actividad economica trimestral de la region del maule
-cuales son los valores del pib regional por actividad economica trimestral de la region de ñuble
-cuales son los valores del pib regional por actividad economica trimestral de la region del bio bio
-cuales son los valores del pib regional por actividad economica trimestral de la region de araucania
-cuales son los valores del pib regional por actividad economica trimestral de la region de los rios
-cuales son los valores del pib regional por actividad economica trimestral de la region de los lagos
-cuales son los valores del pib regional por actividad economica trimestral de la region de aysen
-cuales son los valores del pib regional por actividad economica trimestral de la region de magallanes

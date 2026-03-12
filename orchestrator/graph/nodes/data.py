@@ -22,6 +22,8 @@ from ..state import AgentState, _clone_entities, _emit_stream_chunk
 from orchestrator.data._helpers import coerce_period, extract_year, first_non_empty, to_period_end_str, has_full_quarterly_year
 from orchestrator.data._business_rules import ResolvedEntities, apply_business_rules
 from orchestrator.catalog.catalog_lookup import lookup_series
+from orchestrator.utils.run_detail_log import append_run_detail
+from rules.business_rule import resolve_data_node_overrides
 
 logger = logging.getLogger(__name__)
 
@@ -349,9 +351,81 @@ def make_data_node(memory_adapter: Any):
     def data_node(state: AgentState, *, writer: Optional[StreamWriter] = None):
         # 1. Extraer entidades
         question, entities, ent = _extract_entities_from_state(state)
+        context = state.get("context") if isinstance(state, dict) else None
+        session_id = str((context or {}).get("session_id") or "")
 
         # 2. Aplicar reglas de negocio
         apply_business_rules(ent)
+
+        overrides = resolve_data_node_overrides(
+            question=question,
+            indicator_ent=ent.indicator_ent,
+            calc_mode_cls=ent.calc_mode_cls,
+            req_form_cls=ent.req_form_cls,
+            frequency_ent=ent.frequency_ent,
+        )
+        if "calc_mode_cls" in overrides:
+            ent.calc_mode_cls = overrides.get("calc_mode_cls")
+        if "frequency_ent" in overrides:
+            ent.frequency_ent = overrides.get("frequency_ent")
+        if "price" in overrides:
+            ent.price = overrides.get("price")
+        if "activity_ent" in overrides:
+            ent.activity_ent = overrides.get("activity_ent")
+        if "activity_cls" in overrides:
+            ent.activity_cls = overrides.get("activity_cls")
+        if "activity_cls_resolved" in overrides:
+            ent.activity_cls_resolved = overrides.get("activity_cls_resolved")
+        if "seasonality_ent" in overrides:
+            ent.seasonality_ent = overrides.get("seasonality_ent")
+        if "region_ent" in overrides:
+            ent.region_ent = overrides.get("region_ent")
+        if "region_cls" in overrides:
+            ent.region_cls = overrides.get("region_cls")
+        if "investment_ent" in overrides:
+            ent.investment_ent = overrides.get("investment_ent")
+        if "investment_cls" in overrides:
+            ent.investment_cls = overrides.get("investment_cls")
+
+        append_run_detail(
+            "data_post_rules",
+            {
+                "question": question,
+                "classification_post_rules": asdict(ent),
+                "overrides": overrides,
+            },
+            session_id=session_id,
+        )
+
+        short_circuit_message = str(overrides.get("short_circuit_message") or "").strip()
+        if short_circuit_message:
+            feature = str(overrides.get("feature") or "").strip()
+            logger.info("[DATA_NODE] short-circuit feature=%s", feature)
+
+            append_run_detail(
+                "data_short_circuit",
+                {
+                    "question": question,
+                    "feature": feature,
+                    "message": short_circuit_message,
+                    "message_final": short_circuit_message,
+                    "llm_rewrite": False,
+                    "classification_post_rules": asdict(ent),
+                },
+                session_id=session_id,
+            )
+            _emit_stream_chunk(short_circuit_message, writer)
+            pv = ent.period_ent or []
+            rf = str(ent.req_form_cls or "").strip().lower()
+            return {
+                "output": short_circuit_message,
+                "entities": entities,
+                "parsed_point": str(pv[-1]) if (rf != "range" and pv) else None,
+                "parsed_range": (str(pv[0]), str(pv[-1])) if pv else None,
+                "series": None,
+                "data_classification": asdict(ent),
+            }
+
         logger.info("[DATA_NODE] resolved entities (post-rules)=%s", asdict(ent))
         logger.info("[DATA_NODE] indicator=%s freq=%s activity=%s req_form=%s",
                     ent.indicator_ent, ent.frequency_ent, ent.activity_ent, ent.req_form_cls)
@@ -432,6 +506,12 @@ def make_data_node(memory_adapter: Any):
             "series_title": sl.target_series_title,
             "source_url": sl.source_url,
         }
+
+        append_run_detail(
+            "data_payload",
+            payload,
+            session_id=session_id,
+        )
 
         collected: List[str] = []
         try:

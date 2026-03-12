@@ -642,6 +642,8 @@ def lookup_series(ent: ResolvedEntities) -> SeriesLookupResult:
         "region": ent.region_ent,
         "investment": ent.investment_ent,
     }
+    if ent.price not in _EMPTY_CLS_VALUES:
+        series_eq["price"] = ent.price
 
     # Para contribuciones generales de PIB/IMACEC, ajustar la clave de actividad
     # al token que exista en la familia de series.

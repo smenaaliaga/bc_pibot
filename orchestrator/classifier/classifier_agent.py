@@ -12,6 +12,7 @@ from orchestrator.normalizer.normalizer import (
     normalize_entities,
 )
 from orchestrator.utils.http_client import post_json
+from orchestrator.utils.run_detail_log import append_run_detail
 from config import PREDICT_URL
 from registry import get_intent_router, get_series_interpreter
 
@@ -216,6 +217,69 @@ def _coerce_entities_payload(entities_payload: Any) -> Dict[str, List[str]]:
     return coerced
 
 
+def _format_mapped_params_table(mapped: Dict[str, Any], statuses: Dict[str, str]) -> List[str]:
+    rows: List[Tuple[str, str, str]] = []
+    for key in sorted(mapped.keys()):
+        status = str(statuses.get(key, "MISSING"))
+        raw_value = mapped.get(key)
+        value = "(empty)" if raw_value in (None, "", [], {}) else str(raw_value)
+        rows.append((str(key), status, value))
+
+    key_width = max(3, max((len(row[0]) for row in rows), default=0))
+    status_width = max(6, max((len(row[1]) for row in rows), default=0))
+    lines = [
+        f"{'Key':<{key_width}} | {'Status':<{status_width}} | Value",
+        f"{'-' * key_width}-+-{'-' * status_width}-+-{'-' * 5}",
+    ]
+    for key, status, value in rows:
+        lines.append(f"{key:<{key_width}} | {status:<{status_width}} | {value}")
+    return lines
+
+
+def _format_classification_header_table(
+    *,
+    intent: Any,
+    confidence: Any,
+    indicator: Any,
+    mapped: Dict[str, Any],
+) -> List[str]:
+    def _display(value: Any) -> str:
+        if value in (None, "", [], {}):
+            return "(empty)"
+        return str(value)
+
+    confidence_display = "(empty)"
+    if isinstance(confidence, (int, float)):
+        confidence_display = f"{float(confidence):.3f}"
+    elif confidence not in (None, ""):
+        confidence_display = str(confidence)
+
+    columns: List[Tuple[str, str]] = [
+        ("Intent", _display(intent)),
+        ("Confidence", confidence_display),
+        ("Indicator", _display(indicator)),
+        ("Macro", _display(mapped.get("macro_cls"))),
+        ("Context", _display(mapped.get("context_cls"))),
+        ("CalcMode", _display(mapped.get("calc_mode_cls"))),
+        ("ReqForm", _display(mapped.get("req_form_cls"))),
+        ("Frequency", _display(mapped.get("frequency"))),
+        ("Seasonality", _display(mapped.get("seasonality"))),
+        ("Activity", _display(mapped.get("activity_cls"))),
+        ("Region", _display(mapped.get("region_cls"))),
+        ("Investment", _display(mapped.get("investment_cls"))),
+    ]
+
+    widths = [max(len(header), len(value)) for header, value in columns]
+    header_line = " | ".join(
+        f"{header:<{width}}" for (header, _), width in zip(columns, widths)
+    )
+    separator = "-+-".join("-" * width for width in widths)
+    value_line = " | ".join(
+        f"{value:<{width}}" for (_, value), width in zip(columns, widths)
+    )
+    return [header_line, separator, value_line]
+
+
 def _classify_with_jointbert(question: str) -> ClassificationResult:
     """
     Clasificación usando APIs remotas (o modelo local si está habilitado).
@@ -357,13 +421,8 @@ def classify_question_with_history(
     )
     
     
-    # Fallback: asegurarse de que quede registrado en el archivo de log configurado por RUN_MAIN_LOG,
-    # pero sin truncar ni reescribir; solo append.
+    # Registrar detalle de clasificación usando el logger principal (sin escrituras manuales a run_main.log).
     try:
-        logs_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), "..", "logs")
-        os.makedirs(logs_dir, exist_ok=True)
-        fixed = os.getenv("RUN_MAIN_LOG", "").strip() or "run_main.log"
-        path = os.path.join(logs_dir, fixed)
         predict_raw = classification.predict_raw or {}
         interpretation = predict_raw.get("interpretation") if isinstance(predict_raw.get("interpretation"), dict) else predict_raw
         interpretation = interpretation if isinstance(interpretation, dict) else {}
@@ -404,31 +463,35 @@ def classify_question_with_history(
             key: "PRESENT" if value not in (None, "", [], {}) else "MISSING"
             for key, value in mapped.items()
         }
-        with open(path, "a", encoding="utf-8") as f:
-            f.write(
-                "[CLASSIFIER_FILE] intent=%s confidence=%.3f indicator=%s\n"
-                % (classification.intent, classification.confidence or 0.0, indicator)
-            )
-            f.write("[CLASSIFIER_FILE] PREDICT_RAW=%s\n" % (predict_raw,))
-            f.write("[CLASSIFIER_FILE] MAPPED_PARAMS=\n")
-            f.write("Key                                  | Status     | Value\n")
-            f.write("-------------------------------------+------------+--------------------------\n")
-            for key in sorted(mapped.keys()):
-                status = statuses.get(key, "MISSING")
-                raw_value = mapped.get(key)
-                value = "(empty)" if raw_value in (None, "", [], {}) else str(raw_value)
-                f.write(f"{key:<37} | {status:<10} | {value}\n")
-            f.write("[CLASSIFIER_FILE] PREDICT_RAW=%s\n" % (predict_raw,))
-            f.write("[CLASSIFIER_FILE] MAPPED_PARAMS=\n")
-            f.write("Key                                  | Status     | Value\n")
-            f.write("-------------------------------------+------------+--------------------------\n")
-            for key in sorted(mapped.keys()):
-                status = statuses.get(key, "MISSING")
-                raw_value = mapped.get(key)
-                value = "(empty)" if raw_value in (None, "", [], {}) else str(raw_value)
-                f.write(f"{key:<37} | {status:<10} | {value}\n")
-    except Exception:
-        pass
+        summary = {
+            "intent": classification.intent,
+            "confidence": classification.confidence,
+            "indicator": indicator,
+            "mapped": mapped,
+            "statuses": statuses,
+            "normalized": classification.normalized or {},
+            "predict_raw": predict_raw,
+        }
+        logger.info(
+            "[CLASSIFIER_TRACE] intent=%s confidence=%.3f indicator=%s",
+            classification.intent,
+            classification.confidence or 0.0,
+            indicator,
+        )
+        logger.info("[CLASSIFIER_TRACE] CLASSIFICATION_HEADER_TABLE")
+        for line in _format_classification_header_table(
+            intent=classification.intent,
+            confidence=classification.confidence,
+            indicator=indicator,
+            mapped=mapped,
+        ):
+            logger.info("[CLASSIFIER_TRACE] %s", line)
+        logger.info("[CLASSIFIER_TRACE] MAPPED_PARAMS_TABLE")
+        for line in _format_mapped_params_table(mapped, statuses):
+            logger.info("[CLASSIFIER_TRACE] %s", line)
+        append_run_detail("classifier_classification", summary)
+    except Exception as exc:
+        logger.warning("[CLASSIFIER_TRACE] no se pudo registrar tabla de parametros: %s", exc)
     history_text = _build_history_text(history)
     return classification, history_text
 

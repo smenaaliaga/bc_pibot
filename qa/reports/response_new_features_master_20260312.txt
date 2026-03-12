@@ -1,0 +1,121 @@
+Pregunta 1: Cuál es el PIB en pesos?
+Respuesta 1:
+El PIB a precios corrientes para el tercer trimestre de 2025 es de **81.906,24** miles de millones de pesos. Este valor muestra un crecimiento interanual del 8,71%, aunque presenta una disminución del 1,16% en comparación con el trimestre anterior. 
+
+Si necesitas más información sobre otros indicadores, no dudes en preguntar.
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2?id5=SI&idSerie=F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T&cbFechaInicio=2015&cbFechaTermino=2025&cbFrecuencia=QUARTERLY&cbCalculo=PCT) del Banco Central de Chile.
+
+Key 1: N/A
+Estado 1: metadata_q.json no disponible (flujo usa catalogo/estado del grafo)
+
+################################################################################################################################
+
+Pregunta 2: Cuánto es el PIB de Chile?
+Respuesta 2:
+El PIB a precios corrientes para el tercer trimestre de 2025 es de **81.906,24** miles de millones de pesos. Este valor muestra un crecimiento interanual del 8,71%, aunque presenta una disminución del 1,16% en comparación con el trimestre anterior. 
+
+Si necesitas más información sobre otros indicadores, no dudes en preguntar.
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2?id5=SI&idSerie=F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T&cbFechaInicio=2015&cbFechaTermino=2025&cbFrecuencia=QUARTERLY&cbCalculo=PCT) del Banco Central de Chile.
+
+Key 2: N/A
+Estado 2: metadata_q.json no disponible (flujo usa catalogo/estado del grafo)
+
+################################################################################################################################
+
+Pregunta 3: A cuánto asciende el PIB en Chile?
+Respuesta 3:
+El PIB en Chile para el tercer trimestre de 2025 asciende a **51.879,68** miles de millones de pesos encadenados. Este valor representa un crecimiento interanual de 1,58%, aunque muestra una disminución del 2,19% en comparación con el trimestre anterior. 
+
+Si necesitas más información sobre otros indicadores o periodos, no dudes en preguntar.
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2?id5=SI&idSerie=F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T&cbFechaInicio=2015&cbFechaTermino=2025&cbFrecuencia=QUARTERLY&cbCalculo=PCT) del Banco Central de Chile.
+
+Key 3: N/A
+Estado 3: metadata_q.json no disponible (flujo usa catalogo/estado del grafo)
+
+################################################################################################################################
+
+Pregunta 4: Cuánto pesa el consumo en el PIB?
+Respuesta 4:
+No encontré la serie de **PIB** solicitada en la Base de Datos Estadística del Banco Central. Puedes reformular tu pregunta o consultar el catálogo de series disponibles. Tambien puedes buscar y ver series en 🔗 [Catalogo BDE](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A).
+
+Key 4: N/A
+Estado 4: metadata_q.json no disponible (flujo usa catalogo/estado del grafo)
+
+################################################################################################################################
+
+Pregunta 5: Cuánto pesa el consumo en el PIB?
+Respuesta 5:
+No encontré la serie de **PIB** solicitada en la Base de Datos Estadística del Banco Central. Puedes reformular tu pregunta o consultar el catálogo de series disponibles. Tambien puedes buscar y ver series en 🔗 [Catalogo BDE](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A).
+
+Key 5: N/A
+Estado 5: metadata_q.json no disponible (flujo usa catalogo/estado del grafo)
+
+################################################################################################################################
+
+Pregunta 6: o Cuánto pesa la inversión en Chile?
+Respuesta 6:
+No tengo información específica sobre el peso de la inversión en el PIB de Chile en este momento. Sin embargo, generalmente, la inversión es un componente importante del PIB y puede variar según el contexto económico. Para obtener datos precisos, te recomendaría consultar la Base de Datos Estadística del Banco Central de Chile o informes económicos recientes.
+
+Si necesitas más información o tienes otra consulta, no dudes en preguntar.
+
+Key 6: N/A
+Estado 6: metadata_q.json no disponible (flujo usa catalogo/estado del grafo)
+
+################################################################################################################################
+
+Pregunta 7: Qué porcentaje del PIB son las exportaciones?
+Respuesta 7:
+En el año 2018, las exportaciones representaron un 28,5% del PIB en Chile. Si necesitas información más actualizada o sobre otros periodos, no dudes en preguntar.
+
+Key 7: N/A
+Estado 7: metadata_q.json no disponible (flujo usa catalogo/estado del grafo)
+
+################################################################################################################################
+
+Pregunta 8: Cuál es la participación de la inversión en el PIB?
+Respuesta 8:
+No encontré la serie de **PIB** solicitada en la Base de Datos Estadística del Banco Central. Puedes reformular tu pregunta o consultar el catálogo de series disponibles. Tambien puedes buscar y ver series en 🔗 [Catalogo BDE](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A).
+
+Key 8: N/A
+Estado 8: metadata_q.json no disponible (flujo usa catalogo/estado del grafo)
+
+################################################################################################################################
+
+Pregunta 9: Cuál es el PIB PER capita
+Respuesta 9:
+No tengo una serie de PIB per capita habilitada en el catalogo actual del chatbot. Si quieres, puedo entregarte el PIB total (a precios corrientes o encadenados) para el periodo que te interese.
+
+Key 9: N/A
+Estado 9: metadata_q.json no disponible (flujo usa catalogo/estado del grafo)
+
+################################################################################################################################
+
+Pregunta 10: ii. Cual es el PIB per capita del 2025
+Respuesta 10:
+No tengo una serie de PIB per capita habilitada en el catalogo actual del chatbot. Si quieres, puedo entregarte el PIB total (a precios corrientes o encadenados) para el periodo que te interese.
+
+Key 10: N/A
+Estado 10: metadata_q.json no disponible (flujo usa catalogo/estado del grafo)
+
+################################################################################################################################
+
+Pregunta 11: iii. Cual es el PIB per capita 2024
+Respuesta 11:
+No tengo una serie de PIB per capita habilitada en el catalogo actual del chatbot. Si quieres, puedo entregarte el PIB total (a precios corrientes o encadenados) para el periodo que te interese.
+
+Key 11: N/A
+Estado 11: metadata_q.json no disponible (flujo usa catalogo/estado del grafo)
+
+################################################################################################################################
+
+Pregunta 12: Iv. Cual es el PIB per capita entre 2022 y 2025
+Respuesta 12:
+No tengo una serie de PIB per capita habilitada en el catalogo actual del chatbot. Si quieres, puedo entregarte el PIB total (a precios corrientes o encadenados) para el periodo que te interese.
+
+Key 12: N/A
+Estado 12: metadata_q.json no disponible (flujo usa catalogo/estado del grafo)
+
+################################################################################################################################

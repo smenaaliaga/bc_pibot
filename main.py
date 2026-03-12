@@ -15,7 +15,6 @@ from typing import List, Dict, Optional, Any
 import uuid
 import os
 import logging
-import datetime
 import json
 from urllib.parse import urlsplit, urlunsplit
 
@@ -27,6 +26,7 @@ from config import get_settings, PREDICT_URL
 from registry import warmup_models
 import app
 from orchestrator.utils.http_client import get_json
+from orchestrator.utils.run_detail_log import append_run_detail
 
 
 def _health_url_from_predict_url(predict_url: str) -> str:
@@ -82,6 +82,127 @@ def _log_remote_model_health(logger: logging.LoggerAdapter) -> None:
     )
 
 
+def _extract_classification_payload(classification: Any) -> Dict[str, Any]:
+    if classification is None:
+        return {}
+    return {
+        "intent": getattr(classification, "intent", None),
+        "confidence": getattr(classification, "confidence", None),
+        "entities": getattr(classification, "entities", None),
+        "normalized": getattr(classification, "normalized", None),
+        "macro": getattr(classification, "macro", None),
+        "context": getattr(classification, "context", None),
+        "calc_mode": getattr(classification, "calc_mode", None),
+        "activity": getattr(classification, "activity", None),
+        "region": getattr(classification, "region", None),
+        "investment": getattr(classification, "investment", None),
+        "req_form": getattr(classification, "req_form", None),
+        "words": getattr(classification, "words", None),
+        "slot_tags": getattr(classification, "slot_tags", None),
+        "predict_raw": getattr(classification, "predict_raw", None),
+    }
+
+
+def _strip_streamlit_markers(text: str) -> str:
+    collecting_csv = False
+    collecting_chart = False
+    collecting_followup = False
+    out_lines: List[str] = []
+
+    for line in str(text or "").splitlines(keepends=True):
+        ls = line.strip()
+        if ls == "##CSV_DOWNLOAD_START":
+            collecting_csv = True
+            continue
+        if ls == "##CSV_DOWNLOAD_END":
+            collecting_csv = False
+            continue
+        if ls == "##CHART_START":
+            collecting_chart = True
+            continue
+        if ls == "##CHART_END":
+            collecting_chart = False
+            continue
+        if ls == "##FOLLOWUP_START":
+            collecting_followup = True
+            continue
+        if ls == "##FOLLOWUP_END":
+            collecting_followup = False
+            continue
+
+        if collecting_csv or collecting_chart or collecting_followup:
+            continue
+
+        out_lines.append(line)
+
+    cleaned = "".join(out_lines)
+    return cleaned.replace("\\*", "*").strip()
+
+
+def _log_streamlit_response_block(logger: logging.LoggerAdapter, question: str, response: str) -> None:
+    """Registra en run_main.log la respuesta final con formato legible tipo Streamlit."""
+    compact_question = " ".join(str(question or "").split())
+    logger.info("[QA_TRACE] STREAMLIT_RESPONSE question=%s", compact_question[:180])
+    logger.info("[QA_TRACE] STREAMLIT_RESPONSE_BEGIN")
+
+    text = str(response or "").strip()
+    if not text:
+        logger.info("[QA_TRACE] (sin respuesta)")
+    else:
+        for line in text.splitlines():
+            logger.info("[QA_TRACE] %s", line)
+
+    logger.info("[QA_TRACE] STREAMLIT_RESPONSE_END")
+
+
+def _extract_marker_blocks(text: str, *, start_marker: str, end_marker: str) -> List[str]:
+    blocks: List[str] = []
+    source = str(text or "")
+    cursor = 0
+
+    while True:
+        start_idx = source.find(start_marker, cursor)
+        if start_idx < 0:
+            break
+        end_idx = source.find(end_marker, start_idx)
+        if end_idx < 0:
+            break
+        end_idx += len(end_marker)
+        block = source[start_idx:end_idx]
+        if not block.endswith("\n"):
+            block += "\n"
+        blocks.append(block)
+        cursor = end_idx
+
+    return blocks
+
+
+def _missing_followup_blocks(streamed_text: str, state_output: str) -> List[str]:
+    streamed_blocks = _extract_marker_blocks(
+        streamed_text,
+        start_marker="##FOLLOWUP_START",
+        end_marker="##FOLLOWUP_END",
+    )
+    state_blocks = _extract_marker_blocks(
+        state_output,
+        start_marker="##FOLLOWUP_START",
+        end_marker="##FOLLOWUP_END",
+    )
+    if not state_blocks:
+        return []
+
+    streamed_signatures = {block.strip() for block in streamed_blocks if block.strip()}
+    missing: List[str] = []
+    for block in state_blocks:
+        signature = block.strip()
+        if not signature or signature in streamed_signatures:
+            continue
+        streamed_signatures.add(signature)
+        missing.append(block)
+
+    return missing
+
+
 def main() -> None:
     """Punto de entrada principal."""
     # Cargar variables de entorno desde .env
@@ -113,13 +234,9 @@ def main() -> None:
     # Configurar logger local por ejecución
     logs_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), "logs")
     os.makedirs(logs_dir, exist_ok=True)
-    ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    # Permite forzar un único archivo de log entre reruns (útil en Streamlit)
-    fixed_log = os.getenv("RUN_MAIN_LOG", "").strip()
-    if fixed_log:
-        log_path = os.path.join(logs_dir, fixed_log)
-    else:
-        log_path = os.path.join(logs_dir, f"run_main_{ts}.log")
+    # Usar siempre un único archivo de log en logs/.
+    fixed_log = os.getenv("RUN_MAIN_LOG", "").strip() or "run_main.log"
+    log_path = os.path.join(logs_dir, fixed_log)
     logging.basicConfig(
         level=os.getenv("LOG_LEVEL", "INFO"),
         format="%(asctime)s | %(levelname)s | %(name)s | session=%(session_id)s | %(message)s",
@@ -232,6 +349,16 @@ def main() -> None:
         thread_id = session_id or f"graph-session-{uuid.uuid4().hex}"
         checkpoint_ns = os.getenv("LANGGRAPH_CHECKPOINT_NS", "memory")
         logger.info(f"[STREAM] session={thread_id} question={question[:80]}")
+        logger.info("[QA_TRACE] QUESTION_BEGIN session=%s question=%s", thread_id, " ".join(str(question).split())[:180])
+        append_run_detail(
+            "stream_start",
+            {
+                "question": question,
+                "history_len": len(history or []),
+                "checkpoint_ns": checkpoint_ns,
+            },
+            session_id=thread_id,
+        )
         state = {
             "question": question,
             "history": history or [],
@@ -275,7 +402,42 @@ def main() -> None:
                         final_output = delta.get("output")
                     if final_output is None:
                         final_output = current_state.get("output")
-                    logger.info("[QA_TRACE] RESPUESTA_FINAL=%s", _safe_json(final_output))
+                    logger.info("[QA_TRACE] RESPUESTA_FINAL_RAW_TYPE=%s", type(final_output).__name__)
+
+                if node_name == "classify":
+                    classification = None
+                    if isinstance(delta, dict):
+                        classification = delta.get("classification")
+                    if classification is None:
+                        classification = current_state.get("classification")
+                    append_run_detail(
+                        "classification_detail",
+                        {
+                            "question": question,
+                            "classification": _extract_classification_payload(classification),
+                        },
+                        session_id=thread_id,
+                    )
+
+                if node_name == "data":
+                    data_cls = None
+                    data_series = None
+                    if isinstance(delta, dict):
+                        data_cls = delta.get("data_classification")
+                        data_series = delta.get("series")
+                    if data_cls is None:
+                        data_cls = current_state.get("data_classification")
+                    if data_series is None:
+                        data_series = current_state.get("series")
+                    append_run_detail(
+                        "data_state",
+                        {
+                            "question": question,
+                            "series": data_series,
+                            "data_classification": data_cls,
+                        },
+                        session_id=thread_id,
+                    )
 
                 if isinstance(delta, dict):
                     current_state.update(delta)
@@ -353,6 +515,30 @@ def main() -> None:
                         for out_text in _iter_strings(out_payload):
                             if isinstance(out_text, str):
                                 final_output_text = out_text
+
+            state_output_text = str(current_state.get("output") or "")
+            if got_any and state_output_text:
+                # El output final del nodo memory puede incluir followups que no se emitieron como chunks.
+                for followup_block in _missing_followup_blocks(
+                    streamed_text=final_output_text,
+                    state_output=state_output_text,
+                ):
+                    final_output_text += followup_block
+                    yield followup_block
+
+            final_output_raw = final_output_text or state_output_text
+            streamlit_like = _strip_streamlit_markers(final_output_raw)
+            _log_streamlit_response_block(logger, question, streamlit_like)
+            append_run_detail(
+                "streamlit_response",
+                {
+                    "question": question,
+                    "response": streamlit_like,
+                },
+                session_id=thread_id,
+            )
+            logger.info("[QA_TRACE] QUESTION_END session=%s", thread_id)
+
             if not got_any:
                 if final_output_text:
                     yield final_output_text
@@ -360,6 +546,14 @@ def main() -> None:
                     logger.warning("[STREAM_EMPTY] no chunks produced for session=%s", session_id)
         except Exception as e:
             logger.exception("stream_fn graph stream failed: %s", e)
+            append_run_detail(
+                "stream_error",
+                {
+                    "question": question,
+                    "error": str(e),
+                },
+                session_id=thread_id,
+            )
             yield "No pude generar una respuesta."
 
     def invoke_fn(question: str, history: Optional[List[Dict[str, str]]] = None) -> str:

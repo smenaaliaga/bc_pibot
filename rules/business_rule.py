@@ -6,8 +6,10 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 import re
 import time
+import unicodedata
 from pathlib import Path
 from typing import Any, Dict, Iterable, Optional, List
 
@@ -43,6 +45,46 @@ CALC_MODE_PREV_PATTERN = re.compile(
     r"\b(periodo\s+anterior|per[ií]odo\s+anterior|trimestre\s+anterior|mes\s+anterior|qoq|mom|t/t|m/m|c/r\s+al\s+periodo\s+anterior|c/r\s+al\s+per[ií]odo\s+anterior)\b",
     re.IGNORECASE,
 )
+
+PIB_CURRENT_PRICE_PATTERN = re.compile(
+    r"\b(precios?\s+corrientes?|corriente|nominal|en\s+pesos?|asciende)\b",
+    re.IGNORECASE,
+)
+PIB_SHARE_PATTERN = re.compile(
+    r"(\bparticipacion\b|\bcuanto\s+pesa\b|\bpesa\b|\bque\s+porcentaje\b|\bporcentaje\b)",
+    re.IGNORECASE,
+)
+PIB_SHARE_GASTO_PATTERN = re.compile(
+    r"\b(consumo|inversion|exportaciones?|importaciones?|demanda\s+interna)\b",
+    re.IGNORECASE,
+)
+PIB_PER_CAPITA_PATTERN = re.compile(
+    r"\b(per\s*capita|por\s+persona)\b",
+    re.IGNORECASE,
+)
+
+PIB_PER_CAPITA_UNAVAILABLE_MESSAGE = (
+    "No tengo una serie de PIB per capita habilitada en el catalogo actual del chatbot. "
+    "Si quieres, puedo entregarte el PIB total (a precios corrientes o encadenados) "
+    "para el periodo que te interese."
+)
+
+PIB_SHARE_GASTO_UNAVAILABLE_MESSAGE = (
+    "La participacion del PIB por componentes del gasto requiere revisar las series "
+    "publicadas. Las series las puedes revisar en el siguiente cuadro segun los datos "
+    "de la BDE publicados por el Banco Central de Chile: "
+    "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN_EP18_03_ratio"
+)
+
+RULE_TOGGLES_PATH_ENV = "PIBOT_RULE_TOGGLES_PATH"
+RULE_TOGGLES_FILENAME = "rule_toggles.json"
+
+_RULE_TOGGLE_KEY_ALIASES: Dict[str, str] = {
+    "pib_corrientes": "ENABLE_RULE_PIB_CORRIENTES",
+    "pib_share": "ENABLE_RULE_PIB_SHARE",
+    "pib_per_capita": "ENABLE_RULE_PIB_PER_CAPITA",
+    "pib_share_gasto_guardrail": "ENABLE_RULE_PIB_SHARE_GASTO_GUARDRAIL",
+}
 
 
 def _first_or_none(value: Any) -> Any:
@@ -481,3 +523,149 @@ def resolve_pib_annual_validity(
         "max_valid_year": max_valid_year,
         "resolved_period": [f"{requested_year:04d}-01-01", f"{requested_year:04d}-12-31"],
     }
+
+
+def _env_flag(name: str, default: bool) -> bool:
+    # 1) Prioridad: variable de entorno explícita.
+    raw = os.getenv(name)
+    if raw is None:
+        # 2) Fallback: archivo JSON de toggles en rules/.
+        toggles = _load_rule_toggles()
+        if name in toggles:
+            return toggles[name]
+        # 3) Fallback final: valor por defecto del código.
+        return default
+    return str(raw).strip().lower() in {"1", "true", "yes", "on", "si"}
+
+
+def _resolve_rule_toggles_path() -> Path:
+    raw = str(os.getenv(RULE_TOGGLES_PATH_ENV, "")).strip()
+    if raw:
+        return Path(raw)
+    return Path(__file__).resolve().parent / RULE_TOGGLES_FILENAME
+
+
+def _coerce_bool(value: Any) -> Optional[bool]:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"1", "true", "yes", "on", "si"}:
+            return True
+        if normalized in {"0", "false", "no", "off"}:
+            return False
+    return None
+
+
+def _load_rule_toggles() -> Dict[str, bool]:
+    path = _resolve_rule_toggles_path()
+    if not path.exists() or not path.is_file():
+        return {}
+
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+    if not isinstance(payload, dict):
+        return {}
+
+    # Permite dos formatos:
+    # - {"rules": {"pib_corrientes": true, ...}}
+    # - {"ENABLE_RULE_PIB_CORRIENTES": true, ...}
+    source = payload.get("rules") if isinstance(payload.get("rules"), dict) else payload
+    if not isinstance(source, dict):
+        return {}
+
+    result: Dict[str, bool] = {}
+    for raw_key, raw_value in source.items():
+        key = str(raw_key).strip()
+        if not key:
+            continue
+        parsed = _coerce_bool(raw_value)
+        if parsed is None:
+            continue
+        target_key = _RULE_TOGGLE_KEY_ALIASES.get(key, key)
+        result[target_key] = parsed
+
+    return result
+
+
+def _normalize_for_matching(text: str) -> str:
+    lowered = str(text or "").lower()
+    no_accents = "".join(
+        ch
+        for ch in unicodedata.normalize("NFD", lowered)
+        if unicodedata.category(ch) != "Mn"
+    )
+    return re.sub(r"\s+", " ", no_accents).strip()
+
+
+def resolve_data_node_overrides(
+    *,
+    question: str,
+    indicator_ent: Any,
+    calc_mode_cls: Any,
+    req_form_cls: Any,
+    frequency_ent: Any,
+) -> Dict[str, Any]:
+    """Resuelve overrides de negocio para el nodo DATA.
+
+    Feature flags (env):
+    - ``ENABLE_RULE_PIB_CORRIENTES`` (default: true)
+    - ``ENABLE_RULE_PIB_SHARE`` (default: true)
+    - ``ENABLE_RULE_PIB_PER_CAPITA`` (default: true)
+    """
+
+    indicator = str(indicator_ent or "").strip().lower()
+    if indicator != "pib":
+        return {}
+
+    normalized_q = _normalize_for_matching(question)
+    result: Dict[str, Any] = {}
+
+    enable_corrientes = _env_flag("ENABLE_RULE_PIB_CORRIENTES", True)
+    enable_share = _env_flag("ENABLE_RULE_PIB_SHARE", True)
+    enable_share_gasto_guardrail = _env_flag("ENABLE_RULE_PIB_SHARE_GASTO_GUARDRAIL", True)
+    enable_per_capita = _env_flag("ENABLE_RULE_PIB_PER_CAPITA", True)
+
+    if enable_per_capita and PIB_PER_CAPITA_PATTERN.search(normalized_q):
+        # Enruta a la serie anual de PIB per capita (USD) sin activar guardrail.
+        result["activity_ent"] = "pib_percapita"
+        result["activity_cls"] = "specific"
+        result["activity_cls_resolved"] = "specific"
+        # En conversacion multi-turno pueden venir arrastres de region/inversion.
+        # Para PIB per capita se fuerza el agregado nacional sin desglose.
+        result["region_ent"] = None
+        result["region_cls"] = "none"
+        result["investment_ent"] = None
+        result["investment_cls"] = "none"
+        result["frequency_ent"] = "a"
+        result["seasonality_ent"] = "nsa"
+        result["price"] = None
+        result["feature"] = "pib_per_capita"
+        return result
+
+    if enable_share and PIB_SHARE_PATTERN.search(normalized_q):
+        if enable_share_gasto_guardrail and PIB_SHARE_GASTO_PATTERN.search(normalized_q):
+            result["short_circuit_message"] = PIB_SHARE_GASTO_UNAVAILABLE_MESSAGE
+            result["feature"] = "pib_share_gasto_unavailable"
+            return result
+        result["calc_mode_cls"] = "share"
+        # Las familias de participacion de PIB disponibles en catalogo son anuales.
+        result["frequency_ent"] = "a"
+        result["price"] = "co"
+        result["feature"] = "pib_share"
+
+    if enable_corrientes and PIB_CURRENT_PRICE_PATTERN.search(normalized_q):
+        result["price"] = "co"
+        if "feature" not in result:
+            result["feature"] = "pib_corrientes"
+
+    # Permite ajustes futuros por req_form/frequency si se necesita granularidad extra.
+    _ = str(req_form_cls or "").strip().lower()
+    _ = str(frequency_ent or "").strip().lower()
+
+    return result

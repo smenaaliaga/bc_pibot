@@ -1,0 +1,7 @@
+{
+  "rules": {
+    "pib_corrientes": true,
+    "pib_share": true,
+    "pib_per_capita": true
+  }
+}

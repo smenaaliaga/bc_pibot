@@ -13,10 +13,13 @@ encuentra la serie solicitada.
 
 from __future__ import annotations
 
+import csv
+import datetime
 import logging
 import os
 import re
 from dataclasses import asdict
+from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from langgraph.types import StreamWriter
@@ -276,6 +279,23 @@ presenta cada trimestre disponible con su variación interanual.
 """
 
 
+_TEMPLATE_REWRITE_SYSTEM_PROMPT = """\
+Eres un analista económico del Banco Central de Chile.
+
+Tu tarea es redactar una respuesta en español tomando como base una plantilla (template)
+de respuesta de negocio.
+
+Reglas obligatorias:
+- Mantén el MISMO significado y la MISMA restricción de la plantilla base.
+- No inventes datos, series, cifras ni enlaces adicionales.
+- Reescribe con redacción natural y profesional para que sea similar, pero no idéntica,
+  al template base en cada ejecución.
+- Extensión objetivo: 2 a 4 oraciones.
+- Si se indica una URL obligatoria, inclúyela exactamente una vez y sin modificarla.
+- No uses listas con viñetas salvo que sea estrictamente necesario.
+"""
+
+
 _CONTRIBUTION_PROMPT = """\
 
 Reglas adicionales para consultas de contribución:
@@ -310,11 +330,13 @@ adicional separado.
 
 _CALC_MODE_FIELD_RULES = {
     "original": (
-        "value",
-        "El campo principal a reportar es 'value' (nivel del indicador). "
-        "PRESENTA PRIMERO el campo 'value' como el dato principal. "
-        "En el primer párrafo pon en **negrita** ese valor (e.g. **72,48**). "
-        "Las variaciones (yoy_pct, pct) son secundarias y opcionales."
+        "yoy_pct",
+        "El campo principal a reportar es 'yoy_pct' (variación interanual). "
+        "PRESENTA PRIMERO el campo 'yoy_pct' como el dato principal. "
+        "En el primer párrafo pon en **negrita** ese valor (e.g. **6,9%**). "
+        "Como dato complementario, menciona 'pct' (variación respecto al período anterior) "
+        "si está disponible. NO menciones el 'value' ni la cifra absoluta, "
+        "salvo que el usuario lo pida explícitamente."
     ),
     "yoy": (
         "yoy_pct",
@@ -551,6 +573,56 @@ def _normalize_req_form(value: Any) -> str:
     return str(value or "").strip().lower()
 
 
+def _extract_first_url(text: str) -> Optional[str]:
+    match = re.search(r"https?://[^\s)]+", str(text or ""))
+    if not match:
+        return None
+    return str(match.group(0)).strip()
+
+
+def _build_template_rewrite_messages(payload: Dict[str, Any]) -> list:
+    """Construye mensajes para reescritura LLM de templates de negocio."""
+    if SystemMessage is None or HumanMessage is None:
+        return []
+
+    question = str(payload.get("question") or "").strip()
+    template = str(payload.get("response_template") or "").strip()
+    if not template:
+        return []
+
+    feature = str(payload.get("response_feature") or "").strip()
+    required_url = _extract_first_url(template)
+
+    user_parts: List[str] = [
+        f"Consulta original del usuario: {question or '(sin pregunta)'}",
+        f"Feature de negocio: {feature or 'general'}",
+        "",
+        "Template base (debes conservar su significado, sin copiar literal):",
+        template,
+    ]
+
+    if required_url:
+        user_parts.extend(
+            [
+                "",
+                f"URL obligatoria a mantener exactamente: {required_url}",
+            ]
+        )
+
+    user_parts.extend(
+        [
+            "",
+            "Devuelve solo el texto final para el usuario.",
+        ]
+    )
+
+    user_content = "\n".join(user_parts)
+    return [
+        SystemMessage(content=_TEMPLATE_REWRITE_SYSTEM_PROMPT),
+        HumanMessage(content=user_content),
+    ]
+
+
 def _iter_observations(obs_raw: Any) -> Iterable[Dict[str, Any]]:
     """Itera observaciones sin importar si vienen planas o agrupadas por frecuencia."""
     if isinstance(obs_raw, list):
@@ -678,6 +750,10 @@ def _detect_period_mismatch(
 
 def _build_messages(payload: Dict[str, Any]) -> list:
     """Construye la lista de mensajes (system + user) para el LLM."""
+    response_template = str(payload.get("response_template") or "").strip()
+    if response_template:
+        return _build_template_rewrite_messages(payload)
+
     question = payload.get("question", "")
     classification = payload.get("classification") or {}
     payload_price = str(payload.get("price") or "").strip().lower()
@@ -712,7 +788,7 @@ def _build_messages(payload: Dict[str, Any]) -> list:
             preferred_series_id=str(series_id or "") or None,
         )
         if latest_hint is not None:
-            _primary_field_name = _CALC_MODE_FIELD_RULES.get(cm, ("value",))[0]
+            _primary_field_name = _CALC_MODE_FIELD_RULES.get(cm, ("yoy_pct",))[0]
             system_content += (
                 "\n\nRegla para consultas latest: menciona explícitamente el último "
                 f"dato observado (fecha y campo '{_primary_field_name}') provisto en el contexto de datos."
@@ -741,20 +817,45 @@ def _build_messages(payload: Dict[str, Any]) -> list:
         user_content += f"Precio PIB solicitado: {price}\n"
     if latest_hint is not None:
         latest_date, latest_value, _latest_series_id = latest_hint
-        # Determinar campo prioritario según calc_mode
-        _primary_field = {"yoy": "yoy_pct", "prev_period": "pct"}.get(cm, "value")
-        _primary_value = latest_value
+        _preferred_primary_field = _CALC_MODE_FIELD_RULES.get(cm, ("yoy_pct",))[0]
+        _selected_field = _preferred_primary_field
+        _selected_value: Any = None
         _entry = observations.get(str(_latest_series_id), {})
         for _obs in _iter_observations(_entry.get("observations")):
-            if str(_obs.get("date", ""))[:10] == latest_date[:10]:
-                _primary_value = _obs.get(_primary_field, latest_value)
-                break
+            if str(_obs.get("date", ""))[:10] != latest_date[:10]:
+                continue
+
+            _candidate_fields = [_preferred_primary_field]
+            if _preferred_primary_field == "yoy_pct":
+                _candidate_fields.append("pct")
+            elif _preferred_primary_field == "pct":
+                _candidate_fields.append("yoy_pct")
+            _candidate_fields.append("value")
+
+            for _candidate_field in _candidate_fields:
+                _candidate_value = _obs.get(_candidate_field)
+                if _candidate_value not in (None, "", [], {}):
+                    _selected_field = _candidate_field
+                    _selected_value = _candidate_value
+                    break
+            break
+
+        if _selected_value in (None, "", [], {}):
+            _selected_field = "value"
+            _selected_value = latest_value
+
+        _value_rule_text = (
+            "NO menciones el nivel del índice (value) ni cifras absolutas, salvo que el usuario lo pida explícitamente."
+            if _selected_field != "value"
+            else "Menciona el nivel del índice (value) solo de forma excepcional, porque no hay variaciones disponibles."
+        )
+
         user_content += (
             f"Consulta latest detectada. El último dato disponible es: "
-            f"fecha={latest_date}, {_primary_field}={_primary_value}. "
-            f"DEBES mencionar {_primary_field}={_primary_value} como el valor "
+            f"fecha={latest_date}, {_selected_field}={_selected_value}. "
+            f"DEBES mencionar {_selected_field}={_selected_value} como el valor "
             f"principal en el primer párrafo (en negrita). "
-            f"El nivel del índice (value={latest_value}) menciónalo al final si es relevante.\n"
+            f"{_value_rule_text}\n"
         )
     user_content += f"\nDatos disponibles:\n{obs_text}"
 
@@ -792,6 +893,153 @@ def _build_source_footer(payload: Dict[str, Any]) -> Optional[str]:
     )
 
 
+def _flatten_observations_for_csv(
+    observations: Dict[str, Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Aplana observaciones por serie en filas tabulares para exportar CSV.
+
+    Incluye tanto observaciones planas (lista) como agrupadas por frecuencia
+    (dict con subclaves A/Q/M u otras).
+    """
+    if not isinstance(observations, dict) or not observations:
+        return []
+
+    rows: List[Dict[str, Any]] = []
+
+    for series_id, entry in observations.items():
+        if not isinstance(entry, dict):
+            continue
+
+        meta = entry.get("meta")
+        if not isinstance(meta, dict):
+            meta = {}
+
+        series_title = (
+            meta.get("descripEsp")
+            or meta.get("descripIng")
+            or str(series_id)
+        )
+        base_frequency = str(
+            meta.get("target_frequency")
+            or meta.get("original_frequency")
+            or ""
+        ).upper()
+
+        def _append_row(obs: Dict[str, Any], frequency: str) -> None:
+            if not isinstance(obs, dict):
+                return
+            rows.append(
+                {
+                    "series_id": str(series_id),
+                    "series_title": str(series_title),
+                    "frequency": str(frequency or ""),
+                    "date": str(obs.get("date") or "")[:10],
+                    "value": obs.get("value"),
+                    "yoy_pct": obs.get("yoy_pct"),
+                    "pct": obs.get("pct"),
+                }
+            )
+
+        obs_raw = entry.get("observations")
+        if isinstance(obs_raw, list):
+            for obs in obs_raw:
+                _append_row(obs, base_frequency)
+            continue
+
+        if isinstance(obs_raw, dict):
+            for freq_key, subset in obs_raw.items():
+                if not isinstance(subset, list):
+                    continue
+                freq = str(freq_key or base_frequency or "").upper()
+                for obs in subset:
+                    _append_row(obs, freq)
+
+    rows.sort(
+        key=lambda row: (
+            str(row.get("series_title") or "").lower(),
+            str(row.get("date") or ""),
+            str(row.get("series_id") or ""),
+            str(row.get("frequency") or ""),
+        )
+    )
+    return rows
+
+
+def _export_observations_csv(
+    rows: List[Dict[str, Any]],
+    *,
+    root_dir: Optional[Path] = None,
+) -> Optional[Path]:
+    """Exporta filas tabulares a un CSV en logs/exports."""
+    if not rows:
+        return None
+
+    project_root = root_dir or Path(__file__).resolve().parents[2]
+    export_dir = project_root / "logs" / "exports"
+    export_dir.mkdir(parents=True, exist_ok=True)
+
+    ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
+    output_path = export_dir / f"series_export_{ts}.csv"
+
+    fieldnames = ["series_id", "series_title", "frequency", "date", "value", "yoy_pct", "pct"]
+
+    with output_path.open("w", encoding="utf-8", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({field: row.get(field, "") for field in fieldnames})
+
+    return output_path
+
+
+def _build_csv_download_marker(
+    *,
+    csv_path: Path,
+    filename: Optional[str] = None,
+    label: Optional[str] = None,
+) -> str:
+    """Construye un bloque marker consumible por la UI para descarga CSV."""
+    resolved_filename = str(filename or csv_path.name)
+    resolved_label = str(label or "Descargar CSV")
+    return (
+        "\n##CSV_DOWNLOAD_START\n"
+        f"path={csv_path}\n"
+        f"filename={resolved_filename}\n"
+        f"label={resolved_label}\n"
+        "mimetype=text/csv\n"
+        "##CSV_DOWNLOAD_END"
+    )
+
+
+def _build_csv_marker_from_payload(payload: Dict[str, Any]) -> Optional[str]:
+    """Genera marker CSV a partir de observations del payload si hay datos."""
+    enabled = os.getenv("DATA_RESPONSE_CSV_EXPORT_ENABLED", "1").lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    if not enabled:
+        return None
+
+    observations = payload.get("observations")
+    rows = _flatten_observations_for_csv(observations if isinstance(observations, dict) else {})
+    if not rows:
+        return None
+
+    try:
+        csv_path = _export_observations_csv(rows)
+    except Exception:
+        logger.exception("[DATA_RESPONSE] No se pudo exportar CSV de observaciones")
+        return None
+
+    if not csv_path:
+        return None
+
+    logger.info("[DATA_RESPONSE] CSV export generado | rows=%d | path=%s", len(rows), csv_path)
+    return _build_csv_download_marker(csv_path=csv_path)
+
+
 # ---------------------------------------------------------------------------
 # Streaming de la respuesta LLM
 # ---------------------------------------------------------------------------
@@ -816,11 +1064,16 @@ def stream_data_response(
     logger.info("[DATA_RESPONSE] payload recibido: %s", payload)
     messages = _build_messages(payload)
     source_footer = _build_source_footer(payload)
+    csv_marker = _build_csv_marker_from_payload(payload)
     if not messages:
         yield "No se pudo construir la solicitud al modelo de lenguaje."
     else:
         model_name = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-        temperature = float(os.getenv("DATA_RESPONSE_TEMPERATURE", "0.35"))
+        template_mode = bool(str(payload.get("response_template") or "").strip())
+        if template_mode:
+            temperature = float(os.getenv("DATA_RESPONSE_TEMPLATE_TEMPERATURE", "0.75"))
+        else:
+            temperature = float(os.getenv("DATA_RESPONSE_TEMPERATURE", "0.35"))
 
         if ChatOpenAI is None:
             logger.error("[DATA_RESPONSE] langchain_openai no disponible")
@@ -847,3 +1100,5 @@ def stream_data_response(
 
     if source_footer:
         yield source_footer
+    if csv_marker:
+        yield csv_marker
