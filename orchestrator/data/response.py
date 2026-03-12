@@ -813,7 +813,6 @@ def stream_data_response(
     Yields:
         Fragmentos de texto de la respuesta del LLM.
     """
-    logger.info("[DATA_RESPONSE] payload recibido: %s", payload)
     messages = _build_messages(payload)
     source_footer = _build_source_footer(payload)
     if not messages:

@@ -371,37 +371,16 @@ def make_data_node(memory_adapter: Any):
                 first_non_empty_fn=first_non_empty,
             )
 
-        # 5. Cargar observaciones
+        # 5. Cargar observaciones: siempre familia completa y sin filtro temporal.
         is_contribution = str(ent.calc_mode_cls or "").strip().lower() == "contribution"
-        _cls_vals = [
-            str(ent.activity_cls or "").strip().lower(),
-            str(ent.region_cls or "").strip().lower(),
-            str(ent.investment_cls or "").strip().lower(),
-        ]
-        all_none = all(v in ("none", "", "{}") for v in _cls_vals)
-        any_specific = any(v == "specific" for v in _cls_vals)
-        activity_general_region_specific = (
-            str(ent.activity_cls_resolved or "").strip().lower() == "general"
-            and str(ent.region_cls or "").strip().lower() == "specific"
-        )
-        if is_contribution:
-            series_to_load = sl.family_series
-            logger.info("[DATA_NODE][STEP-5] Familia completa por contribución (%d series)", len(series_to_load or []))
-        elif activity_general_region_specific:
-            series_to_load = sl.family_series
-            logger.info(
-                "[DATA_NODE][STEP-5] Familia completa por activity=general + region=specific (%d series)",
-                len(series_to_load or []),
-            )
-        elif all_none or any_specific:
-            series_to_load = [{"id": sl.target_series_id}]
-            logger.info("[DATA_NODE][STEP-5] Solo serie target (all_none=%s any_specific=%s)", all_none, any_specific)
-        else:
-            series_to_load = sl.family_series
-            logger.info("[DATA_NODE][STEP-5] Familia completa (%d series)", len(series_to_load or []))
+        series_to_load = sl.family_series or ([{"id": sl.target_series_id}] if sl.target_series_id else [])
+        logger.info("[DATA_NODE][STEP-5] Familia completa sin filtros de target/fecha (%d series)", len(series_to_load))
 
         observations = load_observations(
-            series_to_load, _get_load_fn(), ent.period_ent, ent.frequency_ent,
+            series_to_load,
+            _get_load_fn(),
+            period_values=None,
+            frequency=ent.frequency_ent,
             indicator=ent.indicator_ent,
         )
 
