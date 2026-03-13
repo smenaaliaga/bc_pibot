@@ -14,11 +14,11 @@ encuentra la serie solicitada.
 from __future__ import annotations
 
 import csv
-import datetime
 import logging
 import os
 import re
 from dataclasses import asdict
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
@@ -48,6 +48,16 @@ _SEASONALITY_LABELS = {
     "sa": "desestacionalizado",
     "nsa": "empalmado (no desestacionalizado)",
 }
+
+_CSV_FIELDNAMES = [
+    "series_id",
+    "series_title",
+    "frequency",
+    "date",
+    "value",
+    "yoy_pct",
+    "pct",
+]
 
 
 def format_period_labels(period_str: str, freq: str) -> Tuple[str, ...]:
@@ -640,6 +650,142 @@ def _iter_observations(obs_raw: Any) -> Iterable[Dict[str, Any]]:
                     yield item
 
 
+def _flatten_observations_for_csv(
+    observations: Dict[str, Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Aplana observaciones de todas las series para exportarlas a CSV."""
+    if not isinstance(observations, dict) or not observations:
+        return []
+
+    rows: List[Dict[str, Any]] = []
+    for series_id, entry in observations.items():
+        if not isinstance(entry, dict):
+            continue
+
+        meta = entry.get("meta") or {}
+        if not isinstance(meta, dict):
+            meta = {}
+
+        series_title = str(
+            meta.get("descripEsp")
+            or meta.get("descripIng")
+            or series_id
+        ).strip()
+        default_frequency = str(
+            meta.get("target_frequency")
+            or meta.get("original_frequency")
+            or ""
+        ).strip()
+
+        obs_raw = entry.get("observations")
+        if isinstance(obs_raw, list):
+            for obs in obs_raw:
+                if not isinstance(obs, dict):
+                    continue
+                rows.append(
+                    {
+                        "series_id": str(series_id),
+                        "series_title": series_title,
+                        "frequency": default_frequency,
+                        "date": obs.get("date", ""),
+                        "value": obs.get("value"),
+                        "yoy_pct": obs.get("yoy_pct"),
+                        "pct": obs.get("pct"),
+                    }
+                )
+            continue
+
+        if isinstance(obs_raw, dict):
+            for freq_key, sub_obs in obs_raw.items():
+                if not isinstance(sub_obs, list):
+                    continue
+                frequency = str(freq_key or default_frequency).strip()
+                for obs in sub_obs:
+                    if not isinstance(obs, dict):
+                        continue
+                    rows.append(
+                        {
+                            "series_id": str(series_id),
+                            "series_title": series_title,
+                            "frequency": frequency,
+                            "date": obs.get("date", ""),
+                            "value": obs.get("value"),
+                            "yoy_pct": obs.get("yoy_pct"),
+                            "pct": obs.get("pct"),
+                        }
+                    )
+
+    rows.sort(
+        key=lambda row: (
+            str(row.get("series_id") or ""),
+            str(row.get("date") or ""),
+            str(row.get("frequency") or ""),
+        )
+    )
+    return rows
+
+
+def _export_observations_csv(
+    rows: List[Dict[str, Any]],
+    *,
+    root_dir: Optional[Path] = None,
+) -> Optional[Path]:
+    """Exporta filas de observaciones a un archivo CSV y retorna su ruta."""
+    if not rows:
+        return None
+
+    export_root = (
+        Path(root_dir)
+        if root_dir is not None
+        else (Path(__file__).resolve().parents[2] / "logs" / "exports")
+    )
+    export_root.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
+    csv_path = export_root / f"data_export_{timestamp}.csv"
+
+    with csv_path.open("w", encoding="utf-8", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=_CSV_FIELDNAMES)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({key: row.get(key) for key in _CSV_FIELDNAMES})
+
+    logger.info("[DATA_RESPONSE] CSV export generado: %s (rows=%d)", csv_path, len(rows))
+    return csv_path
+
+
+def _build_csv_marker_from_payload(
+    payload: Dict[str, Any],
+    *,
+    root_dir: Optional[Path] = None,
+) -> Optional[str]:
+    """Construye marker Streamlit para descarga CSV cuando el export está habilitado."""
+    export_enabled = os.getenv("DATA_RESPONSE_CSV_EXPORT_ENABLED", "1").strip().lower()
+    if export_enabled not in {"1", "true", "yes", "on"}:
+        return None
+
+    observations = payload.get("observations")
+    if not isinstance(observations, dict) or not observations:
+        return None
+
+    rows = _flatten_observations_for_csv(observations)
+    if not rows:
+        return None
+
+    csv_path = _export_observations_csv(rows, root_dir=root_dir)
+    if csv_path is None:
+        return None
+
+    return (
+        "\n\n##CSV_DOWNLOAD_START\n"
+        f"filename={csv_path.name}\n"
+        f"path={csv_path.resolve()}\n"
+        "mimetype=text/csv\n"
+        "label=Descargar CSV\n"
+        "##CSV_DOWNLOAD_END"
+    )
+
+
 def _pick_latest_observation(
     observations: Dict[str, Dict[str, Any]],
     *,
@@ -893,153 +1039,6 @@ def _build_source_footer(payload: Dict[str, Any]) -> Optional[str]:
     )
 
 
-def _flatten_observations_for_csv(
-    observations: Dict[str, Dict[str, Any]],
-) -> List[Dict[str, Any]]:
-    """Aplana observaciones por serie en filas tabulares para exportar CSV.
-
-    Incluye tanto observaciones planas (lista) como agrupadas por frecuencia
-    (dict con subclaves A/Q/M u otras).
-    """
-    if not isinstance(observations, dict) or not observations:
-        return []
-
-    rows: List[Dict[str, Any]] = []
-
-    for series_id, entry in observations.items():
-        if not isinstance(entry, dict):
-            continue
-
-        meta = entry.get("meta")
-        if not isinstance(meta, dict):
-            meta = {}
-
-        series_title = (
-            meta.get("descripEsp")
-            or meta.get("descripIng")
-            or str(series_id)
-        )
-        base_frequency = str(
-            meta.get("target_frequency")
-            or meta.get("original_frequency")
-            or ""
-        ).upper()
-
-        def _append_row(obs: Dict[str, Any], frequency: str) -> None:
-            if not isinstance(obs, dict):
-                return
-            rows.append(
-                {
-                    "series_id": str(series_id),
-                    "series_title": str(series_title),
-                    "frequency": str(frequency or ""),
-                    "date": str(obs.get("date") or "")[:10],
-                    "value": obs.get("value"),
-                    "yoy_pct": obs.get("yoy_pct"),
-                    "pct": obs.get("pct"),
-                }
-            )
-
-        obs_raw = entry.get("observations")
-        if isinstance(obs_raw, list):
-            for obs in obs_raw:
-                _append_row(obs, base_frequency)
-            continue
-
-        if isinstance(obs_raw, dict):
-            for freq_key, subset in obs_raw.items():
-                if not isinstance(subset, list):
-                    continue
-                freq = str(freq_key or base_frequency or "").upper()
-                for obs in subset:
-                    _append_row(obs, freq)
-
-    rows.sort(
-        key=lambda row: (
-            str(row.get("series_title") or "").lower(),
-            str(row.get("date") or ""),
-            str(row.get("series_id") or ""),
-            str(row.get("frequency") or ""),
-        )
-    )
-    return rows
-
-
-def _export_observations_csv(
-    rows: List[Dict[str, Any]],
-    *,
-    root_dir: Optional[Path] = None,
-) -> Optional[Path]:
-    """Exporta filas tabulares a un CSV en logs/exports."""
-    if not rows:
-        return None
-
-    project_root = root_dir or Path(__file__).resolve().parents[2]
-    export_dir = project_root / "logs" / "exports"
-    export_dir.mkdir(parents=True, exist_ok=True)
-
-    ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
-    output_path = export_dir / f"series_export_{ts}.csv"
-
-    fieldnames = ["series_id", "series_title", "frequency", "date", "value", "yoy_pct", "pct"]
-
-    with output_path.open("w", encoding="utf-8", newline="") as fh:
-        writer = csv.DictWriter(fh, fieldnames=fieldnames)
-        writer.writeheader()
-        for row in rows:
-            writer.writerow({field: row.get(field, "") for field in fieldnames})
-
-    return output_path
-
-
-def _build_csv_download_marker(
-    *,
-    csv_path: Path,
-    filename: Optional[str] = None,
-    label: Optional[str] = None,
-) -> str:
-    """Construye un bloque marker consumible por la UI para descarga CSV."""
-    resolved_filename = str(filename or csv_path.name)
-    resolved_label = str(label or "Descargar CSV")
-    return (
-        "\n##CSV_DOWNLOAD_START\n"
-        f"path={csv_path}\n"
-        f"filename={resolved_filename}\n"
-        f"label={resolved_label}\n"
-        "mimetype=text/csv\n"
-        "##CSV_DOWNLOAD_END"
-    )
-
-
-def _build_csv_marker_from_payload(payload: Dict[str, Any]) -> Optional[str]:
-    """Genera marker CSV a partir de observations del payload si hay datos."""
-    enabled = os.getenv("DATA_RESPONSE_CSV_EXPORT_ENABLED", "1").lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
-    if not enabled:
-        return None
-
-    observations = payload.get("observations")
-    rows = _flatten_observations_for_csv(observations if isinstance(observations, dict) else {})
-    if not rows:
-        return None
-
-    try:
-        csv_path = _export_observations_csv(rows)
-    except Exception:
-        logger.exception("[DATA_RESPONSE] No se pudo exportar CSV de observaciones")
-        return None
-
-    if not csv_path:
-        return None
-
-    logger.info("[DATA_RESPONSE] CSV export generado | rows=%d | path=%s", len(rows), csv_path)
-    return _build_csv_download_marker(csv_path=csv_path)
-
-
 # ---------------------------------------------------------------------------
 # Streaming de la respuesta LLM
 # ---------------------------------------------------------------------------
@@ -1064,16 +1063,11 @@ def stream_data_response(
     logger.info("[DATA_RESPONSE] payload recibido: %s", payload)
     messages = _build_messages(payload)
     source_footer = _build_source_footer(payload)
-    csv_marker = _build_csv_marker_from_payload(payload)
     if not messages:
         yield "No se pudo construir la solicitud al modelo de lenguaje."
     else:
         model_name = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-        template_mode = bool(str(payload.get("response_template") or "").strip())
-        if template_mode:
-            temperature = float(os.getenv("DATA_RESPONSE_TEMPLATE_TEMPERATURE", "0.75"))
-        else:
-            temperature = float(os.getenv("DATA_RESPONSE_TEMPERATURE", "0.35"))
+        temperature = float(os.getenv("DATA_RESPONSE_TEMPERATURE", "0.35"))
 
         if ChatOpenAI is None:
             logger.error("[DATA_RESPONSE] langchain_openai no disponible")
@@ -1100,5 +1094,7 @@ def stream_data_response(
 
     if source_footer:
         yield source_footer
+
+    csv_marker = _build_csv_marker_from_payload(payload)
     if csv_marker:
         yield csv_marker
