@@ -316,7 +316,7 @@ def run_app(
             return
         try:
             # Usar valores por defecto desde entorno para evitar depender del orden del sidebar
-            _model_default = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
+            _model_default = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
             try:
                 _temp_default = float(os.getenv("OPENAI_TEMPERATURE", "0") or 0.0)
             except Exception:
@@ -349,7 +349,7 @@ def run_app(
         st.write(f"Session ID: `{st.session_state.session_id}`")
         
         st.subheader("Modelo generativo")
-        model_sel = st.text_input("Modelo", value=os.getenv("OPENAI_MODEL", "gpt-3.5-turbo"))
+        model_sel = st.text_input("Modelo", value=os.getenv("OPENAI_MODEL", "gpt-4.1-mini"))
         temp_sel = st.slider("Temperatura", min_value=0.0, max_value=1.0, value=float(os.getenv("OPENAI_TEMPERATURE", "0") or 0.0), step=0.1)
         
         st.subheader("Modelo predictror")
@@ -744,7 +744,7 @@ def run_app(
             user_message,
             metadata={
                 "source": "ui",
-                "model": os.getenv("OPENAI_MODEL", "gpt-3.5-turbo"),
+                "model": os.getenv("OPENAI_MODEL", "gpt-4.1-mini"),
                 "temperature": os.getenv("OPENAI_TEMPERATURE", "0"),
             },
         )
@@ -992,7 +992,7 @@ def run_app(
             response_text,
             metadata={
                 "source": "ui",
-                "model": os.getenv("OPENAI_MODEL", "gpt-3.5-turbo"),
+                "model": os.getenv("OPENAI_MODEL", "gpt-4.1-mini"),
                 "temperature": os.getenv("OPENAI_TEMPERATURE", "0"),
             },
         )
