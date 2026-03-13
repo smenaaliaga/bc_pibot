@@ -3,6 +3,7 @@ import os
 import logging
 from pathlib import Path
 from typing import List, Dict, Any
+from urllib.parse import urlencode
 import requests
 
 logger = logging.getLogger(__name__)
@@ -16,9 +17,11 @@ class BDEClient:
     - Si una serie falta o está vacía, consulta BDE y persiste en el almacén
     """
 
-    def __init__(self):
-        # Ruta del almacén único en la raíz del proyecto (../.. desde orchestrator/api)
-        base_store = Path(__file__).resolve().parents[2] / "data_store"
+    def __init__(self, store_dir: Path = None):
+        if store_dir is not None:
+            base_store = Path(store_dir)
+        else:
+            base_store = Path(__file__).resolve().parents[2] / "data_store"
         base_store.mkdir(parents=True, exist_ok=True)
         self._store_path = base_store / "timeseries.json"
         # Mapa en memoria: series_id -> payload (BDE-like)
@@ -106,8 +109,7 @@ class BDEClient:
             "timeseries": timeseries_id
         }
         
-        query_string = "&".join(f"{k}={v}" for k, v in params.items())
-        url = f"{bde_base_url}?{query_string}"
+        url = f"{bde_base_url}?{urlencode(params)}"
         return url
 
     def _persist_store(self, series_id: str, payload: Any) -> None:

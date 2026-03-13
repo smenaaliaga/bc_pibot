@@ -175,35 +175,17 @@ def main() -> None:
     except Exception as e:
         logger.warning(f"Warmup de modelos adicionales falló: {e}")
 
-    preload_series_updates = os.getenv("PRELOAD_SERIES_UPDATES_ON_START", "1").lower() in {"1", "true", "yes", "on"}
-    try:
-        from orchestrator.data.get_data_serie import preload_series_updates_index, start_series_updates_scheduler
-    except Exception as e:
-        logger.warning(f"No se pudo importar SearchSeries updates: {e}")
-    else:
-        if preload_series_updates:
-            try:
-                series_updates = preload_series_updates_index(force=True)
-                logger.info("SearchSeries precargado | series_con_updatedAt=%s", len(series_updates))
-            except Exception as e:
-                logger.warning(f"Precarga de SearchSeries falló: {e}")
+    # Ingest de series: pre-computa métricas derivadas y guarda en data_store
+    ingest_on_start = os.getenv("INGEST_ON_START", "0").lower() in {"1", "true", "yes", "on"}
+    if ingest_on_start:
         try:
-            if start_series_updates_scheduler():
-                logger.info(
-                    "Scheduler diario SearchSeries activo | hora=%s",
-                    os.getenv("SERIES_UPDATES_DAILY_AT", "09:10"),
-                )
+            from orchestrator.catalog.ingest_series import run_ingest
+            _catalog_path = os.path.join(os.path.dirname(__file__), "orchestrator", "catalog", "catalog.json")
+            _output_dir = os.path.join(os.path.dirname(__file__), "orchestrator", "memory", "data_store")
+            n = run_ingest(catalog_path=_catalog_path, output_dir=_output_dir)
+            logger.info("Ingest completado | cuadros_procesados=%s", n)
         except Exception as e:
-            logger.warning(f"No se pudo iniciar scheduler diario de SearchSeries: {e}")
-
-    warm_redis = os.getenv("WARM_REDIS_CACHE_ON_START", "0").lower() in {"1", "true", "yes", "on"}
-    if warm_redis:
-        try:
-            from tools.warm_redis_cache import warm_cache_background
-            warm_workers = int(os.getenv("WARM_REDIS_CACHE_WORKERS", "8"))
-            warm_cache_background(workers=warm_workers, force=False)
-        except Exception as e:
-            logger.warning(f"No se pudo iniciar precalentamiento Redis: {e}")
+            logger.warning(f"Ingest de series falló: {e}")
 
     orch = None
     graph = None

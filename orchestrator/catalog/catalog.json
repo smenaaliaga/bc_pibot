@@ -4,8 +4,8 @@
       "indicator": "imacec",
       "calc_mode": ["original", "prev_period", "yoy"],
       "seasonality": "nsa",
-      "frequency": null,
-      "price": null,
+      "frequency": ["m", "q", "a"],
+      "price": "enc",
       "has_activity": 1,
       "has_region": 0,
       "has_investment": 0
@@ -29,8 +29,8 @@
       "indicator": "imacec",
       "calc_mode": "contribution",
       "seasonality": "nsa",
-      "frequency": null,
-      "price": null,
+      "frequency": ["m", "q", "a"],
+      "price": "enc",
       "has_activity": 1,
       "has_region": 0,
       "has_investment": 0
@@ -53,8 +53,8 @@
       "indicator": "imacec",
       "calc_mode": ["original", "prev_period", "yoy"],
       "seasonality": "sa",
-      "frequency": null,
-      "price": null,
+      "frequency": ["m", "q", "a"],
+      "price": "enc",
       "has_activity": 1,
       "has_region": 0,
       "has_investment": 0
@@ -78,8 +78,8 @@
       "indicator": "imacec",
       "calc_mode": "contribution",
       "seasonality": "sa",
-      "frequency": null,
-      "price": null,
+      "frequency": ["m", "q", "a"],
+      "price": "enc",
       "has_activity": 1,
       "has_region": 0,
       "has_investment": 0
@@ -101,6 +101,8 @@
     "classification": {
       "indicator": "pib",
       "calc_mode": ["original", "prev_period", "yoy"],
+      "seasonality": ["nsa", "sa"],
+      "frequency": ["m", "q", "a"],
       "price": ["enc", "co"],
       "has_activity": 0,
       "has_region": 0,
@@ -2096,10 +2098,10 @@
       "seasonality": "nsa",
       "frequency": "q",
       "price": "enc",
-      "investment": "demanda_interna",
       "has_activity": 0,
       "has_region": 0,
-      "has_investment": 1
+      "has_investment": 1,
+      "investment": "demanda_interna"
     },
     "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_G2V",
     "series": [
