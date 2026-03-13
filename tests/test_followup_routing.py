@@ -156,6 +156,50 @@ def test_followup_first_turn_with_explicit_indicator_routes_rag_for_methodology(
     assert result["entities"][0]["indicator"] == ["pib"]
 
 
+def test_followup_non_first_turn_with_explicit_indicator_routes_data():
+    prev_record = _build_prev_record(intent="value", macro=1, indicator="pib", turn_id=13)
+    classification = _make_classification(
+        intent="value",
+        context="followup",
+        macro=1,
+        intent_raw={
+            "routing": {
+                "context": {"label": "followup"},
+                "intent": {"label": "value"},
+                "macro": {"label": 1},
+            }
+        },
+        predict_raw={
+            "interpretation": {
+                "slot_tags": ["O", "O", "O", "B-indicator"],
+                "entities": {"indicator": ["pib"]},
+                "entities_normalized": {
+                    "indicator": ["pib"],
+                    "seasonality": ["nsa"],
+                    "frequency": ["q"],
+                    "period": ["2025-10-01", "2025-12-31"],
+                },
+            }
+        },
+    )
+    node = make_intent_node(None, StubIntentStore([prev_record]))
+
+    result = node(
+        {
+            "question": "cuanto es el pib de chile",
+            "session_id": "s1d",
+            "user_turn_id": 14,
+            "classification": classification,
+            "entities": [],
+        }
+    )
+
+    assert result["route_decision"] == "data"
+    assert result["intent"]["intent_cls"] == "value"
+    assert result["intent"]["context_cls"] == "standalone"
+    assert result["entities"][0]["indicator"] == ["pib"]
+
+
 def test_followup_recovers_macro_and_intent_from_previous_turn():
     prev_record = _build_prev_record(intent="method", macro=1, indicator="pib", turn_id=3)
     classification = _make_classification(

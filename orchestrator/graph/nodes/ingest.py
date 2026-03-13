@@ -293,6 +293,19 @@ def make_intent_node(memory_adapter: Any, intent_store: Any = None, predict_with
                 if macro_label in (0, "0") or normalized_intent in {"", "none", "other"}:
                     prev_macro = _label(_as_dict(prev_intent_raw.get("macro")).get("label") if isinstance(prev_intent_raw.get("macro"), dict) else prev_intent_raw.get("macro"))
                     prev_intent = _label(_as_dict(prev_intent_raw.get("intent")).get("label") if isinstance(prev_intent_raw.get("intent"), dict) else prev_intent_raw.get("intent"))
+                    prev_routing = _as_dict(prev_intent_raw.get("routing"))
+                    if prev_macro is None:
+                        prev_macro = _label(
+                            _as_dict(prev_routing.get("macro")).get("label")
+                            if isinstance(prev_routing.get("macro"), dict)
+                            else prev_routing.get("macro")
+                        )
+                    if _is_empty_value(prev_intent):
+                        prev_intent = _label(
+                            _as_dict(prev_routing.get("intent")).get("label")
+                            if isinstance(prev_routing.get("intent"), dict)
+                            else prev_routing.get("intent")
+                        )
                     if macro_label in (0, "0") and prev_macro is not None:
                         macro_label = prev_macro
                     if normalized_intent in {"", "none", "other"} and not _is_empty_value(prev_intent):
@@ -308,7 +321,17 @@ def make_intent_node(memory_adapter: Any, intent_store: Any = None, predict_with
 
                     applied_rule = False
 
-                    if region_label == "specific" and not _is_empty_value(current_norm.get("region")) and indicator_missing:
+                    if explicit_indicator and not indicator_missing:
+                        # Si la pregunta follow-up trae indicador explícito,
+                        # se considera una consulta standalone equivalente.
+                        context_label = "standalone"
+                        applied_rule = True
+                    elif not explicit_indicator and not _is_empty_value(prev_indicator):
+                        # Conserva continuidad temática: sin indicador explícito,
+                        # prioriza el indicador previo del hilo.
+                        current_norm["indicator"] = prev_indicator
+                        applied_rule = True
+                    elif region_label == "specific" and not _is_empty_value(current_norm.get("region")) and indicator_missing:
                         if not _is_empty_value(prev_indicator):
                             current_norm["indicator"] = prev_indicator
                             applied_rule = True

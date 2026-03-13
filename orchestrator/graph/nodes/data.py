@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from langgraph.types import StreamWriter
@@ -22,7 +23,7 @@ from ..state import AgentState, _clone_entities, _emit_stream_chunk
 from orchestrator.data._helpers import coerce_period, extract_year, first_non_empty, to_period_end_str, has_full_quarterly_year
 from orchestrator.data._business_rules import ResolvedEntities, apply_business_rules
 from orchestrator.catalog.catalog_lookup import lookup_series
-from orchestrator.utils.run_detail_log import append_run_detail
+from orchestrator.utils.run_detail_log import append_detail_trace, append_detail_trace_lines, append_run_detail
 from rules.business_rule import resolve_data_node_overrides
 
 logger = logging.getLogger(__name__)
@@ -40,6 +41,121 @@ def _get_load_fn():
     import sys
     mod = sys.modules[__name__]
     return getattr(mod, "_load_series_observations")
+
+
+def _is_present_value(value: Any) -> bool:
+    if value in (None, "", "none", "None", "null", "NULL"):
+        return False
+    if isinstance(value, (list, tuple, set, dict)) and len(value) == 0:
+        return False
+    return True
+
+
+def _display_value(value: Any) -> Any:
+    if isinstance(value, dict):
+        if "label" in value:
+            return value.get("label")
+        return value
+    return value
+
+
+def _value_token(value: Any) -> str:
+    rendered = _display_value(value)
+    if isinstance(rendered, (list, tuple)):
+        joined = ",".join(str(item) for item in rendered if str(item).strip())
+        return joined or "none"
+    text = str(rendered).strip()
+    return text if text else "none"
+
+
+def _build_trace_snapshot(ent: ResolvedEntities, intent_payload: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "activity_cls": _display_value(ent.activity_cls),
+        "activity_ent": _display_value(ent.activity_ent),
+        "calc_mode_cls": _display_value(ent.calc_mode_cls),
+        "context_cls": _display_value(intent_payload.get("context_cls")),
+        "frequency": _display_value(ent.frequency_ent),
+        "indicator": _display_value(ent.indicator_ent),
+        "intent_cls": _display_value(intent_payload.get("intent_cls")),
+        "investment_cls": _display_value(ent.investment_cls),
+        "investment_ent": _display_value(ent.investment_ent),
+        "macro_cls": _display_value(intent_payload.get("macro_cls")),
+        "period": _display_value(ent.period_ent),
+        "price": _display_value(ent.price),
+        "region_cls": _display_value(ent.region_cls),
+        "region_ent": _display_value(ent.region_ent),
+        "req_form_cls": _display_value(ent.req_form_cls),
+        "seasonality": _display_value(ent.seasonality_ent),
+    }
+
+
+def _as_cell_text(value: Any, width: int) -> str:
+    text = str(_display_value(value))
+    if len(text) > width:
+        return (text[: width - 3] + "...").ljust(width)
+    return text.ljust(width)
+
+
+def _build_detail_table_lines(before: Dict[str, Any], after: Dict[str, Any]) -> List[str]:
+    keys = [
+        "activity_cls",
+        "activity_ent",
+        "calc_mode_cls",
+        "context_cls",
+        "frequency",
+        "indicator",
+        "intent_cls",
+        "investment_cls",
+        "investment_ent",
+        "macro_cls",
+        "period",
+        "price",
+        "region_cls",
+        "region_ent",
+        "req_form_cls",
+        "seasonality",
+    ]
+
+    lines = [
+        "Key                                  | Status     | Value                          | Value_Post_BR",
+        "-------------------------------------+------------+--------------------------------+-------------------------------",
+    ]
+
+    for key in keys:
+        pre = before.get(key)
+        post = after.get(key)
+        status = "PRESENT" if _is_present_value(pre) else "MISSING"
+        line = (
+            f"{_as_cell_text(key, 37)} | "
+            f"{_as_cell_text(status, 10)} | "
+            f"{_as_cell_text(pre, 30)} | "
+            f"{str(_display_value(post))}"
+        )
+        lines.append(line)
+
+    return lines
+
+
+def _build_detail_key(snapshot: Dict[str, Any]) -> str:
+    parts = [
+        _value_token(snapshot.get("activity_ent")),
+        _value_token(snapshot.get("calc_mode_cls")),
+        _value_token(snapshot.get("context_cls")),
+        _value_token(snapshot.get("frequency")),
+        _value_token(snapshot.get("indicator")),
+        _value_token(snapshot.get("intent_cls")),
+        _value_token(snapshot.get("investment_cls")),
+        _value_token(snapshot.get("macro_cls")),
+        _value_token(snapshot.get("period")),
+        _value_token(snapshot.get("region_cls")),
+        _value_token(snapshot.get("req_form_cls")),
+        _value_token(snapshot.get("seasonality")),
+    ]
+    return "::".join(parts)
+
+
+def _catalog_path_for_trace() -> str:
+    return str(Path(__file__).resolve().parents[2] / "catalog" / "catalog.json")
 
 
 # ---------------------------------------------------------------------------
@@ -353,6 +469,18 @@ def make_data_node(memory_adapter: Any):
         question, entities, ent = _extract_entities_from_state(state)
         context = state.get("context") if isinstance(state, dict) else None
         session_id = str((context or {}).get("session_id") or "")
+        intent_payload = state.get("intent") if isinstance(state.get("intent"), dict) else {}
+        trace_before = _build_trace_snapshot(ent, intent_payload)
+
+        append_run_detail(
+            "data_pre_rules",
+            {
+                "question": question,
+                "classification_pre_rules": asdict(ent),
+                "intent": intent_payload,
+            },
+            session_id=session_id,
+        )
 
         # 2. Aplicar reglas de negocio
         apply_business_rules(ent)
@@ -364,6 +492,8 @@ def make_data_node(memory_adapter: Any):
             req_form_cls=ent.req_form_cls,
             frequency_ent=ent.frequency_ent,
         )
+        if "indicator_ent" in overrides:
+            ent.indicator_ent = overrides.get("indicator_ent")
         if "calc_mode_cls" in overrides:
             ent.calc_mode_cls = overrides.get("calc_mode_cls")
         if "frequency_ent" in overrides:
@@ -387,6 +517,12 @@ def make_data_node(memory_adapter: Any):
         if "investment_cls" in overrides:
             ent.investment_cls = overrides.get("investment_cls")
 
+        trace_after = _build_trace_snapshot(ent, intent_payload)
+        detail_table_lines = _build_detail_table_lines(trace_before, trace_after)
+        detail_business_rule = str(overrides.get("feature") or "none")
+        detail_key = _build_detail_key(trace_after)
+        detail_path_metadata = _catalog_path_for_trace()
+
         append_run_detail(
             "data_post_rules",
             {
@@ -401,6 +537,12 @@ def make_data_node(memory_adapter: Any):
         if short_circuit_message:
             feature = str(overrides.get("feature") or "").strip()
             logger.info("[DATA_NODE] short-circuit feature=%s", feature)
+
+            append_detail_trace_lines(detail_table_lines, session_id=session_id)
+            append_detail_trace(f"BUSINESS_RULE={detail_business_rule}", session_id=session_id)
+            append_detail_trace(f"KEY={detail_key}", session_id=session_id)
+            append_detail_trace("STATUS_KEY=False", session_id=session_id)
+            append_detail_trace(f"PATH_METADATA={detail_path_metadata}", session_id=session_id)
 
             append_run_detail(
                 "data_short_circuit",
@@ -433,6 +575,12 @@ def make_data_node(memory_adapter: Any):
         # 3. Buscar serie en catálogo
         sl = lookup_series(ent)
         logger.info("[DATA_NODE] family=%s target=%s", sl.family_name, sl.target_series_id)
+
+        append_detail_trace_lines(detail_table_lines, session_id=session_id)
+        append_detail_trace(f"BUSINESS_RULE={detail_business_rule}", session_id=session_id)
+        append_detail_trace(f"KEY={detail_key}", session_id=session_id)
+        append_detail_trace(f"STATUS_KEY={bool(sl.source_url and sl.target_series_id)}", session_id=session_id)
+        append_detail_trace(f"PATH_METADATA={detail_path_metadata}", session_id=session_id)
 
         # 4. Sin serie → respuesta informativa
         if not sl.source_url or not sl.target_series_id:

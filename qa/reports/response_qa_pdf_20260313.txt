@@ -1,0 +1,60 @@
+Pregunta 1: cual es el valor del imacec
+Respuesta 1:
+El último dato disponible del IMACEC corresponde a enero de 2026, donde la variación interanual fue de **-0,09%**. Además, en comparación con el mes anterior, se observó una disminución del **-13,51%**. 
+
+Si necesitas más información o algún otro indicador, no dudes en preguntar.
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_IMACEC_01_A?id5=SI&idSerie=F032.IMC.IND.Z.Z.EP18.Z.Z.0.M&cbFechaInicio=2016&cbFechaTermino=2026&cbFrecuencia=MONTHLY&cbCalculo=PCT) del Banco Central de Chile.
+
+Key 1: N/A
+Estado 1: metadata_q.json no disponible (flujo usa catalogo/estado del grafo)
+
+################################################################################################################################
+
+Pregunta 2: cual es el valor del pib
+Respuesta 2:
+El último dato disponible del PIB muestra una variación interanual de **1,58%**. Este dato corresponde al tercer trimestre de 2025. Además, en comparación con el período anterior, el PIB tuvo una variación de -2,19%. 
+
+Si necesitas más información o detalles sobre otros indicadores, no dudes en preguntar.
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2?id5=SI&idSerie=F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T&cbFechaInicio=2015&cbFechaTermino=2025&cbFrecuencia=QUARTERLY&cbCalculo=PCT) del Banco Central de Chile.
+
+Key 2: N/A
+Estado 2: metadata_q.json no disponible (flujo usa catalogo/estado del grafo)
+
+################################################################################################################################
+
+Pregunta 3: Cuanto es el PIB de Chile?
+Respuesta 3:
+El último dato disponible del PIB a precios corrientes de Chile muestra una variación interanual de **8,7%**. En comparación con el trimestre anterior, el PIB tuvo una disminución del **1,2%**. 
+
+Si necesitas más información sobre otros indicadores o detalles específicos, no dudes en preguntar. ¡Estoy aquí para ayudarte!
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2?id5=SI&idSerie=F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T&cbFechaInicio=2015&cbFechaTermino=2025&cbFrecuencia=QUARTERLY&cbCalculo=PCT) del Banco Central de Chile.
+
+Key 3: N/A
+Estado 3: metadata_q.json no disponible (flujo usa catalogo/estado del grafo)
+
+################################################################################################################################
+
+Pregunta 4: ¿Cuánto es el PIB de Chile?
+Respuesta 4:
+El PIB de Chile en el tercer trimestre de 2025 presenta una variación interanual de **8,71%**. En comparación con el trimestre anterior, se observa una disminución de -1,16%. Si necesitas más información o algún otro indicador, no dudes en preguntar.
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2?id5=SI&idSerie=F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T&cbFechaInicio=2015&cbFechaTermino=2025&cbFrecuencia=QUARTERLY&cbCalculo=PCT) del Banco Central de Chile.
+
+Key 4: N/A
+Estado 4: metadata_q.json no disponible (flujo usa catalogo/estado del grafo)
+
+################################################################################################################################
+
+Pregunta 5: ¿Cuánto es el PIB de Chile?
+Respuesta 5:
+El PIB de Chile para el tercer trimestre de 2025 muestra una variación interanual de **8,7%**. En comparación con el período anterior, se observa una disminución del 1,2%. Si necesitas más información o detalles sobre otros indicadores, no dudes en preguntar.
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2?id5=SI&idSerie=F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T&cbFechaInicio=2015&cbFechaTermino=2025&cbFrecuencia=QUARTERLY&cbCalculo=PCT) del Banco Central de Chile.
+
+Key 5: N/A
+Estado 5: metadata_q.json no disponible (flujo usa catalogo/estado del grafo)
+
+################################################################################################################################

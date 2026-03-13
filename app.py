@@ -478,6 +478,11 @@ def run_app(
     # Helper: construir followups en UI a partir de facts si no vienen marcadores
     def _build_ui_followups_from_facts() -> List[Dict[str, str]]:
         suggestions: List[str] = []
+        default_suggestions = [
+            "Quieres que busque los datos mas recientes",
+            "Te muestro un grafico con la ultima variacion",
+            "Prefieres consultar IMACEC o PIB",
+        ]
         try:
             _ma = st.session_state.get("_mem_adapter")
             if _ma:
@@ -515,6 +520,8 @@ def run_app(
                     suggestions.append(f"¿Qué mide el {indicator.upper()}?")
                     if period:
                         suggestions.append(f"¿Cómo ha evolucionado el {indicator.upper()} en los últimos años?")
+            if not suggestions:
+                suggestions.extend(default_suggestions)
             # Dedup y limitar
             seen = set()
             uniq = []
@@ -524,9 +531,9 @@ def run_app(
                     continue
                 seen.add(key)
                 uniq.append(s)
-            return [{f"suggestion_{i+1}": s} for i, s in enumerate(uniq[:2])] # SOLO MUESTRA 2 PREGUNTAS
+            return [{f"suggestion_{i+1}": s} for i, s in enumerate(uniq[:3])]
         except Exception:
-            return []
+            return [{f"suggestion_{i+1}": s} for i, s in enumerate(default_suggestions)]
 
     import re as _decor_re
 
@@ -695,9 +702,10 @@ def run_app(
                         if key.startswith("suggestion_"):
                             suggestions.append(marker_dict[key])
                     if suggestions:
-                        cols = st.columns(len(suggestions) if len(suggestions) <= 2 else 2)
-                        for idx, suggestion in enumerate(suggestions[:2]):
-                            col_idx = idx % 3
+                        max_suggestions = min(3, len(suggestions))
+                        cols = st.columns(max_suggestions)
+                        for idx, suggestion in enumerate(suggestions[:max_suggestions]):
+                            col_idx = idx % max_suggestions
                             with cols[col_idx]:
                                 import hashlib
                                 button_key = f"followup_{scope}_{block_idx}_{idx}_{hashlib.md5(suggestion.encode()).hexdigest()[:8]}"
@@ -787,6 +795,7 @@ def run_app(
     buffer_csv: List[str] = []
     buffer_chart: List[str] = []
     buffer_followup: List[str] = []
+    raw_chunks_accum = ""
     raw_text_accum = ""
     text_accum = ""
     placeholder = assistant_box.empty()
@@ -818,8 +827,9 @@ def run_app(
             placeholder.markdown((content or "\u200B") + "▌")
 
     def handle_chunk(chunk: str) -> None:
-        nonlocal collecting_csv, collecting_chart, collecting_followup, buffer_csv, buffer_chart, buffer_followup, raw_text_accum, text_accum, _debug_chunk_idx, first_stream_piece_rendered
+        nonlocal collecting_csv, collecting_chart, collecting_followup, buffer_csv, buffer_chart, buffer_followup, raw_chunks_accum, raw_text_accum, text_accum, _debug_chunk_idx, first_stream_piece_rendered
         text = str(chunk)
+        raw_chunks_accum += text
         _debug_chunk_idx += 1
         try:
             preview = text[:200].replace("\n", "\\n")
@@ -964,6 +974,37 @@ def run_app(
             markers_followup.extend(parsed_followups)
             # Re-render sin los marcadores para evitar que queden visibles
             _render_streaming_text(response_text, final=True)
+
+    # Respaldo robusto: extraer followups desde todo el stream crudo por si los
+    # marcadores llegaron fragmentados entre chunks y no fueron detectados en línea.
+    if (not charts_requested_for_turn) and raw_chunks_accum:
+        try:
+            import re as _re
+
+            pattern = _re.compile(r"##FOLLOWUP_START(.*?)##FOLLOWUP_END", _re.DOTALL)
+            for m in pattern.finditer(raw_chunks_accum):
+                block = m.group(1)
+                d: Dict[str, str] = {}
+                for ln in block.splitlines():
+                    ln = ln.strip()
+                    if "=" in ln:
+                        k, v = ln.split("=", 1)
+                        d[k.strip()] = v.strip()
+                if d:
+                    markers_followup.append(d)
+        except Exception:
+            pass
+
+    if markers_followup:
+        deduped_followups: List[Dict[str, str]] = []
+        seen_signatures = set()
+        for block in markers_followup:
+            signature = tuple((k, block.get(k, "")) for k in sorted(block.keys()) if k.startswith("suggestion_"))
+            if not signature or signature in seen_signatures:
+                continue
+            seen_signatures.add(signature)
+            deduped_followups.append(block)
+        markers_followup = deduped_followups
 
     try:
         if os.getenv("STREAM_CHUNK_LOGS", "0").lower() in {"1", "true", "yes", "on"}:

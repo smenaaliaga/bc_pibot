@@ -1,0 +1,20 @@
+Cuanto es el PIB de Chile?
+
+El Ultimo dato disponible del PIB muestra una variacién interanual de 1,58%. Este valor
+corresponde al tercer trimestre de 2025. Ademas, en comparacion con el periodo anterior, se
+observa una disminucién del 2,19%.
+
+Si necesitas mas informacién o algun otro indicador, no dudes en preguntar.
+
+Fuente: @ Base de Datos Estadisticos (BDE) del Banco Central de Chile.
+oe Cuanto es el PIB de Chile?
+
+El PIB a precios corrientes presenta una variacion interanual de 8,7% en el tercer trimestre de
+2025. Ademas, en comparacion con el trimestre anterior, se observa una disminuci6n del
+-1,2%.
+
+Si necesitas mas informacién o algun otro dato, no dudes en preguntar.
+
+Fuente: @ Base de Datos Estadisticos (BDE) del Banco Central de Chile.
+
+Generar pruebas integrales al final para garantizar de que se estan corrigiendo los errores

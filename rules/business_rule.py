@@ -50,6 +50,17 @@ PIB_CURRENT_PRICE_PATTERN = re.compile(
     r"\b(precios?\s+corrientes?|corriente|nominal|en\s+pesos?|asciende)\b",
     re.IGNORECASE,
 )
+PIB_CUANTO_ES_PATTERN = re.compile(
+    r"\b(?:cuanto|a\s+cuanto|de\s+cuanto)\s+"
+    r"(?:es|era|fue|vale)\s+"
+    r"(?:el\s+)?(?:pib|producto\s+interno\s+bruto)\b"
+    r"(?:\s+(?:de\s+chile|chileno))?",
+    re.IGNORECASE,
+)
+PIB_INDICATOR_PATTERN = re.compile(
+    r"\b(?:pib|producto\s+interno\s+bruto)\b",
+    re.IGNORECASE,
+)
 PIB_SHARE_PATTERN = re.compile(
     r"(\bparticipacion\b|\bcuanto\s+pesa\b|\bpesa\b|\bque\s+porcentaje\b|\bporcentaje\b)",
     re.IGNORECASE,
@@ -620,11 +631,15 @@ def resolve_data_node_overrides(
     """
 
     indicator = str(indicator_ent or "").strip().lower()
-    if indicator != "pib":
+    normalized_q = _normalize_for_matching(question)
+    mentions_pib = bool(PIB_INDICATOR_PATTERN.search(normalized_q))
+    if indicator != "pib" and not mentions_pib:
         return {}
 
-    normalized_q = _normalize_for_matching(question)
     result: Dict[str, Any] = {}
+    if indicator != "pib" and mentions_pib:
+        # Respaldo cuando el clasificador no logró fijar indicador.
+        result["indicator_ent"] = "pib"
 
     enable_corrientes = _env_flag("ENABLE_RULE_PIB_CORRIENTES", True)
     enable_share = _env_flag("ENABLE_RULE_PIB_SHARE", True)
@@ -663,6 +678,10 @@ def resolve_data_node_overrides(
         result["price"] = "co"
         if "feature" not in result:
             result["feature"] = "pib_corrientes"
+    elif enable_corrientes and PIB_CUANTO_ES_PATTERN.search(normalized_q):
+        result["price"] = "co"
+        if "feature" not in result:
+            result["feature"] = "pib_corrientes_cuanto_es"
 
     # Permite ajustes futuros por req_form/frequency si se necesita granularidad extra.
     _ = str(req_form_cls or "").strip().lower()

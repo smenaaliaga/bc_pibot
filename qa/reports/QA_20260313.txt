@@ -1,0 +1,17 @@
+Encontrar la causa raiz y corregir los siguientes problemas:
+
+Analizar porque la primera consulta se demora y entrega esta respuesta
+
+
+
+
+El valor del pib no entrega las preguntas sugeridas, analizar el limite de token por respuesta,
+pareciera que los esta cotando y por eso siempre salen respuestas cortadas
+
+
+
+
+La misma consulta sobre el ¿Cuanto es el PIB de Chile? una con tilde en cuanto y la otra no
+arroja el siguiente resultado
+Generar pruebas integrales al final para garantizar de que se estan corrigiendo los errores
+

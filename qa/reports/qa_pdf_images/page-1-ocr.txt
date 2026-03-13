@@ -1,0 +1,33 @@
+Encontrar la causa raiz y corregir los siguientes problemas:
+
+Analizar porque la primera consulta se demora y entrega esta respuesta
+
+cual es el valor del imacec
+
+“=| No tengo informacion actualizada sobre el valor del IMACEC en este momento. Te recomiendo
+consultar la pagina oficial del Banco Central de Chile o fuentes de noticias econémicas para
+obtener los datos mas recientes.
+
+. Preguntas sugeridas
+
+Cuanto aceleré la economia el ultimo mes
+
+Explicame que es el PIB
+
+El valor del pib no entrega las preguntas sugeridas, analizar el limite de token por respuesta,
+pareciera que los esta cotando y por eso siempre salen respuestas cortadas
+
+cual es el valor del pib
+
+El ultimo dato disponible del PIB muestra una variacion interanual de 1,58%. Este valor
+corresponde al tercer trimestre de 2025. Ademas, en comparacion con el periodo anterior, se
+observa una disminuci6n del 2,19%.
+
+Si necesitas mas informacion o algun otro indicador, no dudes en preguntar.
+
+Fuente: © Base de Datos Estadisticos (BDE) del Banco Central de Chile.
+
+Descargar CSV
+
+La misma consulta sobre el {Cuanto es el PIB de Chile? una con tilde en cuanto y la otra no
+arroja el siguiente resultado

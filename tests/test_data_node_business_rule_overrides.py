@@ -65,6 +65,158 @@ def test_resolve_data_node_overrides_corrientes_and_share(monkeypatch):
     assert "short_circuit_message" not in per_capita
 
 
+def test_resolve_data_node_overrides_defaults_corrientes_only_for_cuanto_es_pib(monkeypatch):
+    monkeypatch.setenv("ENABLE_RULE_PIB_CORRIENTES", "1")
+    monkeypatch.setenv("ENABLE_RULE_PIB_SHARE", "1")
+    monkeypatch.setenv("ENABLE_RULE_PIB_PER_CAPITA", "1")
+
+    variants = [
+        "Cuánto es el PIB de Chile?",
+        "Cuanto es el PIB de Chile?",
+        "A cuánto vale el PIB chileno?",
+        "De cuánto fue el PIB de Chile?",
+        "Cuánto es el producto interno bruto de Chile?",
+    ]
+
+    for question in variants:
+        result = resolve_data_node_overrides(
+            question=question,
+            indicator_ent="pib",
+            calc_mode_cls="original",
+            req_form_cls="latest",
+            frequency_ent="q",
+        )
+        assert result.get("price") == "co", question
+        assert result.get("feature") == "pib_corrientes_cuanto_es", question
+
+
+def test_resolve_data_node_overrides_does_not_force_corrientes_for_cual_es_encadenado_or_variation(monkeypatch):
+    monkeypatch.setenv("ENABLE_RULE_PIB_CORRIENTES", "1")
+    monkeypatch.setenv("ENABLE_RULE_PIB_SHARE", "1")
+    monkeypatch.setenv("ENABLE_RULE_PIB_PER_CAPITA", "1")
+
+    cual_es = resolve_data_node_overrides(
+        question="Cual es el PIB de Chile?",
+        indicator_ent="pib",
+        calc_mode_cls="original",
+        req_form_cls="latest",
+        frequency_ent="q",
+    )
+    assert cual_es.get("price") is None
+
+    cuanto_crecio = resolve_data_node_overrides(
+        question="Cuánto creció el PIB de Chile?",
+        indicator_ent="pib",
+        calc_mode_cls="yoy",
+        req_form_cls="latest",
+        frequency_ent="q",
+    )
+    assert cuanto_crecio.get("price") is None
+
+    encadenado = resolve_data_node_overrides(
+        question="Cual es el PIB a precios encadenados?",
+        indicator_ent="pib",
+        calc_mode_cls="original",
+        req_form_cls="latest",
+        frequency_ent="q",
+    )
+    assert encadenado.get("price") is None
+
+    variacion = resolve_data_node_overrides(
+        question="Cual es la variación del PIB de Chile?",
+        indicator_ent="pib",
+        calc_mode_cls="yoy",
+        req_form_cls="latest",
+        frequency_ent="q",
+    )
+    assert variacion.get("price") is None
+
+
+def test_resolve_data_node_overrides_infieres_pib_indicator_when_missing(monkeypatch):
+    monkeypatch.setenv("ENABLE_RULE_PIB_CORRIENTES", "1")
+    monkeypatch.setenv("ENABLE_RULE_PIB_SHARE", "1")
+    monkeypatch.setenv("ENABLE_RULE_PIB_PER_CAPITA", "1")
+
+    variants = [
+        "Cuánto es el PIB de Chile?",
+        "Cuanto es el PIB de Chile?",
+        "¿Cua\u0301nto es el producto interno bruto de Chile?",
+    ]
+
+    for question in variants:
+        result = resolve_data_node_overrides(
+            question=question,
+            indicator_ent=None,
+            calc_mode_cls="original",
+            req_form_cls="latest",
+            frequency_ent="q",
+        )
+        assert result.get("indicator_ent") == "pib", question
+        assert result.get("price") == "co", question
+
+
+def test_data_node_applies_inferred_indicator_override_before_lookup(monkeypatch):
+    monkeypatch.setenv("ENABLE_RULE_PIB_CORRIENTES", "1")
+
+    ent = ResolvedEntities(
+        indicator_ent=None,
+        frequency_ent="q",
+        calc_mode_cls="original",
+        seasonality_ent="nsa",
+        activity_ent=None,
+        activity_cls="none",
+        activity_cls_resolved="none",
+        region_ent=None,
+        region_cls="none",
+        investment_ent=None,
+        investment_cls="none",
+        req_form_cls="latest",
+        price=None,
+    )
+
+    monkeypatch.setattr(
+        data_node_module,
+        "_extract_entities_from_state",
+        lambda state: (state.get("question", ""), [], ent),
+    )
+    monkeypatch.setattr(data_node_module, "apply_business_rules", lambda _ent: _ent)
+
+    lookup_capture: dict[str, object] = {}
+
+    def _fake_lookup(_ent):
+        lookup_capture["indicator_ent"] = _ent.indicator_ent
+        lookup_capture["price"] = _ent.price
+        return SimpleNamespace(
+            family_name="PIB",
+            source_url="https://example.com",
+            target_series_id="F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T",
+            target_series_title="PIB a precios corrientes",
+            family_series=[],
+        )
+
+    monkeypatch.setattr(data_node_module, "lookup_series", _fake_lookup)
+
+    monkeypatch.setattr(
+        data_node_module,
+        "load_observations",
+        lambda *args, **kwargs: {
+            "F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T": {
+                "meta": {"original_frequency": "Q"},
+                "observations": [{"date": "2025-09-30", "value": 100.0}],
+            }
+        },
+    )
+
+    monkeypatch.setattr(data_node_module, "_emit_stream_chunk", lambda chunk, writer: None)
+    monkeypatch.setattr(data_node_module, "stream_data_response", lambda payload: iter(["ok"]))
+
+    node = data_node_module.make_data_node(memory_adapter=None)
+    node({"question": "Cuánto es el PIB de Chile?"}, writer=None)
+
+    assert lookup_capture["indicator_ent"] == "pib"
+    assert lookup_capture["price"] == "co"
+
+
 def test_resolve_data_node_overrides_reads_json_toggles(monkeypatch, tmp_path):
     cfg = tmp_path / "rule_toggles.json"
     cfg.write_text(

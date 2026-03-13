@@ -20,10 +20,66 @@ logger = logging.getLogger(__name__)
 
 # Timeouts
 PREDICT_TIMEOUT_SECONDS = float(os.getenv("PREDICT_TIMEOUT_SECONDS", "10"))
+PREDICT_RETRY_ATTEMPTS = max(1, int(os.getenv("PREDICT_RETRY_ATTEMPTS", "2")))
+PREDICT_RETRY_TIMEOUT_SECONDS = float(
+    os.getenv("PREDICT_RETRY_TIMEOUT_SECONDS", str(max(PREDICT_TIMEOUT_SECONDS, 20.0)))
+)
+PREDICT_RETRY_BACKOFF_SECONDS = float(os.getenv("PREDICT_RETRY_BACKOFF_SECONDS", "0.35"))
 
 
 def _use_local_jointbert() -> bool:
     return os.getenv("USE_JOINTBERT_CLASSIFIER", "false").lower() in {"1", "true", "yes", "on"}
+
+
+def _should_retry_predict_error(exc: Exception) -> bool:
+    message = str(exc or "").strip().lower()
+    if not message:
+        return False
+    transient_tokens = (
+        "timed out",
+        "timeout",
+        "temporarily unavailable",
+        "connection reset",
+        "connection refused",
+        "remote end closed connection without response",
+    )
+    return any(token in message for token in transient_tokens)
+
+
+def _predict_with_retry(question: str) -> Dict[str, Any]:
+    predict_payload = {"text": question}
+    attempts = max(1, int(PREDICT_RETRY_ATTEMPTS or 1))
+    last_error: Optional[Exception] = None
+
+    for attempt in range(1, attempts + 1):
+        timeout = (
+            PREDICT_TIMEOUT_SECONDS
+            if attempt == 1
+            else max(PREDICT_TIMEOUT_SECONDS, PREDICT_RETRY_TIMEOUT_SECONDS)
+        )
+        try:
+            return post_json(PREDICT_URL, predict_payload, timeout=timeout)
+        except Exception as exc:
+            last_error = exc
+            can_retry = attempt < attempts and _should_retry_predict_error(exc)
+            if not can_retry:
+                raise
+
+            sleep_s = max(0.0, PREDICT_RETRY_BACKOFF_SECONDS) * attempt
+            logger.warning(
+                "[CLASSIFIER_API] /predict transient failure (attempt %s/%s, timeout=%.1fs): %s",
+                attempt,
+                attempts,
+                timeout,
+                exc,
+            )
+            if sleep_s > 0:
+                time.sleep(sleep_s)
+
+    if last_error is not None:
+        raise last_error
+
+    return {}
 
 
 # ============================================================
@@ -288,8 +344,7 @@ def _classify_with_jointbert(question: str) -> ClassificationResult:
     if _use_local_jointbert():
         logger.warning("USE_JOINTBERT_CLASSIFIER enabled but local classifier is unavailable; using API flow")
 
-    predict_payload = {"text": question}
-    predict_result = post_json(PREDICT_URL, predict_payload, timeout=PREDICT_TIMEOUT_SECONDS)
+    predict_result = _predict_with_retry(question)
     logger.debug("[PREDICT_API] response=%s", predict_result)
     predict_result_dict: Dict[str, Any] = predict_result if isinstance(predict_result, dict) else {}
     interpretation = predict_result_dict.get("interpretation")

@@ -25,8 +25,11 @@ from config import get_settings, PREDICT_URL
 # from orchestrator.classifier.joint_bert_classifier import get_predictor
 from registry import warmup_models
 import app
-from orchestrator.utils.http_client import get_json
-from orchestrator.utils.run_detail_log import append_run_detail
+from orchestrator.utils.http_client import get_json, post_json
+from orchestrator.utils.run_detail_log import append_detail_trace, append_run_detail
+
+
+_DETAIL_SEPARATOR = "************************************************************************************************************"
 
 
 def _health_url_from_predict_url(predict_url: str) -> str:
@@ -79,6 +82,37 @@ def _log_remote_model_health(logger: logging.LoggerAdapter) -> None:
         payload.get("router_hf_repo_id"),
         payload.get("router_hf_revision"),
         payload.get("router_hf_commit"),
+    )
+
+
+def _warmup_predict_endpoint(logger: logging.LoggerAdapter) -> None:
+    """Hace un primer POST /predict para evitar cold-start en la primera consulta del usuario."""
+    enabled = os.getenv("PREDICT_WARMUP_ON_START", "1").lower() in {"1", "true", "yes", "on"}
+    if not enabled:
+        return
+
+    warmup_text = str(os.getenv("PREDICT_WARMUP_TEXT", "cual es el valor del imacec") or "").strip()
+    if not warmup_text:
+        warmup_text = "cual es el valor del imacec"
+
+    timeout = float(os.getenv("PREDICT_WARMUP_TIMEOUT_SECONDS", "30"))
+    t0 = os.times()[4]
+    try:
+        payload = post_json(PREDICT_URL, {"text": warmup_text}, timeout=timeout)
+    except Exception as exc:
+        logger.warning("[MODEL_WARMUP] POST %s failed: %s", PREDICT_URL, exc)
+        return
+
+    elapsed = max(0.0, os.times()[4] - t0)
+    routing = payload.get("routing") if isinstance(payload, dict) else {}
+    routing = routing if isinstance(routing, dict) else {}
+    intent = routing.get("intent") if isinstance(routing.get("intent"), dict) else {}
+    context = routing.get("context") if isinstance(routing.get("context"), dict) else {}
+    logger.info(
+        "[MODEL_WARMUP] ok elapsed=%.3fs intent=%s context=%s",
+        elapsed,
+        intent.get("label"),
+        context.get("label"),
     )
 
 
@@ -153,6 +187,62 @@ def _log_streamlit_response_block(logger: logging.LoggerAdapter, question: str, 
             logger.info("[QA_TRACE] %s", line)
 
     logger.info("[QA_TRACE] STREAMLIT_RESPONSE_END")
+
+
+def _route_to_response_class(route_decision: Any) -> str:
+    decision = str(route_decision or "").strip().lower()
+    if decision == "data":
+        return "DATA"
+    if decision == "rag":
+        return "RAG"
+    if decision == "fallback":
+        return "PAYLOAD"
+    return ""
+
+
+def _resolve_response_classification(state: Dict[str, Any], final_output_raw: str) -> str:
+    if isinstance(state, dict):
+        route_class = _route_to_response_class(state.get("route_decision"))
+        if route_class:
+            return route_class
+
+        intent_payload = state.get("intent")
+        if isinstance(intent_payload, dict):
+            route_class = _route_to_response_class(intent_payload.get("context_mode"))
+            if route_class:
+                return route_class
+
+        # Señal de respaldo para consultas DATA cuando no quedó route_decision.
+        if state.get("series") or state.get("data_classification"):
+            return "DATA"
+
+    raw_text = str(final_output_raw or "")
+    if "##CSV_DOWNLOAD_START" in raw_text:
+        return "DATA"
+    if (
+        "para mayor información, puedes consultar los documentos disponibles en la web oficial del banco central de chile"
+        in raw_text.lower()
+    ):
+        return "RAG"
+    return "PAYLOAD"
+
+
+def _append_detail_trace_response_block(
+    *,
+    question: str,
+    response_classification: str,
+    response_text: str,
+    session_id: Optional[str] = None,
+) -> None:
+    compact_question = " ".join(str(question or "").split())
+    append_detail_trace(_DETAIL_SEPARATOR, session_id=session_id)
+    append_detail_trace(f"PREGUNTA={compact_question}", session_id=session_id)
+    append_detail_trace(
+        f"CLASIFICACION_RESPUESTA={str(response_classification or '').strip() or 'PAYLOAD'}",
+        session_id=session_id,
+    )
+    append_detail_trace(f"RESPUESTA_FINAL_TEXT=\n{str(response_text or '').strip()}", session_id=session_id)
+    append_detail_trace(_DETAIL_SEPARATOR, session_id=session_id)
 
 
 def _extract_marker_blocks(text: str, *, start_marker: str, end_marker: str) -> List[str]:
@@ -275,6 +365,7 @@ def main() -> None:
 
     # Verificar estado del modelo remoto una vez al arranque inicial.
     _log_remote_model_health(logger)
+    _warmup_predict_endpoint(logger)
 
     settings = get_settings()
 
@@ -467,6 +558,11 @@ def main() -> None:
 
         final_output_text = ""
         seen_stream_chunk_count = 0
+        stream_chunk_payload_events = 0
+        stream_chunk_list_events = 0
+        stream_chunk_reset_events = 0
+        stream_piece_count = 0
+        stream_piece_chars = 0
 
         def _split_event(raw_event):
             mode = None
@@ -491,16 +587,31 @@ def main() -> None:
                         _log_qa_trace(payload)
 
                 for chunk_payload in _extract_field(payload, "stream_chunks"):
+                    stream_chunk_payload_events += 1
                     payload_items = chunk_payload
                     if isinstance(chunk_payload, (list, tuple)):
+                        stream_chunk_list_events += 1
                         start_idx = seen_stream_chunk_count
-                        if start_idx < 0 or start_idx > len(chunk_payload):
+                        if start_idx < 0:
+                            start_idx = 0
+                        if start_idx > len(chunk_payload):
+                            stream_chunk_reset_events += 1
+                            append_detail_trace(
+                                (
+                                    "STREAM_CHUNKS_RESET "
+                                    f"prev_seen={seen_stream_chunk_count} "
+                                    f"incoming_len={len(chunk_payload)}"
+                                ),
+                                session_id=thread_id,
+                            )
                             start_idx = len(chunk_payload)
                         payload_items = chunk_payload[start_idx:]
                         seen_stream_chunk_count = len(chunk_payload)
                     for chunk_text in _iter_strings(payload_items):
                         if not chunk_text:
                             continue
+                        stream_piece_count += 1
+                        stream_piece_chars += len(chunk_text)
                         final_output_text += chunk_text
                         try:
                             # Gate per-chunk logs with env flag
@@ -528,12 +639,57 @@ def main() -> None:
 
             final_output_raw = final_output_text or state_output_text
             streamlit_like = _strip_streamlit_markers(final_output_raw)
+
+            append_run_detail(
+                "stream_chunks_stats",
+                {
+                    "question": question,
+                    "chunk_payload_events": stream_chunk_payload_events,
+                    "chunk_list_events": stream_chunk_list_events,
+                    "chunk_reset_events": stream_chunk_reset_events,
+                    "pieces_emitted": stream_piece_count,
+                    "chars_emitted": stream_piece_chars,
+                    "raw_response_len": len(final_output_raw),
+                    "clean_response_len": len(streamlit_like),
+                    "has_csv_marker": "##CSV_DOWNLOAD_START" in final_output_raw,
+                    "has_chart_marker": "##CHART_START" in final_output_raw,
+                    "has_followup_marker": "##FOLLOWUP_START" in final_output_raw,
+                },
+                session_id=thread_id,
+            )
+            append_detail_trace(
+                f"respuesta_final={json.dumps(final_output_raw, ensure_ascii=False)}",
+                session_id=thread_id,
+            )
+            response_classification = _resolve_response_classification(current_state, final_output_raw)
+            append_run_detail(
+                "response_classification",
+                {
+                    "question": question,
+                    "route_decision": current_state.get("route_decision"),
+                    "intent_context_mode": (
+                        current_state.get("intent", {}).get("context_mode")
+                        if isinstance(current_state.get("intent"), dict)
+                        else None
+                    ),
+                    "classification": response_classification,
+                },
+                session_id=thread_id,
+            )
+            _append_detail_trace_response_block(
+                question=question,
+                response_classification=response_classification,
+                response_text=streamlit_like,
+                session_id=thread_id,
+            )
+
             _log_streamlit_response_block(logger, question, streamlit_like)
             append_run_detail(
                 "streamlit_response",
                 {
                     "question": question,
                     "response": streamlit_like,
+                    "classification": response_classification,
                 },
                 session_id=thread_id,
             )
