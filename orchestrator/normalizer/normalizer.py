@@ -193,6 +193,40 @@ def _intent_label(intent_value: Any) -> Optional[str]:
     return str(intent_value).lower()
 
 
+def coerce_specific_class_labels(
+    *,
+    activity_label: Optional[str],
+    region_label: Optional[str],
+    investment_label: Optional[str],
+    normalized_entities: Optional[Dict[str, Any]],
+) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    """Degrada cls='specific' a 'none' cuando no hay entidad normalizada.
+
+    Regla: si activity/region/investment viene como "specific" pero luego del
+    matching la entidad normalizada queda vacía, se interpreta como ausencia de
+    match y la clasificación pasa a "none".
+    """
+    normalized_entities = normalized_entities if isinstance(normalized_entities, dict) else {}
+
+    def _coerce(label: Optional[str], key: str) -> Optional[str]:
+        lbl = str(label or "").strip().lower() or None
+        if lbl != "specific":
+            return lbl
+
+        value = normalized_entities.get(key)
+        if isinstance(value, list):
+            has_value = any(str(v).strip() for v in value if v is not None)
+        else:
+            has_value = bool(str(value).strip()) if value is not None else False
+        return "specific" if has_value else "none"
+
+    return (
+        _coerce(activity_label, "activity"),
+        _coerce(region_label, "region"),
+        _coerce(investment_label, "investment"),
+    )
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Normalización individual por entidad
 # ═══════════════════════════════════════════════════════════════════════════════

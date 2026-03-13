@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 from orchestrator.normalizer.normalizer import (
+    coerce_specific_class_labels,
     coerce_req_form_from_period_and_frequency,
     normalize_entities,
 )
@@ -281,6 +282,12 @@ def _classify_with_jointbert(question: str) -> ClassificationResult:
         raise RuntimeError("Failed to recompute entities_normalized from /predict response") from exc
 
     req_form_label = coerce_req_form_from_period_and_frequency(req_form_label, normalized)
+    activity_label, region_label, investment_label = coerce_specific_class_labels(
+        activity_label=activity_label,
+        region_label=region_label,
+        investment_label=investment_label,
+        normalized_entities=normalized,
+    )
 
     interpretation_state = predict_raw_for_state.get("interpretation")
     if isinstance(interpretation_state, dict):
