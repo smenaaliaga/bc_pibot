@@ -323,3 +323,6 @@ config.local.py
 
 # Ignore example payloads
 orchestrator/data/example_payload.js
+
+# Ignora archivos de datos preprocesados del payload
+orchestrator/memory/data_store/

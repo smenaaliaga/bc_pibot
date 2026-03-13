@@ -3,41 +3,34 @@
 Flujo principal (``data_node``):
     1. Extrae entidades y clasificación del estado del grafo.
     2. Aplica las reglas de negocio (``_business_rules``).
-    3. Busca la familia y serie objetivo en el catálogo (``catalog_lookup``).
-    4. Obtiene las observaciones según la rama correspondiente (``_fetch``).
-    5. Construye el payload y lo envía al flujo de respuesta (streaming).
+    3. Busca el payload en data_store con ``search_output_payloads``.
+    4. Envía question + observations (payload completo) al response.
 """
 
 from __future__ import annotations
 
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from langgraph.types import StreamWriter
 
 from orchestrator.data.response import handle_no_series, stream_data_response
 from ..state import AgentState, _clone_entities, _emit_stream_chunk
-from orchestrator.data._helpers import coerce_period, extract_year, first_non_empty, to_period_end_str, has_full_quarterly_year
+from orchestrator.data._helpers import coerce_period, first_non_empty
 from orchestrator.data._business_rules import ResolvedEntities, apply_business_rules
-from orchestrator.catalog.catalog_lookup import lookup_series
+from orchestrator.data.catalog_data_search import search_output_payloads
 
 logger = logging.getLogger(__name__)
 
 # Re-exportar para compatibilidad con tests que hacen monkeypatch.
 from orchestrator.data._helpers import build_target_series_url as _build_target_series_url  # noqa: F401
-from orchestrator.data._fetch import (
-    load_series_observations as _load_series_observations,  # noqa: F401
-    fetch_series_by_req_form as _fetch_series_by_req_form,  # noqa: F401
-)
 
-
-def _get_load_fn():
-    """Retorna la referencia actual de _load_series_observations."""
-    import sys
-    mod = sys.modules[__name__]
-    return getattr(mod, "_load_series_observations")
+# ---------------------------------------------------------------------------
+# Rutas
+# ---------------------------------------------------------------------------
+_DATA_STORE_DIR = Path(__file__).resolve().parent.parent.parent / "memory" / "data_store"
 
 
 # ---------------------------------------------------------------------------
@@ -122,217 +115,56 @@ def _extract_entities_from_state(
     return question, entities, ent
 
 
+# ---------------------------------------------------------------------------
+# Helpers para búsqueda en data_store
+# ---------------------------------------------------------------------------
 
+def _build_search_kwargs(ent: ResolvedEntities) -> Dict[str, Any]:
+    """Construye los kwargs para ``search_output_payloads`` a partir de las entidades resueltas."""
+    kwargs: Dict[str, Any] = {}
 
+    if ent.indicator_ent:
+        kwargs["indicator"] = ent.indicator_ent
 
-def _obs_to_list(obs_raw: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Normaliza observaciones crudas al formato compacto del payload."""
-    return [
-        {
-            "date": str(o.get("date", "")),
-            "value": o.get("value"),
-            "yoy_pct": o.get("yoy_pct"),
-            "pct": o.get("pct"),
-        }
-        for o in obs_raw
-        if isinstance(o, dict)
-    ]
+    calc = str(ent.calc_mode_cls or "").strip().lower()
+    if calc:
+        kwargs["calc_mode"] = calc
 
+    if ent.seasonality_ent:
+        kwargs["seasonality"] = ent.seasonality_ent
 
-def load_observations(
-    series_list: List[Dict[str, Any]],
-    load_fn,
-    period_values: Optional[List[Any]] = None,
-    frequency: Optional[str] = None,
-    indicator: Optional[str] = None,
-) -> Dict[str, Dict[str, Any]]:
-    """Carga observaciones de cada serie y retorna dict indexado por series_id.
+    if ent.frequency_ent:
+        kwargs["frequency"] = ent.frequency_ent
 
-    Para PIB con frecuencia anual, obtiene datos tanto anuales como
-    trimestrales.  Los años anuales sin los 4 trimestres completos se
-    eliminan de la lista anual y se señalan en meta.  Las observaciones
-    se agrupan por frecuencia: ``{"A": [...], "Q": [...]}``.
+    if ent.price:
+        kwargs["price"] = ent.price
 
-    Estructura retornada::
+    # has_activity / has_region / has_investment: 1 si cls es "general" o "specific", 0 si "none"
+    act = str(ent.activity_cls or "").strip().lower()
+    if act in ("general", "specific"):
+        kwargs["has_activity"] = 1
+    elif act == "none":
+        kwargs["has_activity"] = 0
 
-        {
-            "<series_id>": {
-                "meta": { ... },
-                "observations": [...]             # caso normal (lista)
-            },
-        }
+    reg = str(ent.region_cls or "").strip().lower()
+    if reg in ("general", "specific"):
+        kwargs["has_region"] = 1
+    elif reg == "none":
+        kwargs["has_region"] = 0
 
-    Para PIB anual::
+    if ent.region_ent:
+        kwargs["region"] = ent.region_ent
 
-        {
-            "<series_id>": {
-                "meta": { ... },
-                "observations": {                 # dict con sub-llaves
-                    "A": [...],
-                    "Q": [...],
-                },
-            },
-        }
-    """
-    firstdate = str(period_values[0]) if period_values else None
-    lastdate = str(period_values[-1]) if period_values else None
+    inv = str(ent.investment_cls or "").strip().lower()
+    if inv in ("general", "specific"):
+        kwargs["has_investment"] = 1
+    elif inv == "none":
+        kwargs["has_investment"] = 0
 
-    # Ajustar lastdate al fin de periodo para coincidir con fechas de observación
-    if lastdate and frequency:
-        lastdate = to_period_end_str(lastdate, frequency)
+    if ent.hist:
+        kwargs["hist"] = ent.hist
 
-    result: Dict[str, Dict[str, Any]] = {}
-    
-    # Función interna para cargar una serie (puede ejecutarse en paralelo)
-    def _load_single_series(s: Dict[str, Any]) -> tuple[str, Dict[str, Any]]:
-        """Carga observaciones de una serie. Retorna (series_id, resultado_dict)."""
-        sid = s.get("id") if isinstance(s, dict) else None
-        if not sid:
-            return None, None
-
-        target_freq = frequency.upper() if frequency else None
-
-        obs_raw, meta = load_fn(
-            series_id=sid,
-            firstdate=firstdate,
-            lastdate=lastdate,
-            target_frequency=target_freq,
-            agg_mode="sum",
-            calc_mode=None,
-        )
-
-        # Fallback: si el periodo solicitado queda fuera del rango disponible,
-        # cargar sin filtro y tomar el extremo más cercano.
-        if not obs_raw and period_values and meta and isinstance(meta, dict):
-            last_avail = meta.get("last_available_date") or ""
-            first_avail = meta.get("first_available_date") or ""
-            if lastdate and last_avail and lastdate > last_avail:
-                obs_raw, meta = load_fn(
-                    series_id=sid,
-                    firstdate=last_avail,
-                    lastdate=last_avail,
-                    target_frequency=target_freq,
-                    agg_mode="sum",
-                    calc_mode=None,
-                )
-                logger.debug("[load_observations] Periodo posterior al disponible; usando last_available_date=%s", last_avail)
-            elif firstdate and first_avail and firstdate < first_avail:
-                obs_raw, meta = load_fn(
-                    series_id=sid,
-                    firstdate=first_avail,
-                    lastdate=first_avail,
-                    target_frequency=target_freq,
-                    agg_mode="sum",
-                    calc_mode=None,
-                )
-                logger.debug("[load_observations] Periodo anterior al disponible; usando first_available_date=%s", first_avail)
-
-        # Anotar frecuencia remuestreada si difiere de la original
-        if meta and isinstance(meta, dict) and target_freq:
-            orig = (meta.get("original_frequency") or "").upper()
-            if orig and target_freq != orig:
-                meta["target_frequency"] = target_freq
-
-        return sid, {
-            "meta": meta,
-            "observations": _obs_to_list(obs_raw),
-        }
-
-    # Cargar series en paralelo usando ThreadPoolExecutor
-    # Usar min(len(series_list), 4) workers para evitar overhead
-    num_workers = min(max(1, len(series_list or [])), 4)
-    
-    if num_workers > 1 and series_list:
-        # Modo paralelo para múltiples series
-        with ThreadPoolExecutor(max_workers=num_workers) as executor:
-            futures = {executor.submit(_load_single_series, s): s for s in (series_list or [])}
-            for future in as_completed(futures):
-                try:
-                    sid, data = future.result()
-                    if sid and data:
-                        result[sid] = data
-                except Exception as e:
-                    logger.warning("[load_observations] Error cargando serie en paralelo: %s", e)
-    else:
-        # Modo secuencial para una sola serie o lista vacía
-        for s in (series_list or []):
-            try:
-                sid, data = _load_single_series(s)
-                if sid and data:
-                    result[sid] = data
-            except Exception as e:
-                logger.warning("[load_observations] Error cargando serie: %s", e)
-
-    # ------------------------------------------------------------------
-    # Post-proceso: para PIB anual, obtener también datos trimestrales
-    # y depurar años anuales incompletos.
-    # ------------------------------------------------------------------
-    is_pib_annual = (
-        str(indicator or "").strip().lower() == "pib"
-        and frequency
-        and frequency.strip().upper() == "A"
-    )
-    if is_pib_annual:
-        for sid in list(result.keys()):
-            entry = result[sid]
-            meta = entry.get("meta") or {}
-            obs = entry.get("observations") or []
-            orig = (meta.get("original_frequency") or "").upper()
-            # Fallback: si el cache reporta "U", inferir desde el sufijo de la serie
-            if orig not in ("Q", "T", "M"):
-                suffix = sid.strip().split(".")[-1].upper()
-                if suffix == "T":
-                    orig = "Q"
-            if orig not in ("Q", "T", "M"):
-                continue
-
-            # Años presentes en la lista anual
-            years = sorted({extract_year(o.get("date")) for o in obs if extract_year(o.get("date"))})
-            if not years:
-                continue
-
-            q_first = f"{min(years)}-01-01"
-            q_last = f"{max(years)}-12-31"
-
-            q_obs, q_meta = load_fn(
-                series_id=sid,
-                firstdate=q_first,
-                lastdate=q_last,
-                target_frequency="Q",
-                agg_mode="sum",
-                calc_mode=None,
-            )
-
-            # Remover años incompletos de la lista anual
-            removed_years: List[int] = []
-            clean_annual: List[Dict[str, Any]] = []
-            for o in obs:
-                y = extract_year(o.get("date"))
-                if y and has_full_quarterly_year(q_obs, y):
-                    clean_annual.append(o)
-                elif y:
-                    removed_years.append(y)
-
-            if removed_years:
-                meta["incomplete_annual_note"] = (
-                    f"Los años {', '.join(str(y) for y in removed_years)} no tienen "
-                    f"los 4 trimestres completos; ver datos trimestrales."
-                ) if len(removed_years) > 1 else (
-                    f"El año {removed_years[0]} no tiene los 4 trimestres "
-                    f"completos; ver datos trimestrales."
-                )
-                logger.info(
-                    "[load_observations] Años anuales incompletos removidos: %s para %s",
-                    removed_years, sid,
-                )
-
-            # Agrupar observaciones por frecuencia en un solo dict
-            result[sid]["observations"] = {
-                "A": clean_annual,
-                "Q": _obs_to_list(q_obs),
-            }
-
-    return result
+    return kwargs
 
 
 # ---------------------------------------------------------------------------
@@ -356,12 +188,21 @@ def make_data_node(memory_adapter: Any):
         logger.info("[DATA_NODE] indicator=%s freq=%s activity=%s req_form=%s",
                     ent.indicator_ent, ent.frequency_ent, ent.activity_ent, ent.req_form_cls)
 
-        # 3. Buscar serie en catálogo
-        sl = lookup_series(ent)
-        logger.info("[DATA_NODE] family=%s target=%s", sl.family_name, sl.target_series_id)
+        # 3. Buscar payload en data_store con search_output_payloads
+        search_kwargs = _build_search_kwargs(ent)
+        logger.info("[DATA_NODE] search_output_payloads kwargs=%s", search_kwargs)
 
-        # 4. Sin serie → respuesta informativa
-        if not sl.source_url or not sl.target_series_id:
+        try:
+            matches = search_output_payloads(
+                str(_DATA_STORE_DIR), **search_kwargs
+            )
+        except FileNotFoundError:
+            logger.warning("[DATA_NODE] data_store directory not found: %s", _DATA_STORE_DIR)
+            matches = []
+
+        logger.info("[DATA_NODE] search_output_payloads found %d matches", len(matches))
+
+        if not matches:
             return handle_no_series(
                 question=question,
                 entities=entities,
@@ -371,45 +212,19 @@ def make_data_node(memory_adapter: Any):
                 first_non_empty_fn=first_non_empty,
             )
 
-        # 5. Cargar observaciones: siempre familia completa y sin filtro temporal.
-        is_contribution = str(ent.calc_mode_cls or "").strip().lower() == "contribution"
-        series_to_load = sl.family_series or ([{"id": sl.target_series_id}] if sl.target_series_id else [])
-        logger.info("[DATA_NODE][STEP-5] Familia completa sin filtros de target/fecha (%d series)", len(series_to_load))
+        # El payload completo del data_store ES las observations
+        observations = matches[0]["payload"]
+        source_url = observations.get("source_url", "")
 
-        observations = load_observations(
-            series_to_load,
-            _get_load_fn(),
-            period_values=None,
-            frequency=ent.frequency_ent,
-            indicator=ent.indicator_ent,
-        )
+        logger.info("[DATA_NODE] cuadro=%s freq=%s series_count=%d",
+                    observations.get("cuadro_name"),
+                    observations.get("frequency"),
+                    len(observations.get("series", [])))
 
-        # Para contribuciones, pct y yoy_pct no tienen sentido: el valor ya
-        # representa puntos porcentuales de contribución al crecimiento.
-        if is_contribution:
-            for _entry in observations.values():
-                obs = _entry.get("observations")
-                if isinstance(obs, list):
-                    for o in obs:
-                        o.pop("pct", None)
-                        o.pop("yoy_pct", None)
-                elif isinstance(obs, dict):
-                    for sub in obs.values():
-                        if isinstance(sub, list):
-                            for o in sub:
-                                o.pop("pct", None)
-                                o.pop("yoy_pct", None)
-
-        # 6. Construir payload y hacer streaming de la respuesta LLM
+        # 4. Construir payload: question + observations (payload data_store)
         payload = {
             "question": question,
-            "classification": asdict(ent),
-            "price": ent.price,
             "observations": observations,
-            "family_name": sl.family_name,
-            "series": sl.target_series_id,
-            "series_title": sl.target_series_title,
-            "source_url": sl.source_url,
         }
 
         collected: List[str] = []
@@ -429,12 +244,16 @@ def make_data_node(memory_adapter: Any):
         pv = ent.period_ent or []
         rf = str(ent.req_form_cls or "").strip().lower()
 
+        # Extraer serie objetivo del payload para el retorno
+        store_series = observations.get("series") or []
+        target_id = store_series[0].get("series_id") if store_series else None
+
         return {
             "output": "".join(collected),
             "entities": entities,
             "parsed_point": str(pv[-1]) if (rf != "range" and pv) else None,
             "parsed_range": (str(pv[0]), str(pv[-1])) if pv else None,
-            "series": sl.target_series_id,
+            "series": target_id,
             "data_classification": ent_dict,
         }
 

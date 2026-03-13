@@ -216,10 +216,6 @@ def should_skip_cuadro(cuadro_name: str, cuadro_data: Dict) -> Tuple[bool, str]:
     series = cuadro_data.get("series", [])
     if not series:
         return True, "empty_series"
-    if is_contribution(cls):
-        return True, "contribution"
-    if is_share(cls):
-        return True, "share"
     return False, ""
 
 
@@ -409,18 +405,25 @@ def aggregate_quarterly_to_annual(periods: List[str], values: List[float]) -> Tu
 # Build data block
 # ---------------------------------------------------------------------------
 
-def build_data_block(periods: List[str], values: List[float], freq: str, origin: str) -> Dict:
-    """Construye un bloque de datos con métricas derivadas."""
-    derived = compute_derived(periods, values, freq)
-    return {
+def build_data_block(periods: List[str], values: List[float], freq: str, origin: str, *, skip_derived: bool = False) -> Dict:
+    """Construye un bloque de datos con métricas derivadas.
+
+    Args:
+        skip_derived: Si True, omite el cálculo de tasas derivadas (pct, yoy_pct,
+            delta_abs, etc.). Útil para cuadros de contribución/participación
+            donde los valores ya son porcentajes y las tasas no tienen sentido.
+    """
+    block: Dict[str, Any] = {
         "frequency": freq,
         "origin": origin,
         "aggregation": "sum",
         "latest_period": periods[-1] if periods else None,
         "periods": periods,
         "value": values,
-        **derived,
     }
+    if not skip_derived:
+        block.update(compute_derived(periods, values, freq))
+    return block
 
 
 # ---------------------------------------------------------------------------
@@ -500,7 +503,7 @@ def _convert_block_to_records(block: Dict) -> None:
 # Build one series
 # ---------------------------------------------------------------------------
 
-def build_series_output(series_info: Dict, client: BDEClient, fetched_at: str) -> Optional[Dict]:
+def build_series_output(series_info: Dict, client: BDEClient, fetched_at: str, *, skip_derived: bool = False) -> Optional[Dict]:
     """Construye el output enriquecido de una serie individual."""
     series_id = series_info["id"]
     freq = detect_frequency(series_id)
@@ -544,7 +547,7 @@ def build_series_output(series_info: Dict, client: BDEClient, fetched_at: str) -
     extrema = {}
 
     # Native frequency block
-    native_block = build_data_block(base_periods, base_values, freq, "official")
+    native_block = build_data_block(base_periods, base_values, freq, "official", skip_derived=skip_derived)
     data[freq] = native_block
     latest_snapshot[freq] = build_snapshot_for_block(native_block)
     extrema[freq] = compute_extrema_for_block(native_block)
@@ -554,14 +557,14 @@ def build_series_output(series_info: Dict, client: BDEClient, fetched_at: str) -
         # M -> T
         q_periods, q_values = aggregate_monthly_to_quarterly(base_periods, base_values)
         if q_periods:
-            q_block = build_data_block(q_periods, q_values, "T", "derived_from_M")
+            q_block = build_data_block(q_periods, q_values, "T", "derived_from_M", skip_derived=skip_derived)
             data["T"] = q_block
             latest_snapshot["T"] = build_snapshot_for_block(q_block)
             extrema["T"] = compute_extrema_for_block(q_block)
         # M -> A
         a_periods, a_values = aggregate_monthly_to_annual(base_periods, base_values)
         if a_periods:
-            a_block = build_data_block(a_periods, a_values, "A", "derived_from_M")
+            a_block = build_data_block(a_periods, a_values, "A", "derived_from_M", skip_derived=skip_derived)
             data["A"] = a_block
             latest_snapshot["A"] = build_snapshot_for_block(a_block)
             extrema["A"] = compute_extrema_for_block(a_block)
@@ -570,7 +573,7 @@ def build_series_output(series_info: Dict, client: BDEClient, fetched_at: str) -
         # T -> A
         a_periods, a_values = aggregate_quarterly_to_annual(base_periods, base_values)
         if a_periods:
-            a_block = build_data_block(a_periods, a_values, "A", "derived_from_T")
+            a_block = build_data_block(a_periods, a_values, "A", "derived_from_T", skip_derived=skip_derived)
             data["A"] = a_block
             latest_snapshot["A"] = build_snapshot_for_block(a_block)
             extrema["A"] = compute_extrema_for_block(a_block)
@@ -584,8 +587,8 @@ def build_series_output(series_info: Dict, client: BDEClient, fetched_at: str) -
         "classification_series": series_info.get("classification", {}),
         "series_freq": freq,
         "aggregation_rule": "sum",
-        "is_contribution": False,
-        "derived_rates_enabled": True,
+        "is_contribution": skip_derived,
+        "derived_rates_enabled": not skip_derived,
         "ingestion": {
             "fetched_at_utc": fetched_at,
             "source": "BDE",
@@ -619,8 +622,8 @@ def build_cuadro_summaries(series_outputs: List[Dict]) -> Dict:
                 continue
             periods = block["periods"]
             values = block["value"]
-            pcts = block["pct"]
-            yoys = block["yoy_pct"]
+            pcts = block.get("pct") or [None] * len(periods)
+            yoys = block.get("yoy_pct") or [None] * len(periods)
             for i, period in enumerate(periods):
                 period_entries.setdefault(period, []).append({
                     "series_id": s["series_id"],
@@ -670,11 +673,13 @@ def build_cuadro_output(cuadro_name: str, cuadro_data: Dict, client: BDEClient) 
     classification = cuadro_data.get("classification", {})
     series_list = cuadro_data.get("series", [])
 
+    skip_derived = is_contribution(classification) or is_share(classification)
+
     series_outputs = []
     for i, s_info in enumerate(series_list):
         sid = s_info.get("id", "")
         logger.info(f"  [{i+1}/{len(series_list)}] Processing {sid}")
-        result = build_series_output(s_info, client, now_utc)
+        result = build_series_output(s_info, client, now_utc, skip_derived=skip_derived)
         if result:
             series_outputs.append(result)
 

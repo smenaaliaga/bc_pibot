@@ -1,11 +1,11 @@
-"""Generación de respuesta en streaming para el nodo DATA usando LLM.
+"""Generación de respuesta en streaming para el nodo DATA usando OpenAI function calling.
 
-Recibe un payload con la pregunta del usuario, la clasificación de entidades
-y las observaciones obtenidas de las series económicas, y genera una respuesta
-en lenguaje natural usando el LLM (GPT) vía LangChain con streaming.
+Recibe un payload con la pregunta del usuario y las observations (payload
+completo del data_store JSON) y genera una respuesta usando herramientas
+(tools) que el LLM invoca para consultar los datos del payload.
 
-El LLM actúa como experto económico del Banco Central de Chile especializado
-en PIB e IMACEC de la Base de Datos Estadística.
+Migrado desde el patrón chatbot.py: SYSTEM_PROMPT + TOOLS + handle_tool_call
+con loop de function calling y streaming de la respuesta final.
 
 También incluye utilidades de formateo de períodos y mensajes cuando no se
 encuentra la serie solicitada.
@@ -13,14 +13,15 @@ encuentra la serie solicitada.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
 from dataclasses import asdict
+from datetime import date
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from langgraph.types import StreamWriter
-from orchestrator.data._helpers import build_target_series_url
 
 logger = logging.getLogger(__name__)
 
@@ -193,656 +194,623 @@ def handle_no_series(
 
 
 # ---------------------------------------------------------------------------
-# LangChain / OpenAI
+# OpenAI client
 # ---------------------------------------------------------------------------
 try:
-    from langchain_openai import ChatOpenAI  # type: ignore
+    from openai import OpenAI as _OpenAI
 except Exception:
-    ChatOpenAI = None  # type: ignore[assignment]
-
-try:
-    from langchain.messages import SystemMessage, HumanMessage  # type: ignore
-except Exception:
-    try:
-        from langchain_core.messages import SystemMessage, HumanMessage  # type: ignore
-    except Exception:
-        SystemMessage = None  # type: ignore[assignment,misc]
-        HumanMessage = None  # type: ignore[assignment,misc]
+    _OpenAI = None  # type: ignore[assignment,misc]
 
 
 # ---------------------------------------------------------------------------
-# System prompt
+# System prompt (migrado de chatbot.py — function calling aware)
 # ---------------------------------------------------------------------------
 
-_SYSTEM_PROMPT = """\
-Eres un experto económico del Banco Central de Chile, especializado en PIB e IMACEC \
-de la Base de Datos Estadística (BDE). Tu estilo es conversacional, cercano y \
-profesional — como un analista económico que le explica los datos a un colega \
-con claridad y naturalidad.
+SYSTEM_PROMPT = """\
+Eres un asistente experto en macroeconomía chilena y en interpretación de series del Banco Central de Chile.
 
-Tono y estilo:
-- Responde SIEMPRE en español.
-- Sé claro y directo, pero NO robótico. Varía la forma en que abres tus respuestas; \
-no empieces siempre igual. Puedes ir directo al dato, contextualizar brevemente, \
-o destacar lo más relevante primero.
-- Escribe de forma fluida, como si explicaras los datos en una conversación. \
-Evita enumerar reglas o sonar como un reporte automatizado.
+FECHA ACTUAL: {today}
+Usa esta fecha para interpretar referencias temporales relativas:
+- "el año pasado" = {last_year}, "este año" = {this_year}, "hace dos años" = {two_years_ago}.
+- "el trimestre pasado" = {prev_quarter}, "este trimestre" = {current_quarter}.
+- "el mes pasado" = {prev_month}.
+- NUNCA calcules estos valores tú mismo. Usa EXACTAMENTE los valores indicados arriba.
 
-Manejo de datos:
-- Usa EXCLUSIVAMENTE los datos proporcionados en el contexto de observaciones. \
-No inventes ni supongas datos que no estén presentes.
-- Presenta los valores numéricos con formato claro (separador de miles, decimales \
-según corresponda).
-- Si los datos incluyen variaciones (yoy_pct, pct), incorpóralas en tu análisis.
-- Si la información disponible no es suficiente para responder la pregunta, \
-indícalo explícitamente.
-- No hagas proyecciones ni predicciones a futuro.
+Tienes acceso a herramientas que consultan un payload JSON con series económicas precalculadas.
+USA SIEMPRE las herramientas para obtener datos. NUNCA inventes cifras.
 
-{analysis_block}
+HERRAMIENTAS DISPONIBLES
+- list_series: lista las series disponibles con su ID, título y clasificación.
+- get_series_data: obtiene datos de UNA serie para un período o rango.
+- rank_series: rankea todas las series por una métrica en un período dado.
+- get_extrema: obtiene máximos y mínimos históricos de una serie o de todo el cuadro.
+- get_metadata: obtiene metadatos del cuadro (nombre, clasificación, unidad, frecuencia, últimos períodos, fuente).
 
-Presentación de series:
-- NUNCA menciones el ID o código técnico de la serie (e.g. "F032.PIB.FLU.R.CLP...") \
-en la respuesta, a menos que el usuario lo solicite explícitamente. \
-Refiere a la serie por su nombre descriptivo (e.g. "PIB real trimestral").
-- SIEMPRE menciona el nombre descriptivo completo de la serie consultada \
-(e.g. "IMACEC desestacionalizado", no solo "IMACEC"; "PIB real trimestral", \
-no solo "PIB"). Usa el "Nombre de la serie" provisto en el contexto del usuario.
-- No agregues una línea de fuente o citación al final de tu respuesta; \
+CONTEXTO DEL CUADRO CARGADO
+- Trabajas con UN solo cuadro a la vez. Cada cuadro tiene un conjunto de series
+  relacionadas (ej: PIB total + sus actividades económicas componentes).
+- Usa get_metadata al inicio o ante cualquier duda para conocer el alcance del cuadro.
+- NO puedes cruzar datos entre cuadros distintos. Si el usuario pregunta algo fuera
+  del alcance del cuadro cargado, indícalo claramente.
+
+FLUJO DE TRABAJO
+1. Interpreta la pregunta: identifica serie, período, frecuencia y métrica.
+2. Llama la herramienta adecuada para obtener los datos exactos.
+3. Si el usuario pregunta por un año completo y la serie es trimestral o mensual,
+   usa get_series_data con period_start y period_end para obtener TODOS los sub-períodos del año
+   (ej: period_start="2024-Q1", period_end="2024-Q4" para trimestrales).
+   NO uses period con un solo sub-período.
+4. Si necesitas comparar series, usa rank_series (NO consultes una por una).
+5. Si necesitas aceleración, pide dos períodos consecutivos con get_series_data.
+6. Responde con los datos obtenidos de las herramientas.
+
+MÉTRICAS DISPONIBLES EN LOS DATOS
+- "value": cifra o nivel de la serie en el período.
+- "pct": variación % respecto al período inmediatamente anterior.
+- "yoy_pct": variación % respecto al mismo período del año anterior.
+- "delta_abs": cambio absoluto respecto al período anterior.
+- "yoy_delta_abs": cambio absoluto respecto al mismo período del año anterior.
+- "acceleration_pct": cambio en la tasa "pct" respecto al período previo.
+- "acceleration_yoy": cambio en la tasa "yoy_pct" respecto al período previo.
+
+⚠️ REGLA CRÍTICA — LOS PORCENTAJES YA ESTÁN FORMATEADOS
+Los campos pct, yoy_pct, acceleration_pct, acceleration_yoy vienen como STRINGS
+con el símbolo % incluido (ej: "0.022698%", "5.164212%", "-6.447661%").
+COPIA el valor textual tal cual. NUNCA hagas cálculos ni conversiones.
+Ejemplos:
+  · yoy_pct = "7.39%"     → "creció un **7,39%**"   ✓ CORRECTO
+  · yoy_pct = "0.022698%" → "creció un **0,02%**"    ✓ CORRECTO
+  · yoy_pct = "0.022698%" y reportas "2,27%" → ✗ INCORRECTO (multiplicaste por 100)
+Si yoy_pct dice "0.022698%", es un porcentaje MUY PEQUEÑO. Repórtalo como ~0,02%.
+El símbolo % en el dato CONFIRMA que ya es un porcentaje final.
+
+UNIDADES Y VALORACIÓN
+- El nombre del cuadro indica la unidad y tipo de valoración. Identifícalos con get_metadata:
+  · "miles de millones de pesos encadenados" = volumen real, referencia 2018.
+  · "miles de millones de pesos" (sin "encadenados") = valores nominales (precios corrientes).
+  · "promedio 2018=100" = índice base 100 en 2018.
+- SIEMPRE incluye la unidad al reportar niveles ("value").
+  Correcto: "El PIB fue de 52.456 miles de millones de pesos encadenados en 2024."
+  Incorrecto: "El PIB fue de 52.456."
+- Variaciones porcentuales (pct, yoy_pct) no necesitan unidad (son %).
+- En volúmenes encadenados (price "enc"), las variaciones reflejan cambio real
+  (ajustado por inflación). En precios corrientes (price "co"), las variaciones
+  incluyen tanto actividad real como efecto precios. Menciónalo si es relevante.
+
+REGLAS DE INTERPRETACIÓN DE LA PREGUNTA
+- "la cifra", "el valor", "el dato", "cuánto fue" → metric "value".
+- "cuánto creció", "cuánto cayó", "variación" (sin más detalle) → metric "yoy_pct".
+- "en el margen", "respecto al período anterior", "trimestre/mes anterior",
+  "variación en el margen" → metric "pct".
+  "pct" es SIEMPRE la variación respecto al período inmediatamente anterior.
+- "aceleró", "desaceleró", "aceleración" → metric "acceleration_pct".
+  La aceleración es el cambio en "pct" (variación período anterior) entre dos períodos consecutivos.
+  SIEMPRE reporta PRIMERO la variación "pct" del período actual y del período anterior,
+  y LUEGO la aceleración como la diferencia entre ambas variaciones "pct".
+  NUNCA uses yoy_pct para aceleración; la aceleración se mide SIEMPRE sobre "pct".
+  Agrega análisis interpretativo (se intensifica / se modera / cambia de signo).
+- "cuál creció más", "cuál cayó más", comparaciones → usa rank_series.
+- "máximo", "mínimo", "mejor año", "peor año" → usa get_extrema.
+- Cambio absoluto → "delta_abs" (vs anterior) o "yoy_delta_abs" (vs año anterior).
+
+FRECUENCIAS Y FORMATOS DE PERÍODO
+- "A": YYYY (ej: "2020")
+- "T": YYYY-QN (ej: "2020-Q1")
+- "M": YYYY-MM (ej: "2020-01")
+- Si el usuario no especifica frecuencia, usa la nativa de la serie.
+- Si pide el dato "más reciente", usa get_metadata para consultar latest_available.
+
+PERÍODO POR DEFECTO
+- Si el usuario NO especifica período ni fecha, SIEMPRE usa el último período disponible.
+  Consulta get_metadata para obtener latest_available y usa ese período.
+  NUNCA elijas un período arbitrario o antiguo cuando no se especifica fecha.
+
+DATOS NO DISPONIBLES (FALLBACK)
+- Si el período consultado no tiene datos (ej: aún no publicados), NO te limites a decir
+  que no hay datos. SIEMPRE haz lo siguiente:
+  1. Indica que no hay datos para el período solicitado.
+  2. Consulta get_metadata para identificar el último período disponible (latest_available).
+  3. Automáticamente consulta y presenta los datos del último período disponible como alternativa.
+  Ejemplo correcto: "No hay datos disponibles aún para 2026-Q1. Sin embargo, en el último
+  trimestre con datos (2025-Q3), la construcción creció un 5.2% interanual (yoy_pct),
+  siendo el segundo sector con mayor expansión..."
+  NUNCA termines la respuesta solo diciendo que no hay datos sin ofrecer la alternativa.
+
+DESAMBIGUACIÓN
+- Si la pregunta es general, prioriza la serie total/agregada sobre componentes.
+- Usa list_series si no tienes claro cuál serie elegir.
+- En conversaciones de seguimiento, hereda indicador/serie/frecuencia/métrica del turno anterior.
+  Solo reemplaza lo que el nuevo turno cambie explícitamente.
+
+ESTRUCTURA DE SERIES
+- La primera serie del cuadro es generalmente el total o agregado (ej: "PIB", "Imacec").
+- Las demás son componentes: actividades económicas, componentes del gasto, regiones, etc.
+- En series de volumen encadenado, los componentes NO necesariamente suman al total
+  (propiedad de la metodología de encadenamiento del Banco Central).
+- Si has_activity=1 en la clasificación, las series son actividades económicas.
+  Si has_region=1, se refiere a una región específica (ver campo "region").
+  Si has_investment=1, las series son componentes del gasto (consumo, inversión, etc.).
+
+CLASIFICACIÓN DEL CUADRO
+- El campo "classification" en get_metadata describe el cuadro:
+  · indicator: "imacec" (Índice Mensual de Actividad Económica) o "pib" (Producto Interno Bruto).
+  · seasonality: "nsa" (no desestacionalizado) o "sa" (desestacionalizado).
+    En series desestacionalizadas, pct refleja el cambio marginal limpio de estacionalidad.
+  · price: "enc" (volumen encadenado, real) o "co" (precios corrientes, nominal).
+  · calc_mode: tipo de cálculo ("original", "prev_period", "yoy", "contribution", "share").
+- Si el usuario pregunta por desestacionalizado vs no desestacionalizado, verifica
+  qué tipo de cuadro está cargado con get_metadata.
+
+VALORES NULOS EN LOS DATOS
+- Los primeros registros de una serie pueden tener campos nulos (pct, yoy_pct, etc.).
+  Esto es normal: no existe historia previa suficiente para calcular la métrica.
+  yoy_pct es null en los primeros k períodos (k=12 meses, 4 trimestres, 1 año).
+- No lo reportes como error. Si el usuario pide una métrica y es null, explica que
+  no está disponible para ese período por falta de base comparable.
+
+SERIES ANUALES
+- En series anuales, "pct" y "yoy_pct" pueden coincidir; trátalo como una sola interpretación.
+- Lo mismo para "delta_abs" / "yoy_delta_abs" y "acceleration_pct" / "acceleration_yoy".
+
+REGLA CARDINAL
+- TODA respuesta DEBE contener al menos una cifra numérica obtenida de las herramientas.
+- NUNCA respondas solo con metadata o descripciones sin datos concretos.
+- NUNCA preguntes "¿quieres que consulte los datos?" ni "¿quieres que lo haga?".
+  Si ya identificaste la serie y el período, consulta los datos y preséntalos directamente.
+- Al reportar datos, prioriza en este orden: yoy_pct → pct → value.
+  Siempre incluye al menos la primera métrica disponible, e idealmente las tres.
+
+ESTILO DE RESPUESTA
+- Español, claro, preciso y detallado.
+- FORMATO NEGRITA OBLIGATORIO: SIEMPRE escribe en **negrita** los valores de variaciones
+  (pct, yoy_pct, acceleration) y contribuciones. Ejemplo:
+  · "creció un **0,02%**" ✓   |   "creció un 0,02%" ✗
+  · "la contribución fue de **1,3 pp**" ✓
+  · "aceleró de **3,2%** a **4,1%**" ✓
+  Los valores absolutos (value, delta_abs) van sin negrita, salvo que sean la métrica principal.
+- Primer párrafo: respuesta directa con la cifra o resultado principal.
+- CUANDO el usuario pregunta por un año completo y los datos son trimestrales o mensuales,
+  SIEMPRE presenta los valores de TODOS los sub-períodos del año (ej: los 4 trimestres o los 12 meses).
+  Ejemplo correcto: "La minería creció un 4.69% en 2024-Q1, 2.32% en 2024-Q2, 4.44% en 2024-Q3
+  y 7.45% en 2024-Q4."
+  NUNCA resumas un solo sub-período como si fuera el valor del año completo.
+- Segundo párrafo: contexto y análisis. Explica qué significan los datos,
+  compara con períodos anteriores si es relevante, y describe la tendencia general.
+  NO especules sobre causas ni des opiniones sobre qué factores explican los valores
+  (ej: NO decir "asociado a la pandemia", "por la crisis", "debido al dinamismo del sector").
+  Limítate a describir los datos: magnitudes, comparaciones y tendencias numéricas.
+- Tercer párrafo: detalle de las series usadas con sus series_id, métrica y período.
+- SIEMPRE incluye los series_id de todas las series que participan en la respuesta.
+  En rankings, lista los series_id de cada posición mencionada.
+- Si hay datos adicionales relevantes (valores absolutos, variaciones de períodos cercanos,
+  posición relativa en el ranking completo), inclúyelos para enriquecer la respuesta.
+- SIEMPRE incluye las cifras numéricas exactas obtenidas de las herramientas.
+  NUNCA respondas solo con descripciones cualitativas (ej: "tuvo su mayor expansión").
+  SIEMPRE acompaña con el número concreto (ej: "tuvo su mayor expansión, con un crecimiento de 12.3%").
+  Si mencionas un máximo, mínimo, crecimiento o caída, incluye el valor numérico y el período.
+- No menciones nombres de herramientas al usuario.
+- IMPORTANTE: en rankings de crecimiento/caída, separa claramente los positivos de los negativos.
+  Si el usuario pide "las que más crecieron" y solo algunas tienen variación positiva:
+  → Primero nombra las que efectivamente crecieron (variación > 0).
+  → Luego, si quedan posiciones por cubrir, indica cuáles fueron las que menos cayeron
+    (NO decir que "crecieron" si su variación es negativa).
+  Ejemplo correcto: "Solo Minería creció en 2020 (0.77%). Las actividades que menos
+  se contrajeron fueron Industria (-2.19%) y Comercio (-2.74%)."
+  Aplica la misma lógica inversa para "las que más cayeron" con valores positivos.
+
+EJEMPLOS
+- "cuanto crecio el pib en 2024" → get_series_data con metric yoy_pct.
+- "cual fue la que mas crecio en 2024" → rank_series con metric yoy_pct.
+- "el imacec aceleró en enero 2025?" → get_series_data para 2025-01 y 2024-12.
+- "y cual fue el del 2023" → heredar serie/métrica, cambiar período a 2023.
+
+No agregues una línea de fuente o citación al final de tu respuesta; \
 la fuente se añade automáticamente por el sistema.
-
-Cierre:
-- Cierra tu respuesta con una breve frase de cierre amable y variada. \
-Puede ser una oferta de ayuda, un comentario contextual sobre los datos, \
-o una invitación a explorar otros indicadores. NUNCA repitas la misma frase; \
-sé creativo y natural cada vez.
-
-Regla de disponibilidad de datos:
-- Si el contexto incluye una ALERTA DE DISPONIBILIDAD indicando que el período \
-solicitado por el usuario aún no tiene datos publicados, debes comenzar tu respuesta \
-indicando de forma natural y amable que aún no hay datos disponibles para ese período. \
-Luego presenta el último dato publicado disponible como referencia. \
-Ejemplo: "Aún no se han publicado datos de IMACEC para febrero de 2026. \
-Sin embargo, el último dato disponible corresponde a enero de 2026, donde...".
-
-Reglas para PIB con datos anuales y trimestrales:
-- Cuando los datos incluyen observaciones agrupadas por frecuencia (Anual y Trimestral), \
-analiza AMBAS frecuencias.
-- Si existe una NOTA indicando que un año NO tiene los 4 trimestres completos, \
-indica explícitamente que el dato anual de ese año no está disponible porque \
-la serie aún no tiene los 4 trimestres publicados. Luego presenta los \
-trimestres disponibles de ese año.
-- Cuando el usuario pregunta por el crecimiento de un año y solo hay trimestres parciales, \
-presenta cada trimestre disponible con su variación interanual.
 """
 
 
-_CONTRIBUTION_PROMPT = """\
+# ---------------------------------------------------------------------------
+# Tool definitions (migrado de chatbot.py)
+# ---------------------------------------------------------------------------
 
-Reglas adicionales para consultas de contribución:
-- Cuando se presentan múltiples series de una familia de contribuciones, analiza TODAS \
-las series para identificar cuál tiene mayor o menor contribución al crecimiento.
-- Ordena las actividades económicas de mayor a menor contribución según su valor.
-- Indica el valor de contribución de cada actividad relevante.
-- El valor de cada serie YA está expresado en porcentaje (puntos porcentuales). \
-Por ejemplo, un valor de 1.33 significa una contribución de 1,33 puntos porcentuales. \
-NO multipliques ni dividas el valor; preséntalo tal cual, redondeado a 2 decimales.
-
-REGLAS ESTRICTAS sobre el lenguaje de contribución (OBLIGATORIO):
-1. "Mayor contribución" / "más aportó" / "mayor aporte" = la actividad/región con el valor POSITIVO más alto.
-
-2. "Menor contribución" / "menos aportó" / "menor aporte" / "menos contribuyó" SOLO se aplica a \
-actividades/regiones con valores POSITIVOS. Debes responder EXCLUSIVAMENTE con la que tiene el valor \
-positivo más pequeño (incluso si es cercano a cero). NUNCA uses una actividad con valor negativo para \
-responder estas preguntas, porque los negativos no "aportan" — "restan".
-
-3. Actividades/regiones con valores NEGATIVOS no "aportan" ni "contribuyen": son "detractoras" o \
-"restaron al crecimiento". SOLO menciónalas si preguntan explícitamente por ellas, o como contexto \
-adicional separado.
-
-4. EJEMPLO OBLIGATORIO:
-   Si los datos son: Metropolitana=1.33, Biobío=-0.26, Coquimbo=0.01, Tarapacá=-0.25
-   - Pregunta "¿Quién MÁS aportó?" → Respuesta: Metropolitana (1,33 pp)
-   - Pregunta "¿Quién MENOS aportó?" → Respuesta: Coquimbo (0,01 pp) [es el positivo más bajo]
-   - LUEGO menciona: "Sin embargo, Biobío y Tarapacá fueron detractoras del crecimiento (-0,26 y -0,25 pp respectivamente)."
-   - NUNCA digas "Menos aportó = Biobío" aunque sea un negativo más pequeño.
-"""
-
-
-_CALC_MODE_FIELD_RULES = {
-    "original": (
-        "value",
-        "El campo principal a reportar es 'value' (nivel del indicador). "
-        "PRESENTA PRIMERO el campo 'value' como el dato principal. "
-        "En el primer párrafo pon en **negrita** ese valor (e.g. **72,48**). "
-        "Las variaciones (yoy_pct, pct) son secundarias y opcionales."
-    ),
-    "yoy": (
-        "yoy_pct",
-        "El campo principal a reportar es 'yoy_pct' (variación interanual). "
-        "PRESENTA PRIMERO el campo 'yoy_pct' como el dato principal. "
-        "En el primer párrafo pon en **negrita** ese valor (e.g. **6,9%**). "
-        "Como dato complementario, adicional, menciona también 'pct' (variación respecto al período anterior) "
-        "si está disponible. NO menciones el 'value' ni la cifra absoluta."
-    ),
-    "prev_period": (
-        "pct",
-        "El campo principal a reportar es 'pct' (variación respecto al período anterior). "
-        "PRESENTA PRIMERO el campo 'pct' como el dato principal. "
-        "En el primer párrafo pon en **negrita** ese valor (e.g. **0,19%**). "
-        "Como dato complementario, adicional, menciona también 'yoy_pct' (variación interanual) "
-        "si está disponible. NO menciones 'value' ni la cifra absoluta."
-    ),
-}
+TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "list_series",
+            "description": "Lista las series disponibles en el cuadro con su ID, título corto y clasificación.",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_series_data",
+            "description": (
+                "Obtiene registros de datos de una serie para un período exacto o un rango. "
+                "Cada registro contiene: period, value (número), pct, yoy_pct, acceleration_pct, "
+                "acceleration_yoy (strings con %, ej: '0.022698%', '5.164%'), delta_abs, yoy_delta_abs (números). "
+                "Los campos de porcentaje YA son strings formateados. Cópialos tal cual, NO multipliques por 100."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "series_id": {"type": "string", "description": "ID de la serie (ej: F032.IMC.IND.Z.Z.EP18.Z.Z.0.M)"},
+                    "frequency": {"type": "string", "enum": ["M", "T", "A"], "description": "Frecuencia de datos"},
+                    "period": {"type": "string", "description": "Período exacto (ej: 2020, 2020-Q1, 2020-01). Omitir si se usa rango."},
+                    "period_start": {"type": "string", "description": "Inicio del rango inclusivo (opcional)"},
+                    "period_end": {"type": "string", "description": "Fin del rango inclusivo (opcional)"},
+                },
+                "required": ["series_id", "frequency"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "rank_series",
+            "description": (
+                "Rankea todas las series del cuadro por una métrica en un período dado. "
+                "Devuelve la lista ordenada con series_id, short_title y el valor de la métrica."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "frequency": {"type": "string", "enum": ["M", "T", "A"]},
+                    "period": {"type": "string", "description": "Período a rankear (ej: 2020, 2024-Q3, 2025-01)"},
+                    "metric": {"type": "string", "enum": ["value", "pct", "yoy_pct"], "description": "Métrica de ordenamiento"},
+                    "order": {"type": "string", "enum": ["desc", "asc"], "description": "Orden: desc (mayor primero) o asc (menor primero). Default: desc."},
+                },
+                "required": ["frequency", "period", "metric"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_extrema",
+            "description": (
+                "Obtiene máximos y mínimos históricos por métrica. "
+                "Si se pasa series_id, devuelve extrema de esa serie; si no, de todo el cuadro."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "frequency": {"type": "string", "enum": ["M", "T", "A"]},
+                    "metric": {"type": "string", "enum": ["value", "pct", "yoy_pct"]},
+                    "series_id": {"type": "string", "description": "ID de serie (omitir para extrema del cuadro)"},
+                },
+                "required": ["frequency", "metric"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_metadata",
+            "description": "Obtiene metadatos del cuadro: nombre, clasificación, unidad de medida (en cuadro_name), frecuencia del archivo, último período disponible, URL fuente y fecha de generación.",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+]
 
 
 # ---------------------------------------------------------------------------
-# Nivel de observación analítica (0=ninguna, 1=mínima, 2=moderada, 3=detallada)
-# Controlado por DATA_RESPONSE_ANALYSIS_LEVEL (default: 1)
+# Tool execution backend (migrado de chatbot.py)
 # ---------------------------------------------------------------------------
 
-_ANALYSIS_LEVELS = {
-    0: (
-        "Observación analítica:\n"
-        "- NO agregues observaciones, opiniones ni análisis sobre los datos. "
-        "Limítate a presentar los valores solicitados de forma clara y directa."
-    ),
-    1: (
-        "Observación analítica:\n"
-        "- Después de presentar el dato principal, puedes agregar UNA frase muy breve "
-        "de contexto SOLO si es evidente directamente en los datos "
-        "(e.g. \"aumentó respecto al mes anterior\", \"es el menor registro del trimestre\"). "
-        "NUNCA hagas interpretaciones amplias, especulaciones sobre motivos, o análisis sobre importancia. "
-        "Máximo 1 oración muy corta. Si no hay algo obvio y factual que destacar, omítela."
-    ),
-    2: (
-        "Observación analítica:\n"
-        "- Después de presentar el dato principal, agrega UNA breve observación analítica "
-        "basada en los datos disponibles. Puede ser:\n"
-        "  • Una comparación con el período anterior (\"esto representa una aceleración/desaceleración "
-        "respecto a...\").\n"
-        "  • Identificar una tendencia visible en los datos (\"se observa una recuperación "
-        "en los últimos meses...\").\n"
-        "  • Poner el dato en contexto (\"es el mayor/menor registro en lo que va del año...\").\n"
-        "- La observación debe ser BREVE (1-2 oraciones), FACTUAL (basada solo en los datos "
-        "del contexto) y NATURAL (no forzada). Si no hay nada interesante que destacar, "
-        "omítela."
-    ),
-    3: (
-        "Observación analítica:\n"
-        "- Después de presentar el dato principal, incluye un párrafo breve de análisis "
-        "que cubra los siguientes puntos (solo los que apliquen según los datos disponibles):\n"
-        "  • Comparación con el período anterior y dirección del cambio.\n"
-        "  • Tendencia reciente si hay varios períodos (aceleración, desaceleración, estabilidad).\n"
-        "  • Contexto relativo (máximo/mínimo del rango, posición respecto al promedio).\n"
-        "- El análisis debe ser FACTUAL (basado solo en los datos del contexto), "
-        "en 2-4 oraciones. No hagas proyecciones."
-    ),
-}
+def _find_series(series_list: list, series_id: str):
+    """Busca una serie por ID en la lista del payload."""
+    for s in series_list:
+        if s["series_id"] == series_id:
+            return s
+    return None
 
 
-def _build_system_prompt(*, calc_mode: Optional[str] = None) -> str:
-    """Retorna el system prompt base. Punto de extensión para reglas futuras."""
-    analysis_level = int(os.getenv("DATA_RESPONSE_ANALYSIS_LEVEL", "1"))
-    analysis_level = max(0, min(3, analysis_level))
-    analysis_block = _ANALYSIS_LEVELS[analysis_level]
-
-    prompt = _SYSTEM_PROMPT.replace("{analysis_block}", analysis_block)
-    cm = str(calc_mode or "").strip().lower()
-    if cm == "contribution":
-        prompt += _CONTRIBUTION_PROMPT
-    rule = _CALC_MODE_FIELD_RULES.get(cm)
-    if rule:
-        _, rule_text = rule
-        prompt += f"\n\nRegla de campo prioritario (calc_mode={cm}):\n{rule_text}"
-    return prompt
-
-
-# ---------------------------------------------------------------------------
-# Formateo del contexto de observaciones para el prompt
-# ---------------------------------------------------------------------------
-
-def _format_observations_context(
-    observations: Dict[str, Dict[str, Any]],
-) -> str:
-    """Convierte el dict de observaciones en un bloque de texto legible para el LLM."""
-    if not observations:
-        return "No se obtuvieron observaciones."
-
-    # Límites para evitar overflow de contexto
-    max_obs_per_freq = int(os.getenv("DATA_RESPONSE_MAX_OBS_PER_FREQ", "50"))
-    max_series = int(os.getenv("DATA_RESPONSE_MAX_SERIES", "20"))
-
-    logger.debug("[DATA_RESPONSE] Formateando %d series para contexto LLM", len(observations))
-
-    def _format_obs_list(obs_list: list, indent: str = "  ", freq_code: str = "") -> Tuple[List[str], bool]:
-        """Formatea una lista de observaciones como líneas de texto.
-        
-        Returns:
-            Tupla de (líneas formateadas, fue_truncado)
-        """
-        truncated = False
-        original_len = len(obs_list)
-        if len(obs_list) > max_obs_per_freq:
-            obs_list = obs_list[-max_obs_per_freq:]
-            truncated = True
-        
-        lines: List[str] = []
-        for obs in obs_list:
-            raw_date = obs.get("date", "")
-            date_label = format_period_labels(raw_date, freq_code)[0] if freq_code else raw_date
-            value = obs.get("value", "")
-            yoy = obs.get("yoy_pct")
-            pct = obs.get("pct")
-            line = f"{indent}{date_label} | valor={value}"
-            if yoy is not None:
-                line += f" | var. interanual={yoy}%"
-            if pct is not None:
-                line += f" | var. período ant.={pct}%"
-            lines.append(line)
-        return lines, truncated
-
-    parts: List[str] = []
-    series_items = list(observations.items())
-    if len(series_items) > max_series:
-        parts.append(f"NOTA: Mostrando {max_series} de {len(series_items)} series disponibles (límite de contexto).\n")
-        series_items = series_items[:max_series]
-    
-    for series_id, entry in series_items:
-        meta = entry.get("meta") or {}
-        obs_raw = entry.get("observations")
-
-        # Log observaciones recibidas
-        if isinstance(obs_raw, list) and obs_raw:
-            first_date = obs_raw[0].get("date") if obs_raw else None
-            last_date = obs_raw[-1].get("date") if obs_raw else None
-            # logger.debug("[DATA_RESPONSE] Serie %s: %d obs, desde %s hasta %s",
-            #             series_id, len(obs_raw), first_date, last_date)
-        elif isinstance(obs_raw, dict):
-            for freq_key, sub in obs_raw.items():
-                if isinstance(sub, list) and sub:
-                    first_date = sub[0].get("date") if sub else None
-                    last_date = sub[-1].get("date") if sub else None
-                    # logger.debug("[DATA_RESPONSE] Serie %s [%s]: %d obs, desde %s hasta %s",
-                    #            series_id, freq_key, len(sub), first_date, last_date)
-
-        title = (
-            meta.get("descripEsp")
-            or meta.get("descripIng")
-            or series_id
-        )
-        freq = (
-            meta.get("target_frequency")
-            or meta.get("original_frequency")
-            or "?"
-        )
-
-        header = f"Serie: {title} | Frecuencia: {freq}"
-        parts.append(header)
-
-        note = meta.get("incomplete_annual_note")
-        if note:
-            parts.append(f"  NOTA: {note}")
-
-        # observations puede ser dict {"A": [...], "Q": [...]} o lista plana
-        if isinstance(obs_raw, dict):
-            for freq_key in ("A", "Q", "M"):
-                sub = obs_raw.get(freq_key)
-                if sub is None:
-                    continue
-                freq_label = {"A": "Anual", "Q": "Trimestral", "M": "Mensual"}.get(freq_key, freq_key)
-                parts.append(f"  [{freq_label}]")
-                if not sub:
-                    parts.append("    (sin observaciones)")
-                else:
-                    _fc = {"A": "a", "Q": "q", "M": "m"}.get(freq_key, freq.lower() if freq else "")
-                    formatted_lines, was_truncated = _format_obs_list(sub, indent="    ", freq_code=_fc)
-                    parts.extend(formatted_lines)
-                    if was_truncated:
-                        parts.append(f"    (mostrando últimas {max_obs_per_freq} observaciones)")
-        elif isinstance(obs_raw, list):
-            if not obs_raw:
-                parts.append("  (sin observaciones)")
-            else:
-                _fc = freq.lower() if freq and freq != "?" else ""
-                formatted_lines, was_truncated = _format_obs_list(obs_raw, freq_code=_fc)
-                parts.extend(formatted_lines)
-                if was_truncated:
-                    parts.append(f"  (mostrando últimas {max_obs_per_freq} observaciones)")
-        else:
-            parts.append("  (sin observaciones)")
-
-    return "\n".join(parts)
-
-
-def _format_classification_context(
-    classification: Dict[str, Any],
-) -> str:
-    """Resume la clasificación de entidades como contexto adicional para el LLM."""
-    if not classification:
-        return ""
-
-    relevant_keys = [
-        ("indicator_ent", "Indicador"),
-        ("frequency_ent", "Frecuencia"),
-        ("seasonality_ent", "Estacionalidad"),
-        ("activity_ent", "Actividad"),
-        ("region_ent", "Región"),
-        ("investment_ent", "Inversión"),
-        ("period_ent", "Período"),
-        ("price", "Precio"),
-        ("req_form_cls", "Forma de consulta"),
-    ]
-
-    lines: List[str] = []
-    for key, label in relevant_keys:
-        val = classification.get(key)
-        if val not in (None, "", [], {}, "none", "null"):
-            if key == "seasonality_ent":
-                val = _SEASONALITY_LABELS.get(str(val).strip().lower(), val)
-            lines.append(f"- {label}: {val}")
-
-    return "\n".join(lines) if lines else ""
-
-
-def _normalize_req_form(value: Any) -> str:
-    """Normaliza req_form para comparar ramas como latest/point/range."""
-    if isinstance(value, dict):
-        value = value.get("label")
-    return str(value or "").strip().lower()
-
-
-def _iter_observations(obs_raw: Any) -> Iterable[Dict[str, Any]]:
-    """Itera observaciones sin importar si vienen planas o agrupadas por frecuencia."""
-    if isinstance(obs_raw, list):
-        for item in obs_raw:
-            if isinstance(item, dict):
-                yield item
-        return
-
-    if isinstance(obs_raw, dict):
-        for sub in obs_raw.values():
-            if not isinstance(sub, list):
-                continue
-            for item in sub:
-                if isinstance(item, dict):
-                    yield item
-
-
-def _pick_latest_observation(
-    observations: Dict[str, Dict[str, Any]],
-    *,
-    preferred_series_id: Optional[str],
-) -> Optional[Tuple[str, Any, str]]:
-    """Retorna (fecha, valor, series_id) de la observación más reciente."""
-    if not isinstance(observations, dict) or not observations:
+def _fmt_pct(v) -> Optional[str]:
+    """Formatea un valor porcentual como string con %. None-safe."""
+    if v is None:
         return None
-
-    def _latest_from_entry(series_id: str, entry: Any) -> Optional[Tuple[str, Any, str]]:
-        if not isinstance(entry, dict):
-            return None
-
-        best_date = ""
-        best_value: Any = None
-        for obs in _iter_observations(entry.get("observations")):
-            date = str(obs.get("date") or "").strip()[:10]
-            if not date:
-                continue
-            if date >= best_date:
-                best_date = date
-                best_value = obs.get("value")
-
-        if not best_date:
-            return None
-        return best_date, best_value, series_id
-
-    preferred_id = str(preferred_series_id or "").strip()
-    if preferred_id and preferred_id in observations:
-        preferred_latest = _latest_from_entry(preferred_id, observations.get(preferred_id))
-        if preferred_latest is not None:
-            return preferred_latest
-
-    best: Optional[Tuple[str, Any, str]] = None
-    for sid, entry in observations.items():
-        candidate = _latest_from_entry(str(sid), entry)
-        if candidate is None:
-            continue
-        if best is None or candidate[0] >= best[0]:
-            best = candidate
-
-    return best
+    return f"{v}%"
 
 
-# ---------------------------------------------------------------------------
-# Detección de desfase entre período solicitado y datos disponibles
-# ---------------------------------------------------------------------------
+_PCT_FIELDS = ("pct", "yoy_pct", "acceleration_pct", "acceleration_yoy")
 
-def _detect_period_mismatch(
-    classification: Dict[str, Any],
-    observations: Dict[str, Dict[str, Any]],
-) -> Optional[str]:
-    """Detecta si el período solicitado no tiene datos y genera un aviso legible.
 
-    Compara el inicio del período pedido (``period_ent[0]``) con la
-    ``last_available_date`` de la primera serie.  Si el período solicitado
-    es posterior al último dato disponible, retorna un texto de alerta
-    para inyectar en el prompt del LLM.
+def _add_display_fields(record: dict) -> dict:
+    """Reemplaza los campos numéricos de porcentaje por strings formateados.
+
+    Los campos pct, yoy_pct, acceleration_pct, acceleration_yoy YA están
+    en puntos porcentuales (la fórmula de ingesta ya aplicó ×100).
+    Se reemplazan IN-PLACE por strings "X%" para que el LLM los copie
+    textualmente y no pueda multiplicar por 100.
     """
-    # Si el usuario pide "lo último disponible", no hay desfase posible
-    req_form = str(classification.get("req_form_cls") or "").strip().lower()
-    if req_form == "latest":
-        return None
-
-    period_ent = classification.get("period_ent")
-    if not period_ent or not isinstance(period_ent, list) or len(period_ent) == 0:
-        return None
-
-    requested_start = str(period_ent[0]).strip()[:10]
-    if not requested_start:
-        return None
-
-    # Tomar last_available_date de la primera serie
-    last_avail: Optional[str] = None
-    for entry in observations.values():
-        meta = entry.get("meta")
-        if isinstance(meta, dict):
-            last_avail = str(meta.get("last_available_date") or "").strip()[:10]
-            break
-
-    if not last_avail:
-        return None
-
-    # Solo alertar si el período pedido empieza después de lo disponible
-    if requested_start <= last_avail:
-        return None
-
-    freq = str(classification.get("frequency_ent") or "").strip().lower()
-    requested_label = format_period_labels(requested_start, freq)[0]
-    available_label = format_period_labels(last_avail, freq)[0]
-
-    indicator = str(classification.get("indicator_ent") or "").strip().upper()
-    if indicator in {"", "NONE", "NULL"}:
-        indicator = "la serie"
-
-    return (
-        f"ALERTA DE DISPONIBILIDAD: El usuario preguntó por {requested_label}, "
-        f"pero aún no hay datos publicados de {indicator} para ese período. "
-        f"El último dato disponible corresponde a {available_label} (fecha {last_avail}). "
-        f"Debes indicar esto al usuario de forma clara y amable, y luego presentar "
-        f"los datos del último período disponible."
-    )
+    out = dict(record)
+    for field in _PCT_FIELDS:
+        if field in out and out[field] is not None:
+            out[field] = f"{out[field]}%"
+    # Eliminar _display si existiera de versiones anteriores
+    out.pop("_display", None)
+    return out
 
 
-# ---------------------------------------------------------------------------
-# Construcción de mensajes LLM
-# ---------------------------------------------------------------------------
+def handle_tool_call(name: str, args: dict, payload: dict) -> str:
+    """Ejecuta una herramienta y devuelve el resultado como string JSON."""
+    series_list = payload.get("series", [])
 
-def _build_messages(payload: Dict[str, Any]) -> list:
-    """Construye la lista de mensajes (system + user) para el LLM."""
-    question = payload.get("question", "")
-    classification = payload.get("classification") or {}
-    payload_price = str(payload.get("price") or "").strip().lower()
-    observations = payload.get("observations") or {}
-    family_name = payload.get("family_name", "")
-    series_id = payload.get("series", "")
-    req_form = _normalize_req_form(classification.get("req_form_cls"))
+    if name == "list_series":
+        result = [
+            {
+                "series_id": s["series_id"],
+                "short_title": s["short_title"],
+                "long_title": s.get("long_title", ""),
+                "classification": s.get("classification_series", {}),
+                "series_freq": s.get("series_freq"),
+            }
+            for s in series_list
+        ]
+        return json.dumps(result, ensure_ascii=False)
 
-    calc_mode = classification.get("calc_mode_cls")
-    cm = str(calc_mode or "").strip().lower()
-    system_content = _build_system_prompt(calc_mode=calc_mode)
+    if name == "get_metadata":
+        return json.dumps(
+            {
+                "cuadro_name": payload.get("cuadro_name"),
+                "cuadro_id": payload.get("cuadro_id"),
+                "classification": payload.get("classification", {}),
+                "frequency": payload.get("frequency"),
+                "latest_available": payload.get("latest_available", {}),
+                "series_count": len(series_list),
+                "source_url": payload.get("source_url", ""),
+                "generated_at_utc": payload.get("dataset_meta", {}).get("generated_at_utc", ""),
+            },
+            ensure_ascii=False,
+        )
 
-    series_title = str(payload.get("series_title") or "").strip()
+    if name == "get_series_data":
+        series = _find_series(series_list, args.get("series_id", ""))
+        if not series:
+            return json.dumps({"error": f"Serie '{args.get('series_id')}' no encontrada"})
+        block = series["data"].get(args["frequency"])
+        if not block:
+            avail = list(series["data"].keys())
+            return json.dumps({"error": f"Frecuencia '{args['frequency']}' no disponible. Disponibles: {avail}"})
+        records = block.get("records", [])
+        if args.get("period"):
+            records = [r for r in records if r["period"] == args["period"]]
+        elif args.get("period_start") or args.get("period_end"):
+            start = args.get("period_start", "")
+            end = args.get("period_end", "9999")
+            records = [r for r in records if start <= r["period"] <= end]
+        if not records:
+            return json.dumps({"error": "Sin datos para los parámetros dados", "params": args})
+        return json.dumps(
+            {
+                "series_id": series["series_id"],
+                "short_title": series["short_title"],
+                "frequency": args["frequency"],
+                "records": [_add_display_fields(r) for r in records],
+                "_units_note": "pct, yoy_pct, acceleration_pct, acceleration_yoy YA son strings con %. Cópialos tal cual. NO multipliques por 100.",
+            },
+            ensure_ascii=False,
+        )
 
-    indicator = str(classification.get("indicator_ent") or "").strip().lower()
-    classification_price = str(classification.get("price") or "").strip().lower()
-    price = payload_price or classification_price
-    if indicator == "pib" and price in {"enc", "co"}:
-        if price == "enc":
-            unit_text = "miles de millones de pesos encadenados"
+    if name == "rank_series":
+        freq = args["frequency"]
+        period = args["period"]
+        metric = args["metric"]
+        order = args.get("order", "desc")
+        entries = (payload.get("cuadro_summaries", {})
+                   .get("rankings", {})
+                   .get(freq, {})
+                   .get(period))
+        if not entries:
+            return json.dumps({"error": f"Sin datos para frecuencia '{freq}' período '{period}'"})
+        ranked = sorted(
+            [e for e in entries if e.get(metric) is not None],
+            key=lambda x: x[metric],
+            reverse=(order == "desc"),
+        )
+        titles = {s["series_id"]: s["short_title"] for s in series_list}
+        ranked = [_add_display_fields({**e, "short_title": titles.get(e["series_id"], "")}) for e in ranked]
+        return json.dumps(
+            {"frequency": freq, "period": period, "metric": metric,
+             "order": order, "ranking": ranked,
+             "_units_note": "pct, yoy_pct, acceleration_pct, acceleration_yoy YA son strings con %. Cópialos tal cual. NO multipliques por 100."},
+            ensure_ascii=False,
+        )
+
+    if name == "get_extrema":
+        freq = args["frequency"]
+        metric = args["metric"]
+        sid = args.get("series_id")
+        if sid:
+            series = _find_series(series_list, sid)
+            if not series:
+                return json.dumps({"error": f"Serie '{sid}' no encontrada"})
+            ext = series.get("extrema", {}).get(freq, {})
+            result = {
+                "series_id": sid,
+                "short_title": series["short_title"],
+                f"{metric}_max": ext.get(f"{metric}_max"),
+                f"{metric}_min": ext.get(f"{metric}_min"),
+            }
         else:
-            unit_text = "miles de millones de pesos a precios corrientes"
-        system_content += (
-            "\n\nRegla de unidades para PIB: cuando reportes cifras de NIVEL del PIB "
-            f"(campo 'value', no variaciones yoy_pct/pct), indica explícitamente que están en {unit_text}."
-        )
+            fex = payload.get("cuadro_summaries", {}).get("cuadro_extrema", {}).get(freq, {})
+            result = {
+                "scope": "cuadro",
+                f"{metric}_max": fex.get(f"{metric}_max"),
+                f"{metric}_min": fex.get(f"{metric}_min"),
+            }
+        return json.dumps(result, ensure_ascii=False)
 
-    latest_hint = None
-    if req_form == "latest":
-        latest_hint = _pick_latest_observation(
-            observations,
-            preferred_series_id=str(series_id or "") or None,
-        )
-        if latest_hint is not None:
-            _primary_field_name = _CALC_MODE_FIELD_RULES.get(cm, ("value",))[0]
-            system_content += (
-                "\n\nRegla para consultas latest: menciona explícitamente el último "
-                f"dato observado (fecha y campo '{_primary_field_name}') provisto en el contexto de datos."
-            )
-
-    # Contexto de clasificación
-    cls_text = _format_classification_context(classification)
-    if cls_text:
-        system_content += f"\n\nClasificación de la consulta:\n{cls_text}"
-
-    # Contexto de datos
-    obs_text = _format_observations_context(observations)
-    logger.debug("[DATA_RESPONSE] Contexto de observaciones generado: %d caracteres", len(obs_text))
-
-    # Detección de desfase período solicitado vs disponible
-    period_mismatch_hint = _detect_period_mismatch(classification, observations)
-
-    user_content = f"Pregunta del usuario: {question}\n\n"
-    if period_mismatch_hint:
-        user_content += f"{period_mismatch_hint}\n\n"
-    if series_title:
-        user_content += f"Nombre de la serie: {series_title}\n"
-    if family_name:
-        user_content += f"Familia de series: {family_name}\n"
-    if indicator == "pib" and price in {"enc", "co"}:
-        user_content += f"Precio PIB solicitado: {price}\n"
-    if latest_hint is not None:
-        latest_date, latest_value, _latest_series_id = latest_hint
-        # Determinar campo prioritario según calc_mode
-        _primary_field = {"yoy": "yoy_pct", "prev_period": "pct"}.get(cm, "value")
-        _primary_value = latest_value
-        _entry = observations.get(str(_latest_series_id), {})
-        for _obs in _iter_observations(_entry.get("observations")):
-            if str(_obs.get("date", ""))[:10] == latest_date[:10]:
-                _primary_value = _obs.get(_primary_field, latest_value)
-                break
-        user_content += (
-            f"Consulta latest detectada. El último dato disponible es: "
-            f"fecha={latest_date}, {_primary_field}={_primary_value}. "
-            f"DEBES mencionar {_primary_field}={_primary_value} como el valor "
-            f"principal en el primer párrafo (en negrita). "
-            f"El nivel del índice (value={latest_value}) menciónalo al final si es relevante.\n"
-        )
-    user_content += f"\nDatos disponibles:\n{obs_text}"
-
-    logger.debug("[DATA_RESPONSE] User content generado: %d caracteres", len(user_content))
-
-    if SystemMessage is None or HumanMessage is None:
-        return []
-
-    return [
-        SystemMessage(content=system_content),
-        HumanMessage(content=user_content),
-    ]
+    return json.dumps({"error": f"Herramienta desconocida: {name}"})
 
 
-def _build_source_footer(payload: Dict[str, Any]) -> Optional[str]:
-    """Construye el footer de fuente con link directo a la serie en la BDE."""
-    classification = payload.get("classification") or {}
-    if not isinstance(classification, dict):
-        classification = {}
+# ---------------------------------------------------------------------------
+# Construcción de mensajes iniciales con fecha interpolada
+# ---------------------------------------------------------------------------
 
-    target_url = build_target_series_url(
-        source_url=str(payload.get("source_url") or ""),
-        series_id=str(payload.get("series") or ""),
-        period=classification.get("period_ent"),
-        req_form=str(classification.get("req_form_cls") or ""),
-        frequency=str(classification.get("frequency_ent") or ""),
-        calc_mode=str(classification.get("calc_mode_cls") or ""),
+def _build_initial_messages() -> list:
+    """Construye el mensaje de sistema con la fecha actual interpolada."""
+    today = date.today()
+    q = (today.month - 1) // 3 + 1
+    current_quarter = f"{today.year}-Q{q}"
+    if q == 1:
+        prev_quarter = f"{today.year - 1}-Q4"
+    else:
+        prev_quarter = f"{today.year}-Q{q - 1}"
+    if today.month == 1:
+        prev_month = f"{today.year - 1}-12"
+    else:
+        prev_month = f"{today.year}-{today.month - 1:02d}"
+
+    prompt = SYSTEM_PROMPT.format(
+        today=today.isoformat(),
+        this_year=today.year,
+        last_year=today.year - 1,
+        two_years_ago=today.year - 2,
+        current_quarter=current_quarter,
+        prev_quarter=prev_quarter,
+        prev_month=prev_month,
     )
-    if not target_url:
-        return None
+    return [{"role": "system", "content": prompt}]
 
+
+# ---------------------------------------------------------------------------
+# Source footer
+# ---------------------------------------------------------------------------
+
+def _build_source_footer(observations: Dict[str, Any]) -> Optional[str]:
+    """Construye un footer con el link a la fuente BDE desde el payload."""
+    source_url = str(observations.get("source_url") or "").strip()
+    if not source_url:
+        return None
     return (
-        f"\n\n**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)]({target_url}) "
+        f"\n\n**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)]({source_url}) "
         "del Banco Central de Chile."
     )
 
 
 # ---------------------------------------------------------------------------
-# Streaming de la respuesta LLM
+# Streaming de la respuesta LLM con function calling
 # ---------------------------------------------------------------------------
 
 def stream_data_response(
     payload: Dict[str, Any],
 ) -> Iterable[str]:
-    """Genera la respuesta en streaming a partir del payload.
+    """Genera la respuesta en streaming usando OpenAI function calling.
+
+    El LLM usa herramientas (tools) para consultar los datos del payload
+    data_store en lugar de recibir un contexto pre-formateado.
 
     Args:
         payload: Diccionario con las claves:
             - question (str): pregunta original del usuario.
-            - classification (dict): entidades resueltas (ResolvedEntities como dict).
-            - observations (dict): observaciones indexadas por series_id.
-            - family_name (str): nombre de la familia.
-            - series (str): ID de la serie objetivo.
-            - source_url (str): URL fuente de la serie.
+            - observations (dict): payload completo del data_store JSON
+              (contiene series, clasificación, metadata, etc.).
 
     Yields:
         Fragmentos de texto de la respuesta del LLM.
     """
-    messages = _build_messages(payload)
-    source_footer = _build_source_footer(payload)
-    if not messages:
-        yield "No se pudo construir la solicitud al modelo de lenguaje."
-    else:
-        model_name = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-        temperature = float(os.getenv("DATA_RESPONSE_TEMPERATURE", "0.35"))
+    if _OpenAI is None:
+        logger.error("[DATA_RESPONSE] openai no disponible")
+        yield "El servicio de generación de respuestas no está disponible."
+        return
 
-        if ChatOpenAI is None:
-            logger.error("[DATA_RESPONSE] langchain_openai no disponible")
-            yield "El servicio de generación de respuestas no está disponible."
-        else:
-            try:
-                chat = ChatOpenAI(
-                    model=model_name,
-                    temperature=temperature,
-                    streaming=True,
-                )
-            except Exception:
-                logger.exception("[DATA_RESPONSE] Error inicializando ChatOpenAI")
-                yield "Error al conectar con el modelo de lenguaje."
+    question = payload.get("question", "")
+    observations = payload.get("observations") or {}
+
+    model = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
+    temperature = float(os.getenv("DATA_RESPONSE_TEMPERATURE", "0.35"))
+    max_tool_loops = int(os.getenv("MAX_TOOL_LOOPS", "8"))
+
+    try:
+        client = _OpenAI()
+    except Exception:
+        logger.exception("[DATA_RESPONSE] Error inicializando OpenAI client")
+        yield "Error al conectar con el modelo de lenguaje."
+        return
+
+    messages = _build_initial_messages()
+    messages.append({"role": "user", "content": question})
+
+    try:
+        for _ in range(max_tool_loops):
+            stream = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                tools=TOOLS,
+                temperature=temperature,
+                stream=True,
+            )
+
+            # Acumular respuesta streameada
+            tool_calls_by_idx: Dict[int, Dict[str, str]] = {}
+            content_chunks: List[str] = []
+
+            for chunk in stream:
+                choice = chunk.choices[0] if chunk.choices else None
+                if not choice:
+                    continue
+                delta = choice.delta
+
+                # Contenido de texto → yield inmediato
+                if delta and delta.content:
+                    content_chunks.append(delta.content)
+                    yield delta.content
+
+                # Acumular tool call deltas
+                if delta and delta.tool_calls:
+                    for tc_delta in delta.tool_calls:
+                        idx = tc_delta.index
+                        if idx not in tool_calls_by_idx:
+                            tool_calls_by_idx[idx] = {
+                                "id": "", "name": "", "arguments": "",
+                            }
+                        if tc_delta.id:
+                            tool_calls_by_idx[idx]["id"] = tc_delta.id
+                        if tc_delta.function:
+                            if tc_delta.function.name:
+                                tool_calls_by_idx[idx]["name"] = tc_delta.function.name
+                            if tc_delta.function.arguments:
+                                tool_calls_by_idx[idx]["arguments"] += tc_delta.function.arguments
+
+            if tool_calls_by_idx:
+                # Hay tool calls: ejecutar y continuar el loop
+                messages.append({
+                    "role": "assistant",
+                    "content": "".join(content_chunks) or None,
+                    "tool_calls": [
+                        {
+                            "id": tc["id"],
+                            "type": "function",
+                            "function": {
+                                "name": tc["name"],
+                                "arguments": tc["arguments"],
+                            },
+                        }
+                        for _, tc in sorted(tool_calls_by_idx.items())
+                    ],
+                })
+                for _, tc in sorted(tool_calls_by_idx.items()):
+                    fn_args = json.loads(tc["arguments"])
+                    result = handle_tool_call(tc["name"], fn_args, observations)
+                    logger.debug("[DATA_RESPONSE] tool=%s args=%s result_len=%d",
+                                 tc["name"], tc["arguments"][:120], len(result))
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": tc["id"],
+                        "content": result,
+                    })
             else:
-                try:
-                    for chunk in chat.stream(messages):
-                        text = getattr(chunk, "content", None) or ""
-                        if text:
-                            yield str(text)
-                except Exception:
-                    logger.exception("[DATA_RESPONSE] Error durante streaming")
-                    yield "Ocurrió un error al generar la respuesta."
-
-    if source_footer:
-        yield source_footer
+                # Sin tool calls → respuesta final ya fue yielded via content_chunks
+                source_footer = _build_source_footer(observations)
+                if source_footer:
+                    yield source_footer
+                return
+        else:
+            # Se agotó el loop de herramientas
+            yield "(Se alcanzó el límite de consultas internas. Intenta reformular la pregunta.)"
+    except Exception:
+        logger.exception("[DATA_RESPONSE] Error durante streaming con function calling")
+        yield "Ocurrió un error al generar la respuesta."
