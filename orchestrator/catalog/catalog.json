@@ -6,7 +6,7 @@
       "seasonality": "nsa",
       "frequency": ["m", "q", "a"],
       "price": "enc",
-      "has_activity": 1,
+      "has_activity": [0, 1],
       "has_region": 0,
       "has_investment": 0
     },
@@ -31,7 +31,7 @@
       "seasonality": "nsa",
       "frequency": ["m", "q", "a"],
       "price": "enc",
-      "has_activity": 1,
+      "has_activity": [0, 1],
       "has_region": 0,
       "has_investment": 0
     },
@@ -55,7 +55,7 @@
       "seasonality": "sa",
       "frequency": ["m", "q", "a"],
       "price": "enc",
-      "has_activity": 1,
+      "has_activity": [0, 1],
       "has_region": 0,
       "has_investment": 0
     },
@@ -80,7 +80,7 @@
       "seasonality": "sa",
       "frequency": ["m", "q", "a"],
       "price": "enc",
-      "has_activity": 1,
+      "has_activity": [0, 1],
       "has_region": 0,
       "has_investment": 0
     },

@@ -221,10 +221,14 @@ def make_data_node(memory_adapter: Any):
                     observations.get("frequency"),
                     len(observations.get("series", [])))
 
+        ent_dict = asdict(ent)
+
         # 4. Construir payload: question + observations (payload data_store)
         payload = {
             "question": question,
             "observations": observations,
+            "entities": ent_dict,
+            "calc_mode": str(ent.calc_mode_cls or "").strip().lower(),
         }
 
         collected: List[str] = []
@@ -240,7 +244,6 @@ def make_data_node(memory_adapter: Any):
                 collected.append(fallback)
                 _emit_stream_chunk(fallback, writer)
 
-        ent_dict = asdict(ent)
         pv = ent.period_ent or []
         rf = str(ent.req_form_cls or "").strip().lower()
 

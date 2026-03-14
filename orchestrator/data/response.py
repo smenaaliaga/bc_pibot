@@ -97,9 +97,7 @@ def format_period_labels(period_str: str, freq: str) -> Tuple[str, ...]:
 
 def build_no_series_message(
     *,
-    question: str,
     requested_activity: Optional[str] = None,
-    normalized_activity: Optional[str] = None,
     indicator_label: Optional[str] = None,
 ) -> str:
     """Genera un mensaje amigable cuando no se encuentra la serie solicitada."""
@@ -126,17 +124,12 @@ def build_no_series_message(
             "del Banco Central de Chile."
         )
 
-    if normalized_activity and normalized_activity != str(requested_activity or ""):
-        parts.append(
-            f"La actividad fue normalizada como «{normalized_activity}»."
-        )
-
     parts.append(
         "Puedes reformular tu pregunta o consultar el catálogo de series disponibles."
     )
 
     parts.append(
-        f"Tambien puedes buscar y ver series en 🔗 [Catalogo BDE]({_BDE_SERIES_BROWSER_URL})."
+        f"También puedes buscar y ver series en 🔗 [Catálogo BDE]({_BDE_SERIES_BROWSER_URL})."
     )
 
     return " ".join(parts)
@@ -173,11 +166,8 @@ def handle_no_series(
     if indicator_label in {"", "[]", "NONE", "NULL"}:
         indicator_label = None
 
-    normalized_activity = str(ent.activity_ent or "").strip()
     text = build_no_series_message(
-        question=question,
         requested_activity=requested_activity,
-        normalized_activity=normalized_activity,
         indicator_label=indicator_label,
     )
 
@@ -306,14 +296,18 @@ PERÍODO POR DEFECTO
   NUNCA elijas un período arbitrario o antiguo cuando no se especifica fecha.
 
 DATOS NO DISPONIBLES (FALLBACK)
-- Si el período consultado no tiene datos (ej: aún no publicados), NO te limites a decir
-  que no hay datos. SIEMPRE haz lo siguiente:
+- CASO 1 — El usuario NO mencionó fecha ni período en su pregunta:
+  NO digas "no hay datos para [fecha]". Simplemente usa el último período disponible
+  (latest_available de get_metadata) y responde directamente con esos datos, sin mencionar
+  que algún período futuro no tiene datos.
+  Ejemplo correcto: "En enero de 2026, el IMACEC desestacionalizado creció un **0,19%** ..."
+  Ejemplo INCORRECTO: "En febrero de 2026, no hay datos disponibles. Sin embargo, en enero..."
+- CASO 2 — El usuario pidió EXPLÍCITAMENTE un período y ese período no tiene datos:
   1. Indica que no hay datos para el período solicitado.
   2. Consulta get_metadata para identificar el último período disponible (latest_available).
   3. Automáticamente consulta y presenta los datos del último período disponible como alternativa.
   Ejemplo correcto: "No hay datos disponibles aún para 2026-Q1. Sin embargo, en el último
-  trimestre con datos (2025-Q3), la construcción creció un 5.2% interanual (yoy_pct),
-  siendo el segundo sector con mayor expansión..."
+  trimestre con datos (2025-Q3), la construcción creció un **5,2%** interanual..."
   NUNCA termines la respuesta solo diciendo que no hay datos sin ofrecer la alternativa.
 
 DESAMBIGUACIÓN
@@ -357,11 +351,23 @@ REGLA CARDINAL
 - NUNCA respondas solo con metadata o descripciones sin datos concretos.
 - NUNCA preguntes "¿quieres que consulte los datos?" ni "¿quieres que lo haga?".
   Si ya identificaste la serie y el período, consulta los datos y preséntalos directamente.
-- Al reportar datos, prioriza en este orden: yoy_pct → pct → value.
-  Siempre incluye al menos la primera métrica disponible, e idealmente las tres.
+- PRIORIZACIÓN DE MÉTRICAS SEGÚN calc_mode (usar CONTEXTO DE CLASIFICACIÓN):
+    · Si calc_mode="original": reporta PRIMERO "value"; luego "yoy_pct"; y "pct" solo cuando
+        la pregunta sea de margen/período anterior o aporte claridad.
+    · Si calc_mode="yoy": reporta SIEMPRE PRIMERO "yoy_pct".
+    · Si calc_mode="prev_period": reporta SIEMPRE PRIMERO "pct".
+    · Si no hay calc_mode explícito, usa la clasificación del cuadro en get_metadata y aplica
+        la misma regla.
+    Después de la métrica principal, puedes complementar con las otras métricas relevantes.
 
 ESTILO DE RESPUESTA
 - Español, claro, preciso y detallado.
+- ORDEN DEL PRIMER ENUNCIADO (OBLIGATORIO): la primera oración del primer párrafo
+    debe comenzar mencionando explícitamente el período analizado (ej: "En el 3er trimestre
+    de 2025,..." o "En enero de 2026,..."). No inicies la oración sin anclar primero el período.
+- FORMATO NUMÉRICO ESPAÑOL (OBLIGATORIO): usa coma (,) como separador decimal y
+    punto (.) como separador de miles. Los datos llegan con punto decimal; conviértelos.
+    Ejemplo: value=52975.68 → "52.975,68"; yoy_pct="1.58%" → "**1,58%**".
 - FORMATO NEGRITA OBLIGATORIO: SIEMPRE escribe en **negrita** los valores de variaciones
   (pct, yoy_pct, acceleration) y contribuciones. Ejemplo:
   · "creció un **0,02%**" ✓   |   "creció un 0,02%" ✗
@@ -507,14 +513,12 @@ def _find_series(series_list: list, series_id: str):
     return None
 
 
-def _fmt_pct(v) -> Optional[str]:
-    """Formatea un valor porcentual como string con %. None-safe."""
-    if v is None:
-        return None
-    return f"{v}%"
-
-
 _PCT_FIELDS = ("pct", "yoy_pct", "acceleration_pct", "acceleration_yoy")
+
+_UNITS_NOTE = (
+    "pct, yoy_pct, acceleration_pct, acceleration_yoy YA son strings con %. "
+    "Cópialos tal cual. NO multipliques por 100."
+)
 
 
 def _add_display_fields(record: dict) -> dict:
@@ -589,7 +593,7 @@ def handle_tool_call(name: str, args: dict, payload: dict) -> str:
                 "short_title": series["short_title"],
                 "frequency": args["frequency"],
                 "records": [_add_display_fields(r) for r in records],
-                "_units_note": "pct, yoy_pct, acceleration_pct, acceleration_yoy YA son strings con %. Cópialos tal cual. NO multipliques por 100.",
+                "_units_note": _UNITS_NOTE,
             },
             ensure_ascii=False,
         )
@@ -615,7 +619,7 @@ def handle_tool_call(name: str, args: dict, payload: dict) -> str:
         return json.dumps(
             {"frequency": freq, "period": period, "metric": metric,
              "order": order, "ranking": ranked,
-             "_units_note": "pct, yoy_pct, acceleration_pct, acceleration_yoy YA son strings con %. Cópialos tal cual. NO multipliques por 100."},
+             "_units_note": _UNITS_NOTE},
             ensure_ascii=False,
         )
 
@@ -691,6 +695,38 @@ def _build_source_footer(observations: Dict[str, Any]) -> Optional[str]:
     )
 
 
+def _build_metric_priority_instruction(calc_mode: str) -> Optional[str]:
+    """Construye una instrucción estricta de priorización por calc_mode.
+
+    Esta instrucción se inyecta como mensaje de sistema adicional para
+    endurecer el comportamiento del primer párrafo.
+    """
+    mode = str(calc_mode or "").strip().lower()
+    if mode == "yoy":
+        return (
+            "REGLA ESTRICTA DE REDACCION: en el PRIMER PARRAFO (primera oracion) "
+            "comienza mencionando el PERIODO analizado (ej: 'En el 3er trimestre de 2025, ...') "
+            "y reporta PRIMERO el valor de 'yoy_pct'. "
+            "No comiences con 'value' ni con 'pct'."
+        )
+    if mode == "prev_period":
+        return (
+            "REGLA ESTRICTA DE REDACCION: en el PRIMER PARRAFO (primera oracion) "
+            "comienza mencionando el PERIODO analizado (ej: 'En el 3er trimestre de 2025, ...') "
+            "y reporta PRIMERO el valor de 'pct'. "
+            "No comiences con 'value' ni con 'yoy_pct'."
+        )
+    if mode == "original":
+        return (
+            "REGLA ESTRICTA DE REDACCION: en el PRIMER PARRAFO (primera oracion) "
+            "comienza mencionando el PERIODO analizado (ej: 'En el 3er trimestre de 2025, ...') "
+            "y reporta PRIMERO el valor de 'value' (con su unidad). "
+            "Luego menciona 'yoy_pct', y 'pct' solo si aporta claridad. "
+            "No comiences con 'yoy_pct' ni con 'pct'."
+        )
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Streaming de la respuesta LLM con function calling
 # ---------------------------------------------------------------------------
@@ -719,6 +755,10 @@ def stream_data_response(
 
     question = payload.get("question", "")
     observations = payload.get("observations") or {}
+    entities_ctx = payload.get("entities") if isinstance(payload.get("entities"), dict) else {}
+    calc_mode_ctx = str(payload.get("calc_mode") or "").strip().lower()
+    if not calc_mode_ctx:
+        calc_mode_ctx = str((observations.get("classification") or {}).get("calc_mode") or "").strip().lower()
 
     model = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
     temperature = float(os.getenv("DATA_RESPONSE_TEMPERATURE", "0.35"))
@@ -732,6 +772,22 @@ def stream_data_response(
         return
 
     messages = _build_initial_messages()
+    context_payload = {
+        "calc_mode": calc_mode_ctx or None,
+        "entities": entities_ctx,
+    }
+    messages.append(
+        {
+            "role": "system",
+            "content": (
+                "CONTEXTO DE CLASIFICACION (usar para priorizar metricas): "
+                + json.dumps(context_payload, ensure_ascii=False)
+            ),
+        }
+    )
+    strict_priority_instruction = _build_metric_priority_instruction(calc_mode_ctx)
+    if strict_priority_instruction:
+        messages.append({"role": "system", "content": strict_priority_instruction})
     messages.append({"role": "user", "content": question})
 
     try:
