@@ -94,3 +94,32 @@ def test_relative_period_fallback_instruction_none_when_last_year_exists():
         observations={"latest_available": {"A": str(year - 1)}},
     )
     assert text is None
+
+
+def test_missing_activity_instruction_when_requested_activity_not_available():
+    text = response_module._build_missing_activity_instruction(
+        entities_ctx={"activity_ent": "mineria"},
+        observations={
+            "series": [
+                {"classification_series": {"activity": "industria"}},
+                {"classification_series": {"activity": "servicios"}},
+                {"classification_series": {"indicator": "pib"}},
+            ]
+        },
+    )
+    assert text is not None
+    assert "actividad solicitada no existe" in text
+    assert "NO reemplaces por la serie agregada" in text
+
+
+def test_missing_activity_instruction_none_when_activity_exists():
+    text = response_module._build_missing_activity_instruction(
+        entities_ctx={"activity_ent": "industria"},
+        observations={
+            "series": [
+                {"classification_series": {"activity": "industria"}},
+                {"classification_series": {"activity": "servicios"}},
+            ]
+        },
+    )
+    assert text is None

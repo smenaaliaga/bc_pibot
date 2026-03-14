@@ -17,6 +17,7 @@ import json
 import logging
 import os
 import re
+import unicodedata
 from dataclasses import asdict
 from datetime import date
 from typing import Any, Dict, Iterable, List, Optional, Tuple
@@ -329,6 +330,9 @@ DATOS NO DISPONIBLES (FALLBACK)
 DESAMBIGUACIÓN
 - Si la pregunta es general, prioriza la serie total/agregada sobre componentes.
 - Usa list_series si no tienes claro cuál serie elegir.
+- Si el usuario pide una actividad específica (ej: "minería") y esa actividad NO existe en
+    las series disponibles del cuadro, indícalo explícitamente. NO sustituyas por PIB total
+    ni por otra actividad y NO inventes cifras para la actividad solicitada.
 - En conversaciones de seguimiento, hereda indicador/serie/frecuencia/métrica del turno anterior.
   Solo reemplaza lo que el nuevo turno cambie explícitamente.
 
@@ -755,6 +759,49 @@ def _normalize_freq_code(freq: Any) -> str:
     return _FREQ_CODE_MAP.get(str(freq or "").strip().lower(), "")
 
 
+def _normalize_token(value: Any) -> str:
+    text = str(value or "").strip().lower()
+    if not text:
+        return ""
+    text = unicodedata.normalize("NFKD", text)
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    text = re.sub(r"[^a-z0-9]+", "_", text).strip("_")
+    return text
+
+
+def _build_missing_activity_instruction(
+    entities_ctx: Dict[str, Any],
+    observations: Dict[str, Any],
+) -> Optional[str]:
+    requested_activity = _normalize_token(entities_ctx.get("activity_ent"))
+    if requested_activity in {"", "none", "null"}:
+        return None
+
+    available_activities: List[str] = []
+    for series in observations.get("series", []) or []:
+        cls = series.get("classification_series", {})
+        if not isinstance(cls, dict):
+            continue
+        activity = _normalize_token(cls.get("activity"))
+        if activity:
+            available_activities.append(activity)
+
+    if not available_activities:
+        return None
+
+    available_set = set(available_activities)
+    if requested_activity in available_set:
+        return None
+
+    options = ", ".join(sorted(available_set)[:8])
+    return (
+        "REGLA ESTRICTA DE ACTIVIDAD FALTANTE: la actividad solicitada no existe en este cuadro. "
+        f"Actividad pedida: '{requested_activity}'. Actividades disponibles: {options}. "
+        "Debes responder explícitamente que no hay datos para la actividad solicitada en este cuadro. "
+        "NO reemplaces por la serie agregada (PIB total) ni por otra actividad, y NO inventes valores."
+    )
+
+
 def _resolve_requested_frequency(
     entities_ctx: Dict[str, Any],
     observations: Dict[str, Any],
@@ -1002,6 +1049,12 @@ def stream_data_response(
     )
     if relative_period_fallback_instruction:
         messages.append({"role": "system", "content": relative_period_fallback_instruction})
+    missing_activity_instruction = _build_missing_activity_instruction(
+        entities_ctx=entities_ctx,
+        observations=observations,
+    )
+    if missing_activity_instruction:
+        messages.append({"role": "system", "content": missing_activity_instruction})
     messages.append({"role": "user", "content": question})
 
     try:
