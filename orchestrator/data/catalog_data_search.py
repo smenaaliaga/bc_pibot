@@ -76,6 +76,10 @@ def search_output_payloads(
         match = True
         for key, search_value in kwargs.items():
             cls_value = cls.get(key)
+            if key == "hist" and cls_value is None and search_value == 0:
+                # En cuadros no históricos el campo puede no existir;
+                # para filtrado, tratar ausencia como hist=0.
+                cls_value = 0
             if cls_value is None:
                 match = False
                 break

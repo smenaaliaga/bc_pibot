@@ -161,7 +161,7 @@ def _build_search_kwargs(ent: ResolvedEntities) -> Dict[str, Any]:
     elif inv == "none":
         kwargs["has_investment"] = 0
 
-    if ent.hist:
+    if ent.hist is not None:
         kwargs["hist"] = ent.hist
 
     return kwargs

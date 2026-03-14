@@ -132,16 +132,10 @@ def _rule_assign_price(ent: ResolvedEntities) -> None:
 
 
 def _rule_pib_hist_flag(ent: ResolvedEntities) -> None:
-    """Activa la búsqueda en series históricas si PIB anual y año < 1996."""
+    """Define hist para el filtro: 1 si period[0] <= 1996, en otro caso 0."""
     from orchestrator.data._helpers import extract_year
     ref_year = extract_year(ent.period_ent[0]) if ent.period_ent else None
-    if (
-        ent.indicator_ent == "pib"
-        and str(ent.frequency_ent or "").strip().lower() == "a"
-        and ref_year is not None
-        and ref_year < 1996
-    ):
-        ent.hist = 1
+    ent.hist = 1 if (ref_year is not None and ref_year < 1996) else 0
 
 
 def _rule_contribution_demanda_interna(ent: ResolvedEntities) -> None:
