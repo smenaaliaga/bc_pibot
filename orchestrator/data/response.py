@@ -317,6 +317,8 @@ DATOS NO DISPONIBLES (FALLBACK)
   Ejemplo correcto: "En enero de 2026, el IMACEC desestacionalizado creció un **0,19%** ..."
   Ejemplo INCORRECTO: "En febrero de 2026, no hay datos disponibles. Sin embargo, en enero..."
 - CASO 2 — El usuario pidió EXPLÍCITAMENTE un período y ese período no tiene datos:
+    Las referencias temporales relativas también cuentan como período EXPLÍCITO
+    (ej: "año pasado", "este año", "trimestre pasado", "mes pasado").
   1. Indica que no hay datos para el período solicitado.
   2. Consulta get_metadata para identificar el último período disponible (latest_available).
   3. Automáticamente consulta y presenta los datos del último período disponible como alternativa.
@@ -405,9 +407,11 @@ ESTILO DE RESPUESTA
   NO especules sobre causas ni des opiniones sobre qué factores explican los valores
   (ej: NO decir "asociado a la pandemia", "por la crisis", "debido al dinamismo del sector").
   Limítate a describir los datos: magnitudes, comparaciones y tendencias numéricas.
-- Tercer párrafo: detalle de las series usadas con sus series_id, métrica y período.
-- SIEMPRE incluye los series_id de todas las series que participan en la respuesta.
-  En rankings, lista los series_id de cada posición mencionada.
+- NO agregues un bloque final de trazabilidad del tipo "Los datos se obtuvieron de las siguientes series".
+- NO incluyas listados largos de series_id al final de la respuesta.
+- Si necesitas citar series_id, hazlo de forma breve y solo para las series estrictamente
+    necesarias para sostener el resultado principal, integrado dentro del texto.
+- En rankings, menciona solo los series_id de los elementos efectivamente reportados.
 - Si hay datos adicionales relevantes (valores absolutos, variaciones de períodos cercanos,
   posición relativa en el ranking completo), inclúyelos para enriquecer la respuesta.
 - SIEMPRE incluye las cifras numéricas exactas obtenidas de las herramientas.
@@ -853,6 +857,76 @@ def _build_incomplete_period_instruction(
     return None
 
 
+def _build_relative_period_fallback_instruction(
+    question: str,
+    entities_ctx: Dict[str, Any],
+    observations: Dict[str, Any],
+) -> Optional[str]:
+    text = str(question or "").lower()
+    today = date.today()
+
+    relative_expr = None
+    freq_code = ""
+    target_period = ""
+
+    if "año pasado" in text:
+        relative_expr = "año pasado"
+        freq_code = "A"
+        target_period = str(today.year - 1)
+    elif "este año" in text:
+        relative_expr = "este año"
+        freq_code = "A"
+        target_period = str(today.year)
+    elif "hace dos años" in text:
+        relative_expr = "hace dos años"
+        freq_code = "A"
+        target_period = str(today.year - 2)
+    elif "trimestre pasado" in text:
+        relative_expr = "trimestre pasado"
+        q = (today.month - 1) // 3 + 1
+        target_period = f"{today.year - 1}-Q4" if q == 1 else f"{today.year}-Q{q - 1}"
+        freq_code = "T"
+    elif "este trimestre" in text:
+        relative_expr = "este trimestre"
+        q = (today.month - 1) // 3 + 1
+        target_period = f"{today.year}-Q{q}"
+        freq_code = "T"
+    elif "mes pasado" in text:
+        relative_expr = "mes pasado"
+        target_period = f"{today.year - 1}-12" if today.month == 1 else f"{today.year}-{today.month - 1:02d}"
+        freq_code = "M"
+    elif "este mes" in text:
+        relative_expr = "este mes"
+        target_period = f"{today.year}-{today.month:02d}"
+        freq_code = "M"
+
+    if not (relative_expr and freq_code and target_period):
+        return None
+
+    # Si hay frecuencia explícita en entidades, respetarla para evitar cruces inconsistentes.
+    requested_freq = _resolve_requested_frequency(entities_ctx, observations)
+    if requested_freq and requested_freq != freq_code:
+        freq_code = requested_freq
+
+    latest_available = observations.get("latest_available") or {}
+    latest_period = str(latest_available.get(freq_code) or "").strip()
+    if not latest_period:
+        return None
+
+    if target_period <= latest_period:
+        return None
+
+    latest_label = _natural_period_label(latest_period, freq_code)
+    target_label = target_period if freq_code == "A" else _natural_period_label(target_period, freq_code)
+    return (
+        "REGLA ESTRICTA DE FALLBACK PARA FECHA RELATIVA: la pregunta pide un período explícito "
+        f"('{relative_expr}' = {target_label}) sin datos disponibles. Debes decir explícitamente "
+        f"que no hay datos para {target_label} y luego entregar el dato del período más cercano "
+        f"disponible ({latest_label}). NUNCA omitas el aviso de falta de datos cuando la referencia "
+        "temporal relativa apunta a un período inexistente."
+    )
+
+
 # ---------------------------------------------------------------------------
 # Streaming de la respuesta LLM con function calling
 # ---------------------------------------------------------------------------
@@ -921,6 +995,13 @@ def stream_data_response(
     )
     if incomplete_period_instruction:
         messages.append({"role": "system", "content": incomplete_period_instruction})
+    relative_period_fallback_instruction = _build_relative_period_fallback_instruction(
+        question=question,
+        entities_ctx=entities_ctx,
+        observations=observations,
+    )
+    if relative_period_fallback_instruction:
+        messages.append({"role": "system", "content": relative_period_fallback_instruction})
     messages.append({"role": "user", "content": question})
 
     try:

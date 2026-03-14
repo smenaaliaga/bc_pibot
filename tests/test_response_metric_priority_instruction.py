@@ -71,3 +71,26 @@ def test_build_incomplete_period_instruction_uses_frequency_from_entities_ctx():
     )
     assert text is not None
     assert "semestre solicitado NO está completo" in text
+
+
+def test_relative_period_fallback_instruction_when_last_year_has_no_data():
+    year = response_module.date.today().year
+    text = response_module._build_relative_period_fallback_instruction(
+        question="cuanto crecio la mineria el año pasado",
+        entities_ctx={"frequency_ent": "a"},
+        observations={"latest_available": {"A": str(year - 2)}},
+    )
+    assert text is not None
+    assert "sin datos disponibles" in text
+    assert str(year - 1) in text
+    assert str(year - 2) in text
+
+
+def test_relative_period_fallback_instruction_none_when_last_year_exists():
+    year = response_module.date.today().year
+    text = response_module._build_relative_period_fallback_instruction(
+        question="cuanto crecio la mineria el año pasado",
+        entities_ctx={"frequency_ent": "a"},
+        observations={"latest_available": {"A": str(year - 1)}},
+    )
+    assert text is None
