@@ -422,6 +422,11 @@ ESTILO DE RESPUESTA
   NUNCA respondas solo con descripciones cualitativas (ej: "tuvo su mayor expansión").
   SIEMPRE acompaña con el número concreto (ej: "tuvo su mayor expansión, con un crecimiento de 12.3%").
   Si mencionas un máximo, mínimo, crecimiento o caída, incluye el valor numérico y el período.
+- NO uses nombres técnicos de campos en la respuesta al usuario.
+    Nunca escribas literales como "value", "pct", "yoy_pct", "delta_abs", "yoy_delta_abs",
+    "acceleration_pct" o "acceleration_yoy".
+    En su lugar, usa lenguaje natural: "nivel", "variación mensual/trimestral", "variación interanual",
+    "cambio absoluto" o "aceleración".
 - No menciones nombres de herramientas al usuario.
 - IMPORTANTE: en rankings de crecimiento/caída, separa claramente los positivos de los negativos.
   Si el usuario pide "las que más crecieron" y solo algunas tienen variación positiva:
@@ -769,12 +774,29 @@ def _normalize_token(value: Any) -> str:
     return text
 
 
+def _is_req_form_latest(entities_ctx: Dict[str, Any]) -> bool:
+    req_form = str(entities_ctx.get("req_form_cls") or "").strip().lower()
+    return req_form == "latest"
+
+
 def _build_missing_activity_instruction(
     entities_ctx: Dict[str, Any],
     observations: Dict[str, Any],
 ) -> Optional[str]:
+    activity_cls = str(
+        entities_ctx.get("activity_cls_resolved")
+        or entities_ctx.get("activity_cls")
+        or ""
+    ).strip().lower()
+    if activity_cls != "specific":
+        return None
+
     requested_activity = _normalize_token(entities_ctx.get("activity_ent"))
     if requested_activity in {"", "none", "null"}:
+        return None
+
+    # IMACEC/PIB son indicadores agregados, no actividades económicas.
+    if requested_activity in {"imacec", "pib"}:
         return None
 
     available_activities: List[str] = []
@@ -909,6 +931,9 @@ def _build_relative_period_fallback_instruction(
     entities_ctx: Dict[str, Any],
     observations: Dict[str, Any],
 ) -> Optional[str]:
+    if _is_req_form_latest(entities_ctx):
+        return None
+
     text = str(question or "").lower()
     today = date.today()
 
@@ -971,6 +996,66 @@ def _build_relative_period_fallback_instruction(
         f"que no hay datos para {target_label} y luego entregar el dato del período más cercano "
         f"disponible ({latest_label}). NUNCA omitas el aviso de falta de datos cuando la referencia "
         "temporal relativa apunta a un período inexistente."
+    )
+
+
+def _question_has_explicit_period(question: str, entities_ctx: Dict[str, Any]) -> bool:
+    period_values = entities_ctx.get("period_ent")
+    if isinstance(period_values, list):
+        for value in period_values:
+            text = str(value or "").strip()
+            if re.fullmatch(r"(?:19|20)\d{2}", text):
+                return True
+            if re.fullmatch(r"(?:19|20)\d{2}-Q[1-4]", text, re.IGNORECASE):
+                return True
+            if re.fullmatch(r"(?:19|20)\d{2}-(?:0[1-9]|1[0-2])", text):
+                return True
+
+    text = str(question or "").lower()
+    if re.search(r"\b(?:19|20)\d{2}\b", text):
+        return True
+    if re.search(r"\b(?:19|20)\d{2}-q[1-4]\b", text):
+        return True
+    if re.search(r"\b(?:19|20)\d{2}-(?:0[1-9]|1[0-2])\b", text):
+        return True
+    if re.search(r"\b(primer|1er|1ro|segundo|2do)\s+semestre\b", text):
+        return True
+
+    relative_tokens = (
+        "año pasado",
+        "este año",
+        "hace dos años",
+        "trimestre pasado",
+        "este trimestre",
+        "mes pasado",
+        "este mes",
+        "hoy",
+        "ayer",
+    )
+    return any(token in text for token in relative_tokens)
+
+
+def _build_no_explicit_period_latest_instruction(
+    question: str,
+    entities_ctx: Dict[str, Any],
+    observations: Dict[str, Any],
+) -> Optional[str]:
+    if not _is_req_form_latest(entities_ctx) and _question_has_explicit_period(question, entities_ctx):
+        return None
+
+    freq_code = _resolve_requested_frequency(entities_ctx, observations)
+    latest_available = observations.get("latest_available") or {}
+    latest_period = str(latest_available.get(freq_code) or "").strip() if freq_code else ""
+    if not latest_period:
+        return None
+
+    latest_label = latest_period if freq_code == "A" else _natural_period_label(latest_period, freq_code)
+    return (
+        "REGLA ESTRICTA DE PERIODO POR DEFECTO: "
+        "si req_form_cls='latest', o si la pregunta no especifica fecha, "
+        f"Debes responder usando directamente el ultimo periodo disponible ({latest_label}). "
+        "NO menciones falta de datos para meses/trimestres/años no solicitados y NO infieras "
+        "automaticamente el mes/trimestre actual como periodo pedido."
     )
 
 
@@ -1049,6 +1134,13 @@ def stream_data_response(
     )
     if relative_period_fallback_instruction:
         messages.append({"role": "system", "content": relative_period_fallback_instruction})
+    no_explicit_period_instruction = _build_no_explicit_period_latest_instruction(
+        question=question,
+        entities_ctx=entities_ctx,
+        observations=observations,
+    )
+    if no_explicit_period_instruction:
+        messages.append({"role": "system", "content": no_explicit_period_instruction})
     missing_activity_instruction = _build_missing_activity_instruction(
         entities_ctx=entities_ctx,
         observations=observations,

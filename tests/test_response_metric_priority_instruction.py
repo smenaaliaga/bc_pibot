@@ -98,7 +98,7 @@ def test_relative_period_fallback_instruction_none_when_last_year_exists():
 
 def test_missing_activity_instruction_when_requested_activity_not_available():
     text = response_module._build_missing_activity_instruction(
-        entities_ctx={"activity_ent": "mineria"},
+        entities_ctx={"activity_ent": "mineria", "activity_cls": "specific"},
         observations={
             "series": [
                 {"classification_series": {"activity": "industria"}},
@@ -121,5 +121,72 @@ def test_missing_activity_instruction_none_when_activity_exists():
                 {"classification_series": {"activity": "servicios"}},
             ]
         },
+    )
+    assert text is None
+
+
+def test_missing_activity_instruction_none_for_imacec_indicator_token():
+    text = response_module._build_missing_activity_instruction(
+        entities_ctx={"activity_ent": "imacec", "activity_cls": "specific"},
+        observations={
+            "series": [
+                {"classification_series": {"activity": "industria"}},
+                {"classification_series": {"activity": "servicios"}},
+            ]
+        },
+    )
+    assert text is None
+
+
+def test_missing_activity_instruction_none_for_pib_indicator_token():
+    text = response_module._build_missing_activity_instruction(
+        entities_ctx={"activity_ent": "pib", "activity_cls": "specific"},
+        observations={
+            "series": [
+                {"classification_series": {"activity": "industria"}},
+                {"classification_series": {"activity": "servicios"}},
+            ]
+        },
+    )
+    assert text is None
+
+
+def test_no_explicit_period_instruction_when_question_has_no_date():
+    text = response_module._build_no_explicit_period_latest_instruction(
+        question="dame la contribucion del sector minero a la economia",
+        entities_ctx={"frequency_ent": "m"},
+        observations={"latest_available": {"M": "2026-01"}},
+    )
+    assert text is not None
+    assert "no especifica fecha" in text
+    assert "ultimo periodo disponible" in text
+    assert "NO menciones falta de datos" in text
+
+
+def test_no_explicit_period_instruction_none_when_relative_date_is_explicit():
+    text = response_module._build_no_explicit_period_latest_instruction(
+        question="dame la contribucion del sector minero el mes pasado",
+        entities_ctx={"frequency_ent": "m"},
+        observations={"latest_available": {"M": "2026-01"}},
+    )
+    assert text is None
+
+
+def test_no_explicit_period_instruction_when_req_form_latest_even_with_relative_date():
+    text = response_module._build_no_explicit_period_latest_instruction(
+        question="dame la contribucion del sector minero el mes pasado",
+        entities_ctx={"frequency_ent": "m", "req_form_cls": "latest"},
+        observations={"latest_available": {"M": "2026-01"}},
+    )
+    assert text is not None
+    assert "req_form_cls='latest'" in text
+
+
+def test_relative_period_fallback_instruction_none_when_req_form_latest():
+    year = response_module.date.today().year
+    text = response_module._build_relative_period_fallback_instruction(
+        question="dame la contribucion del sector minero el mes pasado",
+        entities_ctx={"frequency_ent": "m", "req_form_cls": "latest"},
+        observations={"latest_available": {"M": f"{year}-01"}},
     )
     assert text is None
