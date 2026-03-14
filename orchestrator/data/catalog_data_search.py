@@ -49,6 +49,10 @@ def search_output_payloads(
     if "region" in kwargs and "has_region" not in kwargs:
         kwargs["has_region"] = 1
 
+    # Separar region: puede vivir en classification (single-region files)
+    # o en classification_series de cada serie (multi-region files).
+    wanted_region = kwargs.pop("region", None)
+
     # Separar frequency (campo top-level en el payload, no dentro de classification)
     wanted_freq = _normalize_frequency(kwargs.pop("frequency", "") or "")
 
@@ -81,6 +85,19 @@ def search_output_payloads(
 
         if not match:
             continue
+
+        # Filtrar por region: buscar en classification (single-region)
+        # o en classification_series de alguna serie (multi-region)
+        if wanted_region:
+            if cls.get("region") and _match_value(cls["region"], wanted_region):
+                pass  # match at payload level
+            else:
+                series_match = any(
+                    s.get("classification_series", {}).get("region") == wanted_region
+                    for s in payload.get("series", [])
+                )
+                if not series_match:
+                    continue
 
         matches.append(
             {
