@@ -47,6 +47,13 @@ _SEASONALITY_LABELS = {
     "nsa": "empalmado (no desestacionalizado)",
 }
 
+_FREQ_CODE_MAP = {
+    "m": "M",
+    "q": "T",
+    "t": "T",
+    "a": "A",
+}
+
 
 def format_period_labels(period_str: str, freq: str) -> Tuple[str, ...]:
     """Convierte una fecha ISO (YYYY-MM-DD) en una etiqueta de período legible.
@@ -64,6 +71,13 @@ def format_period_labels(period_str: str, freq: str) -> Tuple[str, ...]:
         return ("--",)
 
     freq_lower = str(freq or "").strip().lower()
+
+    quarter_match = re.fullmatch(r"((?:19|20)\d{2})-Q([1-4])", text, re.IGNORECASE)
+    if quarter_match:
+        year = int(quarter_match.group(1))
+        quarter = int(quarter_match.group(2))
+        return (f"{_QUARTER_LABELS.get(quarter, '--')} {year}",)
+
     parts = text[:10].split("-")
 
     if len(parts) == 1:
@@ -380,6 +394,12 @@ ESTILO DE RESPUESTA
   Ejemplo correcto: "La minería creció un 4.69% en 2024-Q1, 2.32% en 2024-Q2, 4.44% en 2024-Q3
   y 7.45% en 2024-Q4."
   NUNCA resumas un solo sub-período como si fuera el valor del año completo.
+- Si el año o semestre solicitado está INCOMPLETO porque aún faltan sub-períodos,
+    NUNCA lo describas como año/semestre cerrado. Debes decir explícitamente que es un resultado
+    parcial o acumulado hasta el último sub-período disponible (ej: "en lo disponible de 2025",
+    "hasta el 3er trimestre de 2025").
+- NUNCA uses frases de cierre como "En 2025, ..." o "Durante el primer semestre de 2025, ..."
+    si no están todos los trimestres/meses requeridos para ese año o semestre.
 - Segundo párrafo: contexto y análisis. Explica qué significan los datos,
   compara con períodos anteriores si es relevante, y describe la tendencia general.
   NO especules sobre causas ni des opiniones sobre qué factores explican los valores
@@ -727,6 +747,112 @@ def _build_metric_priority_instruction(calc_mode: str) -> Optional[str]:
     return None
 
 
+def _normalize_freq_code(freq: Any) -> str:
+    return _FREQ_CODE_MAP.get(str(freq or "").strip().lower(), "")
+
+
+def _resolve_requested_frequency(
+    entities_ctx: Dict[str, Any],
+    observations: Dict[str, Any],
+) -> str:
+    for key in ("frequency_ent", "frequency"):
+        freq_code = _normalize_freq_code(entities_ctx.get(key))
+        if freq_code:
+            return freq_code
+
+    return _normalize_freq_code(
+        (observations.get("classification") or {}).get("frequency")
+        or observations.get("frequency")
+    )
+
+
+def _natural_period_label(period_str: str, freq_code: str) -> str:
+    label = format_period_labels(period_str, "m" if freq_code == "M" else "q" if freq_code == "T" else "a")[0]
+    if freq_code == "T":
+        return re.sub(r" trimestre (\d{4})$", r" trimestre de \1", label)
+    if freq_code == "M":
+        return re.sub(r" ([12]\d{3})$", r" de \1", label)
+    return label
+
+
+def _extract_requested_year(entities_ctx: Dict[str, Any], question: str) -> Optional[str]:
+    period_values = entities_ctx.get("period_ent")
+    if isinstance(period_values, list):
+        for value in period_values:
+            text = str(value or "").strip()
+            if re.fullmatch(r"(19|20)\d{2}", text):
+                return text
+
+    match = re.search(r"\b((?:19|20)\d{2})\b", str(question or ""))
+    if match:
+        return match.group(1)
+    return None
+
+
+def _extract_requested_semester(question: str) -> Tuple[Optional[int], Optional[str]]:
+    text = str(question or "")
+    patterns = [
+        r"\b(primer|1er|1ro)\s+semestre(?:\s+de)?\s+((?:19|20)\d{2})\b",
+        r"\b(segundo|2do)\s+semestre(?:\s+de)?\s+((?:19|20)\d{2})\b",
+    ]
+    for idx, pattern in enumerate(patterns, start=1):
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            return idx, match.group(2)
+    return None, None
+
+
+def _build_incomplete_period_instruction(
+    question: str,
+    entities_ctx: Dict[str, Any],
+    observations: Dict[str, Any],
+) -> Optional[str]:
+    freq_code = _resolve_requested_frequency(entities_ctx, observations)
+    if freq_code not in {"M", "T"}:
+        return None
+
+    latest_available = observations.get("latest_available") or {}
+    latest_period = str(latest_available.get(freq_code) or "").strip()
+    if not latest_period:
+        return None
+
+    requested_semester, semester_year = _extract_requested_semester(question)
+    if requested_semester and semester_year:
+        expected_final = (
+            f"{semester_year}-06" if freq_code == "M" and requested_semester == 1 else
+            f"{semester_year}-12" if freq_code == "M" else
+            f"{semester_year}-Q2" if requested_semester == 1 else
+            f"{semester_year}-Q4"
+        )
+        same_year = latest_period.startswith(f"{semester_year}-")
+        if same_year and latest_period < expected_final:
+            latest_label = _natural_period_label(latest_period, freq_code)
+            semester_label = "primer semestre" if requested_semester == 1 else "segundo semestre"
+            return (
+                "REGLA ESTRICTA DE COBERTURA TEMPORAL: el semestre solicitado NO está completo. "
+                f"Solo hay datos hasta {latest_label}. Debes describirlo como resultado parcial del "
+                f"{semester_label} de {semester_year}, nunca como semestre cerrado. "
+                f"No escribas frases como 'Durante el {semester_label} de {semester_year}, ...'. "
+                f"Usa formulaciones como 'En lo disponible del {semester_label} de {semester_year}, ...' "
+                f"o 'Hasta {latest_label}, ...'."
+            )
+
+    requested_year = _extract_requested_year(entities_ctx, question)
+    if requested_year:
+        expected_final = f"{requested_year}-12" if freq_code == "M" else f"{requested_year}-Q4"
+        if latest_period.startswith(f"{requested_year}-") and latest_period != expected_final:
+            latest_label = _natural_period_label(latest_period, freq_code)
+            return (
+                "REGLA ESTRICTA DE COBERTURA TEMPORAL: el año solicitado NO está cerrado. "
+                f"Solo hay datos hasta {latest_label}. Debes describirlo como resultado parcial "
+                f"o acumulado de {requested_year}, nunca como el resultado anual cerrado. "
+                f"No escribas frases como 'En {requested_year}, ...'. Usa formulaciones como "
+                f"'En lo disponible de {requested_year}, ...' o 'Hasta {latest_label}, ...'."
+            )
+
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Streaming de la respuesta LLM con function calling
 # ---------------------------------------------------------------------------
@@ -756,7 +882,7 @@ def stream_data_response(
     question = payload.get("question", "")
     observations = payload.get("observations") or {}
     entities_ctx = payload.get("entities") if isinstance(payload.get("entities"), dict) else {}
-    calc_mode_ctx = str(payload.get("calc_mode") or "").strip().lower()
+    calc_mode_ctx = str(entities_ctx.get("calc_mode_cls") or "").strip().lower()
     if not calc_mode_ctx:
         calc_mode_ctx = str((observations.get("classification") or {}).get("calc_mode") or "").strip().lower()
 
@@ -788,6 +914,13 @@ def stream_data_response(
     strict_priority_instruction = _build_metric_priority_instruction(calc_mode_ctx)
     if strict_priority_instruction:
         messages.append({"role": "system", "content": strict_priority_instruction})
+    incomplete_period_instruction = _build_incomplete_period_instruction(
+        question=question,
+        entities_ctx=entities_ctx,
+        observations=observations,
+    )
+    if incomplete_period_instruction:
+        messages.append({"role": "system", "content": incomplete_period_instruction})
     messages.append({"role": "user", "content": question})
 
     try:

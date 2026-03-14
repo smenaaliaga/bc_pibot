@@ -228,7 +228,6 @@ def make_data_node(memory_adapter: Any):
             "question": question,
             "observations": observations,
             "entities": ent_dict,
-            "calc_mode": str(ent.calc_mode_cls or "").strip().lower(),
         }
 
         collected: List[str] = []
