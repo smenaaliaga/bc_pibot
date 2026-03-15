@@ -33,6 +33,7 @@ class ResolvedEntities:
     activity_ent: Optional[str] = None
     region_ent: Optional[str] = None
     investment_ent: Optional[str] = None
+    price_ent: Optional[str] = None
     period_ent: List[Any] = field(default_factory=list)
 
     # Clasificaciones del agente
@@ -111,24 +112,13 @@ def _is_empty_cls(value) -> bool:
 def _rule_assign_price(ent: ResolvedEntities) -> None:
     """Determina si se requiere el parámetro de precio para la búsqueda de series.
 
-    Para PIB agregado (sin actividad, región ni inversión) el precio es None;
-    en los demás casos se usa "enc" (encadenado).
-    
-    TEMPORAL: Mientras el modelo no clasifique correctamente, siempre se usa "enc".
+    Si el normalizador detectó un precio explícito ("enc" o "co") se usa directamente.
+    En caso contrario se usa "enc" como valor por defecto.
     """
-    # TODO: Reactivar esta lógica cuando el modelo pueda clasificar correctamente
-    # if (
-    #     ent.indicator_ent == "pib"
-    #     and _is_empty_cls(ent.activity_cls)
-    #     and _is_empty_cls(ent.region_cls)
-    #     and _is_empty_cls(ent.investment_cls)
-    # ):
-    #     ent.price = None
-    # else:
-    #     ent.price = "enc"
-    
-    # TEMPORAL: Siempre usar "enc" hasta que el modelo clasifique correctamente
-    ent.price = "enc"
+    if ent.price_ent:
+        ent.price = ent.price_ent
+    else:
+        ent.price = "enc"
 
 
 def _rule_pib_hist_flag(ent: ResolvedEntities) -> None:

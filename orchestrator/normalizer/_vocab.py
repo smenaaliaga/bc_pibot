@@ -72,6 +72,10 @@ ACTIVITY_TERMS_IMACEC: Dict[str, List[str]] = {
         "impuestos", "impuestos netos sobre productos", "impuestos netos",
         "impuestos sobre productos", "impuestos sobre productos netos",
     ],
+    "per_capita": [
+        "per capita", "per cápita", "percapita", "por habitante", "por persona",
+        "por cada habitante",
+    ],
 }
 
 ACTIVITY_TERMS_PIB: Dict[str, List[str]] = {
@@ -117,6 +121,10 @@ ACTIVITY_TERMS_PIB: Dict[str, List[str]] = {
     "impuestos": [
         "impuestos", "impuestos netos sobre productos", "impuestos netos",
         "impuestos sobre productos", "impuestos sobre productos netos",
+    ],
+    "per_capita": [
+        "per capita", "per cápita", "por habitante", "por persona",
+        "por cada habitante",
     ],
 }
 
@@ -234,6 +242,26 @@ REGION_TERMS: Dict[str, List[str]] = {
         "12va región", "12a región", "12m región", "xii ",
         "antartica", "la antartica", "antartica chilena",
         "antartica chilena y magallanes",
+    ],
+}
+
+# ─── Precios ───────────────────────────────────────────────────────────────────
+
+PRICE_TERMS: Dict[str, List[str]] = {
+    "enc": [
+        "volumen a precios del año anterior encadenado",
+        "medidas encadenadas de volumen",
+        "en términos reales",
+        "serie real",
+        "volumen real",
+        "a precios constantes",
+    ],
+    "co": [
+        "en valores corrientes",
+        "a precios actuales",
+        "en términos nominales",
+        "serie nominal",
+        "valor nominal",
     ],
 }
 

@@ -258,7 +258,7 @@ MÉTRICAS DISPONIBLES EN LOS DATOS
 - "acceleration_pct": cambio en la tasa "pct" respecto al período previo.
 - "acceleration_yoy": cambio en la tasa "yoy_pct" respecto al período previo.
 
-⚠️ REGLA CRÍTICA — LOS PORCENTAJES YA ESTÁN FORMATEADOS
+REGLA CRÍTICA — LOS PORCENTAJES YA ESTÁN FORMATEADOS
 Los campos pct, yoy_pct, acceleration_pct, acceleration_yoy vienen como STRINGS
 con el símbolo % incluido (ej: "0.022698%", "5.164212%", "-6.447661%").
 COPIA el valor textual tal cual. NUNCA hagas cálculos ni conversiones.

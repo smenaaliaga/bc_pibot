@@ -101,6 +101,7 @@ def _extract_entities_from_state(
         activity_ent=first_non_empty(normalized.get("activity")),
         region_ent=first_non_empty(normalized.get("region")),
         investment_ent=first_non_empty(normalized.get("investment")),
+        price_ent=first_non_empty(normalized.get("price")),
         period_ent=period_ent,
         calc_mode_cls=calc_mode_cls,
         activity_cls=activity_cls,

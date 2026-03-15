@@ -55,6 +55,7 @@ from orchestrator.normalizer._vocab import (
     FREQUENCY_TERMS,
     INVESTMENT_TERMS,
     MONTHS,
+    PRICE_TERMS,
     REGION_TERMS,
     SEASONALITY_TERMS,
 )
@@ -100,6 +101,7 @@ from orchestrator.normalizer._vocab import (  # noqa: E402, F811
     MONTHS as MONTHS,
     MONTH_ALIASES as MONTH_ALIASES,
     PERIOD_LATEST_TERMS as PERIOD_LATEST_TERMS,
+    PRICE_TERMS as PRICE_TERMS,
     QUARTERS_START_MONTH as QUARTERS_START_MONTH,
     REGION_TERMS as REGION_TERMS,
     SEASONALITY_TERMS as SEASONALITY_TERMS,
@@ -115,7 +117,7 @@ from orchestrator.normalizer._period import (  # noqa: E402, F811
 # Re-export las funciones de _period que se importaban vía PERIOD_*_REGEX
 from orchestrator.normalizer._vocab import PERIOD_LATEST_REGEX, PERIOD_PREVIOUS_REGEX  # noqa: F811
 
-_ENTITY_KEYS = ("indicator", "seasonality", "frequency", "activity", "region", "investment", "period")
+_ENTITY_KEYS = ("indicator", "seasonality", "frequency", "activity", "region", "investment", "price", "period")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -321,6 +323,13 @@ def normalize_investment(value: Optional[str]) -> Tuple[Optional[str], List[str]
     return (match, []) if match else (None, [value])
 
 
+def normalize_price(value: Optional[str]) -> Optional[str]:
+    """Normaliza ``price`` a código ``enc`` o ``co``."""
+    if not value:
+        return None
+    return best_vocab_key(value, PRICE_TERMS, threshold=0.70)
+
+
 def normalize_period(value: Optional[str]) -> Tuple[Optional[str], List[str]]:
     """Parsea un solo valor de período a ``YYYY-MM-DD`` (fallback simple)."""
     return normalize_single_period(value)
@@ -351,6 +360,7 @@ def normalize_ner_entities(
     region_raw = _first("region")
     investment_raw = _first("investment")
     activity_raw = _first("activity")
+    price_raw = _first("price")
     period_raw = _first("period")
 
     norm_freq = normalize_frequency(freq_raw)
@@ -358,6 +368,7 @@ def normalize_ner_entities(
     norm_seas = normalize_seasonality(seasonality_raw, calc_mode)
     norm_region, fail_region = normalize_region(region_raw)
     norm_inv, fail_inv = normalize_investment(investment_raw)
+    norm_price = normalize_price(price_raw)
 
     # Indicador faltante + contexto regional/inversión → PIB.
     if not indicator_raw and (norm_region is not None or norm_inv is not None):
@@ -372,6 +383,11 @@ def normalize_ner_entities(
     norm_act, fail_act = normalize_activity(
         activity_raw, norm_ind, calc_mode=calc_mode, region_value=norm_region,
     )
+
+    # Actividad per_capita → indicador pib_per_capita.
+    if norm_act == "per_capita":
+        norm_ind = "pib_per_capita"
+
     norm_period, fail_period = normalize_period(period_raw)
 
     # Construir failed_matches.
@@ -408,6 +424,7 @@ def normalize_ner_entities(
             "activity": norm_act,
             "region": norm_region,
             "investment": norm_inv,
+            "price": norm_price,
             "period": norm_period,
         },
         "failed_matches": failed or None,
@@ -443,6 +460,8 @@ def _normalize_multi(
             val = normalize_region(raw)[0]
         elif key == "investment":
             val = normalize_investment(raw)[0]
+        elif key == "price":
+            val = normalize_price(raw)
         if val and val not in out:
             out.append(val)
     return out
@@ -558,6 +577,10 @@ def normalize_entities(
             if a and a not in normed_acts:
                 normed_acts.append(a)
         response["activity"] = normed_acts
+
+    # ── Paso 4b: per_capita → indicador pib_per_capita ──────────────────────
+    if "per_capita" in (response.get("activity") or []):
+        response["indicator"] = ["pib_per_capita"]
 
     # ── Paso 5: ajuste final de frequency ───────────────────────────────────
     has_year_only_point = any(is_year_only_ref(r) for r in period_raw if r)

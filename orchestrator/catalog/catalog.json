@@ -97,6 +97,22 @@
       {"id": "F032.IMC.VAR.Z.Z.2018.N03.Z.3.M", "short_title": "Imacec no minero", "classification": {"activity": "no_mineria"}, "long_title": "Contribución del sector No minero en el IMACEC desestacionalizado"}
     ]
   },
+  "PIB per capita, referencia 2018 (USD)": {
+    "classification": {
+      "indicator": "pib_per_capita",
+      "calc_mode": ["original", "prev_period", "yoy"],
+      "seasonality": "nsa",
+      "frequency": ["q", "a"],
+      "price": "enc",
+      "has_activity": [0, 1],
+      "has_region": 0,
+      "has_investment": 0
+    },
+    "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_ESTADIST_MACRO/MN_EST_MACRO_IV/PEM_ACTyDDA_IndMacA_2_2018",
+    "series": [
+      {"id": "F032.PIB.PP.Z.USD.2018.Z.Z.0.A", "short_title": "PIB per capita", "classification": {"activity": "per_capita"}, "long_title": "PIB per capita"}
+    ]
+  },
   "PIB, referencia 2018 (miles de millones de pesos)": {
     "classification": {
       "indicator": "pib",
