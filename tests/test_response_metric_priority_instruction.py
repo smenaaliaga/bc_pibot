@@ -1,4 +1,5 @@
 import orchestrator.data.response as response_module
+from pathlib import Path
 
 
 def test_build_metric_priority_instruction_for_yoy():
@@ -190,3 +191,85 @@ def test_relative_period_fallback_instruction_none_when_req_form_latest():
         observations={"latest_available": {"M": f"{year}-01"}},
     )
     assert text is None
+
+
+def test_build_csv_markers_returns_single_marker_for_multiple_fetched_series():
+    marker_block = response_module._build_csv_markers(
+        [
+            {
+                "series_id": "SERIE_A",
+                "short_title": "Serie A",
+                "frequency": "M",
+                "records": [
+                    {"period": "2025-01", "value": 10, "pct": "1.0%", "yoy_pct": "2.0%"},
+                ],
+            },
+            {
+                "series_id": "SERIE_B",
+                "short_title": "Serie B",
+                "frequency": "M",
+                "records": [
+                    {"period": "2025-01", "value": 20, "pct": "3.0%", "yoy_pct": "4.0%"},
+                ],
+            },
+        ],
+        cuadro_name="Cuadro de prueba",
+    )
+
+    assert marker_block.count("##CSV_DOWNLOAD_START") == 1
+    assert "filename=serie_SERIE_A.csv" in marker_block
+    assert "title=Serie A" in marker_block
+
+    path_line = next(line for line in marker_block.splitlines() if line.startswith("path="))
+    export_path = Path(path_line.split("=", 1)[1])
+    export_text = export_path.read_text(encoding="utf-8-sig")
+
+    assert "SERIE_A" in export_text
+    assert "SERIE_B" not in export_text
+    assert "Cuadro de prueba" in export_text
+
+
+def test_list_series_exposes_available_frequencies():
+    payload = {
+        "series": [
+            {
+                "series_id": "SERIE.T",
+                "short_title": "Serie trimestral",
+                "long_title": "Serie trimestral larga",
+                "classification_series": {"seasonality": "nsa"},
+                "series_freq": "T",
+                "data": {"T": {"records": []}, "A": {"records": []}},
+            }
+        ]
+    }
+
+    result = response_module.handle_tool_call("list_series", {}, payload)
+    parsed = response_module.json.loads(result)
+
+    assert parsed[0]["series_id"] == "SERIE.T"
+    assert parsed[0]["available_frequencies"] == ["T", "A"]
+
+
+def test_get_series_data_unknown_series_returns_hint_and_catalog():
+    payload = {
+        "series": [
+            {
+                "series_id": "SERIE.T",
+                "short_title": "Serie trimestral",
+                "series_freq": "T",
+                "data": {"T": {"records": []}, "A": {"records": []}},
+            }
+        ]
+    }
+
+    result = response_module.handle_tool_call(
+        "get_series_data",
+        {"series_id": "SERIE.A", "frequency": "A"},
+        payload,
+    )
+    parsed = response_module.json.loads(result)
+
+    assert "no encontrada en este cuadro" in parsed["error"]
+    assert "Usa list_series" in parsed["hint"]
+    assert parsed["available_series"][0]["series_id"] == "SERIE.T"
+    assert parsed["available_series"][0]["available_frequencies"] == ["T", "A"]

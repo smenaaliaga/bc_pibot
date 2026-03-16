@@ -154,7 +154,7 @@ class LLMAdapter:
 
     def __init__(
         self,
-        model: str = "gpt-4.1-mini",
+        model: str = "gpt-4.1",
         temperature: float = 0.0,
         retriever: Optional[Any] = None,
         streaming: bool = True,

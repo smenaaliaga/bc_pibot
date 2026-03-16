@@ -243,11 +243,22 @@ CONTEXTO DEL CUADRO CARGADO
 
 FLUJO DE TRABAJO
 1. Interpreta la pregunta: identifica serie, período, frecuencia y métrica.
+1.b. Antes de usar get_series_data o get_extrema, llama list_series para identificar
+    un series_id EXACTO del cuadro.
+    NUNCA inventes series_id a partir de cuadro_id, del nombre del cuadro, ni cambiando
+    sufijos como .M/.T/.A.
+    El parámetro frequency selecciona el bloque de datos dentro del MISMO series_id,
+    y puede ser distinto de series_freq si available_frequencies lo permite.
 2. Llama la herramienta adecuada para obtener los datos exactos.
 3. Si el usuario pregunta por un año completo y la serie es trimestral o mensual,
    usa get_series_data con period_start y period_end para obtener TODOS los sub-períodos del año
    (ej: period_start="2024-Q1", period_end="2024-Q4" para trimestrales).
    NO uses period con un solo sub-período.
+3.b. Si el usuario pide un rango de varios años, un mandato presidencial o un período histórico
+    extendido, prioriza frecuencia anual ("A") si existe para la serie solicitada.
+    Si no existe frecuencia anual, cubre TODOS los años y TODOS los sub-períodos relevantes
+    dentro del rango pedido. NUNCA respondas un rango plurianual mostrando solo años sueltos
+    o años de ejemplo si el usuario pidió todo el período.
 4. Si necesitas comparar series, usa rank_series (NO consultes una por una).
 5. Si necesitas aceleración, pide dos períodos consecutivos con get_series_data.
 6. Responde con los datos obtenidos de las herramientas.
@@ -403,6 +414,10 @@ ESTILO DE RESPUESTA
   Ejemplo correcto: "La minería creció un 4.69% en 2024-Q1, 2.32% en 2024-Q2, 4.44% en 2024-Q3
   y 7.45% en 2024-Q4."
   NUNCA resumas un solo sub-período como si fuera el valor del año completo.
+- CUANDO el usuario pide un rango plurianual completo (ej: "entre 2010 y 2014", "durante el
+    primer gobierno de...", "entre 2018 y 2022"), SIEMPRE cubre todo el rango pedido. Si existe
+    frecuencia anual para la serie, prefierela para resumir el período completo. Si usas frecuencia
+    trimestral o mensual, debes cubrir todos los años del rango, no solo algunos años seleccionados.
 - Si el año o semestre solicitado está INCOMPLETO porque aún faltan sub-períodos,
     NUNCA lo describas como año/semestre cerrado. Debes decir explícitamente que es un resultado
     parcial o acumulado hasta el último sub-período disponible (ej: "en lo disponible de 2025",
@@ -413,6 +428,8 @@ ESTILO DE RESPUESTA
   compara con períodos anteriores si es relevante, y describe la tendencia general.
   NO especules sobre causas ni des opiniones sobre qué factores explican los valores
   (ej: NO decir "asociado a la pandemia", "por la crisis", "debido al dinamismo del sector").
+    Tampoco introduzcas contexto histórico o causal no observado directamente en los datos
+    (ej: "tras la crisis de 2009", "por el cambio de gobierno", "debido a condiciones externas").
   Limítate a describir los datos: magnitudes, comparaciones y tendencias numéricas.
 - NO agregues un bloque final de trazabilidad del tipo "Los datos se obtuvieron de las siguientes series".
 - NO incluyas listados largos de series_id al final de la respuesta.
@@ -470,6 +487,10 @@ TOOLS = [
             "name": "get_series_data",
             "description": (
                 "Obtiene registros de datos de una serie para un período exacto o un rango. "
+                "El series_id debe salir EXACTAMENTE de list_series. "
+                "NO derives el series_id cambiando sufijos .M/.T/.A ni usando el cuadro_id. "
+                "La frecuencia pedida se selecciona con el parámetro frequency sobre el MISMO series_id, "
+                "siempre que esa frecuencia aparezca en available_frequencies/list_series. "
                 "Cada registro contiene: period, value (número), pct, yoy_pct, acceleration_pct, "
                 "acceleration_yoy (strings con %, ej: '0.022698%', '5.164%'), delta_abs, yoy_delta_abs (números). "
                 "Los campos de porcentaje YA son strings formateados. Cópialos tal cual, NO multipliques por 100."
@@ -549,6 +570,29 @@ def _find_series(series_list: list, series_id: str):
     return None
 
 
+def _ordered_available_frequencies(series: Dict[str, Any]) -> List[str]:
+    data = series.get("data") or {}
+    order = {"M": 0, "T": 1, "A": 2}
+    return sorted(
+        [str(freq).upper() for freq in data.keys() if str(freq).upper() in order],
+        key=lambda freq: order.get(freq, 99),
+    )
+
+
+def _compact_series_catalog(series_list: List[Dict[str, Any]], limit: int = 8) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    for series in series_list[:limit]:
+        out.append(
+            {
+                "series_id": series.get("series_id", ""),
+                "short_title": series.get("short_title", ""),
+                "series_freq": series.get("series_freq"),
+                "available_frequencies": _ordered_available_frequencies(series),
+            }
+        )
+    return out
+
+
 _PCT_FIELDS = ("pct", "yoy_pct", "acceleration_pct", "acceleration_yoy")
 
 _UNITS_NOTE = (
@@ -586,6 +630,7 @@ def handle_tool_call(name: str, args: dict, payload: dict) -> str:
                 "long_title": s.get("long_title", ""),
                 "classification": s.get("classification_series", {}),
                 "series_freq": s.get("series_freq"),
+                "available_frequencies": _ordered_available_frequencies(s),
             }
             for s in series_list
         ]
@@ -609,11 +654,31 @@ def handle_tool_call(name: str, args: dict, payload: dict) -> str:
     if name == "get_series_data":
         series = _find_series(series_list, args.get("series_id", ""))
         if not series:
-            return json.dumps({"error": f"Serie '{args.get('series_id')}' no encontrada"})
+            return json.dumps(
+                {
+                    "error": f"Serie '{args.get('series_id')}' no encontrada en este cuadro",
+                    "hint": (
+                        "Usa list_series y copia exactamente uno de sus series_id. "
+                        "No derives IDs desde cuadro_id ni cambies sufijos .M/.T/.A."
+                    ),
+                    "available_series": _compact_series_catalog(series_list),
+                },
+                ensure_ascii=False,
+            )
         block = series["data"].get(args["frequency"])
         if not block:
-            avail = list(series["data"].keys())
-            return json.dumps({"error": f"Frecuencia '{args['frequency']}' no disponible. Disponibles: {avail}"})
+            avail = _ordered_available_frequencies(series)
+            return json.dumps(
+                {
+                    "error": f"Frecuencia '{args['frequency']}' no disponible para la serie '{series['series_id']}'",
+                    "available_frequencies": avail,
+                    "hint": (
+                        "Mantén el mismo series_id y cambia solo el parámetro frequency "
+                        "a una frecuencia disponible."
+                    ),
+                },
+                ensure_ascii=False,
+            )
         records = block.get("records", [])
         if args.get("period"):
             records = [r for r in records if r["period"] == args["period"]]
@@ -1107,8 +1172,7 @@ def _export_series_csv(
 
 
 def _build_csv_markers(fetched_series: List[Dict[str, Any]], cuadro_name: str = "") -> str:
-    """Build ``##CSV_DOWNLOAD_START/END`` marker blocks for each fetched series."""
-    parts: List[str] = []
+    """Build a single ``##CSV_DOWNLOAD_START/END`` marker using the first fetched series."""
     for entry in fetched_series:
         series_id = entry.get("series_id", "")
         short_title = entry.get("short_title", "")
@@ -1117,7 +1181,7 @@ def _build_csv_markers(fetched_series: List[Dict[str, Any]], cuadro_name: str = 
         if not path:
             continue
         filename = f"serie_{series_id}.csv" if series_id else os.path.basename(path)
-        parts.append(
+        return (
             f"##CSV_DOWNLOAD_START\n"
             f"path={path}\n"
             f"filename={filename}\n"
@@ -1126,7 +1190,83 @@ def _build_csv_markers(fetched_series: List[Dict[str, Any]], cuadro_name: str = 
             f"mimetype=text/csv\n"
             f"##CSV_DOWNLOAD_END"
         )
-    return "\n".join(parts)
+    return ""
+
+
+def _export_cuadro_csv(observations: Dict[str, Any]) -> Optional[str]:
+    """Export the full cuadro payload to a CSV so the UI always has a fallback download."""
+    series_list = observations.get("series") or []
+    rows: List[Dict[str, Any]] = []
+    dynamic_fields: List[str] = []
+    dynamic_seen = set()
+
+    for series in series_list:
+        series_id = series.get("series_id", "")
+        short_title = series.get("short_title", "")
+        data_blocks = series.get("data") or {}
+        for frequency, block in data_blocks.items():
+            records = (block or {}).get("records") or []
+            for record in records:
+                row = {
+                    "series_id": series_id,
+                    "short_title": short_title,
+                    "frequency": frequency,
+                }
+                for key, value in record.items():
+                    if key in _CSV_EXCLUDE_COLS:
+                        continue
+                    row[key] = value
+                    if key not in dynamic_seen:
+                        dynamic_seen.add(key)
+                        dynamic_fields.append(key)
+                rows.append(row)
+
+    if not rows:
+        return None
+
+    try:
+        cuadro_name = str(observations.get("cuadro_name") or "")
+        cuadro_id = str(observations.get("cuadro_id") or "")
+        fieldnames = ["series_id", "short_title", "frequency", *dynamic_fields]
+        buf = io.StringIO()
+        buf.write(f"# Nombre: {cuadro_name}\n")
+        buf.write(f"# Cuadro ID: {cuadro_id}\n")
+        buf.write("# Export: cuadro completo\n")
+        buf.write("#\n")
+        writer = csv.DictWriter(buf, fieldnames=fieldnames, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(rows)
+        tmp = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".csv", prefix="cuadro_",
+            delete=False, encoding="utf-8-sig", newline="",
+        )
+        tmp.write(buf.getvalue())
+        tmp.close()
+        return tmp.name
+    except Exception:
+        logger.exception("[DATA_RESPONSE] Error exportando CSV fallback del cuadro")
+        return None
+
+
+def _build_fallback_csv_marker(observations: Dict[str, Any]) -> str:
+    """Build a fallback marker so the UI can always render one download button."""
+    path = _export_cuadro_csv(observations)
+    if not path:
+        return ""
+
+    cuadro_id = str(observations.get("cuadro_id") or "cuadro")
+    cuadro_name = str(observations.get("cuadro_name") or "")
+    safe_cuadro_id = re.sub(r"[^A-Za-z0-9._-]+", "_", cuadro_id).strip("_") or "cuadro"
+    filename = f"cuadro_{safe_cuadro_id}.csv"
+    return (
+        "##CSV_DOWNLOAD_START\n"
+        f"path={path}\n"
+        f"filename={filename}\n"
+        f"title={cuadro_name}\n"
+        "label=Descargar CSV\n"
+        "mimetype=text/csv\n"
+        "##CSV_DOWNLOAD_END"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1162,9 +1302,9 @@ def stream_data_response(
     if not calc_mode_ctx:
         calc_mode_ctx = str((observations.get("classification") or {}).get("calc_mode") or "").strip().lower()
 
-    model = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
+    model = os.getenv("OPENAI_MODEL", "gpt-4.1")
     temperature = float(os.getenv("DATA_RESPONSE_TEMPERATURE", "0.35"))
-    max_tool_loops = int(os.getenv("MAX_TOOL_LOOPS", "8"))
+    max_tool_loops = int(os.getenv("MAX_TOOL_LOOPS", "16"))
 
     try:
         client = _OpenAI()
@@ -1302,11 +1442,16 @@ def stream_data_response(
                 source_footer = _build_source_footer(observations)
                 if source_footer:
                     yield source_footer
-                # Emit CSV download markers for fetched series
+                csv_block = ""
                 if fetched_series:
-                    csv_block = _build_csv_markers(fetched_series, cuadro_name=str(observations.get("cuadro_name") or ""))
-                    if csv_block:
-                        yield "\n" + csv_block
+                    csv_block = _build_csv_markers(
+                        fetched_series,
+                        cuadro_name=str(observations.get("cuadro_name") or ""),
+                    )
+                if not csv_block:
+                    csv_block = _build_fallback_csv_marker(observations)
+                if csv_block:
+                    yield "\n" + csv_block
                 return
         else:
             # Se agotó el loop de herramientas
