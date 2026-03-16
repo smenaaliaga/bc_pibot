@@ -278,6 +278,20 @@ def _clear_conversation() -> None:
     st.session_state.session_id = f"st-{uuid.uuid4().hex}"
 
 
+def _load_series_titles() -> Dict[str, str]:
+    """Carga series_index.json y devuelve {cod_serie: titulo}."""
+    idx_path = Path(__file__).parent / "series" / "series_index.json"
+    if not idx_path.exists():
+        return {}
+    try:
+        data = json.loads(idx_path.read_text(encoding="utf-8"))
+        return {k: v.get("DESC_SERIE_ESP", "") for k, v in data.items()}
+    except Exception:
+        return {}
+
+_SERIES_TITLES: Dict[str, str] = _load_series_titles()
+
+
 def run_app(
     settings: Settings,
     stream_fn: Optional[StreamFn] = None,
@@ -563,15 +577,19 @@ def run_app(
                     filename = b.get("filename") or f"datos_{i}.csv"
                     label = b.get("label") or "Descargar CSV"
                     mimetype = b.get("mimetype") or "text/csv"
+                    # Extraer series_id del nombre de archivo (serie_{ID}.csv)
+                    series_id = ""
+                    if filename.startswith("serie_") and filename.endswith(".csv"):
+                        series_id = filename[len("serie_"):-len(".csv")]
+                    title = b.get("title") or _SERIES_TITLES.get(series_id, "")
                     try:
-                        import pandas as _pd  # type: ignore
-                        df = _pd.read_csv(path)
-                        data_bytes = df.to_csv(index=False).encode("utf-8")
+                        data_bytes = Path(str(path)).read_bytes()
                     except Exception:
-                        try:
-                            data_bytes = Path(str(path)).read_bytes()
-                        except Exception:
-                            data_bytes = b""
+                        data_bytes = b""
+                    # if title:
+                    #     st.markdown(f"**{title}**")
+                    # if series_id:
+                    #     st.caption(f"Serie: `{series_id}`")
                     st.download_button(
                         label,
                         data_bytes,

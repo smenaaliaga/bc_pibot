@@ -13,10 +13,13 @@ encuentra la serie solicitada.
 
 from __future__ import annotations
 
+import csv
+import io
 import json
 import logging
 import os
 import re
+import tempfile
 import unicodedata
 from dataclasses import asdict
 from datetime import date
@@ -1060,6 +1063,73 @@ def _build_no_explicit_period_latest_instruction(
 
 
 # ---------------------------------------------------------------------------
+# CSV export & download markers
+# ---------------------------------------------------------------------------
+
+# Columns to exclude from the exported CSV
+_CSV_EXCLUDE_COLS = {"delta_abs", "yoy_delta_abs", "acceleration_pct", "acceleration_yoy"}
+
+
+def _export_series_csv(
+    series_id: str,
+    records: List[Dict[str, Any]],
+    short_title: str = "",
+    cuadro_name: str = "",
+) -> Optional[str]:
+    """Write *records* to a temporary CSV and return its path.
+
+    Adds ASCII-safe metadata header and strips internal diagnostic columns.
+    """
+    if not records:
+        return None
+    try:
+        fieldnames = [k for k in records[0] if k not in _CSV_EXCLUDE_COLS]
+        buf = io.StringIO()
+        buf.write(f"# Nombre: {cuadro_name}\n")
+        buf.write(f"# Serie: {short_title}\n")
+        buf.write(f"# Serie ID: {series_id}\n")
+        buf.write("# yoy_pct: variación porcentual interanual\n")
+        buf.write("# pct: variación porcentual respecto al periodo anterior\n")
+        buf.write("#\n")
+        writer = csv.DictWriter(buf, fieldnames=fieldnames, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(records)
+        tmp = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".csv", prefix="serie_",
+            delete=False, encoding="utf-8-sig", newline="",
+        )
+        tmp.write(buf.getvalue())
+        tmp.close()
+        return tmp.name
+    except Exception:
+        logger.exception("[DATA_RESPONSE] Error exportando CSV para %s", series_id)
+        return None
+
+
+def _build_csv_markers(fetched_series: List[Dict[str, Any]], cuadro_name: str = "") -> str:
+    """Build ``##CSV_DOWNLOAD_START/END`` marker blocks for each fetched series."""
+    parts: List[str] = []
+    for entry in fetched_series:
+        series_id = entry.get("series_id", "")
+        short_title = entry.get("short_title", "")
+        records = entry.get("records", [])
+        path = _export_series_csv(series_id, records, short_title=short_title, cuadro_name=cuadro_name)
+        if not path:
+            continue
+        filename = f"serie_{series_id}.csv" if series_id else os.path.basename(path)
+        parts.append(
+            f"##CSV_DOWNLOAD_START\n"
+            f"path={path}\n"
+            f"filename={filename}\n"
+            f"title={short_title}\n"
+            f"label=Descargar CSV\n"
+            f"mimetype=text/csv\n"
+            f"##CSV_DOWNLOAD_END"
+        )
+    return "\n".join(parts)
+
+
+# ---------------------------------------------------------------------------
 # Streaming de la respuesta LLM con function calling
 # ---------------------------------------------------------------------------
 
@@ -1149,6 +1219,8 @@ def stream_data_response(
         messages.append({"role": "system", "content": missing_activity_instruction})
     messages.append({"role": "user", "content": question})
 
+    fetched_series: List[Dict[str, Any]] = []  # track get_series_data results
+
     try:
         for _ in range(max_tool_loops):
             stream = client.chat.completions.create(
@@ -1217,11 +1289,24 @@ def stream_data_response(
                         "tool_call_id": tc["id"],
                         "content": result,
                     })
+                    # Track fetched series data for CSV export
+                    if tc["name"] == "get_series_data":
+                        try:
+                            parsed = json.loads(result)
+                            if "records" in parsed:
+                                fetched_series.append(parsed)
+                        except Exception:
+                            pass
             else:
                 # Sin tool calls → respuesta final ya fue yielded via content_chunks
                 source_footer = _build_source_footer(observations)
                 if source_footer:
                     yield source_footer
+                # Emit CSV download markers for fetched series
+                if fetched_series:
+                    csv_block = _build_csv_markers(fetched_series, cuadro_name=str(observations.get("cuadro_name") or ""))
+                    if csv_block:
+                        yield "\n" + csv_block
                 return
         else:
             # Se agotó el loop de herramientas
