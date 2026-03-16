@@ -15,6 +15,10 @@ import datetime
 import time
 import os
 import re
+import threading
+from queue import Queue, Empty
+
+import html as _html_mod
 
 import streamlit as st
 
@@ -253,16 +257,6 @@ def _init_session_state(settings: Settings) -> None:
     if "session_id" not in st.session_state:
         st.session_state.session_id = f"st-{uuid.uuid4().hex}"
 
-    if not st.session_state.welcome_emitted:
-        welcome_text = (getattr(settings, "welcome_message", "") or "").strip()
-        if not welcome_text:
-            welcome_text = (
-                f"Hola, soy {settings.bot_name}, asistente económico del Banco Central de Chile. "
-                "¿En qué puedo ayudarte hoy?"
-            )
-        st.session_state.messages.append({"role": "assistant", "content": welcome_text})
-        st.session_state.welcome_emitted = True
-
 
 def _clear_conversation() -> None:
     st.session_state.messages = []
@@ -274,10 +268,16 @@ def _clear_conversation() -> None:
     st.session_state.pop("memory_series_chart", None)
     st.session_state.pop("last_response_chart_requested", None)
     st.session_state.pop("last_response_chart_only", None)
+    st.session_state.pop("followup_markers", None)
+    # Limpiar feedback
+    for k in list(st.session_state.keys()):
+        if k.startswith("feedback_"):
+            del st.session_state[k]
     # Forzar nuevo session_id para una conversación limpia
     st.session_state.session_id = f"st-{uuid.uuid4().hex}"
 
 
+@st.cache_data(ttl=3600)
 def _load_series_titles() -> Dict[str, str]:
     """Carga series_index.json y devuelve {cod_serie: titulo}."""
     idx_path = Path(__file__).parent / "series" / "series_index.json"
@@ -290,6 +290,18 @@ def _load_series_titles() -> Dict[str, str]:
         return {}
 
 _SERIES_TITLES: Dict[str, str] = _load_series_titles()
+
+
+def _sanitize_llm_html(text: str) -> str:
+    """Escapa tags HTML peligrosos del LLM pero preserva markdown."""
+    if not text:
+        return text
+    # Escapar <script>, <iframe>, <object>, <embed>, <form>, <style> tags
+    dangerous_pattern = re.compile(
+        r'<\s*/?(script|iframe|object|embed|form|style|link|meta|base)(\s[^>]*)?>',
+        re.IGNORECASE,
+    )
+    return dangerous_pattern.sub(lambda m: _html_mod.escape(m.group(0)), text)
 
 
 def run_app(
@@ -339,7 +351,7 @@ def run_app(
             try:
                 import logging as _logging
                 if hasattr(_orch, "logger"):
-                    _orch.logger = _logging.LoggerAdapter(_orch.logger, extra={"session_id": st.session_state.session_id})  # type: ignore
+                    _orch.logger = _logging.LoggerAdapter(_orch.logger, extra={"session_id": st.session_state.get("session_id", "")})  # type: ignore
             except Exception:
                 pass
             stream_fn = lambda q, history=None, session_id=None: st.session_state.orch.stream(q, history=history, session_id=session_id)  # type: ignore[assignment]
@@ -347,26 +359,23 @@ def run_app(
             st.error(f"No se pudo inicializar el orquestador: {e}")
             return
 
-    # Encabezado: mostrar logo si está disponible
-    _logo_path = _Path("assets/logo.png")
-    if _logo_path.is_file():
-        st.image(str(_logo_path), width=120)
-    else:
-        st.markdown(
-            "<div style='font-size:3rem; line-height:1;'>❉</div>",
-            unsafe_allow_html=True,
-        )
+    # ──────────────────────────────────────────────────────────
+    # Detectar si estamos en modo landing (sin mensajes de usuario)
+    # ──────────────────────────────────────────────────────────
+    _has_user_messages = any(m.get("role") == "user" for m in st.session_state.messages) or bool(
+        st.session_state.get("pending_question")
+    )
 
     # Barra lateral: ajustes de modelo/temperatura y acciones de sesión
     with st.sidebar:
         st.subheader("Debug")
-        st.write(f"Session ID: `{st.session_state.session_id}`")
+        st.write(f"Session ID: `{st.session_state.get('session_id', 'N/A')}`")
         
         st.subheader("Modelo generativo")
         model_sel = st.text_input("Modelo", value=os.getenv("OPENAI_MODEL", "gpt-4.1"))
         temp_sel = st.slider("Temperatura", min_value=0.0, max_value=1.0, value=float(os.getenv("OPENAI_TEMPERATURE", "0") or 0.0), step=0.1)
         
-        st.subheader("Modelo predictror")
+        st.subheader("Modelo predictor")
         # Mostrar solo el nombre de la carpeta final del BERT base/tokenizer, sin permitir edición
         bert_model_full = os.getenv("BERT_MODEL_NAME", "")
         bert_model_name = os.path.basename(bert_model_full.rstrip("/\\")) if bert_model_full else ""
@@ -409,7 +418,7 @@ def run_app(
         def _render_memory_debug(dst_container):
             try:
                 _ma = _get_mem_adapter()
-                _sid = st.session_state.session_id
+                _sid = st.session_state.get("session_id", "")
                 # Header
                 dst_container.subheader("Clasificación y memoria")
                 # Backend
@@ -456,13 +465,6 @@ def run_app(
             _clear_conversation()
             st.rerun()
 
-    # Título y botón de restart
-    col_title, col_btn = st.columns([4, 1])
-    with col_title:
-        st.title(settings.bot_name, anchor=False)
-    with col_btn:
-        st.button("Restart", icon=":material/refresh:", on_click=_clear_conversation)
-
     # Helper: extraer followups embebidos en contenido de asistente
     import re as _re
 
@@ -486,8 +488,321 @@ def run_app(
         cleaned_parts.append(text[last_idx:])
         return ("".join(cleaned_parts), found)
 
-    # Pequeña descripción
-    st.caption("Chatbot que responde a consultas del PIB y el IMACEC")
+    # ──────────────────────────────────────────────────────────
+    # Estilos base: patrón visual tipo ChatGPT (sin logo)
+    # ──────────────────────────────────────────────────────────
+    st.markdown(
+        """
+        <style>
+        :root {
+            --bcch-navy: #0c1c32;
+            --bcch-navy-soft: #1b3152;
+            --bcch-gold: #bf9c69;
+            --bcch-gold-soft: #ccb086;
+            --bcch-surface: #f6f7fb;
+            --bcch-surface-2: #ffffff;
+            --bcch-text: #1b2b46;
+            --bcch-border: #d7ddea;
+            --bcch-gold-light: #f5edd8;
+            --bcch-success: #2e7d57;
+        }
+        .stApp {
+            background: var(--bcch-surface);
+            color: var(--bcch-text);
+        }
+        [data-testid="stMainBlockContainer"] {
+            max-width: 820px;
+            padding-top: 2.2rem;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        h1, h2, h3, h4, h5 {
+            color: var(--bcch-navy);
+            letter-spacing: -0.02em;
+        }
+        .chat-subtitle {
+            color: #6f7f9a;
+            font-size: 0.98rem;
+            margin-top: 0.1rem;
+            margin-bottom: 1.25rem;
+        }
+        /* Link de fuente BDE con estilo de boton simple */
+        .source-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            background: #ffffff;
+            color: var(--bcch-navy) !important;
+            border: 1px solid var(--bcch-border);
+            border-radius: 8px;
+            padding: 0.38rem 0.8rem;
+            font-size: 0.9rem;
+            font-weight: 500;
+            text-decoration: none !important;
+            transition: all 0.18s ease;
+            margin-top: 0.5rem;
+            margin-bottom: 0.3rem;
+        }
+        .source-badge:hover {
+            background: #f8f9fc;
+            border-color: var(--bcch-gold);
+            box-shadow: 0 1px 5px rgba(12, 28, 50, 0.08);
+        }
+        /* Followup suggestion chips */
+        .followup-label {
+            font-size: 0.8rem;
+            color: #8a9bba;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 0.4rem;
+            font-weight: 600;
+        }
+        /* Followup buttons estilo chip */
+        [data-testid="stChatMessage"]:last-of-type .stButton > button[kind="secondary"] {
+            border-radius: 20px;
+            border: 1px solid var(--bcch-border);
+            background: var(--bcch-surface-2);
+            color: var(--bcch-navy-soft);
+            font-size: 0.9rem;
+            padding: 0.4rem 1rem;
+            transition: all 0.18s ease;
+        }
+        [data-testid="stChatMessage"]:last-of-type .stButton > button[kind="secondary"]:hover {
+            border-color: var(--bcch-gold);
+            background: var(--bcch-gold-light);
+            color: var(--bcch-navy);
+            box-shadow: 0 2px 8px rgba(191, 156, 105, 0.18);
+        }
+        a {
+            color: var(--bcch-navy-soft);
+            text-decoration-color: var(--bcch-gold);
+        }
+        a:hover {
+            color: var(--bcch-navy);
+            text-decoration-color: var(--bcch-gold-soft);
+        }
+        div[data-testid="stSidebar"] {
+            background: #eef2f8;
+            border-right: 1px solid var(--bcch-border);
+        }
+        .stChatMessage {
+            background: transparent;
+            border: none;
+            box-shadow: none;
+            padding: 0.15rem 0.1rem;
+            margin-bottom: 1.1rem;
+            max-width: 760px;
+            margin-left: auto;
+            margin-right: auto;
+            padding-left: 0.35rem;
+            border-left: 3px solid rgba(200, 168, 107, 0.45);
+        }
+        [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) {
+            margin-bottom: 1.9rem;
+            border-left-color: rgba(12, 28, 50, 0.22);
+        }
+        [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarAssistant"]) {
+            margin-bottom: 2.2rem;
+            border-left-color: rgba(200, 168, 107, 0.55);
+        }
+        [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) [data-testid="stMarkdownContainer"] p {
+            color: var(--bcch-navy);
+        }
+        .stChatMessage [data-testid="stMarkdownContainer"] p {
+            line-height: 1.95;
+            margin-top: 0.2rem;
+            margin-bottom: 1.6rem;
+            color: var(--bcch-navy-soft);
+            font-size: 1.06rem;
+        }
+        .stChatMessage [data-testid="stMarkdownContainer"] p + p {
+            margin-top: 1.05rem;
+        }
+        .stChatMessage [data-testid="stMarkdownContainer"] p:last-child {
+            margin-bottom: 0;
+        }
+        .stChatMessage [data-testid="stMarkdownContainer"] ul,
+        .stChatMessage [data-testid="stMarkdownContainer"] ol {
+            margin-top: 0.9rem;
+            margin-bottom: 1.5rem;
+            padding-left: 1.4rem;
+            color: var(--bcch-navy-soft);
+        }
+        [data-testid="stChatMessageAvatarUser"] {
+            background: var(--bcch-navy) !important;
+            color: #ffffff !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            align-self: center !important;
+        }
+        [data-testid="stChatMessageAvatarAssistant"] {
+            background: var(--bcch-gold) !important;
+            color: var(--bcch-navy) !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            align-self: flex-start !important;
+        }
+        [data-testid="stChatMessageAvatarUser"] svg,
+        [data-testid="stChatMessageAvatarAssistant"] svg {
+            color: inherit !important;
+        }
+        div[data-testid="stChatInput"] {
+            background: var(--bcch-surface-2);
+            border: 1px solid rgba(200, 168, 107, 0.45);
+            border-radius: 16px;
+            box-shadow:
+                0 10px 26px rgba(3, 27, 61, 0.11),
+                0 0 0 1px rgba(200, 168, 107, 0.16);
+            max-width: 760px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        div[data-testid="stChatInput"]:focus-within {
+            border-color: var(--bcch-gold);
+            box-shadow:
+                0 12px 28px rgba(3, 27, 61, 0.14),
+                0 0 0 2px rgba(200, 168, 107, 0.22);
+        }
+        div[data-testid="stChatInput"] textarea {
+            color: var(--bcch-text);
+        }
+        div[data-testid="stChatInput"] button {
+            background: var(--bcch-navy);
+            color: #ffffff;
+            border: 1px solid var(--bcch-navy);
+        }
+        div[data-testid="stChatInput"] button:hover {
+            background: var(--bcch-navy-soft);
+            border-color: var(--bcch-navy-soft);
+        }
+        .stButton > button,
+        .stDownloadButton > button {
+            border-radius: 10px;
+            border: 1px solid var(--bcch-border);
+            color: var(--bcch-navy);
+            background: #ffffff;
+            padding-top: 0.45rem;
+            padding-bottom: 0.45rem;
+            transition: all 0.18s ease;
+        }
+        .stButton > button:hover,
+        .stDownloadButton > button:hover {
+            border-color: var(--bcch-gold);
+            color: var(--bcch-navy-soft);
+            box-shadow: none;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # ──────────────────────────────────────────────────────────
+    # Modo landing: input centrado + frase grande
+    # ──────────────────────────────────────────────────────────
+    if not _has_user_messages:
+        st.markdown(
+            """
+            <style>
+            div[data-testid="stChatInput"] {
+                position: fixed;
+                left: 50%;
+                bottom: auto;
+                transform: translateX(-50%);
+                top: 56%;
+                width: min(760px, 90vw);
+                z-index: 1000;
+            }
+            .landing-container {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                min-height: 54vh;
+                text-align: center;
+                gap: 0.35rem;
+            }
+            .landing-container .landing-greeting {
+                font-size: 2rem;
+                font-weight: 600;
+                color: #0c1c32;
+                margin-bottom: 0.25rem;
+            }
+            .landing-container .landing-subtitle {
+                font-size: 1rem;
+                color: #425b83;
+                margin-bottom: 2rem;
+            }
+            .landing-examples {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.6rem;
+                justify-content: center;
+                margin-top: 1.2rem;
+                max-width: 680px;
+            }
+            .landing-chip {
+                background: #ffffff;
+                border: 1px solid #d7ddea;
+                border-radius: 20px;
+                padding: 0.5rem 1.1rem;
+                font-size: 0.9rem;
+                color: #1b3152;
+                cursor: pointer;
+                transition: all 0.18s ease;
+                text-decoration: none;
+            }
+            .landing-chip:hover {
+                border-color: #bf9c69;
+                background: #f5edd8;
+                color: #0c1c32;
+                box-shadow: 0 2px 8px rgba(191, 156, 105, 0.18);
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        greeting = (getattr(settings, "welcome_message", "") or "").strip()
+        if not greeting:
+            greeting = "¿En qué puedo ayudarte hoy?"
+
+        st.markdown(
+            f"""
+            <div class="landing-container">
+                <div class="landing-greeting">{greeting}</div>
+                <div class="landing-subtitle">Soy PIBot, asistente del Banco Central de Chile</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        # Preguntas de ejemplo desactivadas temporalmente por solicitud.
+
+        user_message = st.chat_input("Escribe tu pregunta...")
+
+        if user_message:
+            # Pasar la primera pregunta al flujo normal para responder en el mismo ciclo.
+            st.session_state.pending_question = str(user_message).strip()
+            st.rerun()
+        return
+
+    # ──────────────────────────────────────────────────────────
+    # Modo chat: interfaz normal con historial
+    # ──────────────────────────────────────────────────────────
+
+    # Título y botón de restart
+    col_title, col_btn = st.columns([4, 1])
+    with col_title:
+        st.title(settings.bot_name, anchor=False)
+    with col_btn:
+        st.button("Restart", icon=":material/refresh:", on_click=_clear_conversation)
+
+    st.markdown(
+        '<div class="chat-subtitle">Asistente para consultas sobre el PIB y el IMACEC</div>',
+        unsafe_allow_html=True,
+    )
 
     # Helper: construir followups en UI a partir de facts si no vienen marcadores
     def _build_ui_followups_from_facts() -> List[Dict[str, str]]:
@@ -495,7 +810,7 @@ def run_app(
         try:
             _ma = st.session_state.get("_mem_adapter")
             if _ma:
-                facts = _ma.get_facts(st.session_state.session_id) or {}
+                facts = _ma.get_facts(st.session_state.get("session_id", "")) or {}
                 indicator = facts.get("indicator")
                 component = facts.get("component")
                 seasonality = facts.get("seasonality")
@@ -545,8 +860,21 @@ def run_app(
     import re as _decor_re
 
     def _decorate_links(text: str) -> str:
-        """Añade emoji de link a la referencia de la BDE de forma idempotente."""
-        return _decor_re.sub(r"(?<!🔗 )Ver serie en la BDE", "🔗 Ver serie en la BDE", text)
+        """Mantiene la fuente BDE como hipervinculo markdown simple."""
+        text = _sanitize_llm_html(text)
+        # Reemplazar link de BDE con hipervinculo clasico
+        text = _decor_re.sub(
+            r'\[(?:🔗 )?(?:Ver serie en la )?(?:Base de Datos Estad[ií]sticos \(BDE\)|BDE)\]\((https?://[^)]+)\)',
+            r'[Base de Datos Estadisticos (BDE)](\1)',
+            text,
+        )
+        # # Fallback: texto plano sin link
+        # text = _decor_re.sub(
+        #     r"(?<!📊 )(?:🔗 )?Ver serie en la BDE",
+        #     "📊 Fuente: Base de Datos Estadísticos (BDE)",
+        #     text,
+        # )
+        return text
 
     # Mostrar historial de mensajes (sin volver a renderizar botones de followup históricos)
     for idx_msg, msg in enumerate(st.session_state.messages):
@@ -556,10 +884,10 @@ def run_app(
             clean_text, parsed_followups = _extract_followups_from_text(content)
             with st.chat_message(role):
                 if clean_text.strip():
-                    st.markdown(_decorate_links(clean_text))
+                    st.markdown(_decorate_links(clean_text), unsafe_allow_html=True)
         else:
             with st.chat_message(role):
-                st.markdown(_decorate_links(content))
+                st.markdown(_decorate_links(content), unsafe_allow_html=True)
 
     def _render_post_response_blocks(scope: str = "post") -> None:
         """Renderiza descargas, gráficos y preguntas sugeridas actuales."""
@@ -702,31 +1030,13 @@ def run_app(
                             _orch.logger.error(f"[UI_MEMORY_CHART_ERROR] {_e_mem_chart}")
                         st.caption("No se pudo renderizar el gráfico en memoria.")
 
-        # Preguntas sugeridas (usar fallback si no hay markers)
-        followup_blocks_now = st.session_state.get("followup_markers") or _build_ui_followups_from_facts()
-        if followup_blocks_now:
-            with st.chat_message("assistant"):
-                st.markdown("### 💡 Preguntas sugeridas")
-                for block_idx, marker_dict in enumerate(followup_blocks_now):
-                    suggestions = []
-                    for key in sorted(marker_dict.keys()):
-                        if key.startswith("suggestion_"):
-                            suggestions.append(marker_dict[key])
-                    if suggestions:
-                        cols = st.columns(len(suggestions) if len(suggestions) <= 2 else 2)
-                        for idx, suggestion in enumerate(suggestions[:2]):
-                            col_idx = idx % 3
-                            with cols[col_idx]:
-                                import hashlib
-                                button_key = f"followup_{scope}_{block_idx}_{idx}_{hashlib.md5(suggestion.encode()).hexdigest()[:8]}"
-                                if st.button(
-                                    suggestion,
-                                    key=button_key,
-                                    use_container_width=True,
-                                    type="secondary",
-                                ):
-                                    st.session_state.pending_question = suggestion
-                                    st.rerun()
+        # Preguntas sugeridas desactivadas temporalmente.
+        # followup_markers_now = st.session_state.get("followup_markers") or []
+        # if not followup_markers_now:
+        #     followup_markers_now = _build_ui_followups_from_facts()
+        # if followup_markers_now and not chart_only_mode:
+        #     ...
+        pass
 
     # Renderizar bloques con marcadores actuales (permite capturar clicks de followups)
     _render_post_response_blocks(scope="main")
@@ -758,7 +1068,7 @@ def run_app(
         _mem_adapter = st.session_state.get("_mem_adapter") or MemoryAdapter(pg_dsn=os.getenv("PG_DSN", "postgresql://postgres:postgres@localhost:5432/pibot"))
         st.session_state._mem_adapter = _mem_adapter
         _mem_adapter.on_user_turn(
-            st.session_state.session_id,
+            st.session_state.get("session_id", ""),
             user_message,
             metadata={
                 "source": "ui",
@@ -795,7 +1105,7 @@ def run_app(
 
     assistant_box = st.chat_message("assistant")
     status_placeholder = assistant_box.empty()
-    status_placeholder.caption("Pensando...")
+    status_placeholder.caption("Pensando .")
     markers_csv: List[Dict[str, str]] = []
     markers_chart: List[Dict[str, str]] = []
     markers_followup: List[Dict[str, str]] = []
@@ -810,6 +1120,11 @@ def run_app(
     placeholder = assistant_box.empty()
     _debug_chunk_idx = 0
     first_stream_piece_rendered = False
+    thinking_frame = 0
+
+    def _thinking_caption(frame: int) -> str:
+        dots = (frame % 3) + 1
+        return f"Pensando {'.' * dots}"
     stream_cursor_enabled = os.getenv("STREAMLIT_STREAM_CURSOR", "1").lower() in {"1", "true", "yes", "on"}
     try:
         stream_delay_ms = float(os.getenv("STREAMLIT_STREAM_DELAY_MS", "50") or 50)
@@ -831,14 +1146,17 @@ def run_app(
 
     def _render_streaming_text(content: str, *, final: bool = False) -> None:
         if final or not stream_cursor_enabled:
-            placeholder.markdown(content or "\u200B")
+            placeholder.markdown(_decorate_links(content) or "\u200B", unsafe_allow_html=True)
         else:
             placeholder.markdown((content or "\u200B") + "▌")
 
     def handle_chunk(chunk: str) -> None:
-        nonlocal collecting_csv, collecting_chart, collecting_followup, buffer_csv, buffer_chart, buffer_followup, raw_text_accum, text_accum, _debug_chunk_idx, first_stream_piece_rendered
+        nonlocal collecting_csv, collecting_chart, collecting_followup, buffer_csv, buffer_chart, buffer_followup, raw_text_accum, text_accum, _debug_chunk_idx, first_stream_piece_rendered, thinking_frame
         text = str(chunk)
         _debug_chunk_idx += 1
+        if not first_stream_piece_rendered:
+            status_placeholder.caption(_thinking_caption(thinking_frame))
+            thinking_frame = (thinking_frame + 1) % 4
         try:
             preview = text[:200].replace("\n", "\\n")
             if os.getenv("STREAM_CHUNK_LOGS", "0").lower() in {"1", "true", "yes", "on"}:
@@ -923,14 +1241,45 @@ def run_app(
                 if first_stream_piece_rendered and stream_delay_ms > 0:
                     time.sleep(stream_delay_ms / 1000.0)
                 text_accum += piece
+                if not first_stream_piece_rendered:
+                    status_placeholder.empty()
                 _render_streaming_text(text_accum, final=False)
                 first_stream_piece_rendered = True
             if not filtered and not text_accum:
                 _render_streaming_text(text_accum, final=False)
 
-    raw_chunks = stream_fn(user_message, history=history, session_id=st.session_state.session_id)
-    for _chunk in raw_chunks:
+    chunk_queue: Queue = Queue()
+    stream_done = threading.Event()
+    stream_errors: List[Exception] = []
+
+    def _produce_chunks() -> None:
+        try:
+            for _chunk in stream_fn(user_message, history=history, session_id=st.session_state.get("session_id", "")):
+                chunk_queue.put(_chunk)
+        except Exception as _e_stream:
+            stream_errors.append(_e_stream)
+        finally:
+            stream_done.set()
+            chunk_queue.put(None)
+
+    threading.Thread(target=_produce_chunks, daemon=True).start()
+
+    while True:
+        try:
+            _chunk = chunk_queue.get(timeout=0.35)
+        except Empty:
+            if not first_stream_piece_rendered and not stream_done.is_set():
+                status_placeholder.caption(_thinking_caption(thinking_frame))
+                thinking_frame = (thinking_frame + 1) % 3
+            continue
+
+        if _chunk is None:
+            break
+
         handle_chunk(_chunk)
+
+    if stream_errors:
+        raise stream_errors[0]
     raw_response_text = _decorate_links(raw_text_accum)
     response_text = raw_response_text
     if charts_requested_for_turn:
@@ -955,28 +1304,6 @@ def run_app(
 
     # Fallback: extraer y limpiar marcadores de followup por si algún chunk los mostró como texto
     if (not charts_requested_for_turn) and "##FOLLOWUP_START" in response_text:
-        import re as _re
-
-        def _extract_followups_from_text(text: str) -> tuple[str, List[Dict[str, str]]]:
-            cleaned_parts: List[str] = []
-            found: List[Dict[str, str]] = []
-            pattern = _re.compile(r"##FOLLOWUP_START(.*?)##FOLLOWUP_END", _re.DOTALL)
-            last_idx = 0
-            for m in pattern.finditer(text):
-                cleaned_parts.append(text[last_idx : m.start()])
-                block = m.group(1)
-                d: Dict[str, str] = {}
-                for ln in block.splitlines():
-                    ln = ln.strip()
-                    if "=" in ln:
-                        k, v = ln.split("=", 1)
-                        d[k.strip()] = v.strip()
-                if d:
-                    found.append(d)
-                last_idx = m.end()
-            cleaned_parts.append(text[last_idx:])
-            return ("".join(cleaned_parts), found)
-
         response_text, parsed_followups = _extract_followups_from_text(response_text)
         if parsed_followups:
             markers_followup.extend(parsed_followups)
@@ -1006,7 +1333,7 @@ def run_app(
         _mem_adapter = st.session_state.get("_mem_adapter") or MemoryAdapter(pg_dsn=os.getenv("PG_DSN", "postgresql://postgres:postgres@localhost:5432/pibot"))
         st.session_state._mem_adapter = _mem_adapter
         _mem_adapter.on_assistant_turn(
-            st.session_state.session_id,
+            st.session_state.get("session_id", ""),
             response_text,
             metadata={
                 "source": "ui",
@@ -1025,7 +1352,7 @@ def run_app(
     except Exception:
         pass
 
-    # Guardar respuesta en historial (chat principal sin markers)
+    # Guardar respuesta en historial
     st.session_state.messages.append({"role": "user", "content": user_message})
     st.session_state.messages.append({"role": "assistant", "content": response_text})
 
@@ -1084,7 +1411,7 @@ def run_app(
                     hist2: List[Dict[str, str]] = list(st.session_state.messages) if use_history2 else []
                     with st.chat_message("assistant"):
                         with st.spinner("Procesando los datos solicitados..."):
-                            response_chunks = stream_fn(cmd, history=hist2, session_id=st.session_state.session_id)
+                            response_chunks = stream_fn(cmd, history=hist2, session_id=st.session_state.get("session_id", ""))
                             # Render streaming en UI secundaria
                             text_accum2 = ""
                             ph2 = st.empty()

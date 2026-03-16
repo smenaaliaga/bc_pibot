@@ -2,14 +2,14 @@
 base = "light"
 
 # General color setup
-textColor = "#3f3f46"
-primaryColor = "#60a5fa"
-backgroundColor = "#fafafa"
+textColor = "#0c1c32"
+primaryColor = "#bf9c69"
+backgroundColor = "#f6f7fb"
 secondaryBackgroundColor = "#ffffff"
 
 # Widgets
 showWidgetBorder = true
-borderColor = "#eeeef0"
+borderColor = "#d7ddea"
 
 # Base text
 font = "Inter:https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap"

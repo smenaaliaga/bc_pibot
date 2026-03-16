@@ -21,6 +21,7 @@ from ..state import AgentState, _clone_entities, _emit_stream_chunk
 from orchestrator.data._helpers import coerce_period, first_non_empty
 from orchestrator.data._business_rules import ResolvedEntities, apply_business_rules
 from orchestrator.data.catalog_data_search import search_output_payloads
+from orchestrator.normalizer.routing_utils import INTENT_CONFIDENCE_THRESHOLD
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,24 @@ def _extract_entities_from_state(
     ResolvedEntities,            # ent (mutable, pre-reglas)
 ]:
     """Extrae y normaliza las entidades desde el estado del grafo."""
+
+    def _coerce_class_label(value: Any, *, apply_threshold: bool = True) -> Optional[str]:
+        if value is None:
+            return None
+        if isinstance(value, dict):
+            if apply_threshold:
+                conf_raw = value.get("confidence")
+                if conf_raw is not None:
+                    try:
+                        if float(conf_raw) < INTENT_CONFIDENCE_THRESHOLD:
+                            return "none"
+                    except (TypeError, ValueError):
+                        pass
+            lbl = value.get("label")
+            return str(lbl).strip().lower() if lbl is not None else None
+        text = str(value).strip().lower()
+        return text or None
+
     question = state.get("question", "")
     entities_state = _clone_entities(state.get("entities"))
 
@@ -52,11 +71,11 @@ def _extract_entities_from_state(
     predict_raw = getattr(classification, "predict_raw", None) if classification else None
     predict_raw = predict_raw if isinstance(predict_raw, dict) else {}
 
-    calc_mode_cls = getattr(classification, "calc_mode", None) or {}
-    activity_cls = getattr(classification, "activity", None) or {}
-    region_cls = getattr(classification, "region", None) or {}
-    investment_cls = getattr(classification, "investment", None) or {}
-    req_form_cls = getattr(classification, "req_form", None) or {}
+    calc_mode_cls = _coerce_class_label(getattr(classification, "calc_mode", None), apply_threshold=False)
+    activity_cls = _coerce_class_label(getattr(classification, "activity", None), apply_threshold=True)
+    region_cls = _coerce_class_label(getattr(classification, "region", None), apply_threshold=True)
+    investment_cls = _coerce_class_label(getattr(classification, "investment", None), apply_threshold=True)
+    req_form_cls = _coerce_class_label(getattr(classification, "req_form", None), apply_threshold=False)
 
     classification_entities = getattr(classification, "entities", None) or {}
     normalized_from_classification = getattr(classification, "normalized", None) or {}

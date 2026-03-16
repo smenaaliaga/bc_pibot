@@ -76,6 +76,10 @@ from orchestrator.normalizer._period import (
     reference_now,
     resolve_period,
 )
+from orchestrator.normalizer.routing_utils import (
+    INTENT_CONFIDENCE_THRESHOLD,
+    LOW_CONFIDENCE_NONE_KEYS,
+)
 
 # Aliases internos para acceso legado (compatibilidad con imports directos)
 _normalize_text = normalize_text
@@ -186,10 +190,18 @@ def _as_list(value: Optional[Union[str, List[str]]]) -> List[str]:
     return [value] if value else []
 
 
-def _intent_label(intent_value: Any) -> Optional[str]:
+def _intent_label(intent_value: Any, *, key: Optional[str] = None) -> Optional[str]:
     if intent_value is None:
         return None
     if isinstance(intent_value, dict):
+        if key in LOW_CONFIDENCE_NONE_KEYS:
+            conf_raw = intent_value.get("confidence")
+            if conf_raw is not None:
+                try:
+                    if float(conf_raw) < INTENT_CONFIDENCE_THRESHOLD:
+                        return "none"
+                except (TypeError, ValueError):
+                    pass
         lbl = intent_value.get("label")
         return str(lbl).lower() if lbl is not None else None
     return str(intent_value).lower()
@@ -504,8 +516,8 @@ def normalize_entities(
     req_norm = (req_form or "").strip().lower()
 
     # Contexto regional / inversión.
-    region_lbl = _intent_label((intents or {}).get("region"))
-    inv_lbl = _intent_label((intents or {}).get("investment"))
+    region_lbl = _intent_label((intents or {}).get("region"), key="region")
+    inv_lbl = _intent_label((intents or {}).get("investment"), key="investment")
     has_region_ctx = (
         region_lbl not in {None, "none"}
         or bool(response.get("region"))

@@ -189,6 +189,16 @@ def _intent_label_from_interpretation(predict_source: Dict[str, Any], key: str) 
     return _extract_label(payload)
 
 
+def _intent_payload_from_interpretation(predict_source: Dict[str, Any], key: str) -> Any:
+    intents = predict_source.get("intents") if isinstance(predict_source, dict) else {}
+    intents = intents if isinstance(intents, dict) else {}
+    payload = intents.get(key)
+    if isinstance(payload, dict):
+        return payload
+    label = _extract_label(payload)
+    return {"label": label} if label is not None else None
+
+
 def _coerce_entities_payload(entities_payload: Any) -> Dict[str, List[str]]:
     if not isinstance(entities_payload, dict):
         return {}
@@ -261,9 +271,12 @@ def _classify_with_jointbert(question: str) -> ClassificationResult:
 
     calc_mode_label = _intent_label_from_interpretation(predict_source, "calc_mode")
     req_form_label = _intent_label_from_interpretation(predict_source, "req_form")
-    activity_label = _intent_label_from_interpretation(predict_source, "activity")
-    region_label = _intent_label_from_interpretation(predict_source, "region")
-    investment_label = _intent_label_from_interpretation(predict_source, "investment")
+    activity_payload = _intent_payload_from_interpretation(predict_source, "activity")
+    region_payload = _intent_payload_from_interpretation(predict_source, "region")
+    investment_payload = _intent_payload_from_interpretation(predict_source, "investment")
+    activity_label = _extract_label(activity_payload)
+    region_label = _extract_label(region_payload)
+    investment_label = _extract_label(investment_payload)
     try:
         normalized = normalize_entities(
             entities=entities_api,
@@ -272,9 +285,9 @@ def _classify_with_jointbert(question: str) -> ClassificationResult:
             intents={
                 "intent": routing_intent_label,
                 "context": routing_context_label,
-                "activity": activity_label,
-                "region": region_label,
-                "investment": investment_label,
+                "activity": activity_payload,
+                "region": region_payload,
+                "investment": investment_payload,
             },
         )
     except Exception as exc:
@@ -325,9 +338,9 @@ def _classify_with_jointbert(question: str) -> ClassificationResult:
         words=predict_source.get("words") or [],
         slot_tags=predict_source.get("slot_tags") or predict_source.get("slots") or [],
         calc_mode=calc_mode_label,
-        activity=activity_label,
-        region=region_label,
-        investment=investment_label,
+        activity=activity_payload,
+        region=region_payload,
+        investment=investment_payload,
         req_form=req_form_label,
         macro=macro,
         context=context,

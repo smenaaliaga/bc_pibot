@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+import os
 from typing import Any, Dict
+
+
+INTENT_CONFIDENCE_THRESHOLD = float(os.getenv("PIBOT_INTENT_CONFIDENCE_THRESHOLD", "0.65"))
+LOW_CONFIDENCE_NONE_KEYS = frozenset({"activity", "region", "investment"})
 
 
 def as_dict(value: Any) -> Dict[str, Any]:
