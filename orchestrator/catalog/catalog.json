@@ -101,7 +101,7 @@
     "classification": {
       "indicator": "pib_per_capita",
       "calc_mode": ["original", "prev_period", "yoy"],
-      "seasonality": "nsa",
+      "seasonality": ["nsa", "sa"],
       "frequency": ["q", "a"],
       "price": "enc",
       "has_activity": [0, 1],
