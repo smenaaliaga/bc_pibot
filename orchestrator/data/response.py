@@ -291,6 +291,10 @@ UNIDADES Y VALORACIÓN
   · "miles de millones de pesos encadenados" = volumen real, referencia 2018.
   · "miles de millones de pesos" (sin "encadenados") = valores nominales (precios corrientes).
   · "promedio 2018=100" = índice base 100 en 2018.
+- REGLA ESPECÍFICA IMACEC:
+    · IMACEC es SIEMPRE un índice (base 2018=100) cuando reportas "value".
+    · No lo trates como moneda, volumen físico ni porcentaje.
+    · Si la unidad no está explícita en la pregunta, igual aclara que corresponde a nivel de índice.
 - SIEMPRE incluye la unidad al reportar niveles ("value").
   Correcto: "El PIB fue de 52.456 miles de millones de pesos encadenados en 2024."
   Incorrecto: "El PIB fue de 52.456."
@@ -317,12 +321,16 @@ REGLAS DE INTERPRETACIÓN DE LA PREGUNTA
 - "en el margen", "respecto al período anterior", "trimestre/mes anterior",
   "variación en el margen" → metric "pct".
   "pct" es SIEMPRE la variación respecto al período inmediatamente anterior.
+- Si la pregunta es de variación (mensual/trimestral/interanual, "creció", "cayó", "en el margen"),
+    NO reportes niveles (value) ni aumentos/disminuciones absolutas.
+    Reporta solo variaciones porcentuales. Puedes incluir la variación en el margen (pct)
+    y también la variación interanual (yoy_pct) como complemento.
 - "aceleró", "desaceleró", "aceleración" → metric "acceleration_pct".
   La aceleración es el cambio en "pct" (variación período anterior) entre dos períodos consecutivos.
   SIEMPRE reporta PRIMERO la variación "pct" del período actual y del período anterior,
   y LUEGO la aceleración como la diferencia entre ambas variaciones "pct".
   NUNCA uses yoy_pct para aceleración; la aceleración se mide SIEMPRE sobre "pct".
-  Agrega análisis interpretativo (se intensifica / se modera / cambia de signo).
+    Describe el resultado en términos estrictamente numéricos (magnitud y signo).
 - "cuál creció más", "cuál cayó más", comparaciones → usa rank_series.
 - "máximo", "mínimo", "mejor año", "peor año" → usa get_extrema.
 - Cambio absoluto → "delta_abs" (vs anterior) o "yoy_delta_abs" (vs año anterior).
@@ -387,9 +395,10 @@ CLASIFICACIÓN DEL CUADRO
 REGLA DE REDACCIÓN — ESTACIONALIDAD
 - Si seasonality = "nsa", asume serie estacional/sin ajuste estacional por defecto y NO lo menciones
     explícitamente en la redacción, salvo que el usuario lo pida.
-- Menciona explícitamente "desestacionalizado" SOLO cuando:
-    1) seasonality = "sa", o
-    2) el usuario pida explícitamente distinguir ajuste estacional vs no ajustado.
+- Si seasonality = "sa", SIEMPRE menciona explícitamente en la respuesta que la serie es
+    "desestacionalizada" o "desestacionalizado".
+  Esta mención debe aparecer en la oración principal donde reportas el dato.
+- Si el usuario pide distinguir ajuste estacional vs no ajustado, explicita ambos conceptos con claridad.
 
 VALORES NULOS EN LOS DATOS
 - Los primeros registros de una serie pueden tener campos nulos (pct, yoy_pct, etc.).
@@ -421,6 +430,14 @@ REGLA CARDINAL
 
 ESTILO DE RESPUESTA
 - Español, claro, preciso y detallado.
+- REGLA DE LENGUAJE PARA VARIACIONES (CRÍTICA):
+    · Cuando reportes variaciones porcentuales (mensual/trimestral/interanual), NO menciones
+        la palabra "índice"/"indice".
+    · En esas oraciones, NO uses "aceleración", "aceleró", "desaceleró", "cambio",
+        "delta" ni "variación del cambio".
+    · En respuestas de variación, NO incluyas niveles ni montos absolutos.
+    · Redacta solo en términos de "variación mensual/trimestral" o "variación interanual"
+        y su valor numérico.
 - ORDEN DEL PRIMER ENUNCIADO (OBLIGATORIO): la primera oración del primer párrafo
     debe comenzar mencionando explícitamente el período analizado (ej: "En el 3er trimestre
     de 2025,..." o "En enero de 2026,..."). No inicies la oración sin anclar primero el período.
@@ -452,13 +469,13 @@ ESTILO DE RESPUESTA
     "hasta el 3er trimestre de 2025").
 - NUNCA uses frases de cierre como "En 2025, ..." o "Durante el primer semestre de 2025, ..."
     si no están todos los trimestres/meses requeridos para ese año o semestre.
-- Segundo párrafo: contexto y análisis. Explica qué significan los datos,
-  compara con períodos anteriores si es relevante, y describe la tendencia general.
-  NO especules sobre causas ni des opiniones sobre qué factores explican los valores
-  (ej: NO decir "asociado a la pandemia", "por la crisis", "debido al dinamismo del sector").
-    Tampoco introduzcas contexto histórico o causal no observado directamente en los datos
-    (ej: "tras la crisis de 2009", "por el cambio de gobierno", "debido a condiciones externas").
-  Limítate a describir los datos: magnitudes, comparaciones y tendencias numéricas.
+- Segundo párrafo (opcional): contexto descriptivo estrictamente basado en datos.
+    Puedes comparar con períodos anteriores si es relevante, pero sin causalidad ni opinión.
+- REGLA DE OBJETIVIDAD (CRÍTICA):
+    · NO des opiniones, valoraciones ni juicios (ej: "desafíos", "fortaleza", "debilidad", "preocupante").
+    · NO especules sobre causas ni factores explicativos no observados en los datos.
+    · NO introduzcas contexto histórico, político o externo que no provenga de las herramientas.
+    · Limítate a describir cifras, variaciones, comparaciones y tendencia numérica observada.
 - NO agregues un bloque final de trazabilidad del tipo "Los datos se obtuvieron de las siguientes series".
 - NO incluyas listados largos de series_id al final de la respuesta.
 - Si necesitas citar series_id, hazlo de forma breve y solo para las series estrictamente
@@ -623,6 +640,22 @@ def _compact_series_catalog(series_list: List[Dict[str, Any]], limit: int = 8) -
 
 _PCT_FIELDS = ("pct", "yoy_pct", "acceleration_pct", "acceleration_yoy")
 
+_MONTH_NAME_TO_NUM = {
+    "enero": 1,
+    "febrero": 2,
+    "marzo": 3,
+    "abril": 4,
+    "mayo": 5,
+    "junio": 6,
+    "julio": 7,
+    "agosto": 8,
+    "septiembre": 9,
+    "setiembre": 9,
+    "octubre": 10,
+    "noviembre": 11,
+    "diciembre": 12,
+}
+
 _UNITS_NOTE = (
     "pct, yoy_pct, acceleration_pct, acceleration_yoy YA son strings con %. "
     "Cópialos tal cual. NO multipliques por 100."
@@ -644,6 +677,73 @@ def _add_display_fields(record: dict) -> dict:
     # Eliminar _display si existiera de versiones anteriores
     out.pop("_display", None)
     return out
+
+
+def _canonicalize_period_token(freq: str, raw_period: Any) -> str:
+    """Normaliza períodos a la llave esperada por frecuencia.
+
+    Ejemplos:
+    - M: 2024-02-01 -> 2024-02
+    - T: 2024-02-01 -> 2024-Q1
+    - A: 2024-02-01 -> 2024
+    """
+    text = str(raw_period or "").strip()
+    if not text:
+        return ""
+
+    freq_code = str(freq or "").strip().upper()
+
+    normalized_text = unicodedata.normalize("NFKD", text.lower())
+    normalized_text = "".join(ch for ch in normalized_text if not unicodedata.combining(ch))
+    normalized_text = re.sub(r"\s+", " ", normalized_text).strip()
+
+    quarter_match = re.fullmatch(r"((?:19|20)\d{2})-Q([1-4])", text, re.IGNORECASE)
+    if quarter_match:
+        year = quarter_match.group(1)
+        quarter = quarter_match.group(2)
+        if freq_code == "A":
+            return year
+        return f"{year}-Q{quarter}"
+
+    month_match = re.fullmatch(r"((?:19|20)\d{2})[-/]([0-1]\d)(?:[-/]([0-3]\d))?", text)
+    if month_match:
+        year = int(month_match.group(1))
+        month = int(month_match.group(2))
+        if month < 1 or month > 12:
+            return text
+        if freq_code == "M":
+            return f"{year:04d}-{month:02d}"
+        if freq_code == "T":
+            quarter = ((month - 1) // 3) + 1
+            return f"{year:04d}-Q{quarter}"
+        if freq_code == "A":
+            return f"{year:04d}"
+        return text
+
+    month_name_match = re.fullmatch(
+        r"(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\s+(?:de\s+)?((?:19|20)\d{2})",
+        normalized_text,
+    )
+    if month_name_match:
+        month_name = month_name_match.group(1)
+        year = int(month_name_match.group(2))
+        month = _MONTH_NAME_TO_NUM.get(month_name)
+        if month is None:
+            return text
+        if freq_code == "M":
+            return f"{year:04d}-{month:02d}"
+        if freq_code == "T":
+            quarter = ((month - 1) // 3) + 1
+            return f"{year:04d}-Q{quarter}"
+        if freq_code == "A":
+            return f"{year:04d}"
+        return text
+
+    year_match = re.fullmatch(r"((?:19|20)\d{2})", text)
+    if year_match and freq_code == "A":
+        return year_match.group(1)
+
+    return text
 
 
 def handle_tool_call(name: str, args: dict, payload: dict) -> str:
@@ -708,14 +808,24 @@ def handle_tool_call(name: str, args: dict, payload: dict) -> str:
                 ensure_ascii=False,
             )
         records = block.get("records", [])
+        freq_code = str(args.get("frequency") or "").upper()
         if args.get("period"):
-            records = [r for r in records if r["period"] == args["period"]]
+            period = _canonicalize_period_token(freq_code, args.get("period"))
+            records = [r for r in records if r["period"] == period]
         elif args.get("period_start") or args.get("period_end"):
-            start = args.get("period_start", "")
-            end = args.get("period_end", "9999")
+            start = _canonicalize_period_token(freq_code, args.get("period_start"))
+            end = _canonicalize_period_token(freq_code, args.get("period_end")) or "9999"
             records = [r for r in records if start <= r["period"] <= end]
         if not records:
-            return json.dumps({"error": "Sin datos para los parámetros dados", "params": args})
+            debug_params = dict(args)
+            if args.get("period"):
+                debug_params["period"] = _canonicalize_period_token(freq_code, args.get("period"))
+            else:
+                if args.get("period_start"):
+                    debug_params["period_start"] = _canonicalize_period_token(freq_code, args.get("period_start"))
+                if args.get("period_end"):
+                    debug_params["period_end"] = _canonicalize_period_token(freq_code, args.get("period_end"))
+            return json.dumps({"error": "Sin datos para los parámetros dados", "params": debug_params})
         return json.dumps(
             {
                 "series_id": series["series_id"],
@@ -852,6 +962,33 @@ def _build_metric_priority_instruction(calc_mode: str) -> Optional[str]:
             "y reporta PRIMERO el valor de 'value' (con su unidad). "
             "Luego menciona 'yoy_pct', y 'pct' solo si aporta claridad. "
             "No comiences con 'yoy_pct' ni con 'pct'."
+        )
+    return None
+
+
+def _build_seasonality_strict_instruction(
+    entities_ctx: Dict[str, Any],
+    observations: Dict[str, Any],
+) -> Optional[str]:
+    """Construye instrucción estricta de estacionalidad según contexto resuelto.
+
+    Prioriza la estacionalidad resuelta por entidades (clasificador/reglas de negocio)
+    por sobre metadatos agregados del cuadro.
+    """
+    seasonality = str(entities_ctx.get("seasonality_ent") or entities_ctx.get("seasonality") or "").strip().lower()
+    if not seasonality:
+        seasonality = str((observations.get("classification") or {}).get("seasonality") or "").strip().lower()
+
+    if seasonality == "sa":
+        return (
+            "REGLA ESTRICTA DE ESTACIONALIDAD: la serie consultada es desestacionalizada. "
+            "Debes escribir explícitamente 'desestacionalizado' o 'desestacionalizada' "
+            "en la primera oración donde reportas el dato principal."
+        )
+    if seasonality == "nsa":
+        return (
+            "REGLA ESTRICTA DE ESTACIONALIDAD: la serie consultada es no desestacionalizada. "
+            "No menciones desestacionalización salvo que el usuario lo pida explícitamente."
         )
     return None
 
@@ -1114,6 +1251,11 @@ def _question_has_explicit_period(question: str, entities_ctx: Dict[str, Any]) -
         return True
     if re.search(r"\b(?:19|20)\d{2}-(?:0[1-9]|1[0-2])\b", text):
         return True
+    if re.search(
+        r"\b(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\s+(?:de\s+)?(?:19|20)\d{2}\b",
+        text,
+    ):
+        return True
     if re.search(r"\b(primer|1er|1ro|segundo|2do)\s+semestre\b", text):
         return True
 
@@ -1136,7 +1278,9 @@ def _build_no_explicit_period_latest_instruction(
     entities_ctx: Dict[str, Any],
     observations: Dict[str, Any],
 ) -> Optional[str]:
-    if not _is_req_form_latest(entities_ctx) and _question_has_explicit_period(question, entities_ctx):
+    # Si el usuario sí especificó período (aunque req_form_cls venga como latest),
+    # nunca fuerces la regla de "último disponible".
+    if _question_has_explicit_period(question, entities_ctx):
         return None
 
     freq_code = _resolve_requested_frequency(entities_ctx, observations)
@@ -1358,6 +1502,12 @@ def stream_data_response(
     strict_priority_instruction = _build_metric_priority_instruction(calc_mode_ctx)
     if strict_priority_instruction:
         messages.append({"role": "system", "content": strict_priority_instruction})
+    seasonality_strict_instruction = _build_seasonality_strict_instruction(
+        entities_ctx=entities_ctx,
+        observations=observations,
+    )
+    if seasonality_strict_instruction:
+        messages.append({"role": "system", "content": seasonality_strict_instruction})
     incomplete_period_instruction = _build_incomplete_period_instruction(
         question=question,
         entities_ctx=entities_ctx,
