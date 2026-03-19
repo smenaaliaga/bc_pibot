@@ -180,10 +180,38 @@ def main() -> None:
     if ingest_on_start:
         try:
             from orchestrator.catalog.ingest_series import run_ingest
-            _catalog_path = os.path.join(os.path.dirname(__file__), "orchestrator", "catalog", "catalog.json")
-            _output_dir = os.path.join(os.path.dirname(__file__), "orchestrator", "memory", "data_store")
-            n = run_ingest(catalog_path=_catalog_path, output_dir=_output_dir)
-            logger.info("Ingest completado | cuadros_procesados=%s", n)
+            _base_dir = os.path.dirname(__file__)
+            _catalog_path = os.path.join(_base_dir, "orchestrator", "catalog", "catalog.json")
+            _output_dir = os.path.join(_base_dir, "orchestrator", "memory", "data_store")
+            _store_dir = os.path.join(_base_dir, "orchestrator", "catalog", "data_store")
+            ingest_force_refresh = os.getenv("INGEST_FORCE_REFRESH", "1").lower() in {
+                "1", "true", "yes", "on"
+            }
+
+            # Compatibilidad: si el entorno trae BCCH_* pero no BDE_*, reutilizar credenciales.
+            if not os.getenv("BDE_USER") and os.getenv("BCCH_USER"):
+                os.environ["BDE_USER"] = os.getenv("BCCH_USER", "")
+                logger.info("[INGEST] BDE_USER ausente; usando BCCH_USER")
+            if not os.getenv("BDE_PASS") and os.getenv("BCCH_PASS"):
+                os.environ["BDE_PASS"] = os.getenv("BCCH_PASS", "")
+                logger.info("[INGEST] BDE_PASS ausente; usando BCCH_PASS")
+
+            logger.info(
+                "[INGEST] Inicio | catalog=%s output=%s store=%s force_refresh=%s bde_user_set=%s bde_pass_set=%s",
+                _catalog_path,
+                _output_dir,
+                _store_dir,
+                ingest_force_refresh,
+                bool(os.getenv("BDE_USER")),
+                bool(os.getenv("BDE_PASS")),
+            )
+            n = run_ingest(
+                catalog_path=_catalog_path,
+                output_dir=_output_dir,
+                store_dir=_store_dir,
+                force_refresh=ingest_force_refresh,
+            )
+            logger.info("[INGEST] Completado | cuadros_procesados=%s", n)
         except Exception as e:
             logger.warning(f"Ingest de series falló: {e}")
 

@@ -3,7 +3,7 @@ import os
 import logging
 from pathlib import Path
 from typing import List, Dict, Any
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit, urlunsplit, parse_qsl
 import requests
 
 logger = logging.getLogger(__name__)
@@ -17,13 +17,14 @@ class BDEClient:
     - Si una serie falta o está vacía, consulta BDE y persiste en el almacén
     """
 
-    def __init__(self, store_dir: Path = None):
+    def __init__(self, store_dir: Path = None, force_refresh: bool = False):
         if store_dir is not None:
             base_store = Path(store_dir)
         else:
             base_store = Path(__file__).resolve().parents[2] / "data_store"
         base_store.mkdir(parents=True, exist_ok=True)
         self._store_path = base_store / "timeseries.json"
+        self._force_refresh = force_refresh
         # Mapa en memoria: series_id -> payload (BDE-like)
         self._store: Dict[str, Any] = {}
         if self._store_path.exists():
@@ -33,6 +34,12 @@ class BDEClient:
             except Exception as e:
                 logger.warning(f"Could not load store file {self._store_path}: {e}. Starting with empty store.")
                 self._store = {}
+        logger.info(
+            "BDEClient initialized | store=%s cache_series=%s force_refresh=%s",
+            self._store_path,
+            len(self._store),
+            self._force_refresh,
+        )
 
     def fetch_series(self, series_id: str) -> List[Dict]:
         """Obtiene serie desde almacén único o BDE y persiste al almacén.
@@ -40,28 +47,46 @@ class BDEClient:
         Args:
             series_id: ID de la serie (e.g., "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M")
         """
-        # 1) Intentar desde almacén en memoria
-        payload = self._store.get(series_id)
-        if isinstance(payload, list):
-            if payload:
-                logger.info(f"Serving series from in-memory store: {series_id}")
-                return payload
-        elif isinstance(payload, dict):
-            obs = self._extract_obs(payload)
-            if obs:
-                logger.info(f"Serving series from in-memory store: {series_id}")
-                return obs
+        # 1) Intentar desde almacén en memoria (salvo force_refresh)
+        if not self._force_refresh:
+            payload = self._store.get(series_id)
+            if isinstance(payload, list):
+                if payload:
+                    logger.info(f"Serving series from in-memory store: {series_id}")
+                    return payload
+            elif isinstance(payload, dict):
+                obs = self._extract_obs(payload)
+                if obs:
+                    logger.info(f"Serving series from in-memory store: {series_id}")
+                    return obs
+        else:
+            logger.info(f"Force refresh enabled; bypassing cache for series: {series_id}")
 
         # Mostrar URL que se usaría para BDE
         bde_url = self._build_bde_url(series_id)
         
         # 2) Obtener desde BDE API
-        logger.info(f"Fetching series from BDE API: {bde_url}")
+        logger.info("Fetching series from BDE API: %s", self._redact_bde_url(bde_url))
         bde_payload = self._fetch_raw_bde_payload(bde_url)
         obs = self._extract_obs(bde_payload)
         # Persistimos el payload BDE tal cual
         self._persist_store(series_id, bde_payload)
         return obs
+
+    @staticmethod
+    def _redact_bde_url(url: str) -> str:
+        """Oculta credenciales sensibles antes de loggear la URL."""
+        try:
+            split = urlsplit(url)
+            query_items = dict(parse_qsl(split.query, keep_blank_values=True))
+            if "user" in query_items and query_items["user"]:
+                query_items["user"] = "***"
+            if "pass" in query_items and query_items["pass"]:
+                query_items["pass"] = "***"
+            query = urlencode(query_items)
+            return urlunsplit((split.scheme, split.netloc, split.path, query, split.fragment))
+        except Exception:
+            return "<bde_url_redacted>"
 
     def preload_from_catalog(self, catalog_path: str) -> None:
         """Recorre el catálogo y llena el almacén único en disco/memoria."""

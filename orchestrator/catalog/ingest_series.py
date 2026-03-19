@@ -6,7 +6,7 @@ computa métricas derivadas (pct, yoy, delta, acceleration, direction, extrema, 
 agrega por suma (M→T→A, T→A) y guarda un JSON legible por cuadro en output/.
 
 Uso:
-    python ingest_series.py [--catalog catalog.json] [--output output]
+    python ingest_series.py [--catalog catalog.json] [--output output] [--store-dir data_store] [--force-refresh]
 
 Requiere variables de entorno BDE_USER y BDE_PASS (o archivo .env).
 """
@@ -789,18 +789,44 @@ def split_by_frequency(cuadro_json: dict) -> dict[str, dict]:
     return result
 
 
+def _clear_series_store_cache(store_path: Path) -> None:
+    """Borra el cache persistente de series para forzar fetch fresco desde BDE."""
+    cache_path = store_path / "timeseries.json"
+    if cache_path.exists():
+        cache_path.unlink()
+        logger.info("Cleared series cache file: %s", cache_path)
+    else:
+        logger.info("Series cache file not found (nothing to clear): %s", cache_path)
+
+
 # ---------------------------------------------------------------------------
 # Programmatic entry point (called from main.py)
 # ---------------------------------------------------------------------------
 
-def run_ingest(catalog_path: str, output_dir: str, store_dir: str = None) -> int:
+def run_ingest(
+    catalog_path: str,
+    output_dir: str,
+    store_dir: str = None,
+    force_refresh: bool = False,
+) -> int:
     """Ejecuta el ingest completo. Retorna cantidad de cuadros procesados."""
     catalog_p = Path(catalog_path)
     output_p = Path(output_dir)
     output_p.mkdir(parents=True, exist_ok=True)
 
     store_p = Path(store_dir) if store_dir else Path(__file__).resolve().parent / "data_store"
-    client = BDEClient(store_dir=store_p)
+    store_p.mkdir(parents=True, exist_ok=True)
+    if force_refresh:
+        _clear_series_store_cache(store_p)
+
+    logger.info(
+        "Ingest config | catalog=%s output=%s store=%s force_refresh=%s",
+        catalog_p,
+        output_p,
+        store_p,
+        force_refresh,
+    )
+    client = BDEClient(store_dir=store_p, force_refresh=force_refresh)
 
     logger.info(f"Loading catalog from {catalog_p}")
     catalog = load_catalog(str(catalog_p))
@@ -846,6 +872,11 @@ def main():
     parser.add_argument("--catalog", default="catalog.json", help="Path to catalog.json")
     parser.add_argument("--output", default="output", help="Output directory")
     parser.add_argument("--store-dir", default=None, help="BDE data store directory")
+    parser.add_argument(
+        "--force-refresh",
+        action="store_true",
+        help="Clear local series cache and fetch every series from BDE",
+    )
     args = parser.parse_args()
 
     catalog_path = Path(args.catalog)
@@ -853,7 +884,18 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     store_dir = Path(args.store_dir) if args.store_dir else Path(__file__).resolve().parent / "data_store"
-    client = BDEClient(store_dir=store_dir)
+    store_dir.mkdir(parents=True, exist_ok=True)
+    if args.force_refresh:
+        _clear_series_store_cache(store_dir)
+
+    logger.info(
+        "Ingest config | catalog=%s output=%s store=%s force_refresh=%s",
+        catalog_path,
+        output_dir,
+        store_dir,
+        args.force_refresh,
+    )
+    client = BDEClient(store_dir=store_dir, force_refresh=args.force_refresh)
 
     logger.info(f"Loading catalog from {catalog_path}")
     catalog = load_catalog(str(catalog_path))
