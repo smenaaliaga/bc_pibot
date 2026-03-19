@@ -133,11 +133,16 @@ _ORIGINAL_VALUE_TOKENS = (
     "pib en pesos",
     "pib en dolares",
     "pib per capita",
-    # --- IMACEC ---
-    "valor del imacec",
-    "cuanto es el imacec",
-    "a cuanto asciende el imacec",
-    "nivel del imacec",
+)
+
+_PIB_ORIGINAL_VALUE_HINTS = (
+    "precios corrientes",
+    "per capita",
+    "per cápita",
+    "dolares",
+    "dólares",
+    "usd",
+    "en pesos",
 )
 
 _VALUE_QUERY_HINTS = (
@@ -244,11 +249,16 @@ _NEGATIVE_DECLINE_PHRASE_RE = re.compile(
     re.IGNORECASE,
 )
 _CONTRIBUTION_VALUE_RE = re.compile(
-    r"(contribuci[oó]n[^\n]{0,80}?)(\*\*)?(-?\d+(?:[\.,]\d+)?)(\*\*)?(\s*(?:puntos?\s+porcentuales|pp|%))",
+    r"(contribuci[oó]n[^\n]{0,80}?)(\*\*)?(-?\d+(?:[\.,]\d+)?)(\*\*)?(\s*(?:puntos?\s+porcentuales|pp))",
     re.IGNORECASE,
 )
 _GENERIC_PP_VALUE_RE = re.compile(
     r"(\*\*)?(-?\d+(?:[\.,]\d+)?)(\*\*)?(\s*(?:pp|puntos?\s+porcentuales))",
+    re.IGNORECASE,
+)
+_CONTRIBUTION_BARE_BOLD_VALUE_RE = re.compile(
+    r"((?:contribuy[oó]|aport[oó]|contribuci[oó]n)[^.\n]{0,80}?(?:con|de)\s+\*\*)"
+    r"(-?\d+(?:[\.,]\d{2,}))(\*\*)(?!\s*%)",
     re.IGNORECASE,
 )
 _SUGGESTION_LINE_RE = re.compile(r"^\s*suggestion_\d+\s*=\s*(.+?)\s*$", re.IGNORECASE | re.MULTILINE)
@@ -902,6 +912,20 @@ def _normalize_contribution_decimals(text: str) -> str:
 
     normalized = _CONTRIBUTION_VALUE_RE.sub(_replace, str(text or ""))
 
+    def _replace_bare_contribution(match: re.Match[str]) -> str:
+        head = str(match.group(1) or "")
+        number = str(match.group(2) or "")
+        tail = str(match.group(3) or "")
+
+        value = _to_float(number)
+        if value is None:
+            return match.group(0)
+
+        rounded = _format_decimal(value, decimals=1)
+        return f"{head}{rounded}{tail}"
+
+    normalized = _CONTRIBUTION_BARE_BOLD_VALUE_RE.sub(_replace_bare_contribution, normalized)
+
     def _replace_pp(match: re.Match[str]) -> str:
         open_bold = str(match.group(1) or "")
         number = str(match.group(2) or "")
@@ -920,27 +944,53 @@ def _normalize_contribution_decimals(text: str) -> str:
     return _GENERIC_PP_VALUE_RE.sub(_replace_pp, normalized)
 
 
+def _is_pib_context(
+    question_norm: str,
+    entities: Dict[str, Any],
+    observations: Dict[str, Any],
+) -> bool:
+    ent_indicator = _norm_text(
+        entities.get("indicator_ent")
+        or entities.get("indicator")
+        or ""
+    )
+    classification = (
+        observations.get("classification")
+        if isinstance(observations.get("classification"), dict)
+        else {}
+    )
+    obs_indicator = _norm_text(classification.get("indicator") or "")
+
+    if ent_indicator == "pib" or obs_indicator == "pib":
+        return True
+
+    return "pib" in question_norm or "producto interno bruto" in question_norm
+
+
 def _requires_original_value_response(
     question: str,
     entities: Dict[str, Any],
     generation_logic: Dict[str, Any],
 ) -> bool:
     q_norm = _norm_text(question)
+    observations = _extract_generation_observations(generation_logic)
+    if not _is_pib_context(q_norm, entities, observations):
+        return False
+
     if _contains_any(q_norm, _ORIGINAL_VALUE_TOKENS):
         return True
 
-    calc_mode = str(entities.get("calc_mode_cls") or entities.get("calc_mode") or "").strip().lower()
-    if calc_mode in {"value", "original_value", "nominal"}:
+    if _contains_any(q_norm, _PIB_ORIGINAL_VALUE_HINTS):
         return True
 
-    observations = _extract_generation_observations(generation_logic)
+    calc_mode = str(entities.get("calc_mode_cls") or entities.get("calc_mode") or "").strip().lower()
+    if calc_mode in {"original_value", "nominal"}:
+        return True
+
     classification = observations.get("classification") if isinstance(observations.get("classification"), dict) else {}
-    indicator = _norm_text(classification.get("indicator") or "")
     price = _norm_text(classification.get("price") or "")
 
-    if indicator == "pib" and price == "co" and _contains_any(q_norm, _VALUE_QUERY_HINTS):
-        return True
-    if indicator == "pib" and ("per capita" in q_norm or "precios corrientes" in q_norm):
+    if price == "co" and calc_mode == "value" and _contains_any(q_norm, _VALUE_QUERY_HINTS):
         return True
     return False
 
@@ -1243,6 +1293,21 @@ def _postprocess_response_sections(
                 )
                 if _PERCENT_RE.search(intro_clean) and not _contains_any(_norm_text(intro_clean), _UNPUBLISHED_TOKENS):
                     intro_clean = _BASE_INTRO_TEXT
+
+    if mode == "data" and is_yoy_default and not isinstance(unpublished_override, dict):
+        response_clean = _ensure_yoy_metric_sentence_in_response(intro_clean, response_clean)
+
+    if mode == "data" and not isinstance(unpublished_override, dict):
+        intro_clean = _ensure_data_intro_context(
+            intro_clean,
+            response_clean,
+            question=question,
+            entities=entities,
+            observations=observations,
+        )
+
+    if intro_clean and response_clean.startswith(intro_clean):
+        response_clean = response_clean[len(intro_clean):].lstrip(" \n\t.,:;-")
 
     if mode == "data":
         intro_clean = _normalize_percentage_decimals(intro_clean)
@@ -1691,6 +1756,216 @@ def _subject_for_unpublished_response(question: str, indicator_label: str) -> st
     return "el indicador consultado"
 
 
+def _frequency_label(freq: str) -> str:
+    code = _normalize_frequency_code(freq)
+    if code == "M":
+        return "mensual"
+    if code == "T":
+        return "trimestral"
+    if code == "A":
+        return "anual"
+    return ""
+
+
+def _build_frequency_note(question: str, freq: str) -> str:
+    q_norm = _norm_text(question)
+    code = _normalize_frequency_code(freq)
+    if not code:
+        return ""
+
+    has_month_reference = "mes" in q_norm or _contains_any(q_norm, _MONTH_TOKENS)
+    has_quarter_reference = "trimestre" in q_norm
+    has_year_reference = bool(_YEAR_RE.search(question)) or "ano" in q_norm or "año" in str(question or "").lower()
+
+    if code == "T" and has_month_reference:
+        return "La serie disponible se publica en frecuencia trimestral."
+    if code == "M" and has_quarter_reference:
+        return "La serie disponible se publica en frecuencia mensual."
+    if code == "A" and (has_month_reference or has_quarter_reference):
+        return "La serie disponible se publica en frecuencia anual."
+
+    if not has_month_reference and not has_quarter_reference and not has_year_reference:
+        label = _frequency_label(code)
+        if label:
+            return f"La serie se reporta con frecuencia {label}."
+
+    return ""
+
+
+def _subject_for_data_context(question: str, indicator_label: str, freq: str) -> str:
+    q_norm = _norm_text(question)
+    label = str(indicator_label or "").strip()
+    label_norm = _norm_text(label)
+
+    if "demanda interna" in q_norm:
+        return "la demanda interna"
+    if "inversion" in q_norm or "inversión" in str(question or "").lower():
+        return "la inversión en Chile"
+    if label == "IMACEC":
+        if "economia" in q_norm:
+            return "la economía, medida por el IMACEC"
+        return "el IMACEC"
+    if label == "PIB":
+        if "economia" in q_norm:
+            return "la economía, medida por el PIB"
+        return "el PIB"
+    if label_norm == "demanda interna":
+        return "la demanda interna"
+    if label:
+        if label_norm.startswith(("el ", "la ")):
+            return label
+        return f"el indicador {label}"
+
+    code = _normalize_frequency_code(freq)
+    if "economia" in q_norm:
+        if code == "M":
+            return "la economía, medida por el IMACEC"
+        if code in {"T", "A"}:
+            return "la economía, medida por el PIB"
+        return "la economía"
+    return "el indicador consultado"
+
+
+def _has_indicator_reference(text: str, question: str, indicator_label: str) -> bool:
+    t_norm = _norm_text(text)
+    q_norm = _norm_text(question)
+    label_norm = _norm_text(indicator_label)
+
+    if label_norm:
+        if label_norm in t_norm:
+            return True
+        if label_norm == "pib" and ("pib" in t_norm or "producto interno bruto" in t_norm):
+            return True
+        if label_norm == "imacec" and "imacec" in t_norm:
+            return True
+        if label_norm == "demanda interna" and "demanda interna" in t_norm:
+            return True
+
+    if "inversion" in q_norm and "inversion" in t_norm:
+        return True
+    if "demanda interna" in q_norm and "demanda interna" in t_norm:
+        return True
+    if "economia" in q_norm and ("pib" in t_norm or "imacec" in t_norm):
+        return True
+
+    return False
+
+
+def _resolve_reference_period(
+    question: str,
+    entities: Dict[str, Any],
+    observations: Dict[str, Any],
+    latest_point: Dict[str, Any],
+) -> Tuple[str, str, bool]:
+    freq = _normalize_frequency_code(
+        latest_point.get("frequency")
+        or observations.get("frequency")
+        or entities.get("frequency_ent")
+        or entities.get("frequency")
+    )
+    if not freq:
+        return "", "", False
+
+    latest_available = observations.get("latest_available")
+    latest_available = latest_available if isinstance(latest_available, dict) else {}
+    latest_token = _canonicalize_period(
+        freq,
+        str(latest_point.get("period") or latest_available.get(freq) or ""),
+    )
+    requested_token = _resolve_requested_period_token(question, entities, freq)
+
+    selected_token = latest_token
+    requested_non_latest = False
+    if requested_token and latest_token:
+        cmp_result = _compare_period_tokens(freq, requested_token, latest_token)
+        if cmp_result in {-1, 0}:
+            selected_token = requested_token
+            requested_non_latest = requested_token != latest_token
+    elif requested_token and not latest_token:
+        selected_token = requested_token
+        requested_non_latest = True
+
+    period_label = _natural_period_label(selected_token, freq) if selected_token else ""
+    return freq, period_label, requested_non_latest
+
+
+def _ensure_data_intro_context(
+    intro: str,
+    response_text: str,
+    *,
+    question: str,
+    entities: Dict[str, Any],
+    observations: Dict[str, Any],
+) -> str:
+    narrative, _source = _split_narrative_and_source(response_text)
+    core_paragraphs = [
+        paragraph.strip()
+        for paragraph in narrative.split("\n\n")
+        if paragraph.strip() and not _is_recommendation_paragraph(paragraph)
+    ]
+    response_core = "\n\n".join(core_paragraphs).strip()
+
+    latest_point = _extract_latest_point_summary(observations, entities)
+    indicator_label = _indicator_label_from_observations(observations, latest_point)
+    freq, period_label, requested_non_latest = _resolve_reference_period(
+        question,
+        entities,
+        observations,
+        latest_point,
+    )
+    subject = _subject_for_data_context(question, indicator_label, freq)
+    combined = f"{intro} {response_core}".strip()
+
+    has_period = _has_period_anchor(intro) or _has_period_anchor(response_core)
+    has_indicator = _has_indicator_reference(combined, question, indicator_label)
+    needs_context = _is_generic_intro(intro) or not has_period or not has_indicator
+    if not needs_context:
+        return intro
+
+    if period_label:
+        if requested_non_latest:
+            rebuilt_intro = f"Para {period_label}, {subject} corresponde al período consultado."
+        else:
+            rebuilt_intro = f"El último dato disponible para {subject} corresponde a {period_label}."
+    else:
+        freq_label = _frequency_label(freq)
+        if freq_label:
+            rebuilt_intro = f"La consulta para {subject} se responde con frecuencia {freq_label}."
+        else:
+            rebuilt_intro = intro or _BASE_INTRO_TEXT
+
+    frequency_note = _build_frequency_note(question, freq)
+    if frequency_note and _norm_text(frequency_note) not in _norm_text(rebuilt_intro):
+        rebuilt_intro = f"{rebuilt_intro} {frequency_note}".strip()
+
+    return rebuilt_intro
+
+
+def _ensure_yoy_metric_sentence_in_response(intro: str, response_text: str) -> str:
+    narrative, source = _split_narrative_and_source(response_text)
+    if _PERCENT_RE.search(narrative):
+        return response_text
+
+    pct_token = _extract_first_percentage(intro)
+    if not pct_token:
+        return response_text
+
+    metric_sentence = f"La variación anual fue {pct_token} respecto al mismo período del año anterior."
+    paragraphs = [p.strip() for p in narrative.split("\n\n") if p.strip()]
+    if paragraphs and _norm_text(paragraphs[0]) == _norm_text(metric_sentence):
+        rebuilt_narrative = "\n\n".join(paragraphs).strip()
+    else:
+        paragraphs.insert(0, metric_sentence)
+        rebuilt_narrative = "\n\n".join(paragraphs).strip()
+
+    parts: List[str] = []
+    if rebuilt_narrative:
+        parts.append(rebuilt_narrative)
+    if source:
+        parts.append(source)
+    return "\n\n".join(parts).strip()
+
+
 def _build_unpublished_period_override(
     *,
     question: str,
@@ -1740,7 +2015,7 @@ def _build_unpublished_period_override(
     if not yoy_metric:
         yoy_metric = _format_percent_token(latest_point.get("pct"), decimals=1)
 
-    intro = f"Los datos de {requested_label} aún no han sido publicados."
+    intro = f"Los datos de {requested_label} aún no han sido publicados según los datos de la BDE."
     if yoy_metric:
         comparison_tail = "respecto al mismo período del año anterior"
         if indicator_label in {"IMACEC", "PIB"}:
@@ -1844,32 +2119,39 @@ def _requires_original_value_case(
     generation_entities: Dict[str, Any],
     observations: Dict[str, Any],
 ) -> bool:
+    if not _is_pib_context(question_norm, generation_entities, observations):
+        return False
+
     if _contains_any(question_norm, _ORIGINAL_VALUE_TOKENS):
         return True
+    if _contains_any(question_norm, _PIB_ORIGINAL_VALUE_HINTS):
+        return True
+
     calc_mode = str(
         generation_entities.get("calc_mode_cls")
         or generation_entities.get("calc_mode")
         or ""
     ).strip().lower()
-    if calc_mode in {"value", "original_value", "nominal"}:
+    if calc_mode in {"original_value", "nominal"}:
         return True
+
     classification = (
         observations.get("classification")
         if isinstance(observations.get("classification"), dict)
         else {}
     )
-    indicator = _norm_acceptance(classification.get("indicator") or "")
     price = _norm_acceptance(classification.get("price") or "")
-    if indicator == "pib" and price == "co" and _contains_any(question_norm, _VALUE_QUERY_HINTS):
+    if price == "co" and calc_mode == "value" and _contains_any(question_norm, _VALUE_QUERY_HINTS):
         return True
-    if indicator == "pib" and ("per capita" in question_norm or "precios corrientes" in question_norm):
-        return True
+
     return False
 
 
 def _extract_contribution_decimals(response_text: str) -> List[int]:
     pattern = re.compile(
-        r"contribuci[oó]n[^\n]{0,80}?(-?\d+(?:[\.,]\d+)?)(?:\s*(?:puntos?\s+porcentuales|pp|%))",
+        r"(?:contribuci[oó]n|contribuy[oó]|aport[oó])[^\n]{0,80}?"
+        r"(?:con|de)?\s*\*\*(-?\d+(?:[\.,]\d+)?)\*\*"
+        r"(?:\s*(?:puntos?\s+porcentuales|pp|%))?",
         re.IGNORECASE,
     )
     decimals: List[int] = []
