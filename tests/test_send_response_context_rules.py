@@ -104,3 +104,30 @@ def test_contribution_decimal_pipeline_preserves_bold_percent_format() -> None:
     assert "**0,5%**" in normalized
     assert "**-0,6%**" in normalized
     assert "****%" not in normalized
+
+
+def test_postprocess_recovers_negative_sign_from_decline_wording() -> None:
+    question = "cual es el valor del ultimo imacec"
+    entities = {"calc_mode_cls": "yoy", "indicator_ent": "imacec", "frequency_ent": "m"}
+    observations = {
+        "frequency": "M",
+        "latest_available": {"M": "2026-01"},
+        "classification": {"indicator": "imacec", "price": "enc"},
+        "latest_point": {"frequency": "M", "period": "2026-01", "yoy_pct": "-0.6"},
+    }
+    generation_logic = _build_generation_logic(
+        question=question,
+        entities=entities,
+        observations=observations,
+    )
+
+    sections = {
+        "introduccion": "Con base en los datos disponibles, se reporta el resultado solicitado.",
+        "respuesta": "En comparación con el mismo mes del año anterior, disminuyó un 0,6%.",
+        "sugerencias": "",
+        "csv": "",
+    }
+
+    _composed, updated = _postprocess_response_sections(sections, generation_logic)
+
+    assert "-0,6%" in updated["respuesta"]

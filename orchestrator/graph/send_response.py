@@ -1950,6 +1950,12 @@ def _ensure_yoy_metric_sentence_in_response(intro: str, response_text: str) -> s
     if not pct_token:
         return response_text
 
+    intro_norm = _norm_text(intro)
+    if not pct_token.strip().startswith("-") and any(
+        marker in intro_norm for marker in ("disminuy", "retroced", "baj", "cayo", "cayó")
+    ):
+        pct_token = f"-{pct_token}"
+
     metric_sentence = f"La variación anual fue {pct_token} respecto al mismo período del año anterior."
     paragraphs = [p.strip() for p in narrative.split("\n\n") if p.strip()]
     if paragraphs and _norm_text(paragraphs[0]) == _norm_text(metric_sentence):
