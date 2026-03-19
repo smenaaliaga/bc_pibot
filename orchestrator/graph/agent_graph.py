@@ -25,6 +25,7 @@ from .nodes import (
     make_rag_node,
     make_router_node,
 )
+from .send_response import make_response_node
 from .state import (
     AgentState,
     _emit_stream_chunk,
@@ -38,6 +39,7 @@ _RETRIEVER = None
 _RAG_LLM = None
 _FALLBACK_LLM = None
 _INTENT_STORE: Optional[IntentStoreBase] = None
+RESPONSE_STATE_NODE = "response"
 
 
 def _ensure_backends() -> None:
@@ -79,17 +81,25 @@ def router_node(state: AgentState) -> AgentState:
 
 
 def data_node(state: AgentState, *, writer: Optional[StreamWriter] = None):
-    node_fn = make_data_node(_MEMORY)
+    node_fn = make_data_node(_MEMORY, emit_payload_only=True)
     return node_fn(state, writer=writer)
 
 
 def rag_node(state: AgentState, *, writer: Optional[StreamWriter] = None):
-    node_fn = make_rag_node(_RAG_LLM)
+    node_fn = make_rag_node(_RAG_LLM, emit_payload_only=True)
     return node_fn(state, writer=writer)
 
 
 def fallback_node(state: AgentState, *, writer: Optional[StreamWriter] = None):
-    node_fn = make_fallback_node(_FALLBACK_LLM)
+    node_fn = make_fallback_node(_FALLBACK_LLM, emit_payload_only=True)
+    return node_fn(state, writer=writer)
+
+
+def response_node(state: AgentState, *, writer: Optional[StreamWriter] = None) -> AgentState:
+    node_fn = make_response_node(
+        rag_llm_adapter=_RAG_LLM,
+        fallback_llm_adapter=_FALLBACK_LLM,
+    )
     return node_fn(state, writer=writer)
 
 
@@ -117,9 +127,13 @@ def build_graph():
     )
     intent = make_intent_node(_MEMORY, _INTENT_STORE)
     router = make_router_node()
-    data = make_data_node(_MEMORY)
-    rag = make_rag_node(_RAG_LLM)
-    fallback = make_fallback_node(_FALLBACK_LLM)
+    data = make_data_node(_MEMORY, emit_payload_only=True)
+    rag = make_rag_node(_RAG_LLM, emit_payload_only=True)
+    fallback = make_fallback_node(_FALLBACK_LLM, emit_payload_only=True)
+    response = make_response_node(
+        rag_llm_adapter=_RAG_LLM,
+        fallback_llm_adapter=_FALLBACK_LLM,
+    )
     memory = make_memory_node(_MEMORY, _INTENT_STORE)
 
     builder.add_node("ingest", ingest)
@@ -129,6 +143,7 @@ def build_graph():
     builder.add_node("data", data)
     builder.add_node("rag", rag)
     builder.add_node("fallback", fallback)
+    builder.add_node(RESPONSE_STATE_NODE, response)
     builder.add_node("memory", memory)
 
     builder.add_edge(START, "ingest")
@@ -140,9 +155,11 @@ def build_graph():
         _route_from_router,
         {"data": "data", "rag": "rag", "fallback": "fallback"},
     )
-    builder.add_edge("data", "memory")
-    builder.add_edge("rag", "memory")
-    builder.add_edge("fallback", "memory")
+    # Estado de convergencia: toda salida DATA/RAG/FALLBACK se normaliza en RESPONSE.
+    builder.add_edge("data", RESPONSE_STATE_NODE)
+    builder.add_edge("rag", RESPONSE_STATE_NODE)
+    builder.add_edge("fallback", RESPONSE_STATE_NODE)
+    builder.add_edge(RESPONSE_STATE_NODE, "memory")
     builder.add_edge("memory", END)
 
     checkpointer = getattr(_MEMORY, "saver", None)

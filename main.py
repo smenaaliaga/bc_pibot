@@ -315,6 +315,11 @@ def main() -> None:
 
         final_output_text = ""
         seen_stream_chunk_count = 0
+        stream_chunks_enabled = (
+            bool(stream_chunks)
+            if stream_chunks is not None
+            else os.getenv("STREAM_CHUNKS_ENABLED", "0").lower() in {"1", "true", "yes", "on"}
+        )
 
         def _split_event(raw_event):
             mode = None
@@ -338,32 +343,39 @@ def main() -> None:
                     if qa_trace_enabled:
                         _log_qa_trace(payload)
 
-                for chunk_payload in _extract_field(payload, "stream_chunks"):
-                    payload_items = chunk_payload
-                    if isinstance(chunk_payload, (list, tuple)):
-                        start_idx = seen_stream_chunk_count
-                        if start_idx < 0 or start_idx > len(chunk_payload):
-                            start_idx = len(chunk_payload)
-                        payload_items = chunk_payload[start_idx:]
-                        seen_stream_chunk_count = len(chunk_payload)
-                    for chunk_text in _iter_strings(payload_items):
-                        if not chunk_text:
-                            continue
-                        final_output_text += chunk_text
-                        try:
-                            # Gate per-chunk logs with env flag
-                            if os.getenv("STREAM_CHUNK_LOGS", "0").lower() in {"1", "true", "yes", "on"}:
-                                logger.debug("[STREAM_OUT] chunk=%s", chunk_text[:120])
-                        except Exception:
-                            pass
-                        got_any = True
-                        yield chunk_text
+                if stream_chunks_enabled:
+                    for chunk_payload in _extract_field(payload, "stream_chunks"):
+                        payload_items = chunk_payload
+                        if isinstance(chunk_payload, (list, tuple)):
+                            start_idx = seen_stream_chunk_count
+                            if start_idx < 0 or start_idx > len(chunk_payload):
+                                start_idx = len(chunk_payload)
+                            payload_items = chunk_payload[start_idx:]
+                            seen_stream_chunk_count = len(chunk_payload)
+                        for chunk_text in _iter_strings(payload_items):
+                            if not chunk_text:
+                                continue
+                            final_output_text += chunk_text
+                            try:
+                                # Gate per-chunk logs with env flag
+                                if os.getenv("STREAM_CHUNK_LOGS", "0").lower() in {"1", "true", "yes", "on"}:
+                                    logger.debug("[STREAM_OUT] chunk=%s", chunk_text[:120])
+                            except Exception:
+                                pass
+                            got_any = True
+                            yield chunk_text
                 if mode in (None, "updates", "values"):
                     for out_payload in _extract_field(payload, "output"):
                         for out_text in _iter_strings(out_payload):
-                            if isinstance(out_text, str):
+                            if isinstance(out_text, str) and out_text.strip():
                                 final_output_text = out_text
-            if not got_any:
+
+            # Por defecto, la UI muestra el output final post-procesado del nodo response
+            # para mantener consistencia con validaciones y run_detail.log.
+            if not stream_chunks_enabled and final_output_text:
+                got_any = True
+                yield final_output_text
+            elif not got_any:
                 if final_output_text:
                     yield final_output_text
                 else:

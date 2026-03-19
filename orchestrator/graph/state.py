@@ -57,12 +57,25 @@ class AgentState(TypedDict, total=False):
     parsed_range: Optional[Tuple[str, str]]
     series: Optional[str]
     data_classification: Dict[str, Any]
+    data_store_lookup: Dict[str, Any]
     data_params: Dict[str, Any]
     data_params_status: Dict[str, str]
     metadata_response: Dict[str, Any]
     metadata_key: Optional[str]
     series_fetch_args: Dict[str, Any]
     series_fetch_result: Dict[str, Any]
+    response: Dict[str, Any]
+    response_payload: Dict[str, Any]
+    response_structure: List[str]
+    response_sections: Dict[str, str]
+    response_logic: Dict[str, Any]
+    acceptance_checks: Dict[str, Any]
+    response_temperature: float
+    response_ok: bool
+    response_errors: List[str]
+    response_metrics: Dict[str, Any]
+    response_classification_type: str
+    response_detail_log_path: str
 
 
 def _emit_stream_chunk(chunk_text: str, writer: Optional[StreamWriter]) -> None:

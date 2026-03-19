@@ -262,7 +262,7 @@ def _filter_series_by_entities(
 # Nodo principal
 # ---------------------------------------------------------------------------
 
-def make_data_node(memory_adapter: Any):
+def make_data_node(memory_adapter: Any, *, emit_payload_only: bool = False):
     """Fábrica del nodo DATA. Retorna la función ``data_node`` que se registra
     en el grafo de LangGraph.
 
@@ -294,6 +294,28 @@ def make_data_node(memory_adapter: Any):
         logger.info("[DATA_NODE] search_output_payloads found %d matches", len(matches))
 
         if not matches:
+            if emit_payload_only:
+                no_series_result = handle_no_series(
+                    question=question,
+                    entities=entities,
+                    ent=ent,
+                    writer=None,
+                    emit_fn=lambda *_args, **_kwargs: None,
+                    first_non_empty_fn=first_non_empty,
+                )
+                return {
+                    "output": "",
+                    "entities": no_series_result.get("entities") or entities,
+                    "parsed_point": None,
+                    "parsed_range": None,
+                    "series": None,
+                    "data_classification": no_series_result.get("data_classification") or asdict(ent),
+                    "response_payload": {
+                        "mode": "prebuilt",
+                        "route_decision": "data",
+                        "text": str(no_series_result.get("output") or ""),
+                    },
+                }
             return handle_no_series(
                 question=question,
                 entities=entities,
@@ -322,6 +344,34 @@ def make_data_node(memory_adapter: Any):
             "entities": ent_dict,
         }
 
+        pv = ent.period_ent or []
+        rf = str(ent.req_form_cls or "").strip().lower()
+        store_series = observations.get("series") or []
+        target_id = store_series[0].get("series_id") if store_series else None
+
+        if emit_payload_only:
+            return {
+                "output": "",
+                "entities": entities,
+                "parsed_point": str(pv[-1]) if (rf != "range" and pv) else None,
+                "parsed_range": (str(pv[0]), str(pv[-1])) if pv else None,
+                "series": target_id,
+                "data_classification": ent_dict,
+                "data_store_lookup": {
+                    "cuadro_name": observations.get("cuadro_name"),
+                    "frequency": observations.get("frequency"),
+                    "series_count": len(store_series),
+                    "source_url": source_url,
+                    "latest_available": observations.get("latest_available"),
+                    "classification": observations.get("classification"),
+                },
+                "response_payload": {
+                    "mode": "data",
+                    "route_decision": "data",
+                    "payload": payload,
+                },
+            }
+
         collected: List[str] = []
         try:
             for chunk in stream_data_response(payload):
@@ -334,13 +384,6 @@ def make_data_node(memory_adapter: Any):
                 fallback = "Ocurrió un problema al generar la respuesta."
                 collected.append(fallback)
                 _emit_stream_chunk(fallback, writer)
-
-        pv = ent.period_ent or []
-        rf = str(ent.req_form_cls or "").strip().lower()
-
-        # Extraer serie objetivo del payload para el retorno
-        store_series = observations.get("series") or []
-        target_id = store_series[0].get("series_id") if store_series else None
 
         return {
             "output": "".join(collected),

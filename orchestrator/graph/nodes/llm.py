@@ -118,8 +118,30 @@ def _run_llm(
     return {"output": "".join(collected)}
 
 
-def make_rag_node(llm_adapter):
+def run_llm_stream(
+    state: AgentState,
+    adapter,
+    *,
+    writer: Optional[StreamWriter] = None,
+):
+    """Public bridge used by response-state execution."""
+    return _run_llm(state, adapter, writer=writer)
+
+
+def make_rag_node(llm_adapter, *, emit_payload_only: bool = False):
     def rag_node(state: AgentState, *, writer: Optional[StreamWriter] = None):
+        if emit_payload_only:
+            return {
+                "response_payload": {
+                    "mode": "rag",
+                    "route_decision": "rag",
+                    "question": state.get("question", ""),
+                    "history": list(state.get("conversation_history") or []),
+                    "intent_info": state.get("intent_info") or {},
+                    "append_methodology_footer": True,
+                }
+            }
+
         intent_payload = state.get("intent")
         if isinstance(intent_payload, dict):
             intent = intent_payload.get("intent", "")
@@ -153,11 +175,29 @@ def make_rag_node(llm_adapter):
     return rag_node
 
 
-def make_fallback_node(llm_adapter):
+def make_fallback_node(llm_adapter, *, emit_payload_only: bool = False):
     def fallback_node(state: AgentState, *, writer: Optional[StreamWriter] = None):
+        if emit_payload_only:
+            return {
+                "response_payload": {
+                    "mode": "fallback",
+                    "route_decision": "fallback",
+                    "question": state.get("question", ""),
+                    "history": list(state.get("conversation_history") or []),
+                    "intent_info": state.get("intent_info") or {},
+                    "append_methodology_footer": False,
+                }
+            }
         return _run_llm(state, llm_adapter, writer=writer)
 
     return fallback_node
 
 
-__all__ = ["make_rag_node", "make_fallback_node"]
+__all__ = [
+    "make_rag_node",
+    "make_fallback_node",
+    "run_llm_stream",
+    "_build_methodology_footer",
+    "_has_existing_methodology_footer",
+    "_is_generation_error_output",
+]

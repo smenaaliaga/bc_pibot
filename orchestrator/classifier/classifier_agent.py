@@ -20,6 +20,8 @@ logger = logging.getLogger(__name__)
 
 # Timeouts
 PREDICT_TIMEOUT_SECONDS = float(os.getenv("PREDICT_TIMEOUT_SECONDS", "10"))
+PREDICT_RETRY_TIMEOUT_SECONDS = float(os.getenv("PREDICT_RETRY_TIMEOUT_SECONDS", "30"))
+PREDICT_MAX_RETRIES = int(os.getenv("PREDICT_MAX_RETRIES", "1"))
 
 
 def _use_local_jointbert() -> bool:
@@ -227,16 +229,16 @@ def _coerce_entities_payload(entities_payload: Any) -> Dict[str, List[str]]:
     return coerced
 
 
-def _classify_with_jointbert(question: str) -> ClassificationResult:
+def _classify_with_jointbert(question: str, timeout: Optional[float] = None) -> ClassificationResult:
     """
-    Clasificación usando APIs remotas (o modelo local si está habilitado).
     Clasificación usando APIs remotas (o modelo local si está habilitado).
     """
     if _use_local_jointbert():
         logger.warning("USE_JOINTBERT_CLASSIFIER enabled but local classifier is unavailable; using API flow")
 
+    effective_timeout = timeout if timeout is not None else PREDICT_TIMEOUT_SECONDS
     predict_payload = {"text": question}
-    predict_result = post_json(PREDICT_URL, predict_payload, timeout=PREDICT_TIMEOUT_SECONDS)
+    predict_result = post_json(PREDICT_URL, predict_payload, timeout=effective_timeout)
     logger.debug("[PREDICT_API] response=%s", predict_result)
     predict_result_dict: Dict[str, Any] = predict_result if isinstance(predict_result, dict) else {}
     interpretation = predict_result_dict.get("interpretation")
@@ -355,12 +357,27 @@ def classify_question_with_history(
     
     t_start = time.perf_counter()
     logger.info("[CLASSIFICATION] Iniciando clasificación de la consulta | question='%s'", question)
-    try:
-        classification = _classify_with_jointbert(question)
-    except Exception as exc:
-        t_end = time.perf_counter()
-        logger.error("[CLASSIFICATION] ERROR al clasificar | time='%s' | error=%s", t_end - t_start, exc)
-        raise
+    last_exc: Optional[Exception] = None
+    classification: Optional[ClassificationResult] = None
+    current_timeout: Optional[float] = None
+    for attempt in range(1 + PREDICT_MAX_RETRIES):
+        try:
+            classification = _classify_with_jointbert(question, timeout=current_timeout)
+            last_exc = None
+            break
+        except Exception as exc:
+            last_exc = exc
+            elapsed = time.perf_counter() - t_start
+            is_timeout = "timed out" in str(exc).lower() or "timeout" in str(exc).lower()
+            if is_timeout and attempt < PREDICT_MAX_RETRIES:
+                logger.warning(
+                    "[CLASSIFICATION] Timeout en intento %d (%.1fs), reintentando con timeout extendido (%ss)...",
+                    attempt + 1, elapsed, PREDICT_RETRY_TIMEOUT_SECONDS,
+                )
+                current_timeout = PREDICT_RETRY_TIMEOUT_SECONDS
+                continue
+            logger.error("[CLASSIFICATION] ERROR al clasificar | time='%s' | error=%s", elapsed, exc)
+            raise
     
     # Extraer indicador normalizado
     indicator: Optional[str] = None
