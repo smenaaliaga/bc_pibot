@@ -793,14 +793,13 @@ def split_by_frequency(cuadro_json: dict) -> dict[str, dict]:
 # Programmatic entry point (called from main.py)
 # ---------------------------------------------------------------------------
 
-def run_ingest(catalog_path: str, output_dir: str, store_dir: str = None) -> int:
+def run_ingest(catalog_path: str, output_dir: str) -> int:
     """Ejecuta el ingest completo. Retorna cantidad de cuadros procesados."""
     catalog_p = Path(catalog_path)
     output_p = Path(output_dir)
     output_p.mkdir(parents=True, exist_ok=True)
 
-    store_p = Path(store_dir) if store_dir else Path(__file__).resolve().parent / "data_store"
-    client = BDEClient(store_dir=store_p, force_api=True)
+    client = BDEClient()
 
     logger.info(f"Loading catalog from {catalog_p}")
     catalog = load_catalog(str(catalog_p))
@@ -845,15 +844,13 @@ def main():
     parser = argparse.ArgumentParser(description="Ingest series from BDE catalog and build cuadro JSONs")
     parser.add_argument("--catalog", default="catalog.json", help="Path to catalog.json")
     parser.add_argument("--output", default="output", help="Output directory")
-    parser.add_argument("--store-dir", default=None, help="BDE data store directory")
     args = parser.parse_args()
 
     catalog_path = Path(args.catalog)
     output_dir = Path(args.output)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    store_dir = Path(args.store_dir) if args.store_dir else Path(__file__).resolve().parent / "data_store"
-    client = BDEClient(store_dir=store_dir, force_api=True)
+    client = BDEClient()
 
     logger.info(f"Loading catalog from {catalog_path}")
     catalog = load_catalog(str(catalog_path))
