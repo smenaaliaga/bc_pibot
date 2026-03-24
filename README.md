@@ -61,16 +61,6 @@ Este script comprueba:
 | `REDIS_URL`, `USE_REDIS_CACHE` | Cache para consultas BCCh | ✓ Sí |
 | `RAG_ENABLED`, `RAG_BACKEND`, `RAG_PGVECTOR_URL` | Activa el retriever metodológico | ✓ Sí |
 
-### Clonar modelo clasificador
-
-```bash
-# 1) Descargar el tokenizer BETO (se guarda en models/tokenizers/)
-hf download dccuchile/bert-base-spanish-wwm-cased --local-dir ./models/tokenizers/dccuchile/bert-base-spanish-wwm-cased
-
-# 2) Descargar el modelo entrenado (JointBERT)
-hf download smenaaliaga/pibot-jointbert \
-    --local-dir ./models/pibot_series_interpreter/pibot-jointbert
-```
 
 ### Ejecuta la aplicación
 ```bash
@@ -78,10 +68,9 @@ uv run streamlit run main.py
 ```
 
 Al iniciar, el sistema automáticamente:
-1. ✅ Carga el modelo JointBERT (clasificador de intenciones) - ~6 segundos
-2. ✅ Inicializa el grafo LangGraph
-3. ✅ Prepara la memoria conversacional
-4. ✅ Abre la interfaz web en `http://localhost:8501`
+1. ✅ Inicializa el grafo LangGraph
+2. ✅ Prepara la memoria conversacional
+3. ✅ Abre la interfaz web en `http://localhost:8501`
 
 El entrypoint `main.py` prepara logging + configuración, invoca el grafo desde `orchestrator/` y la UI
 se renderiza desde `app.py`.

@@ -800,7 +800,7 @@ def run_ingest(catalog_path: str, output_dir: str, store_dir: str = None) -> int
     output_p.mkdir(parents=True, exist_ok=True)
 
     store_p = Path(store_dir) if store_dir else Path(__file__).resolve().parent / "data_store"
-    client = BDEClient(store_dir=store_p)
+    client = BDEClient(store_dir=store_p, force_api=True)
 
     logger.info(f"Loading catalog from {catalog_p}")
     catalog = load_catalog(str(catalog_p))
@@ -853,7 +853,7 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     store_dir = Path(args.store_dir) if args.store_dir else Path(__file__).resolve().parent / "data_store"
-    client = BDEClient(store_dir=store_dir)
+    client = BDEClient(store_dir=store_dir, force_api=True)
 
     logger.info(f"Loading catalog from {catalog_path}")
     catalog = load_catalog(str(catalog_path))

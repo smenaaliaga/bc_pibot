@@ -23,8 +23,6 @@ import streamlit as st
 from dotenv import load_dotenv
 
 from config import get_settings, PREDICT_URL
-# from orchestrator.classifier.joint_bert_classifier import get_predictor
-from registry import warmup_models
 import app
 from orchestrator.utils.http_client import get_json
 
@@ -160,20 +158,6 @@ def main() -> None:
     _log_remote_model_health(logger)
 
     settings = get_settings()
-
-    # # Pre-cargar modelo JointBERT (singleton global dentro de get_predictor)
-    # logger.info("Inicializando predictor")
-    # try:
-    #     get_predictor()  # fuerza la inicialización una sola vez
-    #     # logger.info("Predictor inicializado")
-    # except Exception as e:
-    #     logger.warning(f"Predictor no disponible: {e}")
-
-    # Warm-up de modelos (router + interpreter) para evitar recargas en reruns
-    try:
-        warmup_models()
-    except Exception as e:
-        logger.warning(f"Warmup de modelos adicionales falló: {e}")
 
     # Ingest de series: pre-computa métricas derivadas y guarda en data_store
     ingest_on_start = os.getenv("INGEST_ON_START", "0").lower() in {"1", "true", "yes", "on"}

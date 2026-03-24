@@ -17,13 +17,15 @@ class BDEClient:
     - Si una serie falta o está vacía, consulta BDE y persiste en el almacén
     """
 
-    def __init__(self, store_dir: Path = None):
+    def __init__(self, store_dir: Path = None, force_api: bool = False):
         if store_dir is not None:
             base_store = Path(store_dir)
         else:
             base_store = Path(__file__).resolve().parents[2] / "data_store"
         base_store.mkdir(parents=True, exist_ok=True)
         self._store_path = base_store / "timeseries.json"
+        # Si está activo, siempre consulta API y omite lectura desde caché.
+        self._force_api = force_api
         # Mapa en memoria: series_id -> payload (BDE-like)
         self._store: Dict[str, Any] = {}
         if self._store_path.exists():
@@ -40,17 +42,18 @@ class BDEClient:
         Args:
             series_id: ID de la serie (e.g., "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M")
         """
-        # 1) Intentar desde almacén en memoria
-        payload = self._store.get(series_id)
-        if isinstance(payload, list):
-            if payload:
-                logger.info(f"Serving series from in-memory store: {series_id}")
-                return payload
-        elif isinstance(payload, dict):
-            obs = self._extract_obs(payload)
-            if obs:
-                logger.info(f"Serving series from in-memory store: {series_id}")
-                return obs
+        # 1) Intentar desde almacén en memoria (salvo force_api)
+        if not self._force_api:
+            payload = self._store.get(series_id)
+            if isinstance(payload, list):
+                if payload:
+                    logger.info(f"Serving series from in-memory store: {series_id}")
+                    return payload
+            elif isinstance(payload, dict):
+                obs = self._extract_obs(payload)
+                if obs:
+                    logger.info(f"Serving series from in-memory store: {series_id}")
+                    return obs
 
         # Mostrar URL que se usaría para BDE
         bde_url = self._build_bde_url(series_id)
@@ -59,8 +62,9 @@ class BDEClient:
         logger.info(f"Fetching series from BDE API: {bde_url}")
         bde_payload = self._fetch_raw_bde_payload(bde_url)
         obs = self._extract_obs(bde_payload)
-        # Persistimos el payload BDE tal cual
-        self._persist_store(series_id, bde_payload)
+        # En modo force_api evitamos cachear en memoria/disco.
+        if not self._force_api:
+            self._persist_store(series_id, bde_payload)
         return obs
 
     def preload_from_catalog(self, catalog_path: str) -> None:
