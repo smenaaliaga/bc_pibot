@@ -11,6 +11,18 @@ logger = logging.getLogger(__name__)
 class BDEClient:
     """Cliente para obtener series del BDE directamente desde la API."""
 
+    def __init__(self) -> None:
+        self._session = requests.Session()
+
+    def close(self) -> None:
+        self._session.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
+
     def fetch_series(self, series_id: str) -> List[Dict]:
         """Obtiene serie directamente desde la API del BDE.
 
@@ -70,7 +82,7 @@ class BDEClient:
         """Realiza request a la API del BDE y devuelve el payload crudo."""
         try:
             bde_timeout = int(os.getenv("BDE_TIMEOUT_SEC", "15"))
-            r = requests.get(url, timeout=bde_timeout)
+            r = self._session.get(url, timeout=bde_timeout)
             r.raise_for_status()
             
             if not r.text.strip():

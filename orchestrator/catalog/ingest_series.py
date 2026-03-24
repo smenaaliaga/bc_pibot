@@ -13,11 +13,13 @@ Requiere variables de entorno BDE_USER y BDE_PASS (o archivo .env).
 
 import json
 import logging
+import os
 import re
 import math
 import unicodedata
 import argparse
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -675,13 +677,22 @@ def build_cuadro_output(cuadro_name: str, cuadro_data: Dict, client: BDEClient) 
 
     skip_derived = is_contribution(classification) or is_share(classification)
 
+    max_workers = int(os.getenv("INGEST_MAX_WORKERS", "4"))
     series_outputs = []
-    for i, s_info in enumerate(series_list):
-        sid = s_info.get("id", "")
-        logger.info(f"  [{i+1}/{len(series_list)}] Processing {sid}")
-        result = build_series_output(s_info, client, now_utc, skip_derived=skip_derived)
-        if result:
-            series_outputs.append(result)
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures = {
+            pool.submit(build_series_output, s_info, client, now_utc, skip_derived=skip_derived): idx
+            for idx, s_info in enumerate(series_list)
+        }
+        results_by_idx: Dict[int, Dict] = {}
+        for future in as_completed(futures):
+            idx = futures[future]
+            sid = series_list[idx].get("id", "")
+            logger.info(f"  [{idx+1}/{len(series_list)}] Done {sid}")
+            result = future.result()
+            if result:
+                results_by_idx[idx] = result
+        series_outputs = [results_by_idx[i] for i in sorted(results_by_idx)]
 
     # Determine latest_available per freq
     latest_available = {}
@@ -793,47 +804,49 @@ def split_by_frequency(cuadro_json: dict) -> dict[str, dict]:
 # Programmatic entry point (called from main.py)
 # ---------------------------------------------------------------------------
 
-def run_ingest(catalog_path: str, output_dir: str) -> int:
-    """Ejecuta el ingest completo. Retorna cantidad de cuadros procesados."""
-    catalog_p = Path(catalog_path)
-    output_p = Path(output_dir)
-    output_p.mkdir(parents=True, exist_ok=True)
+def _process_catalog(catalog_path: Path, output_dir: Path) -> int:
+    """Lógica compartida de ingest: lee catálogo, construye JSONs, escribe archivos."""
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-    client = BDEClient()
-
-    logger.info(f"Loading catalog from {catalog_p}")
-    catalog = load_catalog(str(catalog_p))
+    logger.info(f"Loading catalog from {catalog_path}")
+    catalog = load_catalog(str(catalog_path))
     logger.info(f"Catalog has {len(catalog)} cuadros")
 
     encoder = CompactJSONEncoder(indent=2, ensure_ascii=False)
     processed = 0
     skipped = 0
 
-    for cuadro_name, cuadro_data in catalog.items():
-        skip, reason = should_skip_cuadro(cuadro_name, cuadro_data)
-        if skip:
-            logger.info(f"SKIP [{reason}]: {cuadro_name}")
-            skipped += 1
-            continue
+    with BDEClient() as client:
+        for cuadro_name, cuadro_data in catalog.items():
+            skip, reason = should_skip_cuadro(cuadro_name, cuadro_data)
+            if skip:
+                logger.info(f"SKIP [{reason}]: {cuadro_name}")
+                skipped += 1
+                continue
 
-        logger.info(f"PROCESSING: {cuadro_name}")
-        cuadro_json = build_cuadro_output(cuadro_name, cuadro_data, client)
+            logger.info(f"PROCESSING: {cuadro_name}")
+            cuadro_json = build_cuadro_output(cuadro_name, cuadro_data, client)
 
-        slug = slugify(cuadro_name)
-        freq_splits = split_by_frequency(cuadro_json)
-        for freq, freq_json in freq_splits.items():
-            out_path = output_p / f"{slug}_{freq}.json"
-            with open(out_path, "w", encoding="utf-8") as f:
-                f.write(encoder.encode(freq_json))
-                f.write("\n")
+            slug = slugify(cuadro_name)
+            freq_splits = split_by_frequency(cuadro_json)
+            for freq, freq_json in freq_splits.items():
+                out_path = output_dir / f"{slug}_{freq}.json"
+                with open(out_path, "w", encoding="utf-8") as f:
+                    f.write(encoder.encode(freq_json))
+                    f.write("\n")
 
-        freqs = ", ".join(sorted(freq_splits.keys()))
-        n_series = len(cuadro_json["series"])
-        logger.info(f"  -> Saved {slug}_[{freqs}].json ({n_series} series)")
-        processed += 1
+            freqs = ", ".join(sorted(freq_splits.keys()))
+            n_series = len(cuadro_json["series"])
+            logger.info(f"  -> Saved {slug}_[{freqs}].json ({n_series} series)")
+            processed += 1
 
     logger.info(f"Done. Processed: {processed}, Skipped: {skipped}")
     return processed
+
+
+def run_ingest(catalog_path: str, output_dir: str) -> int:
+    """Ejecuta el ingest completo. Retorna cantidad de cuadros procesados."""
+    return _process_catalog(Path(catalog_path), Path(output_dir))
 
 
 # ---------------------------------------------------------------------------
@@ -845,45 +858,7 @@ def main():
     parser.add_argument("--catalog", default="catalog.json", help="Path to catalog.json")
     parser.add_argument("--output", default="output", help="Output directory")
     args = parser.parse_args()
-
-    catalog_path = Path(args.catalog)
-    output_dir = Path(args.output)
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    client = BDEClient()
-
-    logger.info(f"Loading catalog from {catalog_path}")
-    catalog = load_catalog(str(catalog_path))
-    logger.info(f"Catalog has {len(catalog)} cuadros")
-
-    encoder = CompactJSONEncoder(indent=2, ensure_ascii=False)
-    processed = 0
-    skipped = 0
-
-    for cuadro_name, cuadro_data in catalog.items():
-        skip, reason = should_skip_cuadro(cuadro_name, cuadro_data)
-        if skip:
-            logger.info(f"SKIP [{reason}]: {cuadro_name}")
-            skipped += 1
-            continue
-
-        logger.info(f"PROCESSING: {cuadro_name}")
-        cuadro_json = build_cuadro_output(cuadro_name, cuadro_data, client)
-
-        slug = slugify(cuadro_name)
-        freq_splits = split_by_frequency(cuadro_json)
-        for freq, freq_json in freq_splits.items():
-            out_path = output_dir / f"{slug}_{freq}.json"
-            with open(out_path, "w", encoding="utf-8") as f:
-                f.write(encoder.encode(freq_json))
-                f.write("\n")
-
-        freqs = ", ".join(sorted(freq_splits.keys()))
-        n_series = len(cuadro_json["series"])
-        logger.info(f"  -> Saved {slug}_[{freqs}].json ({n_series} series)")
-        processed += 1
-
-    logger.info(f"Done. Processed: {processed}, Skipped: {skipped}")
+    _process_catalog(Path(args.catalog), Path(args.output))
 
 
 if __name__ == "__main__":
