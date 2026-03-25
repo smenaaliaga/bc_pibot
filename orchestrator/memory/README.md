@@ -37,10 +37,7 @@ compatibilidad, pero el grafo ya no los invoca.
 - `DIVERSITY_*` (si usas Response Diversity) sigue funcionando igual.
 
 `session_facts` almacena `macro_cls`, `intent_cls`, `context_cls`, entidades normalizadas y
-`session_payload` (suposiciones o preferencias persistidas) por sesión.
-
-Consulta `docs/README_memory.md` para ver el estado de las migraciones (`session_facts` JSONB) y los
-pasos para ejecutar los scripts en `docker/postgres/migrations`.
+`session_payload` (suposiciones o preferencias persistidas) por sesión.\n\nLas migraciones de esquema (`session_facts` JSONB) se ejecutan desde `docker/postgres/migrations`.
 
 ## Operación y pruebas
 - `MemoryAdapter.get_backend_status()` expone banderas (`using_pg`, `fallback_sessions`, métricas) que puedes
@@ -48,7 +45,7 @@ pasos para ejecutar los scripts en `docker/postgres/migrations`.
 - Tests útiles: `pytest tests/test_memory_adapter.py tests/test_session.py`.
 - El nodo `memory` deduce metadata de gráficos leyendo los markers `##CHART_START/END` en la salida y la adjunta
 	a los turnos más recientes, evitando depender de facts globales.
-- Para validar manualmente, ejecuta `tools/debug_graph_stream.py --no-pg` y revisa que el fallback se
+- Para validar manualmente, ejecuta `tools/debug_graph.py --stream --no-pg` y revisa que el fallback se
   informe correctamente.
 
 ## Documentación relacionada

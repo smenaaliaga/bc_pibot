@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import re
-import unicodedata
 from dataclasses import dataclass
 from typing import Optional, List, Pattern, Tuple
 from difflib import SequenceMatcher
+
+from orchestrator.normalizer._text import strip_accents
 
 
 # =========================
@@ -37,12 +38,6 @@ PIB_ALIASES = [
 # =========================
 # Utilidades de normalización
 # =========================
-
-def strip_accents(s: str) -> str:
-    return "".join(
-        c for c in unicodedata.normalize("NFKD", s)
-        if not unicodedata.combining(c)
-    )
 
 def normalize_text(s: str) -> str:
     """

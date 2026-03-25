@@ -7,7 +7,7 @@ centralizado y emiten chunks en vivo mediante LangGraph Topics + `StreamWriter`.
 - `AgentState`: `TypedDict` con `question`, `history`, `context`,
   `classification`/`intent_info`, `route_decision`, `output` y
   `stream_chunks: Topic[str]` para
-  depurar desde `tools/debug_graph_stream.py`.
+  depurar desde `tools/debug_graph.py --stream`.
 - `_ensure_backends()`: inicializa una sola vez `MemoryAdapter`, `LLMAdapter` y el retriever RAG.
 - `_emit_stream_chunk()`: escribe el fragmento both en el writer recibido y en
   `get_runtime().stream_writer`, habilitando los eventos `custom` consumidos por Streamlit.
@@ -18,7 +18,7 @@ centralizado y emiten chunks en vivo mediante LangGraph Topics + `StreamWriter`.
 | Nodo | Entrada clave | Salida/efecto |
 | --- | --- | --- |
 | `ingest` | `question`, `history` | Normaliza texto, crea `session_id`, obtiene la ventana reciente desde memoria y arma `context`. |
-| `classify` | Estado previo | Llama a `classifier_agent.classify_question_with_history` (JointBERT + normalización) y produce `ClassificationResult` + `history_text`. |
+| `classify` | Estado previo | Llama a `classifier_agent.classify_question_with_history` (endpoint remoto + normalización) y produce `ClassificationResult` + `history_text`. |
 | `intent` | `classification`, historial de entidades | Invoca el IntentRouter (macro/intent/context), rellena entidades faltantes y propone `route_decision`. |
 | `router` | `route_decision` | Fan-out hacia `data`/`rag`/`fallback` y valida follow-ups de gráficos. |
 | `data` / `rag` / `fallback` | Dependiendo de la ruta | Emiten los chunks de cada flujo; `data` y `rag` también adjuntan markers y follow-ups. |
@@ -28,7 +28,7 @@ centralizado y emiten chunks en vivo mediante LangGraph Topics + `StreamWriter`.
 - Los nodos productores llaman `_emit_stream_chunk(chunk, writer)` antes de `yield`; Streamlit recibe
   `{"stream_chunks": "texto"}` en el canal `custom` y lo pinta tal cual llega (sin deduplicación automática).
 - `graph.stream(..., stream_mode=["updates","custom"])` envía tanto cambios de estado como eventos
-  personalizados. Úsalo también en herramientas CLI (`tools/debug_graph_stream.py`).
+  personalizados. Úsalo también en herramientas CLI (`tools/debug_graph.py --stream`).
 - Para nuevos canales, agrega un `Topic` adicional en `AgentState` o incluye claves específicas en el
   diccionario emitido por `_emit_stream_chunk`.
 

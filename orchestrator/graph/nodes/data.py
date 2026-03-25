@@ -20,7 +20,7 @@ from orchestrator.data.response import handle_no_series, stream_data_response
 from ..state import AgentState, _clone_entities, _emit_stream_chunk
 from orchestrator.data._helpers import coerce_period, first_non_empty
 from orchestrator.data._business_rules import ResolvedEntities, apply_business_rules
-from orchestrator.data.catalog_data_search import search_output_payloads
+from orchestrator.catalog.catalog_data_search import search_output_payloads
 from orchestrator.normalizer.routing_utils import INTENT_CONFIDENCE_THRESHOLD
 
 logger = logging.getLogger(__name__)

@@ -1,5 +1,5 @@
 from orchestrator.data._business_rules import ResolvedEntities, apply_business_rules
-from orchestrator.data.catalog_data_search import search_output_payloads
+from orchestrator.catalog.catalog_data_search import search_output_payloads
 
 
 def test_hist_is_one_when_period_is_1996_or_older():

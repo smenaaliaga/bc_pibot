@@ -26,10 +26,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from dotenv import load_dotenv
 
-try:
-    from orchestrator.api.bde_client import BDEClient
-except ImportError:
-    from bde_client import BDEClient
+from orchestrator.api.bde_client import BDEClient
 
 load_dotenv()
 

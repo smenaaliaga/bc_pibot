@@ -13,17 +13,9 @@ from orchestrator.normalizer.normalizer import (
     normalize_entities,
 )
 from orchestrator.utils.http_client import post_json
-from config import PREDICT_URL
-from registry import get_intent_router, get_series_interpreter
+from config import PREDICT_TIMEOUT_SECONDS, PREDICT_URL
 
 logger = logging.getLogger(__name__)
-
-# Timeouts
-PREDICT_TIMEOUT_SECONDS = float(os.getenv("PREDICT_TIMEOUT_SECONDS", "10"))
-
-
-def _use_local_jointbert() -> bool:
-    return os.getenv("USE_JOINTBERT_CLASSIFIER", "false").lower() in {"1", "true", "yes", "on"}
 
 
 # ============================================================
@@ -50,77 +42,6 @@ class ClassificationResult:
     intent_raw: Optional[dict] = None
     predict_raw: Optional[dict] = None
 
-
-# ============================================================
-# SHARED MODEL ACCESSORS
-# ============================================================
-
-def get_router_model(path: Optional[str] = None):
-    """Singleton IntentRouter (cached en registry.py)."""
-    return get_intent_router(path)
-
-
-def get_series_interpreter_model(path: Optional[str] = None):
-    """Singleton SeriesInterpreter (cached en registry.py)."""
-    return get_series_interpreter(path)
-
-
-def load_intent_router(path: Optional[str] = None):
-    """Alias simple para obtener el IntentRouter compartido."""
-    return get_router_model(path)
-
-
-def load_series_interpreter(path: Optional[str] = None):
-    """Alias simple para obtener el SeriesInterpreter compartido."""
-    return get_series_interpreter_model(path)
-
-
-def predict_with_router(query: str) -> Any:
-    """
-    Predice la intención usando el IntentRouter compartido.
-
-    Args:
-        query: Texto a clasificar.
-
-    Returns:
-        Resultado retornado por el IntentRouter.
-    """
-    router = load_intent_router()
-    if router is None:
-        logger.debug("IntentRouter unavailable; returning None")
-        return None
-    return router.predict(query)
-
-
-def predict_with_interpreter(query: str) -> Any:
-    """
-    Predice interpretaciones de series usando el SeriesInterpreter compartido.
-
-    Args:
-        query: Texto a interpretar.
-
-    Returns:
-        Resultado retornado por el SeriesInterpreter.
-    """
-    interpreter = load_series_interpreter()
-    if interpreter is None:
-        logger.debug("SeriesInterpreter unavailable; returning None")
-        return None
-    return interpreter.predict(query)
-
-
-def predict_with_router_and_interpreter(query: str) -> Dict[str, Any]:
-    """Ejecuta predicción usando IntentRouter y SeriesInterpreter con caché global.
-
-    Args:
-        query: Texto a clasificar/interpetar.
-
-    Returns:
-        Dict con llaves `router` y `interpreter` conteniendo las respuestas de cada modelo.
-    """
-    router_out = predict_with_router(query)
-    interpreter_out = predict_with_interpreter(query)
-    return {"router": router_out, "interpreter": interpreter_out}
 
 
 # ============================================================
@@ -174,14 +95,6 @@ def _extract_confidence(value: Any) -> Optional[float]:
     return value if isinstance(value, (int, float)) else None
 
 
-def _coalesce_defined(primary: Any, fallback: Any) -> Any:
-    if primary is None:
-        return fallback
-    if isinstance(primary, str) and not primary.strip():
-        return fallback
-    return primary
-
-
 def _intent_label_from_interpretation(predict_source: Dict[str, Any], key: str) -> Any:
     intents = predict_source.get("intents") if isinstance(predict_source, dict) else {}
     intents = intents if isinstance(intents, dict) else {}
@@ -227,14 +140,8 @@ def _coerce_entities_payload(entities_payload: Any) -> Dict[str, List[str]]:
     return coerced
 
 
-def _classify_with_jointbert(question: str) -> ClassificationResult:
-    """
-    Clasificación usando APIs remotas (o modelo local si está habilitado).
-    Clasificación usando APIs remotas (o modelo local si está habilitado).
-    """
-    if _use_local_jointbert():
-        logger.warning("USE_JOINTBERT_CLASSIFIER enabled but local classifier is unavailable; using API flow")
-
+def _classify_via_endpoint(question: str) -> ClassificationResult:
+    """Clasificación usando el endpoint remoto PREDICT_URL."""
     predict_payload = {"text": question}
     predict_result = post_json(PREDICT_URL, predict_payload, timeout=PREDICT_TIMEOUT_SECONDS)
     logger.debug("[PREDICT_API] response=%s", predict_result)
@@ -356,7 +263,7 @@ def classify_question_with_history(
     t_start = time.perf_counter()
     logger.info("[CLASSIFICATION] Iniciando clasificación de la consulta | question='%s'", question)
     try:
-        classification = _classify_with_jointbert(question)
+        classification = _classify_via_endpoint(question)
     except Exception as exc:
         t_end = time.perf_counter()
         logger.error("[CLASSIFICATION] ERROR al clasificar | time='%s' | error=%s", t_end - t_start, exc)

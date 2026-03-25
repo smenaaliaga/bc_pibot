@@ -26,9 +26,9 @@ LOG_PATH = Path(__file__).resolve().parent / "qa_trace.log"
 GRAPH_NAME = "pibot_trace_graph"
 API_CALL_NOTE = (
     "Este script usa build_graph (mismo flujo que Streamlit). "
-    "La clasificación puede llamar a APIs externas en "
-    "orchestrator/classifier/classifier_agent._classify_with_jointbert() "
-    "(post_json a PREDICT_URL e INTENT_CLASSIFIER_URL) si USE_JOINTBERT_CLASSIFIER=false."
+    "La clasificaci\u00f3n llama al endpoint remoto en "
+    "orchestrator/classifier/classifier_agent._classify_via_endpoint() "
+    "(post_json a PREDICT_URL)."
 )
 
 NODE_DESCRIPTIONS = {
@@ -131,7 +131,6 @@ def run_trace(
     echo_logs: bool = False,
     print_node_io: bool = True,
 ) -> str:
-    os.environ["USE_JOINTBERT_CLASSIFIER"] = "false"
     from orchestrator.graph.agent_graph import build_graph  # noqa: E402
 
     logger = _setup_logger(mode=log_mode, echo_to_console=echo_logs)

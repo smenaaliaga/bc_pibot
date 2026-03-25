@@ -19,7 +19,7 @@ follow-ups coherentes.
 | 3. Fetch | `_get_series_with_retry` arma `firstdate/lastdate`, llama a la API y registra errores con `_record_fetch_error`. | Logs `[DATA_FETCH_*]`, `fetch_error` en contexto. |
 | 4. Tabla + CSV | `_build_year_table` (usa `get_series.build_year_comparison_table_text`), `_export_table_to_csv`, `_emit_csv_download_marker`. | Markers `##CSV_DOWNLOAD_START/END`, ruta a `/logs/exports/*.csv`. |
 | 5. Visualización | `_emit_chart_marker` agrega datos estructurados para la UI (serie, puntos, etiquetas). | Marker `##CHART_START/END`. |
-| 6. Follow-ups | `utils.followups.build_followups` crea hasta tres sugerencias específicas. | Texto Markdown enumerado. |
+| 6. Follow-ups | `graph/suggestions.py` genera hasta tres sugerencias específicas. | Texto Markdown enumerado. |
 
 ## Contrato con la UI
 - `##CSV_DOWNLOAD_START/END` → Streamlit muestra botón de descarga.
@@ -33,7 +33,7 @@ follow-ups coherentes.
   helpers `_load_defaults_for_<dominio>` que reutilicen `_get_series_with_retry`.
 - **Markers adicionales**: respeta el prefijo `##` y encapsula el bloque entre `START/END` para que la UI
   siga siendo backwards-compatible.
-- **Follow-ups a medida**: ajusta `utils/followups.py` o pasa flags adicionales en `_last_data_context`.
+- **Follow-ups a medida**: ajusta `graph/suggestions.py` o pasa flags adicionales en `_last_data_context`.
 - **Errores controlados**: usa `_record_fetch_error` para que el usuario vea qué falló sin inundar logs.
 
 ## Documentación relacionada

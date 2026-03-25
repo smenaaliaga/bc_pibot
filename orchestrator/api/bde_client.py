@@ -1,9 +1,10 @@
 import json
-import os
 import logging
 from typing import List, Dict
 from urllib.parse import urlencode
 import requests
+
+from config import BDE_BASE_URL, BDE_PASS, BDE_TIMEOUT_SEC, BDE_USER
 
 logger = logging.getLogger(__name__)
 
@@ -61,28 +62,23 @@ class BDEClient:
         Returns:
             URL completa con parámetros
         """
-        bde_user = os.getenv("BDE_USER", "")
-        bde_pass = os.getenv("BDE_PASS", "")
-        bde_base_url = os.getenv("BDE_BASE_URL", "https://si3.bcentral.cl/SieteRestWS/SieteRestWS.ashx")
-        
-        if not bde_user or not bde_pass:
+        if not BDE_USER or not BDE_PASS:
             logger.warning("BDE credentials not configured. Set BDE_USER and BDE_PASS in .env")
         
         params = {
-            "user": bde_user,
-            "pass": bde_pass,
+            "user": BDE_USER,
+            "pass": BDE_PASS,
             "function": "GetSeries",
             "timeseries": timeseries_id
         }
         
-        url = f"{bde_base_url}?{urlencode(params)}"
+        url = f"{BDE_BASE_URL}?{urlencode(params)}"
         return url
 
     def _fetch_raw_bde_payload(self, url: str) -> Dict:
         """Realiza request a la API del BDE y devuelve el payload crudo."""
         try:
-            bde_timeout = int(os.getenv("BDE_TIMEOUT_SEC", "15"))
-            r = self._session.get(url, timeout=bde_timeout)
+            r = self._session.get(url, timeout=BDE_TIMEOUT_SEC)
             r.raise_for_status()
             
             if not r.text.strip():

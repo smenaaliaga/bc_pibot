@@ -1,5 +1,4 @@
 import re
-import unicodedata
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Optional, Dict
@@ -7,6 +6,8 @@ from difflib import get_close_matches
 
 import pandas as pd
 import dateparser
+
+from orchestrator.normalizer._text import strip_accents
 
 
 # ---------------------------
@@ -64,12 +65,6 @@ RANGE_QUARTER_MONTHS = {
     3: (7, 9),
     4: (10, 12),
 }
-
-def strip_accents(s: str) -> str:
-    return "".join(
-        c for c in unicodedata.normalize("NFD", s)
-        if unicodedata.category(c) != "Mn"
-    )
 
 def normalize_text(s: str) -> str:
     s = s.lower().strip()

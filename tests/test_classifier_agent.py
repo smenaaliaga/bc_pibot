@@ -19,7 +19,7 @@ def test_predict_raw_uses_interpretation(monkeypatch):
     monkeypatch.setattr(ca, "PREDICT_URL", "predict-url")
     monkeypatch.setattr(ca, "post_json", fake_post_json)
 
-    result = ca._classify_with_jointbert("q")
+    result = ca._classify_via_endpoint("q")
 
     assert result.predict_raw["text"] == predict_response["text"]
     assert result.predict_raw["interpretation"]["text"] == predict_response["interpretation"]["text"]
@@ -49,7 +49,7 @@ def test_macro_zero_from_intent_api_is_not_overwritten_by_routing(monkeypatch):
     monkeypatch.setattr(ca, "PREDICT_URL", "predict-url")
     monkeypatch.setattr(ca, "post_json", fake_post_json)
 
-    result = ca._classify_with_jointbert("q")
+    result = ca._classify_via_endpoint("q")
 
     assert result.macro == 1
     assert result.intent == "value"
@@ -81,7 +81,7 @@ def test_keeps_other_when_intent_api_says_other_even_with_predict_value(monkeypa
     monkeypatch.setattr(ca, "PREDICT_URL", "predict-url")
     monkeypatch.setattr(ca, "post_json", fake_post_json)
 
-    result = ca._classify_with_jointbert("q")
+    result = ca._classify_via_endpoint("q")
 
     assert result.intent == "value"
     assert result.macro == 1
@@ -115,7 +115,7 @@ def test_non_value_intent_keeps_empty_indicator_when_frequency_missing(monkeypat
     monkeypatch.setattr(ca, "PREDICT_URL", "predict-url")
     monkeypatch.setattr(ca, "post_json", fake_post_json)
 
-    result = ca._classify_with_jointbert("q")
+    result = ca._classify_via_endpoint("q")
 
     assert result.intent == "methodology"
     assert result.entities["indicator"] == []
@@ -149,6 +149,6 @@ def test_req_form_point_is_coerced_to_range_when_period_spans_multiple_quarters(
     monkeypatch.setattr(ca, "PREDICT_URL", "predict-url")
     monkeypatch.setattr(ca, "post_json", fake_post_json)
 
-    result = ca._classify_with_jointbert("q")
+    result = ca._classify_via_endpoint("q")
 
     assert result.req_form == "range"

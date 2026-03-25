@@ -46,7 +46,6 @@ def _resolve_ui_logger() -> logging.Logger:
     for lg in candidates:
         if lg and lg.handlers:
             return lg
-    logging.basicConfig(level=logging.INFO)
     return logging.getLogger()
 
 _ui_logger = _resolve_ui_logger()
@@ -375,23 +374,6 @@ def run_app(
         model_sel = st.text_input("Modelo", value=os.getenv("OPENAI_MODEL", "gpt-4.1"))
         temp_sel = st.slider("Temperatura", min_value=0.0, max_value=1.0, value=float(os.getenv("OPENAI_TEMPERATURE", "0") or 0.0), step=0.1)
         
-        st.subheader("Modelo predictor")
-        # Mostrar solo el nombre de la carpeta final del BERT base/tokenizer, sin permitir edición
-        bert_model_full = os.getenv("BERT_MODEL_NAME", "")
-        bert_model_name = os.path.basename(bert_model_full.rstrip("/\\")) if bert_model_full else ""
-        st.text_input("Modelo BERT", value=bert_model_name)
-        # Mostrar solo el nombre de la carpeta final, pero mantener el path completo
-        joint_bert_model_dir_full = os.getenv("JOINT_BERT_MODEL_DIR", "")
-        joint_bert_model_dir_name = os.path.basename(joint_bert_model_dir_full.rstrip("/\\")) if joint_bert_model_dir_full else ""
-        joint_bert_model_dir_name_new = st.text_input("Modelo Joint BERT", value=joint_bert_model_dir_name)
-        # Reconstruir el path completo si el usuario lo cambia
-        if joint_bert_model_dir_name_new != joint_bert_model_dir_name and joint_bert_model_dir_name_new:
-            # Mantener el directorio padre original si existe, si no, usar el valor nuevo tal cual
-            parent_dir = os.path.dirname(joint_bert_model_dir_full) if joint_bert_model_dir_full else "models/pibot_series_interpreter"
-            joint_bert_model_dir = os.path.join(parent_dir, joint_bert_model_dir_name_new)
-        else:
-            joint_bert_model_dir = joint_bert_model_dir_full
-        
         # Aplicar cambios de modelo al entorno para que el predictor los tome
         _env_changed = False
         if model_sel and os.getenv("OPENAI_MODEL") != model_sel:
@@ -400,11 +382,6 @@ def run_app(
         # Persistir temperatura elegida
         if os.getenv("OPENAI_TEMPERATURE") != str(temp_sel):
             os.environ["OPENAI_TEMPERATURE"] = str(temp_sel)
-            _env_changed = True
-        # Tokenizer/base model para JointBERT (solo lectura desde UI)
-        # Directorio del modelo entrenado de JointBERT
-        if joint_bert_model_dir and os.getenv("JOINT_BERT_MODEL_DIR") != joint_bert_model_dir:
-            os.environ["JOINT_BERT_MODEL_DIR"] = joint_bert_model_dir
             _env_changed = True
 
         # --- Panel dinámico: Memoria y clasificación ---------------------

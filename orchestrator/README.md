@@ -64,13 +64,13 @@ flowchart LR
 | `llm/` | `LLMAdapter` y construcción del mensaje de sistema con guardrails. |
 | `rag/` | Fábrica de retrievers para PGVector/FAISS/Chroma. |
 | `memory/` | Adaptadores de memoria conversacional + LangGraph checkpoints (Postgres + fallback). |
-| `utils/` | utilidades compartidas (`pg_logging`, `followups`). |
+| `utils/` | utilidades compartidas (`pg_logging`, `http_client`). |
 
 ## Contrato de streaming
 - `_emit_stream_chunk` envía cada fragmento a `StreamWriter` y al runtime (`custom` event). La UI
    muestra los chunks tal cual llegan y detecta markers (`##CSV_DOWNLOAD_START`, `##CHART_START`).
 - `Topic(str, accumulate=True)` en `AgentState.stream_chunks` conserva el historial para pruebas con
-  `tools/debug_graph_stream.py` o `tools/debug_llm_stream.py`.
+  `tools/debug_graph.py --stream` o `tools/debug_llm.py --stream`.
 - Los nodos pueden adjuntar metadata usando `updates` (estado) para que Streamlit muestre barras de
   progreso o banners reutilizables.
 
@@ -215,7 +215,7 @@ para almacenar la respuesta completa de la API (meta + observaciones + variacion
 Todas las tablas se crean desde docker/postgres/init.sql (docker compose o psql -f).
 
 ## Desarrollo y pruebas
-- `tools/debug_graph_stream.py` y `tools/debug_graph_invoke.py`: validan streaming LangGraph (updates vs
+- `tools/debug_graph.py` y `tools/debug_graph.py --stream`: validan streaming LangGraph (updates vs
   custom) y muestran markers en consola.
 - `tools/test_orch2_chunk.py`: smoke test completo del grafo, útil en CI o tras cambios grandes.
 - `pytest tests/test_orchestrator2.py tests/test_agent_graph_streaming.py`: validan clasificación,

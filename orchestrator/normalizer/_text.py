@@ -9,6 +9,7 @@ Funciones de bajo nivel reutilizadas por todos los submódulos:
 """
 
 import re
+import unicodedata
 from typing import Dict, List, Optional
 from difflib import SequenceMatcher
 
@@ -17,20 +18,20 @@ from orchestrator.normalizer._vocab import GENERIC_INDICATOR_TERMS
 
 # ─── Normalización de texto ────────────────────────────────────────────────────
 
-_ACCENT_MAP = {
-    "á": "a", "é": "e", "í": "i", "ó": "o", "ú": "u",
-    "ü": "u", "ñ": "n",
-}
+
+def strip_accents(s: str) -> str:
+    """Elimina diacríticos unicode (NFD).  Ej: ``'Minería'`` → ``'Mineria'``."""
+    return "".join(
+        c for c in unicodedata.normalize("NFD", s)
+        if unicodedata.category(c) != "Mn"
+    )
 
 
 def normalize_text(text: str) -> str:
     """Convierte a minúsculas y elimina acentos.  Ej: ``'Minería'`` → ``'mineria'``."""
     if not text:
         return ""
-    text = text.lower().strip()
-    for accented, plain in _ACCENT_MAP.items():
-        text = text.replace(accented, plain)
-    return text
+    return strip_accents(text.lower().strip())
 
 
 # ─── Fuzzy matching ────────────────────────────────────────────────────────────

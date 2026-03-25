@@ -1,16 +1,12 @@
 # Clasificación de intents
 
-Aquí convergen las dos capas que definen el rumbo inicial de cada pregunta: clasificación JointBERT y
-heurísticas deterministas. La salida combinada (`ClassificationResult` + `intent_info`) alimenta los
-nodos `classify` e `intent_shortcuts` del grafo.
+Aquí convergen las dos capas que definen el rumbo inicial de cada pregunta: clasificación vía
+endpoint remoto (`PREDICT_URL`) y heurísticas deterministas. La salida combinada
+(`ClassificationResult` + `intent_info`) alimenta los nodos `classify` e `intent` del grafo.
 
 ## Archivos
-- `classifier_agent.py`: punto de entrada. Ejecuta JointBERT (modelo local) + normalización de entidades y
-	construye `intent_info` para el resto del grafo.
-- `intent_classifier.py`: reglas adicionales (regex, palabras clave) para casos comunes (IMACEC, PIB,
-	frecuencia) antes de llamar al LLM.
-- `joint_intent_classifier.py`: clasificador BIO opcional que detecta entidades (indicador, sector,
-	frecuencia) para enriquecer `intent_info`.
+- `classifier_agent.py`: punto de entrada. Llama al endpoint remoto de clasificación (`PREDICT_URL`)
+	y construye `intent_info` para el resto del grafo.
 - `intent_store.py` / `intent_memory.py`: cache ligero por sesión que evita repetir decisiones cuando
 	el usuario hace follow-ups inmediatos.
 

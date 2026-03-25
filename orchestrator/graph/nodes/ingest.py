@@ -59,60 +59,16 @@ _PREVIOUS_ACTIVITY_HINTS = {
 }
 
 
-def _as_dict(value: Any) -> Dict[str, Any]:
-    return value if isinstance(value, dict) else {}
-
-
-def _label(value: Any) -> Any:
-    if isinstance(value, dict):
-        return value.get("label")
-    return value
-
-
-def _is_empty_value(value: Any) -> bool:
-    if value in (None, "", "none", "None", "null", "NULL"):
-        return True
-    if isinstance(value, (list, tuple, set, dict)) and len(value) == 0:
-        return True
-    return False
-
-
-def _first_non_empty(value: Any) -> Any:
-    if isinstance(value, list):
-        for item in value:
-            if not _is_empty_value(item):
-                return item
-        return None
-    return None if _is_empty_value(value) else value
-
-
-def _normalize_intent_label(intent_label: Any) -> str:
-    raw = str(intent_label or "").strip().lower()
-    if raw == "methodology":
-        return "method"
-    return raw
-
-
-def _predict_payload_root(predict_raw: Any) -> Dict[str, Any]:
-    payload = _as_dict(predict_raw)
-    interpretation = payload.get("interpretation")
-    if isinstance(interpretation, dict):
-        return interpretation
-    return payload
-
-
-def _has_explicit_indicator(payload_root: Dict[str, Any]) -> bool:
-    if not isinstance(payload_root, dict):
-        return False
-    entities = _as_dict(payload_root.get("entities"))
-    if not _is_empty_value(entities.get("indicator")):
-        return True
-    slot_tags = payload_root.get("slot_tags")
-    if isinstance(slot_tags, list):
-        for tag in slot_tags:
-            if str(tag or "").strip().lower() == "b-indicator":
-                return True
-    return False
+# Helpers importados de routing_utils (fuente canónica)
+from orchestrator.normalizer.routing_utils import (
+    as_dict as _as_dict,
+    first_non_empty as _first_non_empty,
+    is_empty_value as _is_empty_value,
+    label as _label,
+    normalize_intent_label as _normalize_intent_label,
+    predict_payload_root as _predict_payload_root,
+    has_explicit_indicator as _has_explicit_indicator,
+)
 
 
 def _extract_previous_turn_payload(

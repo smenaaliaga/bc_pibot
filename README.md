@@ -7,7 +7,7 @@ combinando datos oficiales, RAG con documentos internos y memoria conversacional
 ### Requisitos
 - Python 3.12 administrado con [`uv`](https://astral.sh/uv)
 - Cuenta BCCh (`BCCH_USER`, `BCCH_PASS`) con acceso a las APIs oficiales
-- Credenciales de OpenAI (`OPENAI_API_KEY`) y servicios opcionales (Postgres, Redis, Azure AI Search)
+- Credenciales de OpenAI (`OPENAI_API_KEY`) y servicios opcionales (Postgres, Redis)
 
 ### Instala dependencias
 
@@ -17,50 +17,39 @@ pip install uv
 
 uv python install 3.12
 uv sync
-# (Opcional) activar entorno
-.\.venv\Scripts\activate   # Windows
-# source .venv/bin/activate  # macOS/Linux
+```
+
+### Activar entorno
+
+```bash
+# macOS/Linux
+source .venv/bin/activate
+
+# Windows
+.\.venv\Scripts\activate
 ```
 
 **Dependencias clave incluidas:**
-- `transformers`, `pytorch-crf` - Para clasificación JointBERT de intenciones y entidades
-- `langchain`, `langgraph` - Orquestación de agentes
-- `streamlit` - Interface de usuario
-- `torch` - Deep learning (CPU por defecto)
+- `langchain`, `langgraph` — Orquestación de agentes
+- `streamlit` — Interfaz de usuario
 
 ### Variables de entorno mínimas
 
-Copia `.env.example` a `.env` y configura:
-
-```bash
-cp .env.example .env
-```
-
-Edita `.env` y configura al menos `OPENAI_API_KEY`.
-
-**Verifica tu instalación:**
-```bash
-python verify_setup.py
-```
-
-Este script comprueba:
-- ✓ Versión de Python correcta
-- ✓ Dependencias instaladas
-- ✓ Variables de entorno configuradas
-- ✓ Archivos del modelo JointBERT
-- ✓ Carga correcta del modelo
+Crea un archivo `.env` en la raíz del proyecto y configura al menos `OPENAI_API_KEY`.
 
 | Variable | Descripción | Requerido |
 | --- | --- | --- |
-| `OPENAI_API_KEY`, `OPENAI_MODEL` | Modelo y clave usados por `LLMAdapter` | ✓ Sí |
-| `BCCH_USER`, `BCCH_PASS` | Credenciales para `get_series.py` | ✓ Sí |
-| `PREDICT_URL` | Endpoint para clasificación `/predict` (check bc_pibot_models_api) | ✓ Sí |
-| `INTENT_CLASSIFIER_URL` | Endpoint para clasificación `/intent` (Docker expone intent-api en `http://localhost:8100`) | ✓ Sí |
-| `USE_AGENT_GRAPH=1` | Habilita el grafo LangGraph en `main.py` | ✓ Sí |
-| `PG_DSN`, `REQUIRE_PG_MEMORY` | Configuran memoria conversacional y checkpoints | ✓ Sí |
-| `REDIS_URL`, `USE_REDIS_CACHE` | Cache para consultas BCCh | ✓ Sí |
-| `RAG_ENABLED`, `RAG_BACKEND`, `RAG_PGVECTOR_URL` | Activa el retriever metodológico | ✓ Sí |
+| `OPENAI_API_KEY`, `OPENAI_MODEL` | Modelo y clave usados por `LLMAdapter` | ✓ |
+| `BCCH_USER`, `BCCH_PASS` | Credenciales para la API de series BCCh | ✓ |
+| `PREDICT_URL` | Endpoint remoto de clasificación `/predict` | ✓ |
+| `PG_DSN`, `REQUIRE_PG_MEMORY` | Memoria conversacional y checkpoints (Postgres) | ✓ |
+| `REDIS_URL`, `USE_REDIS_CACHE` | Cache para consultas BCCh | Recomendado |
+| `RAG_ENABLED`, `RAG_BACKEND`, `RAG_PGVECTOR_URL` | Retriever metodológico | Recomendado |
+| `BDE_USER`, `BDE_PASS`, `BDE_BASE_URL` | Endpoint BDE (default: usa BCCH_*) | Opcional |
+| `PREDICT_HEALTHCHECK_ON_START` | Health-check del modelo al arrancar (default: `1`) | ✓ |
+| `INGEST_ON_START` | Pre-computa métricas derivadas al arrancar (default: `0`) | Opcional |
 
+Todas las variables se centralizan en `config.py` (módulo + dataclass `Settings`).
 
 ### Ejecuta la aplicación
 ```bash
@@ -68,20 +57,35 @@ uv run streamlit run main.py
 ```
 
 Al iniciar, el sistema automáticamente:
-1. ✅ Inicializa el grafo LangGraph
-2. ✅ Prepara la memoria conversacional
-3. ✅ Abre la interfaz web en `http://localhost:8501`
-
-El entrypoint `main.py` prepara logging + configuración, invoca el grafo desde `orchestrator/` y la UI
-se renderiza desde `app.py`.
+1. Configura logging (archivo en `logs/` + consola)
+2. Verifica health del modelo remoto (`PREDICT_URL/health`)
+3. Construye el grafo LangGraph (`orchestrator/graph/agent_graph.py:build_graph`)
+4. Abre la interfaz web en `http://localhost:8501`
 
 ## Arquitectura
-- `main.py` crea `AppConfig`, inicializa memoria/checkpoints y transmite el grafo LangGraph con
-	`stream_mode=["updates","custom"]`.
-- `app.py` consume los eventos del grafo y muestra chunks, tablas CSV/CHART y follow-ups.
-- `orchestrator/` contiene el grafo (`graph/agent_graph.py`), clasificadores/intents, ruteo, flujo de
-	datos BCCh, RAG factory, prompts compartidos y memoria.
-- `get_series.py` abstrae las llamadas a la API de series del BCCh con cache Redis y helpers de reprocesamiento.
+
+### Archivos raíz
+| Archivo | Rol |
+| --- | --- |
+| `main.py` | Entry-point: logging, health-check, grafo, Streamlit |
+| `app.py` | UI Streamlit: consume stream del grafo, muestra chunks/tablas/charts |
+| `config.py` | Configuración centralizada (`Settings`, constantes de entorno) |
+
+### Orquestador (`orchestrator/`)
+| Módulo | Responsabilidad |
+| --- | --- |
+| `graph/` | Grafo LangGraph: `agent_graph.py`, nodos (`ingest`, `classify`, `intent`, `data`, `llm`, `memory`), estado, suggestions |
+| `classifier/` | Clasificación vía endpoint remoto (`PREDICT_URL`) + intent store/memory |
+| `normalizer/` | NER: normalización de entidades, períodos, texto, vocabularios, reglas de follow-up |
+| `data/` | Fetch de series BCCh, business rules, response streaming, helpers |
+| `llm/` | Adaptador LLM (OpenAI), system prompt |
+| `rag/` | Fábrica de retrievers (PGVector/FAISS/Chroma) |
+| `memory/` | Adaptador de memoria conversacional + LangGraph checkpoints (Postgres + fallback) |
+| `catalog/` | Catálogo de series, búsqueda e ingest |
+| `api/` | Cliente BDE (API de series BCCh) |
+| `utils/` | Helpers compartidos: `pg_logging`, `http_client`, `period_normalizer`, `indicator_normalizer` |
+
+### Flujo del grafo
 
 ```mermaid
 flowchart LR
@@ -91,7 +95,7 @@ flowchart LR
     subgraph LangGraph: Orquestador de grafo
         IN[ingest]
         CL[classify]
-        IS[intent_shortcuts]
+        IS[intent]
         RT{route}
         DT[data]
         RG[rag]
@@ -133,36 +137,47 @@ Consulta `docker/README.md` para conocer volúmenes, migraciones y reinicios.
 
 ## Esquema de almacenamiento (Postgres/Redis)
 - **Postgres**: memoria conversacional (`session_facts`, `session_turns`), checkpoints LangGraph y
-    embeddings (`series_embeddings` en db/pgvector.sql).
+    embeddings (`series_embeddings`).
 - **Redis**: cache de series BCCh con claves tipo
     `bcch:series:{series_id}:{firstdate}:{lastdate}:{frequency}:{agg}`.
 
-Para crear tablas de memoria manualmente, aplica el script de esquema:
-`psql -f docker/postgres/init.sql` (o levanta el contenedor Postgres, que lo ejecuta al inicio).
+Para crear tablas manualmente: `psql -f docker/postgres/init.sql`
+(o levanta el contenedor Postgres, que lo ejecuta al inicio).
 
-Detalles completos y ER diagram en [orchestrator/README.md](orchestrator/README.md).
+ER diagram completo en [orchestrator/README.md](orchestrator/README.md).
 
 ## Flujo de datos + RAG
-1. **Series BCCh**: `get_series.py` usa las credenciales BCCh y opcionalmente Redis; la metadata de
-	 apoyo se carga con `tools/load_series_metadata.py`, que pobla la tabla `series_metadata` usada por
-	 `series/series_index.py`.
-2. **RAG metodológico**: `rag.py` provee ABIs para PGVector, FAISS o Azure AI Search. Ejecuta
-	 `docker/postgres/load_txt_rag.py` para indexar documentos usando embebidos OpenAI. El script acepta
-	 banderas como `--manifest manifest.json`, `--purge-mode staged`, `--eval-report report.json` para
-	 controlar ingestas incrementales.
-3. **Memoria**: `memory/MemoryAdapter` lee/escribe `session_facts` y checkpoints en Postgres; ver
-	 `docs/README_memory.md` para migraciones recientes.
+1. **Series BCCh**: `orchestrator/data/get_data_serie.py` usa las credenciales BCCh y opcionalmente Redis.
+   La metadata de apoyo se carga con `tools/load_series_metadata.py` (tabla `series_metadata`).
+2. **RAG metodológico**: `orchestrator/rag/rag_factory.py` provee retrievers para PGVector, FAISS o
+    Chroma. Ejecuta `docker/postgres/load_txt_rag.py` para indexar documentos usando embeddings
+   OpenAI. El script acepta banderas como `--manifest`, `--purge-mode staged`, `--eval-report`.
+3. **Memoria**: `orchestrator/memory/memory_adapter.py` lee/escribe `session_facts` y checkpoints en Postgres.
 
-## Flujo de trabajo para desarrolladores
-- **Debug de streaming**: `tools/debug_graph_stream.py`, `tools/debug_llm_stream.py`.
-- **CLI headless**: `tools/tmp_langgraph_test.py`, `tools/test_orch2_chunk.py`.
-- **Pruebas**: `uv run pytest tests/` (ver `tests/README.md` para atajos como `tools/run_small_tests.py`).
-- **Registro de prompts/planes**: `plan_agents/*.prompt.md` describe mejoras pendientes (phase2 prompt,
-	dedupe de chunks, etc.).
+## Herramientas para desarrolladores
+
+| Herramienta | Uso |
+| --- | --- |
+| `tools/debug_graph.py` | Debug del grafo (invoke por defecto; `--stream` para streaming) |
+| `tools/debug_llm.py` | Debug del LLM (`--stream` para streaming) |
+| `tools/debug_data_response_stream.py` | Debug del pipeline de datos |
+| `tools/test_bcch_connectivity.py` | Verifica conectividad con la API BCCh |
+| `tools/warm_redis_cache.py` | Pre-calienta cache Redis con series |
+| `tools/load_series_metadata.py` | Carga metadata de series a Postgres |
+| `tools/run_small_tests.py` | Runner rápido de tests seleccionados |
+| `tools/extract_questions.py` | Extrae preguntas desde logs |
+| `tools/clean.py` | Limpieza de texto para documentos RAG |
+
+### Tests
+```bash
+uv run pytest tests/ -v
+```
+
+Ver `tests/README.md` para convenciones y atajos.
 
 ## Documentación relacionada
-- `orchestrator/README.md`: detalle del grafo, intents y configuración.
-- `docs/README_memory.md`: esquema y migraciones de memoria.
-- `docker/README.md`: stack local (Postgres, Redis) y loaders.
-- `tests/README.md`: convención de pruebas.
-- `plan_agents/`: hojas de ruta activas.
+- [orchestrator/README.md](orchestrator/README.md) — Grafo, intents, almacenamiento, diagramas ER
+- [docker/README.md](docker/README.md) — Stack local (Postgres, Redis) y loaders
+- [tests/README.md](tests/README.md) — Convención de pruebas
+- [docs/BUSINESS_RULES_README.md](docs/BUSINESS_RULES_README.md) — Reglas de negocio
+- [docs/FOLLOWUP_SUGGESTIONS.md](docs/FOLLOWUP_SUGGESTIONS.md) — Sistema de sugerencias

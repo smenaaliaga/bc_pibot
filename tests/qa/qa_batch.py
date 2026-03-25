@@ -93,8 +93,6 @@ def _run_trace_silent(question: str) -> tuple[str, str]:
     sink_out = io.StringIO()
     sink_err = io.StringIO()
     with redirect_stdout(sink_out), redirect_stderr(sink_err):
-        os.environ["USE_JOINTBERT_CLASSIFIER"] = "false"
-
         from orchestrator.graph.agent_graph import build_graph  # type: ignore
 
         formatter: Callable[[Any], str] | None = None

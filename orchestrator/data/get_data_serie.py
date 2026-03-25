@@ -81,6 +81,7 @@ except Exception:
             return logger
         numeric_level = getattr(logging, level.upper(), logging.INFO)
         logger.setLevel(numeric_level)
+        logger.propagate = False
         root = _os.path.abspath(_os.path.dirname(__file__))
         log_dir = _os.path.join(root, "logs")
         _os.makedirs(log_dir, exist_ok=True)

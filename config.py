@@ -20,27 +20,37 @@ BCCH_USER: str = os.getenv("BCCH_USER", "")
 BCCH_PASS: str = os.getenv("BCCH_PASS", "")
 REDIS_URL: Optional[str] = os.getenv("REDIS_URL")
 
-# Modelo JointBERT para clasificación de intenciones
-JOINT_BERT_MODEL_DIR: str = os.getenv(
-    "JOINT_BERT_MODEL_DIR",
-    "models/pibot_series_interpreter/pibot-jointbert",
-)
-
 # Endpoints de clasificación remota
 PREDICT_URL: str = os.getenv(
     "PREDICT_URL",
     "http://localhost:8000/predict",
 )
-INTENT_API_BASE_URL: str = os.getenv(
-    "INTENT_API_BASE_URL"
-)
-INTENT_CLASSIFIER_URL: str = os.getenv(
-    "INTENT_CLASSIFIER_URL",
-)
+PREDICT_TIMEOUT_SECONDS: float = float(os.getenv("PREDICT_TIMEOUT_SECONDS", "10"))
 
-# Controla si se exponen enlaces de API con credenciales en texto plano en los logs.
-# Por defecto ACTIVADO en este entorno protegido; puedes desactivarlo con LOG_EXPOSE_API_LINKS=0
-LOG_EXPOSE_API_LINKS: bool = os.getenv("LOG_EXPOSE_API_LINKS", "1").lower() in ("1", "true", "yes")
+# Conexión al endpoint BDE
+BDE_USER: str = os.getenv("BDE_USER", BCCH_USER)
+BDE_PASS: str = os.getenv("BDE_PASS", BCCH_PASS)
+BDE_BASE_URL: str = os.getenv(
+    "BDE_BASE_URL",
+    "https://si3.bcentral.cl/SieteRestWS/SieteRestWS.ashx",
+)
+BDE_TIMEOUT_SEC: int = int(os.getenv("BDE_TIMEOUT_SEC", "15"))
+
+# Flags de arranque y streaming
+PREDICT_HEALTHCHECK_ON_START: bool = os.getenv(
+    "PREDICT_HEALTHCHECK_ON_START", "1"
+).lower() in {"1", "true", "yes", "on"}
+PREDICT_HEALTH_TIMEOUT_SECONDS: float = float(
+    os.getenv("PREDICT_HEALTH_TIMEOUT_SECONDS", "5")
+)
+INGEST_ON_START: bool = os.getenv(
+    "INGEST_ON_START", "0"
+).lower() in {"1", "true", "yes", "on"}
+
+STREAM_CHUNK_LOGS: bool = os.getenv(
+    "STREAM_CHUNK_LOGS", "0"
+).lower() in {"1", "true", "yes", "on"}
+LANGGRAPH_CHECKPOINT_NS: str = os.getenv("LANGGRAPH_CHECKPOINT_NS", "memory")
 
 
 @dataclass
@@ -49,16 +59,14 @@ class Settings:
 
     openai_api_key: str
     openai_model: str = "gpt-4o-mini"
-    openai_embeddings_model: str = "text-embedding-3-large"  # puede sobreescribirse con OPENAI_EMBEDDINGS_MODEL
+    openai_embeddings_model: str = "text-embedding-3-large" 
     bot_name: str = "PIBot"
     welcome_message: Optional[str] = None
     debug: bool = False
     pg_dsn: Optional[str] = None  # se rellena desde PG_DSN / DATABASE_URL si existen
 
     # Parámetros de comportamiento del frontend
-    show_suggestions: bool = False
     history_length: int = 5
-    summarize_old_history: bool = False
     min_time_between_requests: float = 3.0  # segundos
 
 

@@ -31,7 +31,7 @@ cambios de backend.
 ## Validación
 - `pytest tests/test_llm_adapter_modes.py`
 - `tests/test_agent_graph_streaming.py` para asegurarse de que los chunks lleguen correctamente.
-- `tools/debug_llm_stream.py` permite inspeccionar en consola cómo se emiten los eventos `custom`.
+- `tools/debug_llm.py --stream` permite inspeccionar en consola cómo se emiten los eventos `custom`.
 
 ## Documentación relacionada
 - [README del orquestador](../README.md)
