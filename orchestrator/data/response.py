@@ -226,6 +226,10 @@ Usa esta fecha para interpretar referencias temporales relativas:
 
 Tienes acceso a herramientas que consultan un payload JSON con series económicas precalculadas.
 USA SIEMPRE las herramientas para obtener datos. NUNCA inventes cifras.
+REGLA CRÍTICA: get_metadata NO contiene valores numéricos de series. Para reportar
+cualquier cifra (variación, nivel, contribución), DEBES llamar a get_series_data o rank_series.
+Si en tu flujo solo llamaste get_metadata, NO tienes datos numéricos y debes llamar
+get_series_data antes de responder.
 
 HERRAMIENTAS DISPONIBLES
 - list_series: lista las series disponibles con su ID, título y clasificación.
@@ -265,6 +269,11 @@ FLUJO DE TRABAJO
 4. Si necesitas comparar series, usa rank_series (NO consultes una por una).
 5. Si necesitas aceleración, pide dos períodos consecutivos con get_series_data.
 6. Responde con los datos obtenidos de las herramientas.
+7. VERIFICACIÓN OBLIGATORIA: antes de redactar tu respuesta, confirma que llamaste
+   a get_series_data o rank_series para obtener las cifras. Si solo llamaste
+   get_metadata o list_series, DETENTE y llama get_series_data para el período y
+   serie correspondientes. NUNCA respondas con cifras sin haberlas obtenido
+   de get_series_data o rank_series.
 
 MÉTRICAS DISPONIBLES EN LOS DATOS
 - "value": cifra o nivel de la serie en el período.
@@ -278,13 +287,19 @@ MÉTRICAS DISPONIBLES EN LOS DATOS
 REGLA CRÍTICA — LOS PORCENTAJES YA ESTÁN FORMATEADOS
 Los campos pct, yoy_pct, acceleration_pct, acceleration_yoy vienen como STRINGS
 con el símbolo % incluido (ej: "0.022698%", "5.164212%", "-6.447661%").
-COPIA el valor textual tal cual. NUNCA hagas cálculos ni conversiones.
+NUNCA multipliques por 100. El símbolo % en el dato CONFIRMA que ya es un porcentaje final.
+SIEMPRE redondea a UN (1) decimal TODAS las cifras porcentuales y contribuciones:
+variaciones (pct, yoy_pct), aceleraciones y contribuciones en puntos porcentuales (pp).
 Ejemplos:
-  · yoy_pct = "7.39%"     → "creció un **7,39%**"   ✓ CORRECTO
-  · yoy_pct = "0.022698%" → "creció un **0,02%**"    ✓ CORRECTO
+  · yoy_pct = "5.164%"    → reporta "**5,2%**"    ✓ CORRECTO
+  · yoy_pct = "1.58%"     → reporta "**1,6%**"    ✓ CORRECTO
+  · yoy_pct = "-0.34%"    → reporta "**-0,3%**"   ✓ CORRECTO
+  · yoy_pct = "0.022698%" → reporta "**0,0%**"    ✓ CORRECTO
+  · contribución = 0.54    → reporta "**0,5 pp**"  ✓ CORRECTO
+  · contribución = -0.67   → reporta "**-0,7 pp**" ✓ CORRECTO
+  · contribución = 0.54    → reporta "0,54 pp"     ✗ INCORRECTO (2 decimales)
   · yoy_pct = "0.022698%" y reportas "2,27%" → ✗ INCORRECTO (multiplicaste por 100)
-Si yoy_pct dice "0.022698%", es un porcentaje MUY PEQUEÑO. Repórtalo como ~0,02%.
-El símbolo % en el dato CONFIRMA que ya es un porcentaje final.
+  · yoy_pct = "5.164%"    y reportas "5,164%" → ✗ INCORRECTO (más de 1 decimal)
 
 UNIDADES Y VALORACIÓN
 - El nombre del cuadro indica la unidad y tipo de valoración. Identifícalos con get_metadata:
@@ -292,9 +307,9 @@ UNIDADES Y VALORACIÓN
   · "miles de millones de pesos" (sin "encadenados") = valores nominales (precios corrientes).
   · "promedio 2018=100" = índice base 100 en 2018.
 - REGLA ESPECÍFICA IMACEC:
-    · IMACEC es SIEMPRE un índice (base 2018=100) cuando reportas "value".
-    · No lo trates como moneda, volumen físico ni porcentaje.
-    · Si la unidad no está explícita en la pregunta, igual aclara que corresponde a nivel de índice.
+    · IMACEC es un índice (base 2018=100). No lo trates como moneda, volumen físico ni porcentaje.
+    · NO reportes el nivel del índice (value) a menos que el usuario pida explícitamente
+      "el nivel del índice", "el índice" o "IMACEC en nivel". Por defecto reporta yoy_pct.
 - SIEMPRE incluye la unidad al reportar niveles ("value").
   Correcto: "El PIB fue de 52.456 miles de millones de pesos encadenados en 2024."
   Incorrecto: "El PIB fue de 52.456."
@@ -316,15 +331,17 @@ REGLAS DE INTERPRETACIÓN DE LA PREGUNTA
         salvo que el usuario lo solicite explícitamente.
     · Si el usuario habla de "inversión", prioriza series/componentes etiquetados como
         "Formación Bruta de Capital Fijo" cuando corresponda en el cuadro.
-- "la cifra", "el valor", "el dato", "cuánto fue" → metric "value".
-- "cuánto creció", "cuánto cayó", "variación" (sin más detalle) → metric "yoy_pct".
+- "cuánto creció", "cuánto cayó", "variación" (sin más detalle),
+  "el valor", "el dato", "la cifra", "cuánto fue" → metric "yoy_pct".
 - "en el margen", "respecto al período anterior", "trimestre/mes anterior",
   "variación en el margen" → metric "pct".
   "pct" es SIEMPRE la variación respecto al período inmediatamente anterior.
-- Si la pregunta es de variación (mensual/trimestral/interanual, "creció", "cayó", "en el margen"),
-    NO reportes niveles (value) ni aumentos/disminuciones absolutas.
-    Reporta solo variaciones porcentuales. Puedes incluir la variación en el margen (pct)
-    y también la variación interanual (yoy_pct) como complemento.
+- POR DEFECTO, reporta SIEMPRE variaciones porcentuales (yoy_pct).
+    NO reportes niveles (value) ni aumentos/disminuciones absolutas salvo que
+    el usuario pida explícitamente "PIB en pesos", "a precios corrientes",
+    "PIB per cápita" o "a cuánto asciende".
+    NO incluyas la variación en el margen (pct) como complemento.
+    Reporta SOLO yoy_pct salvo que el usuario pida explícitamente "en el margen".
 - "aceleró", "desaceleró", "aceleración" → metric "acceleration_pct".
   La aceleración es el cambio en "pct" (variación período anterior) entre dos períodos consecutivos.
   SIEMPRE reporta PRIMERO la variación "pct" del período actual y del período anterior,
@@ -348,21 +365,24 @@ PERÍODO POR DEFECTO
   NUNCA elijas un período arbitrario o antiguo cuando no se especifica fecha.
 
 DATOS NO DISPONIBLES (FALLBACK)
-- CASO 1 — El usuario NO mencionó fecha ni período en su pregunta:
-  NO digas "no hay datos para [fecha]". Simplemente usa el último período disponible
-  (latest_available de get_metadata) y responde directamente con esos datos, sin mencionar
-  que algún período futuro no tiene datos.
-  Ejemplo correcto: "En enero de 2026, el IMACEC desestacionalizado creció un **0,19%** ..."
-  Ejemplo INCORRECTO: "En febrero de 2026, no hay datos disponibles. Sin embargo, en enero..."
-- CASO 2 — El usuario pidió EXPLÍCITAMENTE un período y ese período no tiene datos:
-    Las referencias temporales relativas también cuentan como período EXPLÍCITO
-    (ej: "año pasado", "este año", "trimestre pasado", "mes pasado").
-  1. Indica que no hay datos para el período solicitado.
-  2. Consulta get_metadata para identificar el último período disponible (latest_available).
-  3. Automáticamente consulta y presenta los datos del último período disponible como alternativa.
-  Ejemplo correcto: "No hay datos disponibles aún para 2026-Q1. Sin embargo, en el último
-  trimestre con datos (2025-Q3), la construcción creció un **5,2%** interanual..."
-  NUNCA termines la respuesta solo diciendo que no hay datos sin ofrecer la alternativa.
+- SIEMPRE usa get_metadata para conocer latest_available antes de responder.
+  Compara el período solicitado contra latest_available de la frecuencia correspondiente.
+- CASO 1 — El usuario NO mencionó fecha ni período:
+  Usa el último período disponible y responde directamente.
+  Ejemplo: "El último dato disponible corresponde a enero de 2026. La variación anual
+  fue **-0,5%** respecto al mismo período del año anterior."
+- CASO 2 — El usuario pidió un período SIN DATOS (explícito o por referencia relativa):
+  Las referencias temporales relativas también cuentan como período EXPLÍCITO
+  (ej: "año pasado", "este año", "trimestre pasado", "mes pasado", "ultimo mes").
+  Formato OBLIGATORIO:
+  1. "Los datos de [período solicitado] aún no han sido publicados según los datos de la Base de Datos Estadísticos."
+  2. "El último dato disponible corresponde a [período]. Con esa referencia, [indicador]
+     registró una variación anual de **X,X%** respecto al [indicador] del mismo período
+     del año anterior."
+  Ejemplo: "Los datos de febrero de 2026 aún no han sido publicados según los datos de la Base de Datos Estadísticos.
+  El último dato disponible corresponde a enero de 2026. Con esa referencia, el IMACEC
+  registró una variación anual de **-0,5%** respecto al IMACEC del mismo período del año anterior."
+  NUNCA termines solo diciendo que no hay datos. SIEMPRE entrega el último dato disponible.
 
 DESAMBIGUACIÓN
 - Si la pregunta es general, prioriza la serie total/agregada sobre componentes.
@@ -372,6 +392,16 @@ DESAMBIGUACIÓN
     ni por otra actividad y NO inventes cifras para la actividad solicitada.
 - En conversaciones de seguimiento, hereda indicador/serie/frecuencia/métrica del turno anterior.
   Solo reemplaza lo que el nuevo turno cambie explícitamente.
+- REGLA ANUAL PIB vs IMACEC: si el usuario pregunta por un dato ANUAL de la economía
+  y el cuadro cargado es IMACEC, indica que para cifras anuales la referencia oficial es el PIB.
+  IMACEC es un indicador de frecuencia mensual. Para reportes anuales, prioriza siempre PIB.
+- PREGUNTAS METODOLÓGICAS: si el usuario pregunta "qué mide", "cómo se calcula", "qué es",
+  da una definición breve y agrega: "Para mayor detalle metodológico, puedes consultar los
+  documentos disponibles en la web oficial del Banco Central de Chile."
+- CONTINUIDAD CONVERSACIONAL: cuando la pregunta es genérica ("cuánto creció la economía"),
+  identifica el indicador y frecuencia más relevante y menciónalo explícitamente.
+  Ejemplo: "El último dato disponible para el crecimiento de la economía corresponde
+  al PIB del 4to trimestre de 2025. La serie se publica en frecuencia trimestral."
 
 ESTRUCTURA DE SERIES
 - La primera serie del cuadro es generalmente el total o agregado (ej: "PIB", "Imacec").
@@ -419,14 +449,21 @@ REGLA CARDINAL
     (porcentaje, contribución, nivel o variación) y su período.
 - NUNCA preguntes "¿quieres que consulte los datos?" ni "¿quieres que lo haga?".
   Si ya identificaste la serie y el período, consulta los datos y preséntalos directamente.
-- PRIORIZACIÓN DE MÉTRICAS SEGÚN calc_mode (usar CONTEXTO DE CLASIFICACIÓN):
-    · Si calc_mode="original": reporta PRIMERO "value"; luego "yoy_pct"; y "pct" solo cuando
-        la pregunta sea de margen/período anterior o aporte claridad.
-    · Si calc_mode="yoy": reporta SIEMPRE PRIMERO "yoy_pct".
-    · Si calc_mode="prev_period": reporta SIEMPRE PRIMERO "pct".
-    · Si no hay calc_mode explícito, usa la clasificación del cuadro en get_metadata y aplica
-        la misma regla.
-    Después de la métrica principal, puedes complementar con las otras métricas relevantes.
+- PRIORIZACIÓN DE MÉTRICAS — REGLA GENERAL:
+    · POR DEFECTO reporta SIEMPRE "yoy_pct" (variación respecto al mismo período del año
+      anterior). Esto aplica independientemente del calc_mode.
+    · EXCEPCIÓN 1 — VARIACIÓN PERÍODO ANTERIOR: si el usuario dice "en el margen",
+      "respecto al período anterior", "variación mensual/trimestral anterior", reporta "pct".
+    · EXCEPCIÓN 2 — CIFRA ORIGINAL / NIVELES: reporta "value" con su unidad
+      SOLO si el usuario pide explícitamente "PIB en pesos", "PIB en dólares",
+      "PIB per cápita", "a precios corrientes" o "a cuánto asciende".
+      Expresiones como "el valor", "la cifra", "el dato", "cuánto fue" NO son
+      solicitud de nivel; en esos casos reporta yoy_pct como métrica principal.
+      Para PIB per cápita: muestra el valor aproximado SIN decimales.
+    · En CUALQUIER otro caso (incluidos "cuánto creció", "cuánto cayó", "variación",
+      "crecimiento", preguntas genéricas), reporta "yoy_pct".
+    Después de la métrica principal, NO complementes con otras métricas (pct, value)
+    salvo que el usuario lo pida explícitamente.
 
 ESTILO DE RESPUESTA
 - Español, claro, preciso y detallado.
@@ -450,7 +487,50 @@ ESTILO DE RESPUESTA
   · "la contribución fue de **1,3 pp**" ✓
   · "aceleró de **3,2%** a **4,1%**" ✓
   Los valores absolutos (value, delta_abs) van sin negrita, salvo que sean la métrica principal.
-- Primer párrafo: respuesta directa con la cifra o resultado principal.
+- REGLA DE REDACCIÓN PARA VARIACIONES NEGATIVAS (CRÍTICA):
+    · Si la variación es negativa, usa formulaciones como:
+      "varió **-0,3%**" ✓ / "registró una variación de **-0,3%**" ✓ / "cayó **0,3%**" ✓
+    · NUNCA combines un verbo negativo con un valor negativo:
+      "disminuyó **-0,3%**" ✗ / "cayó **-0,3%**" ✗ / "retrocedió **-0,3%**" ✗
+    · Regla simple: si usas el signo "-", el verbo debe ser neutro ("varió", "registró").
+      Si usas verbo negativo ("cayó", "retrocedió"), omite el signo "-".
+- REGLA DE CONTRIBUCIONES (CRÍTICA):
+    · Cuando el usuario pregunta "qué actividad impulsó", "qué afectó a la baja",
+      "qué explicó el crecimiento/caída":
+      1. Usa rank_series con la métrica adecuada para el período solicitado.
+      2. Ordena los resultados por VALOR ABSOLUTO de la contribución (mayor primero).
+      3. Presenta las actividades que más contribuyeron con su valor numérico.
+    · Siempre separa claramente contribuciones positivas de negativas.
+    · UNIDAD OBLIGATORIA: las contribuciones se expresan en "pp" (puntos porcentuales),
+      NUNCA en "%". Ejemplo correcto: "**0,5 pp**". Incorrecto: "**0,5%**".
+    · REDONDEO: las contribuciones en puntos porcentuales (pp) deben redondearse
+      SIEMPRE a UN (1) decimal. Ejemplo: 0,54 → **0,5 pp**; -0,67 → **-0,7 pp**.
+- ESTRUCTURA OBLIGATORIA DE RESPUESTA (3 bloques separados por salto de línea):
+    IMPORTANTE: cada bloque debe ir en un PÁRRAFO SEPARADO (con un salto de línea entre bloques).
+    Los 3 bloques son OBLIGATORIOS en TODA respuesta, sin excepción.
+    1. INTRODUCCIÓN (1-2 oraciones, SIEMPRE presente): línea contextual que ancla indicador, período y frecuencia.
+       - Si los datos del período solicitado EXISTEN: "El IMACEC de enero de 2026 muestra los siguientes resultados."
+       - Si el período solicitado NO tiene datos: "Los datos de [período] aún no han
+         sido publicados según los datos de la Base de Datos Estadísticos. El último dato disponible corresponde a [período]."
+       NUNCA omitas la introducción. NUNCA la fusiones con el bloque de DATOS.
+    2. DATOS (1-3 oraciones): cifra principal con formato correcto (1 decimal, negrita, formato
+       español). Siempre indicar contra qué se compara: "respecto al mismo período del año
+       anterior" o "respecto al período anterior".
+    3. RECOMENDACIÓN (OBLIGATORIA, 1 oración): SIEMPRE incluye una oración final de
+       recomendación. Ejemplos:
+       · "Puedes profundizar revisando el desglose sectorial del IMACEC y su trayectoria reciente."
+       · "Puedes profundizar comparando la trayectoria reciente de la actividad económica y sus componentes."
+       · "Puedes profundizar revisando el detalle de contribuciones por actividad en el mismo período."
+       NO des opinión. La recomendación es solo una sugerencia de exploración de datos.
+       NUNCA omitas este bloque.
+    EJEMPLO DE FORMATO CORRECTO (3 párrafos separados):
+    ---
+    Los datos de febrero de 2026 aún no han sido publicados según los datos de la Base de Datos Estadísticos. El último dato disponible corresponde a enero de 2026.
+
+    El IMACEC registró una variación interanual de **-0,1%** respecto al mismo período del año anterior.
+
+    Puedes profundizar revisando el desglose sectorial del IMACEC y su trayectoria reciente.
+    ---
 - Si el usuario pregunta "qué impulsó" una variable agregada (ej: demanda interna),
   identifica el/los componente(s) con mayor aporte y reporta sus valores numéricos
   (contribución/variación) junto con el período antes de cualquier interpretación.
@@ -501,6 +581,19 @@ ESTILO DE RESPUESTA
   Ejemplo correcto: "Solo Minería creció en 2020 (0.77%). Las actividades que menos
   se contrajeron fueron Industria (-2.19%) y Comercio (-2.74%)."
   Aplica la misma lógica inversa para "las que más cayeron" con valores positivos.
+
+REGLA ESTRICTA DE PIB ANUAL:
+- El PIB se publica en frecuencia trimestral. Un dato anual del PIB solo es válido
+  si los 4 trimestres del año están publicados.
+- Antes de responder una consulta anual de PIB, verifica con get_series_data
+  cuántos trimestres del año solicitado tienen datos:
+    · 4/4 trimestres → entrega el dato anual normalmente.
+    · 1-3 trimestres → responde: "Aún no se han publicado todos los datos del PIB [año].
+      Solo se dispone de [N]/4 trimestres publicados. El último dato anual completo
+      corresponde a [año anterior], con una variación de **X,X%**."
+    · 0/4 trimestres → responde: "Aún no se han publicado datos del PIB [año].
+      El último dato anual completo corresponde a [año anterior]."
+- NUNCA presentes un valor anual del PIB si faltan trimestres por publicar.
 
 EJEMPLOS
 - "cuanto crecio el pib en 2024" → get_series_data con metric yoy_pct.
@@ -941,12 +1034,38 @@ def _build_metric_priority_instruction(calc_mode: str) -> Optional[str]:
     endurecer el comportamiento del primer párrafo.
     """
     mode = str(calc_mode or "").strip().lower()
-    if mode == "yoy":
+    if mode == "contribution":
         return (
-            "REGLA ESTRICTA DE REDACCION: en el PRIMER PARRAFO (primera oracion) "
-            "comienza mencionando el PERIODO analizado (ej: 'En el 3er trimestre de 2025, ...') "
-            "y reporta PRIMERO el valor de 'yoy_pct'. "
-            "No comiences con 'value' ni con 'pct'."
+            "REGLA ESTRICTA DE REDACCION PARA CONTRIBUCIONES:\n"
+            "1. En el PRIMER PARRAFO comienza mencionando el PERIODO analizado "
+            "(ej: 'En el 3er trimestre de 2025, ...').\n"
+            "2. Los datos son CONTRIBUCIONES al crecimiento. La unidad es SIEMPRE "
+            "puntos porcentuales (pp), NUNCA '%'.\n"
+            "   Correcto: '**0,5 pp**'  |  Incorrecto: '**0,5%**'\n"
+            "3. Redondea SIEMPRE a 1 decimal: 0,54 → **0,5 pp**; -0,67 → **-0,7 pp**.\n"
+            "4. Ordena por VALOR ABSOLUTO de la contribución (mayor primero).\n"
+            "5. Separa claramente contribuciones positivas de negativas.\n"
+            "6. PROHIBIDO usar el símbolo '%' para contribuciones. USA 'pp'.\n"
+            "6.b. Cuando una contribución sea menor a cero, NO uses la frase 'contribución negativa'. "
+            "Usa redacción neutral: 'tuvo una contribución de **-X,X pp**' o "
+            "'registró una variación de **-X,X pp**'.\n"
+            "7. FLUJO OBLIGATORIO: primero llama list_series y luego llama rank_series "
+            "con metric='value' y order='desc' para obtener el ranking de contribuciones.\n"
+            "7.b. TOOLING MÍNIMO OBLIGATORIO: antes de redactar debes haber ejecutado "
+            "get_metadata y rank_series para el periodo objetivo.\n"
+            "8. Si calc_mode='contribution', está PROHIBIDO responder solo con la serie "
+            "agregada del PIB total. Debes reportar actividades/componentes.\n"
+            "8.b. En preguntas del tipo 'qué actividad impulsó', está PROHIBIDO redactar "
+            "el bloque DATOS como 'el PIB registró X%'. Debes listar actividades con su aporte en pp.\n"
+            "9. Debes reportar al menos 5 actividades (si existen) con mayor aporte y, "
+            "si hay aportes negativos, mencionar explícitamente la principal caída.\n"
+            "10. Si rank_series no devuelve ranking para el periodo solicitado, debes "
+            "decir explícitamente que no hay contribuciones disponibles para ese periodo. "
+            "NO reemplaces esa situación con 'PIB creció X%'.\n"
+            "11. CHEQUEO FINAL OBLIGATORIO: si no hay salida de rank_series en el contexto "
+            "de herramientas, no redactes la respuesta final y vuelve a llamar rank_series.\n"
+            "12. Si existe ranking, usa SOLO esos resultados para el bloque DATOS; no cambies "
+            "a una métrica de variación agregada del PIB."
         )
     if mode == "prev_period":
         return (
@@ -955,15 +1074,20 @@ def _build_metric_priority_instruction(calc_mode: str) -> Optional[str]:
             "y reporta PRIMERO el valor de 'pct'. "
             "No comiences con 'value' ni con 'yoy_pct'."
         )
-    if mode == "original":
-        return (
-            "REGLA ESTRICTA DE REDACCION: en el PRIMER PARRAFO (primera oracion) "
-            "comienza mencionando el PERIODO analizado (ej: 'En el 3er trimestre de 2025, ...') "
-            "y reporta PRIMERO el valor de 'value' (con su unidad). "
-            "Luego menciona 'yoy_pct', y 'pct' solo si aporta claridad. "
-            "No comiences con 'yoy_pct' ni con 'pct'."
-        )
-    return None
+    # Para "original", "yoy" y cualquier otro: siempre yoy_pct por defecto
+    return (
+        "REGLA ESTRICTA DE REDACCION:\n"
+        "1. En el PRIMER PARRAFO comienza mencionando el PERIODO analizado "
+        "(ej: 'En el 3er trimestre de 2025, ...').\n"
+        "2. Reporta SOLO la variación interanual (yoy_pct) como dato principal.\n"
+        "3. PROHIBIDO incluir niveles (value) o cifras de índice en la respuesta. "
+        "NO uses get_series_data con metric='value' ni menciones niveles de índice.\n"
+        "4. La única excepción para reportar 'value' es si el usuario pide explícitamente "
+        "'PIB en pesos', 'PIB en dólares', 'PIB per cápita' o 'a precios corrientes'.\n"
+        "5. Expresiones como 'el valor', 'la cifra', 'cuánto fue', 'el dato' "
+        "NO son solicitud de nivel; en esos casos reporta yoy_pct.\n"
+        "6. No comiences con 'value' ni con 'pct' salvo que la pregunta lo requiera explícitamente."
+    )
 
 
 def _build_seasonality_strict_instruction(
@@ -1057,6 +1181,246 @@ def _build_missing_activity_instruction(
     )
 
 
+def _build_contribution_activity_focus_instruction(
+    question: str,
+    entities_ctx: Dict[str, Any],
+    observations: Dict[str, Any],
+) -> Optional[str]:
+    calc_mode = str(
+        entities_ctx.get("calc_mode_cls")
+        or entities_ctx.get("calc_mode")
+        or ""
+    ).strip().lower()
+    if calc_mode != "contribution":
+        return None
+
+    text = str(question or "").lower()
+    if not any(token in text for token in ("actividad", "impuls", "aporte", "contribu")):
+        return None
+
+    latest_t = str((observations.get("latest_available") or {}).get("T") or "").strip()
+    latest_label = _natural_period_label(latest_t, "T") if latest_t else "el último trimestre disponible"
+
+    return (
+        "REGLA ESTRICTA PARA PREGUNTAS DE ACTIVIDAD-CONTRIBUCIÓN: "
+        "esta pregunta exige DESGLOSE POR ACTIVIDADES, no variación agregada del PIB. "
+        f"Si el período mensual pedido no existe para PIB, usa directamente {latest_label}. "
+        "NO escribas 'enero no publicado' para este tipo de pregunta; ancla la respuesta al trimestre disponible. "
+        "OBLIGATORIO: llama rank_series (metric='value') para ese trimestre y construye el bloque DATOS "
+        "con al menos 5 actividades (si existen) en formato de lista, cada una con su contribución en pp. "
+        "Incluye además la principal contribución negativa, si existe. "
+        "La respuesta es inválida si no incluye lista de actividades con pp. "
+        "Está PROHIBIDO responder solo con 'el PIB registró X%'."
+    )
+
+
+def _build_economy_wording_instruction(
+    question: str,
+    entities_ctx: Dict[str, Any],
+) -> Optional[str]:
+    text = str(question or "").lower()
+    if "econom" not in text:
+        return None
+
+    indicator = str(entities_ctx.get("indicator_ent") or "").strip().lower()
+    if indicator == "pib":
+        return (
+            "REGLA DE CONTINUIDAD PARA CONSULTAS DE ECONOMÍA: en la INTRODUCCIÓN "
+            "incluye literalmente la frase 'El último dato disponible para el crecimiento "
+            "de la economía, medida por el PIB,'."
+        )
+    if indicator == "imacec":
+        return (
+            "REGLA DE CONTINUIDAD PARA CONSULTAS DE ECONOMÍA: en la INTRODUCCIÓN "
+            "incluye literalmente la frase 'El último dato disponible para el crecimiento "
+            "de la economía, medida por el IMACEC,'."
+        )
+    return None
+
+
+def _build_recommendation_length_instruction() -> str:
+    return (
+        "REGLA DE RECOMENDACIÓN: el bloque final de recomendación debe tener una sola oración, "
+        "pero más desarrollada (mínimo 16 palabras), conectada con la consulta del usuario, "
+        "sin opiniones ni proyecciones."
+    )
+
+
+def _build_special_query_mapping_instruction(
+    question: str,
+    entities_ctx: Dict[str, Any],
+) -> Optional[str]:
+    text = str(question or "").lower()
+    text_norm = unicodedata.normalize("NFKD", text)
+    text_norm = "".join(ch for ch in text_norm if not unicodedata.combining(ch))
+
+    rules: List[str] = []
+
+    if "imacec" in text_norm and "ultimo trimestre" in text_norm:
+        rules.append(
+            "CASO IMACEC TRIMESTRAL: cuando pregunten por 'IMACEC del último trimestre', "
+            "debes usar frecuencia trimestral (T), no mensual. "
+            "Usa el último trimestre disponible del IMACEC y reporta una sola variación anual "
+            "del trimestre (no desgloses por meses dentro del trimestre)."
+        )
+
+    if "demanda interna" in text_norm:
+        rules.append(
+            "CASO DEMANDA INTERNA: interpreta 'demanda interna' como gasto interno. "
+            "Responde con la serie de demanda interna en frecuencia trimestral y su variación anual."
+        )
+
+    if "inversion" in text_norm or "inversión" in text:
+        rules.append(
+            "CASO INVERSIÓN: cuando la pregunta sea 'inversión en Chile', usa como referencia "
+            "la serie 'Formación Bruta de Capital Fijo' del cuadro de demanda interna/gasto del PIB. "
+            "No reemplaces por PIB total salvo que no exista esa serie en el cuadro."
+        )
+
+    if "pib per capita" in text_norm or "pib per cápita" in text:
+        rules.append(
+            "CASO PIB PER CÁPITA: reporta valor original (value), no yoy_pct, salvo que el usuario "
+            "pida explícitamente variación. Redondea a entero sin decimales y con separador de miles '.'."
+            " (ej: 16.586). Para rangos anuales, lista cada año con su valor aproximado. "
+            "No reemplaces PIB per cápita por PIB total ni por otra serie agregada. "
+            "Si no hay serie de PIB per cápita en los resultados, indica esa falta y sugiere reformular."
+        )
+
+    if "pib en pesos" in text_norm or "precios corrientes" in text_norm or "a cuanto asciende el pib" in text_norm:
+        rules.append(
+            "CASO PIB EN PESOS / PRECIOS CORRIENTES: reporta valor original (value) en pesos, "
+            "redondeado a entero sin decimales y con separador de miles '.'. "
+            "NO multipliques ni reescales el valor; úsalo tal como lo entrega get_series_data. "
+            "Si la unidad es 'miles de millones de pesos', NO agregues ceros adicionales."
+        )
+
+    calc_mode = str(
+        entities_ctx.get("calc_mode_cls")
+        or entities_ctx.get("calc_mode")
+        or ""
+    ).strip().lower()
+    activity_cls = str(
+        entities_ctx.get("activity_cls_resolved")
+        or entities_ctx.get("activity_cls")
+        or ""
+    ).strip().lower()
+    if calc_mode == "contribution" and activity_cls == "specific":
+        rules.append(
+            "CASO CONTRIBUCIÓN ESPECÍFICA: cuando consulten cuánto contribuyó una actividad específica, "
+            "entrega primero una respuesta directa de ESA actividad para el período objetivo. "
+            "No incluyas ranking de otras actividades salvo que el usuario lo solicite explícitamente."
+        )
+
+    if not rules:
+        return None
+
+    return "REGLAS ESPECIALES DE INTERPRETACIÓN:\n- " + "\n- ".join(rules)
+
+
+def _build_specific_contribution_directness_instruction(question: str) -> Optional[str]:
+    text = str(question or "").lower()
+    text_norm = unicodedata.normalize("NFKD", text)
+    text_norm = "".join(ch for ch in text_norm if not unicodedata.combining(ch))
+
+    if ("contribuy" in text_norm or "contribuyo" in text_norm) and ("imacec" in text_norm or "pib" in text_norm):
+        return (
+            "REGLA DE CONTRIBUCIÓN DIRECTA: si la pregunta es 'cuánto contribuyó [actividad] ...', "
+            "responde de forma directa con ESA actividad y su valor para el período objetivo. "
+            "No agregues ranking de otras actividades salvo que el usuario lo pida explícitamente. "
+            "PROHIBIDO usar la palabra 'negativa' o frases equivalentes. Usa redacción neutral "
+            "con signo (ej: 'tuvo una contribución de **-0,5 pp**'). "
+            "En el bloque DATOS usa solo una oración con la contribución de esa actividad."
+        )
+    return None
+
+
+def _build_value_no_rescale_instruction(question: str) -> Optional[str]:
+    text = str(question or "").lower()
+    text_norm = unicodedata.normalize("NFKD", text)
+    text_norm = "".join(ch for ch in text_norm if not unicodedata.combining(ch))
+    if any(token in text_norm for token in ("pib en pesos", "precios corrientes", "pib per capita", "pib per cápita", "a cuanto asciende")):
+        return (
+            "REGLA DE ESCALA PARA VALORES ORIGINALES: cuando entregues value, conserva exactamente "
+            "la escala entregada por get_series_data (no multiplicar, no dividir, no convertir unidades). "
+            "Solo redondea y formatea separadores de miles. "
+            "Ejemplo: si get_series_data entrega 57246,76 (miles de millones), reporta 57.247 y nunca 57.247.000."
+        )
+    return None
+
+
+def _build_annual_pib_completeness_instruction(
+    question: str,
+    entities_ctx: Dict[str, Any],
+    observations: Dict[str, Any],
+) -> Optional[str]:
+    """Inyecta regla de PIB anual: solo válido si 4/4 trimestres están publicados."""
+    indicator = str(entities_ctx.get("indicator_ent") or "").strip().lower()
+    if indicator != "pib":
+        return None
+
+    # Solo aplica si se pregunta por un año completo
+    requested_year = _extract_requested_year(entities_ctx, question)
+    if not requested_year:
+        return None
+
+    freq_code = _resolve_requested_frequency(entities_ctx, observations)
+
+    # For annual frequency, check if requested year is beyond latest annual data
+    if freq_code == "A":
+        latest_available = observations.get("latest_available") or {}
+        latest_a = str(latest_available.get("A") or "").strip()
+        if latest_a and requested_year > latest_a:
+            return (
+                f"REGLA ESTRICTA DE PIB ANUAL: aún no se han publicado datos del PIB {requested_year}. "
+                f"Debes indicar: 'Aún no se han publicado datos del PIB {requested_year}.' "
+                f"OBLIGATORIO: llama list_series para obtener el series_id, luego llama "
+                f"get_series_data con frequency='A' y period='{latest_a}' para obtener la cifra real. "
+                "NO reportes niveles absolutos en pesos en la respuesta final; "
+                "reporta solo la variación anual (yoy_pct). "
+                f"NO respondas con ninguna cifra sin haber llamado get_series_data."
+            )
+        if latest_a and requested_year == latest_a:
+            return None  # data exists for the requested year
+        # If latest_a is not set, fall through to quarterly check
+
+    if freq_code not in {"T", ""}:
+        # Si la frecuencia resuelta no es trimestral ni vacía, no aplica
+        if freq_code != "T":
+            return None
+
+    latest_available = observations.get("latest_available") or {}
+    latest_t = str(latest_available.get("T") or "").strip()
+    if not latest_t:
+        return None
+
+    # Contar trimestres disponibles para el año solicitado
+    q_match = re.fullmatch(r"(\d{4})-Q([1-4])", latest_t)
+    if not q_match:
+        return None
+
+    latest_year = q_match.group(1)
+    latest_q = int(q_match.group(2))
+
+    if requested_year > latest_year:
+        # 0/4 trimestres
+        return (
+            f"REGLA ESTRICTA DE PIB ANUAL: aún no se han publicado datos del PIB {requested_year}. "
+            f"Debes indicar: 'Aún no se han publicado datos del PIB {requested_year}.' "
+            "Luego USA get_series_data para obtener el último dato anual completo disponible "
+            "y reporta solo la variación anual (yoy_pct), sin niveles absolutos."
+        )
+    elif requested_year == latest_year and latest_q < 4:
+        return (
+            f"REGLA ESTRICTA DE PIB ANUAL: el año {requested_year} NO está completo. "
+            f"Solo se dispone de {latest_q}/4 trimestres publicados. "
+            f"Debes indicar: 'Aún no se han publicado todos los datos del PIB {requested_year}. "
+            f"Solo se dispone de {latest_q}/4 trimestres publicados.' "
+            "Luego USA get_series_data para obtener el último dato anual completo disponible "
+            "y reporta solo la variación anual (yoy_pct), sin niveles absolutos."
+        )
+    return None
+
+
 def _resolve_requested_frequency(
     entities_ctx: Dict[str, Any],
     observations: Dict[str, Any],
@@ -1136,11 +1500,10 @@ def _build_incomplete_period_instruction(
             semester_label = "primer semestre" if requested_semester == 1 else "segundo semestre"
             return (
                 "REGLA ESTRICTA DE COBERTURA TEMPORAL: el semestre solicitado NO está completo. "
-                f"Solo hay datos hasta {latest_label}. Debes describirlo como resultado parcial del "
-                f"{semester_label} de {semester_year}, nunca como semestre cerrado. "
-                f"No escribas frases como 'Durante el {semester_label} de {semester_year}, ...'. "
-                f"Usa formulaciones como 'En lo disponible del {semester_label} de {semester_year}, ...' "
-                f"o 'Hasta {latest_label}, ...'."
+                f"Debes indicar: 'Los datos del {semester_label} de {semester_year} aún no han sido "
+                f"publicados en su totalidad según los datos de la Base de Datos Estadísticos. "
+                f"El último dato disponible corresponde a {latest_label}.' "
+                f"Luego USA get_series_data para obtener la cifra de {latest_label} y entrégala."
             )
 
     requested_year = _extract_requested_year(entities_ctx, question)
@@ -1150,10 +1513,10 @@ def _build_incomplete_period_instruction(
             latest_label = _natural_period_label(latest_period, freq_code)
             return (
                 "REGLA ESTRICTA DE COBERTURA TEMPORAL: el año solicitado NO está cerrado. "
-                f"Solo hay datos hasta {latest_label}. Debes describirlo como resultado parcial "
-                f"o acumulado de {requested_year}, nunca como el resultado anual cerrado. "
-                f"No escribas frases como 'En {requested_year}, ...'. Usa formulaciones como "
-                f"'En lo disponible de {requested_year}, ...' o 'Hasta {latest_label}, ...'."
+                f"Debes indicar: 'Los datos de {requested_year} aún no han sido publicados "
+                f"en su totalidad según los datos de la Base de Datos Estadísticos. El último dato disponible "
+                f"corresponde a {latest_label}.' "
+                f"Luego USA get_series_data para obtener la cifra de {latest_label} y entrégala."
             )
 
     return None
@@ -1204,6 +1567,15 @@ def _build_relative_period_fallback_instruction(
         relative_expr = "este mes"
         target_period = f"{today.year}-{today.month:02d}"
         freq_code = "M"
+    elif re.search(r"\b[uú]ltimo\s+trimestre\b", text):
+        relative_expr = "último trimestre"
+        q = (today.month - 1) // 3 + 1
+        target_period = f"{today.year - 1}-Q4" if q == 1 else f"{today.year}-Q{q - 1}"
+        freq_code = "T"
+    elif re.search(r"\b[uú]ltimo\s+mes\b", text):
+        relative_expr = "último mes"
+        target_period = f"{today.year - 1}-12" if today.month == 1 else f"{today.year}-{today.month - 1:02d}"
+        freq_code = "M"
 
     if not (relative_expr and freq_code and target_period):
         return None
@@ -1225,10 +1597,10 @@ def _build_relative_period_fallback_instruction(
     target_label = target_period if freq_code == "A" else _natural_period_label(target_period, freq_code)
     return (
         "REGLA ESTRICTA DE FALLBACK PARA FECHA RELATIVA: la pregunta pide un período explícito "
-        f"('{relative_expr}' = {target_label}) sin datos disponibles. Debes decir explícitamente "
-        f"que no hay datos para {target_label} y luego entregar el dato del período más cercano "
-        f"disponible ({latest_label}). NUNCA omitas el aviso de falta de datos cuando la referencia "
-        "temporal relativa apunta a un período inexistente."
+        f"('{relative_expr}' = {target_label}) sin datos disponibles. "
+        f"Debes indicar: 'Los datos de {target_label} aún no han sido publicados según los datos de la Base de Datos Estadísticos. "
+        f"El último dato disponible corresponde a {latest_label}.' "
+        f"Luego USA get_series_data para obtener la cifra de {latest_label} y entrégala con su variación anual."
     )
 
 
@@ -1269,6 +1641,10 @@ def _question_has_explicit_period(question: str, entities_ctx: Dict[str, Any]) -
         "este mes",
         "hoy",
         "ayer",
+        "ultimo trimestre",
+        "último trimestre",
+        "ultimo mes",
+        "último mes",
     )
     return any(token in text for token in relative_tokens)
 
@@ -1278,6 +1654,16 @@ def _build_no_explicit_period_latest_instruction(
     entities_ctx: Dict[str, Any],
     observations: Dict[str, Any],
 ) -> Optional[str]:
+    calc_mode = str(
+        entities_ctx.get("calc_mode_cls")
+        or entities_ctx.get("calc_mode")
+        or ""
+    ).strip().lower()
+    # En contribution se usa una regla específica con rank_series; evitar conflicto
+    # con la regla genérica que fuerza get_series_data sobre la serie agregada.
+    if calc_mode == "contribution":
+        return None
+
     # Si el usuario sí especificó período (aunque req_form_cls venga como latest),
     # nunca fuerces la regla de "último disponible".
     if _question_has_explicit_period(question, entities_ctx):
@@ -1290,12 +1676,17 @@ def _build_no_explicit_period_latest_instruction(
         return None
 
     latest_label = latest_period if freq_code == "A" else _natural_period_label(latest_period, freq_code)
+    freq_label = "mensual" if freq_code == "M" else "trimestral" if freq_code == "T" else "anual"
     return (
         "REGLA ESTRICTA DE PERIODO POR DEFECTO: "
         "si req_form_cls='latest', o si la pregunta no especifica fecha, "
-        f"Debes responder usando directamente el ultimo periodo disponible ({latest_label}). "
+        f"usa el ultimo periodo disponible ({latest_label}). "
+        f"USA get_series_data para obtener la cifra de {latest_label} antes de responder. "
+        f"En la INTRODUCCION incluye literalmente esta oración: 'La serie se reporta con frecuencia {freq_label}.' "
+        "Cuando reportes yoy_pct, usa la expresión 'variación anual'. "
         "NO menciones falta de datos para meses/trimestres/años no solicitados y NO infieras "
-        "automaticamente el mes/trimestre actual como periodo pedido."
+        "automaticamente el mes/trimestre actual como periodo pedido. "
+        "Mantén la estructura de 3 bloques: INTRODUCCIÓN (ancla indicador y período), DATOS, RECOMENDACIÓN."
     )
 
 
@@ -1535,6 +1926,43 @@ def stream_data_response(
     )
     if missing_activity_instruction:
         messages.append({"role": "system", "content": missing_activity_instruction})
+    contribution_activity_focus_instruction = _build_contribution_activity_focus_instruction(
+        question=question,
+        entities_ctx=entities_ctx,
+        observations=observations,
+    )
+    if contribution_activity_focus_instruction:
+        messages.append({"role": "system", "content": contribution_activity_focus_instruction})
+    economy_wording_instruction = _build_economy_wording_instruction(
+        question=question,
+        entities_ctx=entities_ctx,
+    )
+    if economy_wording_instruction:
+        messages.append({"role": "system", "content": economy_wording_instruction})
+    special_query_mapping_instruction = _build_special_query_mapping_instruction(
+        question=question,
+        entities_ctx=entities_ctx,
+    )
+    if special_query_mapping_instruction:
+        messages.append({"role": "system", "content": special_query_mapping_instruction})
+    specific_contribution_directness_instruction = _build_specific_contribution_directness_instruction(
+        question=question,
+    )
+    if specific_contribution_directness_instruction:
+        messages.append({"role": "system", "content": specific_contribution_directness_instruction})
+    value_no_rescale_instruction = _build_value_no_rescale_instruction(
+        question=question,
+    )
+    if value_no_rescale_instruction:
+        messages.append({"role": "system", "content": value_no_rescale_instruction})
+    messages.append({"role": "system", "content": _build_recommendation_length_instruction()})
+    annual_pib_instruction = _build_annual_pib_completeness_instruction(
+        question=question,
+        entities_ctx=entities_ctx,
+        observations=observations,
+    )
+    if annual_pib_instruction:
+        messages.append({"role": "system", "content": annual_pib_instruction})
     messages.append({"role": "user", "content": question})
 
     fetched_series: List[Dict[str, Any]] = []  # track get_series_data results

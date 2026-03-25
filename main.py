@@ -25,6 +25,7 @@ from dotenv import load_dotenv
 from config import get_settings, PREDICT_URL
 import app
 from orchestrator.utils.http_client import get_json
+from qa.run_detail import DetailTracer, OpenAICapture
 
 
 def _health_url_from_predict_url(predict_url: str) -> str:
@@ -212,6 +213,14 @@ def main() -> None:
         current_state: Dict[str, Any] = dict(state)
         qa_trace_enabled = os.getenv("QA_TRACE_ENABLED", "1").lower() in {"1", "true", "yes", "on"}
 
+        # --- Log detallado (logs/run_detail.log) ---
+        detail_tracer = DetailTracer(question)
+        if not hasattr(main, "_openai_capture_installed"):
+            main._openai_capture = OpenAICapture()
+            main._openai_capture.install()
+            main._openai_capture_installed = True
+        detail_tracer.set_openai_capture(main._openai_capture)
+
         def _safe_json(data: Any) -> str:
             try:
                 return json.dumps(data, ensure_ascii=False, default=str)
@@ -242,6 +251,9 @@ def main() -> None:
                     if final_output is None:
                         final_output = current_state.get("output")
                     logger.info("[QA_TRACE] RESPUESTA_FINAL=%s", _safe_json(final_output))
+
+                # Alimentar el detail tracer
+                detail_tracer.on_node_update(node_name, delta)
 
                 if isinstance(delta, dict):
                     current_state.update(delta)
@@ -327,6 +339,12 @@ def main() -> None:
         except Exception as e:
             logger.exception("stream_fn graph stream failed: %s", e)
             yield "No pude generar una respuesta."
+
+        # Escribir log detallado
+        try:
+            detail_tracer.flush()
+        except Exception:
+            logger.debug("[RUN_DETAIL] Error escribiendo log detallado", exc_info=True)
 
     def invoke_fn(question: str, history: Optional[List[Dict[str, str]]] = None) -> str:
         logger.info(f"[INVOKE] question={question[:80]}")
