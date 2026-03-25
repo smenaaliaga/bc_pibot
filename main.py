@@ -25,7 +25,7 @@ from dotenv import load_dotenv
 from config import get_settings, PREDICT_URL
 import app
 from orchestrator.utils.http_client import get_json
-from qa.run_detail import DetailTracer, OpenAICapture
+from qa.run_detail import DetailTracer, OpenAICapture, DataStoreCapture
 
 
 def _health_url_from_predict_url(predict_url: str) -> str:
@@ -219,7 +219,12 @@ def main() -> None:
             main._openai_capture = OpenAICapture()
             main._openai_capture.install()
             main._openai_capture_installed = True
+        if not hasattr(main, "_datastore_capture_installed"):
+            main._datastore_capture = DataStoreCapture()
+            main._datastore_capture.install()
+            main._datastore_capture_installed = True
         detail_tracer.set_openai_capture(main._openai_capture)
+        detail_tracer.set_datastore_capture(main._datastore_capture)
 
         def _safe_json(data: Any) -> str:
             try:

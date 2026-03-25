@@ -20,12 +20,14 @@ import logging
 import os
 import re
 import tempfile
+import time
 import unicodedata
 from dataclasses import asdict
 from datetime import date
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from langgraph.types import StreamWriter
+from orchestrator.data._helpers import build_target_series_url
 
 logger = logging.getLogger(__name__)
 
@@ -764,9 +766,19 @@ def _add_display_fields(record: dict) -> dict:
     textualmente y no pueda multiplicar por 100.
     """
     out = dict(record)
+
+    # Normaliza aliases de calculo para asegurar columnas estables en CSV.
+    if "yoy_pct" not in out and "yoy" in out:
+        out["yoy_pct"] = out.get("yoy")
+    if "pct" not in out and "prev_period" in out:
+        out["pct"] = out.get("prev_period")
+
     for field in _PCT_FIELDS:
         if field in out and out[field] is not None:
             out[field] = f"{out[field]}%"
+    # Alias explicito para compatibilidad con nomenclatura BDE.
+    if "yoy_pct" in out and "YTYPCT" not in out:
+        out["YTYPCT"] = out.get("yoy_pct")
     # Eliminar _display si existiera de versiones anteriores
     out.pop("_display", None)
     return out
@@ -1016,9 +1028,12 @@ def _build_initial_messages() -> list:
 # Source footer
 # ---------------------------------------------------------------------------
 
-def _build_source_footer(observations: Dict[str, Any]) -> Optional[str]:
+def _build_source_footer(
+    observations: Dict[str, Any],
+    source_url_override: Optional[str] = None,
+) -> Optional[str]:
     """Construye un footer con el link a la fuente BDE desde el payload."""
-    source_url = str(observations.get("source_url") or "").strip()
+    source_url = str(source_url_override or observations.get("source_url") or "").strip()
     if not source_url:
         return None
     return (
@@ -1711,17 +1726,39 @@ def _export_series_csv(
     if not records:
         return None
     try:
-        fieldnames = [k for k in records[0] if k not in _CSV_EXCLUDE_COLS]
+        normalized_records: List[Dict[str, Any]] = []
+        for row in records:
+            if not isinstance(row, dict):
+                continue
+            clean_row = dict(row)
+            if "YTYPCT" not in clean_row and "yoy_pct" in clean_row:
+                clean_row["YTYPCT"] = clean_row.get("yoy_pct")
+            clean_row.pop("yoy_pct", None)
+            normalized_records.append(clean_row)
+
+        if not normalized_records:
+            return None
+
+        fieldnames: List[str] = []
+        seen = set()
+        for row in normalized_records:
+            for key in row.keys():
+                if key in _CSV_EXCLUDE_COLS or key in seen:
+                    continue
+                seen.add(key)
+                fieldnames.append(key)
+        if not fieldnames:
+            return None
         buf = io.StringIO()
         buf.write(f"# Nombre: {cuadro_name}\n")
         buf.write(f"# Serie: {short_title}\n")
         buf.write(f"# Serie ID: {series_id}\n")
-        buf.write("# yoy_pct: variación porcentual interanual\n")
+        buf.write("# YTYPCT: alias BDE de variación porcentual interanual\n")
         buf.write("# pct: variación porcentual respecto al periodo anterior\n")
         buf.write("#\n")
         writer = csv.DictWriter(buf, fieldnames=fieldnames, extrasaction="ignore")
         writer.writeheader()
-        writer.writerows(records)
+        writer.writerows(normalized_records)
         tmp = tempfile.NamedTemporaryFile(
             mode="w", suffix=".csv", prefix="serie_",
             delete=False, encoding="utf-8-sig", newline="",
@@ -1756,6 +1793,212 @@ def _build_csv_markers(fetched_series: List[Dict[str, Any]], cuadro_name: str = 
     return ""
 
 
+def _pick_series_frequency(series: Dict[str, Any], preferred_frequency: str = "") -> Optional[str]:
+    data = series.get("data") or {}
+    if not isinstance(data, dict) or not data:
+        return None
+
+    preferred = str(preferred_frequency or "").strip().upper()
+    if preferred and preferred in data:
+        return preferred
+
+    for candidate in ("M", "T", "A"):
+        if candidate in data:
+            return candidate
+
+    try:
+        return str(next(iter(data.keys()))).upper()
+    except Exception:
+        return None
+
+
+def _resolve_selected_series_context(
+    observations: Dict[str, Any],
+    entities_ctx: Dict[str, Any],
+    selected_from_tools: Optional[Dict[str, str]],
+) -> Optional[Dict[str, str]]:
+    if selected_from_tools:
+        sid = str(selected_from_tools.get("series_id") or "").strip()
+        freq = str(selected_from_tools.get("frequency") or "").strip().upper()
+        if sid and freq:
+            return {"series_id": sid, "frequency": freq}
+
+    series_list = observations.get("series") or []
+    if not isinstance(series_list, list) or not series_list:
+        return None
+
+    first_series = series_list[0] if isinstance(series_list[0], dict) else {}
+    series_id = str(first_series.get("series_id") or "").strip()
+    if not series_id:
+        return None
+
+    preferred_freq = _resolve_requested_frequency(entities_ctx, observations)
+    frequency = _pick_series_frequency(first_series, preferred_freq)
+    if not frequency:
+        return None
+
+    return {"series_id": series_id, "frequency": frequency}
+
+
+def _find_series_records(
+    observations: Dict[str, Any],
+    series_id: str,
+    frequency: str,
+) -> Optional[Dict[str, Any]]:
+    sid = str(series_id or "").strip()
+    freq = str(frequency or "").strip().upper()
+    if not sid or not freq:
+        return None
+
+    for series in observations.get("series") or []:
+        if not isinstance(series, dict):
+            continue
+        if str(series.get("series_id") or "").strip() != sid:
+            continue
+
+        block = (series.get("data") or {}).get(freq) or {}
+        raw_records = block.get("records") or []
+        if not raw_records:
+            return None
+
+        # data_store local puede traer solo value; completar variaciones para CSV.
+        lag = {"M": 12, "T": 4, "A": 1}.get(freq)
+        enriched_records: List[Dict[str, Any]] = []
+        value_series: List[Optional[float]] = []
+
+        for raw in raw_records:
+            if not isinstance(raw, dict):
+                continue
+            row = dict(raw)
+            val_num: Optional[float]
+            try:
+                val = row.get("value")
+                val_num = float(val) if val is not None else None
+            except Exception:
+                val_num = None
+            value_series.append(val_num)
+            enriched_records.append(row)
+
+        for idx, row in enumerate(enriched_records):
+            curr_val = value_series[idx]
+
+            if "pct" not in row and "prev_period" not in row:
+                pct_val: Optional[float] = None
+                if idx > 0:
+                    prev_val = value_series[idx - 1]
+                    if curr_val is not None and prev_val not in (None, 0):
+                        pct_val = (curr_val / prev_val - 1.0) * 100.0
+                row["pct"] = pct_val
+
+            if "yoy_pct" not in row and "yoy" not in row:
+                yoy_val: Optional[float] = None
+                if lag is not None and idx >= lag:
+                    prev_yoy_val = value_series[idx - lag]
+                    if curr_val is not None and prev_yoy_val not in (None, 0):
+                        yoy_val = (curr_val / prev_yoy_val - 1.0) * 100.0
+                row["yoy_pct"] = yoy_val
+
+        formatted_records = [
+            _add_display_fields(record)
+            for record in enriched_records
+            if isinstance(record, dict)
+        ]
+        if not formatted_records:
+            return None
+
+        return {
+            "series_id": sid,
+            "short_title": str(series.get("short_title") or ""),
+            "frequency": freq,
+            "records": formatted_records,
+        }
+    return None
+
+
+def _build_full_history_csv_marker(
+    observations: Dict[str, Any],
+    selected_series_ctx: Optional[Dict[str, str]],
+    cuadro_name: str = "",
+) -> str:
+    if not selected_series_ctx:
+        return ""
+
+    selected = _find_series_records(
+        observations,
+        selected_series_ctx.get("series_id", ""),
+        selected_series_ctx.get("frequency", ""),
+    )
+    if not selected:
+        return ""
+
+    series_id = selected.get("series_id", "")
+    short_title = selected.get("short_title", "")
+    frequency = selected.get("frequency", "")
+    records = selected.get("records", [])
+    path = _export_series_csv(series_id, records, short_title=short_title, cuadro_name=cuadro_name)
+    if not path:
+        return ""
+
+    safe_series_id = re.sub(r"[^A-Za-z0-9._-]+", "_", str(series_id)).strip("_") or "serie"
+    filename = f"serie_{safe_series_id}_{frequency}.csv"
+    return (
+        f"##CSV_DOWNLOAD_START\n"
+        f"path={path}\n"
+        f"filename={filename}\n"
+        f"title={short_title}\n"
+        f"label=Descargar CSV\n"
+        f"mimetype=text/csv\n"
+        f"##CSV_DOWNLOAD_END"
+    )
+
+
+def _build_filtered_source_url(
+    observations: Dict[str, Any],
+    entities_ctx: Dict[str, Any],
+    selected_series_ctx: Optional[Dict[str, str]],
+) -> Optional[str]:
+    if not selected_series_ctx:
+        return None
+
+    source_url = str(observations.get("source_url") or "").strip()
+    if not source_url:
+        return None
+
+    series_id = selected_series_ctx.get("series_id", "")
+    frequency = selected_series_ctx.get("frequency", "")
+    series_data = _find_series_records(observations, series_id, frequency)
+    if not series_data:
+        return None
+
+    period_values = entities_ctx.get("period_ent")
+    period: Optional[List[Any]] = period_values if isinstance(period_values, list) else None
+    req_form = entities_ctx.get("req_form_cls")
+    calc_mode = (
+        entities_ctx.get("calc_mode_cls")
+        or (observations.get("classification") or {}).get("calc_mode")
+    )
+    calc_mode_for_url = str(calc_mode or "").strip().lower()
+    if calc_mode_for_url == "original":
+        calc_mode_for_url = "yoy"
+
+    frequency_for_url = {
+        "M": "m",
+        "T": "q",
+        "A": "a",
+    }.get(str(frequency).upper(), str(frequency or "").strip().lower())
+
+    filtered = build_target_series_url(
+        source_url=source_url,
+        series_id=series_id,
+        period=period,
+        req_form=req_form,
+        observations=series_data.get("records") or [],
+        frequency=frequency_for_url,
+        calc_mode=calc_mode_for_url,
+    )
+    return str(filtered or "").strip() or None
+
+
 def _export_cuadro_csv(observations: Dict[str, Any]) -> Optional[str]:
     """Export the full cuadro payload to a CSV so the UI always has a fallback download."""
     series_list = observations.get("series") or []
@@ -1777,6 +2020,12 @@ def _export_cuadro_csv(observations: Dict[str, Any]) -> Optional[str]:
                 }
                 for key, value in record.items():
                     if key in _CSV_EXCLUDE_COLS:
+                        continue
+                    if key == "yoy_pct":
+                        row["YTYPCT"] = value
+                        if "YTYPCT" not in dynamic_seen:
+                            dynamic_seen.add("YTYPCT")
+                            dynamic_fields.append("YTYPCT")
                         continue
                     row[key] = value
                     if key not in dynamic_seen:
@@ -1861,6 +2110,7 @@ def stream_data_response(
     question = payload.get("question", "")
     observations = payload.get("observations") or {}
     entities_ctx = payload.get("entities") if isinstance(payload.get("entities"), dict) else {}
+    timing = payload.get("_timing") if isinstance(payload.get("_timing"), dict) else None
     calc_mode_ctx = str(entities_ctx.get("calc_mode_cls") or "").strip().lower()
     if not calc_mode_ctx:
         calc_mode_ctx = str((observations.get("classification") or {}).get("calc_mode") or "").strip().lower()
@@ -1966,9 +2216,12 @@ def stream_data_response(
     messages.append({"role": "user", "content": question})
 
     fetched_series: List[Dict[str, Any]] = []  # track get_series_data results
+    selected_series_ctx: Optional[Dict[str, str]] = None
+    tool_calls_elapsed_ms = 0.0
 
     try:
         for _ in range(max_tool_loops):
+            loop_t0 = time.perf_counter()
             stream = client.chat.completions.create(
                 model=model,
                 messages=messages,
@@ -2041,15 +2294,40 @@ def stream_data_response(
                             parsed = json.loads(result)
                             if "records" in parsed:
                                 fetched_series.append(parsed)
+                                selected_series_ctx = {
+                                    "series_id": str(parsed.get("series_id") or fn_args.get("series_id") or ""),
+                                    "frequency": str(parsed.get("frequency") or fn_args.get("frequency") or "").upper(),
+                                }
                         except Exception:
                             pass
+                tool_calls_elapsed_ms += (time.perf_counter() - loop_t0) * 1000.0
             else:
                 # Sin tool calls → respuesta final ya fue yielded via content_chunks
-                source_footer = _build_source_footer(observations)
+                post_t0 = time.perf_counter()
+                final_series_ctx = _resolve_selected_series_context(
+                    observations=observations,
+                    entities_ctx=entities_ctx,
+                    selected_from_tools=selected_series_ctx,
+                )
+                filtered_source_url = _build_filtered_source_url(
+                    observations=observations,
+                    entities_ctx=entities_ctx,
+                    selected_series_ctx=final_series_ctx,
+                )
+                source_footer = _build_source_footer(
+                    observations,
+                    source_url_override=filtered_source_url,
+                )
                 if source_footer:
                     yield source_footer
                 csv_block = ""
-                if fetched_series:
+                if final_series_ctx:
+                    csv_block = _build_full_history_csv_marker(
+                        observations,
+                        selected_series_ctx=final_series_ctx,
+                        cuadro_name=str(observations.get("cuadro_name") or ""),
+                    )
+                if not csv_block and fetched_series:
                     csv_block = _build_csv_markers(
                         fetched_series,
                         cuadro_name=str(observations.get("cuadro_name") or ""),
@@ -2058,6 +2336,9 @@ def stream_data_response(
                     csv_block = _build_fallback_csv_marker(observations)
                 if csv_block:
                     yield "\n" + csv_block
+                if timing is not None:
+                    timing["openai_tool_calls_ms"] = round(tool_calls_elapsed_ms, 2)
+                    timing["post_response_blocks_ms"] = round((time.perf_counter() - post_t0) * 1000.0, 2)
                 return
         else:
             # Se agotó el loop de herramientas

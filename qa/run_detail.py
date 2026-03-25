@@ -153,6 +153,7 @@ class OpenAICapture:
     def __init__(self):
         self.messages: List[Dict[str, Any]] = []
         self.elapsed_seconds: float = 0.0
+        self.stage_ms: Dict[str, float] = {}
         self._patched = False
 
     def install(self):
@@ -163,11 +164,18 @@ class OpenAICapture:
         capture = self
 
         def _wrapped(payload: Dict[str, Any]):
+            timing: Dict[str, Any] = {}
+            instrumented_payload = dict(payload)
+            instrumented_payload["_timing"] = timing
             capture.messages = _rebuild_openai_messages(payload)
             t0 = time.perf_counter()
-            for chunk in original_stream(payload):
+            for chunk in original_stream(instrumented_payload):
                 yield chunk
             capture.elapsed_seconds = time.perf_counter() - t0
+            capture.stage_ms = {
+                "openai_tool_calls_ms": float(timing.get("openai_tool_calls_ms", 0.0) or 0.0),
+                "post_response_blocks_ms": float(timing.get("post_response_blocks_ms", 0.0) or 0.0),
+            }
 
         data_mod.stream_data_response = _wrapped
         self._original = original_stream
@@ -201,9 +209,16 @@ class DetailTracer:
         self._memory_input: Dict[str, Any] = {}
         self._current_state: Dict[str, Any] = {}
         self._openai_capture: Optional[OpenAICapture] = None
+        self._datastore_capture: Optional[DataStoreCapture] = None
+        self._t0 = time.perf_counter()
+        self._final_response_text: str = ""
+        self._response_format_ms: float = 0.0
 
     def set_openai_capture(self, capture: OpenAICapture):
         self._openai_capture = capture
+
+    def set_datastore_capture(self, capture: "DataStoreCapture"):
+        self._datastore_capture = capture
 
     def on_node_update(self, node_name: str, delta: Any):
         """Alimenta el tracer con la salida de un nodo del grafo."""
@@ -244,6 +259,8 @@ class DetailTracer:
         """Escribe el log completo al archivo."""
         self._log_path.parent.mkdir(parents=True, exist_ok=True)
 
+        self._prepare_response()
+
         self._write_header()
         self._write_summary()
         self._write_response()
@@ -265,7 +282,7 @@ class DetailTracer:
         self._add("")
 
     def _write_summary(self):
-        self._add("RESUMEN:")
+        self._add("NODO CLASSIFY:")
         info = _extract_classification_info(self._classification)
         self._add(f"  INTENT      : {info.get('intent', '—')}")
         self._add(f"  CONFIDENCE  : {info.get('confidence', '—')}")
@@ -278,16 +295,98 @@ class DetailTracer:
         fallback = (route == "fallback")
         self._add(f"  RUTA        : {self._route_decision or '—'}")
         self._add(f"  FALLBACK    : {_as_yes_no(fallback)}")
+        self._add("  CLASIFICACION (predict_raw):")
+        self._add(_indent(_pretty_json(info.get("predict_raw") or {}), 4))
+        self._add("")
+        self._add("TIEMPOS POR ETAPA (s):")
+        timings = self._compute_stage_timings_seconds()
+        self._add(f"  1. BUSQUEDA EN DATA_STORE: {timings.get('data_store_search_s', 0.0):.2f} s")
+        self._add(f"  2. LLAMADA API OPEN AI (TOOL CALLS): {timings.get('openai_tool_calls_s', 0.0):.2f} s")
+        self._add(f"  3. GENERACIÓN RESPUESTAS FUENTE,CSV y BLOQUE SUGERENCIAS: {timings.get('post_response_blocks_s', 0.0):.2f} s")
+        self._add(f"  4. ORQUESTACIÓN GENERAL (INGEST/CLASSIFY/INTENT/ROUTER/MEMORY): {timings.get('general_orchestration_s', 0.0):.2f} s")
+        self._add(f"  5. TIEMPO TOTAL: {timings.get('total_s', 0.0):.2f} s")
         self._add("")
 
     def _write_response(self):
-        final_output = self._current_state.get("output", "")
-        formatted = _format_final_response(final_output)
         self._add("RESPUESTA:")
-        self._add(_indent(formatted, 2))
+        self._add(_indent(self._final_response_text, 2))
         self._add("")
         self._add(SEPARATOR)
         self._add("")
+
+    def _prepare_response(self):
+        final_output = self._current_state.get("output", "")
+        t0 = time.perf_counter()
+        self._final_response_text = _format_final_response(final_output)
+        self._response_format_ms = (time.perf_counter() - t0) * 1000.0
+
+    def _compute_stage_timings_seconds(self) -> Dict[str, float]:
+        data_store_ms = 0.0
+        if self._datastore_capture is not None:
+            data_store_ms = float(self._datastore_capture.elapsed_ms)
+
+        openai_tool_ms = 0.0
+        post_blocks_ms = self._response_format_ms
+        if self._openai_capture is not None:
+            openai_tool_ms = float(
+                (self._openai_capture.stage_ms or {}).get("openai_tool_calls_ms", 0.0)
+            )
+            post_blocks_ms += float(
+                (self._openai_capture.stage_ms or {}).get("post_response_blocks_ms", 0.0)
+            )
+
+        total_ms = (time.perf_counter() - self._t0) * 1000.0
+
+        # Mostrar métricas que cuadren al nivel visible (2 decimales en segundos).
+        data_store_s = round(data_store_ms / 1000.0, 2)
+        openai_tool_s = round(openai_tool_ms / 1000.0, 2)
+        post_blocks_s = round(post_blocks_ms / 1000.0, 2)
+        total_s = round(total_ms / 1000.0, 2)
+        general_orchestration_s = round(
+            max(0.0, total_s - (data_store_s + openai_tool_s + post_blocks_s)),
+            2,
+        )
+
+        return {
+            "data_store_search_s": data_store_s,
+            "openai_tool_calls_s": openai_tool_s,
+            "post_response_blocks_s": post_blocks_s,
+            "general_orchestration_s": general_orchestration_s,
+            "total_s": total_s,
+        }
+
+
+class DataStoreCapture:
+    """Intercepta búsqueda en data_store y acumula tiempo en milisegundos."""
+
+    def __init__(self):
+        self.elapsed_ms: float = 0.0
+        self.calls: int = 0
+        self._patched = False
+
+    def install(self):
+        import orchestrator.graph.nodes.data as data_mod
+
+        original_search = data_mod.search_output_payloads
+        capture = self
+
+        def _wrapped(*args, **kwargs):
+            t0 = time.perf_counter()
+            try:
+                return original_search(*args, **kwargs)
+            finally:
+                capture.elapsed_ms += (time.perf_counter() - t0) * 1000.0
+                capture.calls += 1
+
+        data_mod.search_output_payloads = _wrapped
+        self._original = original_search
+        self._module = data_mod
+        self._patched = True
+
+    def uninstall(self):
+        if self._patched:
+            self._module.search_output_payloads = self._original
+            self._patched = False
 
 
 # ---------------------------------------------------------------------------
@@ -296,15 +395,16 @@ class DetailTracer:
 
 def run_detail_standalone(question: str) -> str:
     """Ejecuta el grafo completo y escribe el log detallado. Para uso CLI."""
-    os.environ["USE_JOINTBERT_CLASSIFIER"] = "false"
-
     from orchestrator.graph.agent_graph import build_graph
 
     capture = OpenAICapture()
     capture.install()
+    ds_capture = DataStoreCapture()
+    ds_capture.install()
 
     tracer = DetailTracer(question)
     tracer.set_openai_capture(capture)
+    tracer.set_datastore_capture(ds_capture)
 
     try:
         graph = build_graph()
@@ -332,6 +432,7 @@ def run_detail_standalone(question: str) -> str:
         return _format_final_response(tracer._current_state.get("output", ""))
     finally:
         capture.uninstall()
+        ds_capture.uninstall()
 
 
 def main():
