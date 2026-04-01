@@ -496,6 +496,10 @@ ESTILO DE RESPUESTA
       "disminuyó **-0,3%**" ✗ / "cayó **-0,3%**" ✗ / "retrocedió **-0,3%**" ✗
     · Regla simple: si usas el signo "-", el verbo debe ser neutro ("varió", "registró").
       Si usas verbo negativo ("cayó", "retrocedió"), omite el signo "-".
+        · Para contribuciones menores a cero (pp), usa redacción neutral con signo:
+            "tuvo una contribución de **-0,5 pp**" ✓ / "registró un aporte de **-0,5 pp**" ✓
+        · PROHIBIDO en contribuciones con signo: "contribución negativa de **-0,5 pp**" ✗,
+            "caída de **-0,5 pp**" ✗, "disminuyó **-0,5 pp**" ✗.
 - REGLA DE CONTRIBUCIONES (CRÍTICA):
     · Cuando el usuario pregunta "qué actividad impulsó", "qué afectó a la baja",
       "qué explicó el crecimiento/caída":
@@ -1064,6 +1068,8 @@ def _build_metric_priority_instruction(calc_mode: str) -> Optional[str]:
             "6.b. Cuando una contribución sea menor a cero, NO uses la frase 'contribución negativa'. "
             "Usa redacción neutral: 'tuvo una contribución de **-X,X pp**' o "
             "'registró una variación de **-X,X pp**'.\n"
+            "6.c. También está PROHIBIDO escribir 'contribución negativa de **-X,X pp**', "
+            "'caída de **-X,X pp**' o cualquier verbo negativo acompañado de signo.\n"
             "7. FLUJO OBLIGATORIO: primero llama list_series y luego llama rank_series "
             "con metric='value' y order='desc' para obtener el ranking de contribuciones.\n"
             "7.b. TOOLING MÍNIMO OBLIGATORIO: antes de redactar debes haber ejecutado "
@@ -1223,7 +1229,7 @@ def _build_contribution_activity_focus_instruction(
         "NO escribas 'enero no publicado' para este tipo de pregunta; ancla la respuesta al trimestre disponible. "
         "OBLIGATORIO: llama rank_series (metric='value') para ese trimestre y construye el bloque DATOS "
         "con al menos 5 actividades (si existen) en formato de lista, cada una con su contribución en pp. "
-        "Incluye además la principal contribución negativa, si existe. "
+        "Incluye además el principal aporte con signo negativo, si existe, usando redacción neutral. "
         "La respuesta es inválida si no incluye lista de actividades con pp. "
         "Está PROHIBIDO responder solo con 'el PIB registró X%'."
     )

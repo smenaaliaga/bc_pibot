@@ -31,6 +31,14 @@ def test_build_metric_priority_instruction_for_unknown_mode_returns_none():
     assert response_module._build_metric_priority_instruction("") is None
 
 
+def test_build_metric_priority_instruction_for_contribution_enforces_neutral_negative_wording():
+    text = response_module._build_metric_priority_instruction("contribution")
+    assert text is not None
+    assert "contribución negativa" in text
+    assert "redacción neutral" in text
+    assert "verbo negativo acompañado de signo" in text
+
+
 def test_build_incomplete_period_instruction_for_incomplete_quarterly_year():
     text = response_module._build_incomplete_period_instruction(
         question="cuanto crecio el pib de la region metropolitana en 2025",
