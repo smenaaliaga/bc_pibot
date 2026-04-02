@@ -2,16 +2,22 @@
 Utilidades de texto y matching fuzzy para el normalizador NER.
 
 Funciones de bajo nivel reutilizadas por todos los submódulos:
-- Normalización de texto (minúsculas, sin acentos)
-- Matching fuzzy con SequenceMatcher
+- Normalización de texto (minúsculas, sin acentos, con lru_cache)
+- Matching fuzzy con rapidfuzz (fallback a difflib.SequenceMatcher)
 - Búsqueda de mejor clave en vocabularios
 - Detección de indicadores genéricos
 """
 
-import re
 import unicodedata
+from functools import lru_cache
 from typing import Dict, List, Optional
-from difflib import SequenceMatcher
+
+try:
+    from rapidfuzz.fuzz import ratio as _rapidfuzz_ratio
+    _USE_RAPIDFUZZ = True
+except ImportError:
+    from difflib import SequenceMatcher
+    _USE_RAPIDFUZZ = False
 
 from orchestrator.normalizer._vocab import GENERIC_INDICATOR_TERMS
 
@@ -27,6 +33,7 @@ def strip_accents(s: str) -> str:
     )
 
 
+@lru_cache(maxsize=2048)
 def normalize_text(text: str) -> str:
     """Convierte a minúsculas y elimina acentos.  Ej: ``'Minería'`` → ``'mineria'``."""
     if not text:
@@ -38,6 +45,8 @@ def normalize_text(text: str) -> str:
 
 def similarity_ratio(a: str, b: str) -> float:
     """Ratio de similitud (0‑1) entre dos strings ya normalizados."""
+    if _USE_RAPIDFUZZ:
+        return _rapidfuzz_ratio(a, b) / 100.0
     return SequenceMatcher(None, a, b).ratio()
 
 

@@ -1,44 +1,82 @@
 """
-NER Normalizer — Normalización de entidades para indicadores económicos chilenos.
+Normalizer — Normalización de entidades y ajuste de clasificaciones.
 
-Punto de entrada principal del pipeline de normalización que transforma las
-entidades crudas detectadas por el modelo NER en valores canónicos listos
-para consultar el catálogo de series (IMACEC / PIB).
+Transforma las entidades crudas del NER en valores canónicos y aplica reglas
+de negocio que también modifican las clasificaciones del modelo (calc_mode,
+activity, region, investment, req_form). El resultado final es un
+ResolvedEntities listo para buscar en data_store.
 
-Arquitectura del módulo (tras refactorización):
-    _vocab.py   → Diccionarios de vocabulario (única fuente de verdad)
-    _text.py    → Normalización de texto y matching fuzzy
-    _period.py  → Parseo y resolución de períodos temporales
-    normalizer.py (este archivo) → Orquestación y reglas de negocio
+Arquitectura:
+    _vocab.py       → Diccionarios de vocabulario (fuente de verdad)
+    _text.py        → Normalización de texto y matching fuzzy
+    _period.py      → Parseo y resolución de períodos temporales
+    normalizer.py   → Orquestación, reglas de negocio y resolución final
 
-API pública (consumida por classifier_agent y tests):
+API pública:
     normalize_entities()                          → normalización completa para /predict
     normalize_region()                            → normalización aislada de región
     normalize_ner_entities()                      → normalización interna legacy
     normalize_from_json()                         → wrapper CLI con entrada/salida JSON
-    coerce_req_form_from_period_and_frequency()   → ajuste de req_form si period cubre varios períodos
+    resolve_entities_for_data_query()             → resolución final para el nodo DATA
+    coerce_req_form_from_period_and_frequency()   → ajuste de req_form según período
+    coerce_specific_class_labels()                → degrada cls specific → none si falta entidad
 
-Reglas de negocio (orden de ejecución):
-    1. Fuzzy matching  — Cada entidad se normaliza contra su vocabulario con
-       tolerancia a faltas de ortografía. Se priorizan variantes negativas
-       cuando el input contiene "no" (ej: "no minero" → "no_mineria").
-
-    2. Separación compuesta — En activity/region/investment, expresiones con "y"
-       se dividen en subvalores salvo que la frase completa ya tenga buen match.
-
+Pipeline de normalización NER (normalize_entities):
+    1. Fuzzy matching — Cada entidad se normaliza contra su vocabulario con
+       tolerancia a errores. Prioriza variantes negativas si hay "no"
+       (ej: "no minero" → "no_mineria").
+    2. Separación compuesta — activity/region/investment con "y" se dividen
+       en subvalores salvo que la frase completa ya tenga match.
     3. Inferencia indicator/frequency:
-       a) Si hay frequency explícita → indicator se deriva directamente.
-       b) Si hay region/investment → indicator=pib.
-       c) Si hay period → se infiere frequency desde granularidad del período.
+       a) frequency explícita → indicator derivado.
+       b) region/investment presentes → indicator=pib.
+       c) period → frequency desde granularidad.
        d) Fallback: imacec/m.
-
     4. Inferencia seasonality:
        - prev_period → sa; yoy/original/contribution/vacío → nsa.
        - PIB regional → siempre nsa.
-
     5. Resolución de period:
-       - Siempre rango [inicio, fin] en formato YYYY-MM-DD.
-       - Soporta: referencias relativas, trimestres, meses, décadas, latest.
+       - Rango [inicio, fin] en YYYY-MM-DD.
+       - Soporta: relativas, trimestres, meses, décadas, latest.
+
+Reglas de negocio sobre clasificaciones (apply_business_rules):
+    Estas reglas mutan campos *_cls del ResolvedEntities después de la
+    normalización NER. Se ejecutan en resolve_entities_for_data_query().
+
+    1. contribution + investment_specific sin entidad ni región
+       → activity_cls_resolved = "general"
+       (Fuerza búsqueda por actividad general como desglose de contribución)
+
+    2. IMACEC fuerza frecuencia mensual
+       → frequency_ent = "m"
+       (IMACEC solo tiene frecuencia mensual)
+
+    3. IMACEC sin actividad explícita
+       → activity_ent = "imacec"
+       (Default del indicador como actividad raíz)
+
+    4. Asignación de precio
+       → price = price_ent o "enc" por defecto
+       (Encadenado es el precio estándar)
+
+    5. Flag histórico (hist)
+       → hist = 1 si period <= 1996, 0 en caso contrario
+
+    6. contribution + investment=demanda_interna
+       → investment_cls = "general"
+       (Demanda interna se trata como componente general de gasto)
+
+    7. PIB con frecuencia mensual → redirige a trimestral
+       → frequency_ent = "q", req_form_cls = "latest", period_ent = []
+       (PIB mensual no existe; se redirige al último trimestre)
+
+Ajustes adicionales a clasificaciones (fuera de apply_business_rules):
+    - coerce_specific_class_labels(): degrada activity_cls/region_cls/
+      investment_cls de "specific" → "none" cuando la entidad normalizada
+      quedó vacía (el modelo dijo specific pero no hubo match).
+    - coerce_req_form_from_period_and_frequency(): cambia req_form de
+      "point" → "range" si el período resuelto abarca más de un período
+      para la frecuencia dada.
 """
 
 from __future__ import annotations
@@ -56,21 +94,16 @@ from orchestrator.normalizer._vocab import (
     ACTIVITY_TERMS_PIB_REGIONAL,
     FREQUENCY_TERMS,
     INVESTMENT_TERMS,
-    MONTHS,
     PRICE_TERMS,
     REGION_TERMS,
     SEASONALITY_TERMS,
 )
 from orchestrator.normalizer._text import (
     best_vocab_key,
-    fuzzy_match,
     is_generic_indicator,
     normalize_text,
 )
 from orchestrator.normalizer._period import (
-    contains_latest_ref,
-    fmt_month_start,
-    has_quarter_ref,
     infer_frequency_from_period,
     is_year_only_ref,
     normalize_single_period,
@@ -83,45 +116,8 @@ from orchestrator.normalizer.routing_utils import (
     LOW_CONFIDENCE_NONE_KEYS,
 )
 
-# Aliases internos para acceso legado (compatibilidad con imports directos)
-_normalize_text = normalize_text
-_fuzzy_match = fuzzy_match
-_best_vocab_key = best_vocab_key
-_is_generic_indicator_value = is_generic_indicator
-_contains_latest_reference = contains_latest_ref
-_has_quarter_reference = has_quarter_ref
-_is_year_only_period_reference = is_year_only_ref
-_infer_frequency_from_period_for_point = infer_frequency_from_period
+# Alias legado usado en tests (monkeypatch)
 _reference_now = reference_now
-_parse_yyyymmdd = parse_yyyymmdd
-_format_month_start = fmt_month_start
-
-# Constantes re-exportadas para compatibilidad
-from orchestrator.normalizer._vocab import (  # noqa: E402, F811
-    ACTIVITY_TERMS_IMACEC as ACTIVITY_TERMS_IMACEC,
-    ACTIVITY_TERMS_PIB as ACTIVITY_TERMS_PIB,
-    ACTIVITY_TERMS_PIB_REGIONAL as ACTIVITY_TERMS_PIB_REGIONAL,
-    FREQUENCY_TERMS as FREQUENCY_TERMS,
-    INDICATOR_TERMS as INDICATOR_TERMS,
-    INVESTMENT_TERMS as INVESTMENT_TERMS,
-    MONTHS as MONTHS,
-    MONTH_ALIASES as MONTH_ALIASES,
-    PERIOD_LATEST_TERMS as PERIOD_LATEST_TERMS,
-    PRICE_TERMS as PRICE_TERMS,
-    QUARTERS_START_MONTH as QUARTERS_START_MONTH,
-    REGION_TERMS as REGION_TERMS,
-    SEASONALITY_TERMS as SEASONALITY_TERMS,
-    SPANISH_NUMBER_WORDS as SPANISH_NUMBER_WORDS,
-    DECADE_WORDS as DECADE_WORDS,
-    ROMAN_QUARTERS as ROMAN_QUARTERS,
-    REFERENCE_TIMEZONE as REFERENCE_TIMEZONE,
-)
-from orchestrator.normalizer._period import (  # noqa: E402, F811
-    PERIOD_LATEST_REGEX as PERIOD_LATEST_REGEX_PATTERNS,
-    PERIOD_PREVIOUS_REGEX as PERIOD_PREVIOUS_REGEX_PATTERNS,
-)
-# Re-export las funciones de _period que se importaban vía PERIOD_*_REGEX
-from orchestrator.normalizer._vocab import PERIOD_LATEST_REGEX, PERIOD_PREVIOUS_REGEX  # noqa: F811
 
 _ENTITY_KEYS = ("indicator", "seasonality", "frequency", "activity", "region", "investment", "price", "period")
 
@@ -616,25 +612,23 @@ def _normalize_multi(
     base: Dict[str, Optional[str]],
 ) -> List[str]:
     """Normaliza N valores para una misma entidad, deduplica y preserva orden."""
+    _NORMALIZERS = {
+        "indicator": lambda raw, cm, b: normalize_indicator(raw, b.get("frequency")),
+        "seasonality": lambda raw, cm, b: normalize_seasonality(raw, cm),
+        "frequency": lambda raw, cm, b: normalize_frequency(raw),
+        "activity": lambda raw, cm, b: normalize_activity(raw, b.get("indicator"), calc_mode=cm, region_value=b.get("region"))[0],
+        "region": lambda raw, cm, b: normalize_region(raw)[0],
+        "investment": lambda raw, cm, b: normalize_investment(raw)[0],
+        "price": lambda raw, cm, b: normalize_price(raw),
+    }
+    fn = _NORMALIZERS.get(key)
+    if fn is None:
+        return []
     out: List[str] = []
     for raw in raw_values:
         if not raw:
             continue
-        val: Optional[str] = None
-        if key == "indicator":
-            val = normalize_indicator(raw, base.get("frequency"))
-        elif key == "seasonality":
-            val = normalize_seasonality(raw, calc_mode)
-        elif key == "frequency":
-            val = normalize_frequency(raw)
-        elif key == "activity":
-            val = normalize_activity(raw, base.get("indicator"), calc_mode=calc_mode, region_value=base.get("region"))[0]
-        elif key == "region":
-            val = normalize_region(raw)[0]
-        elif key == "investment":
-            val = normalize_investment(raw)[0]
-        elif key == "price":
-            val = normalize_price(raw)
+        val = fn(raw, calc_mode, base)
         if val and val not in out:
             out.append(val)
     return out
