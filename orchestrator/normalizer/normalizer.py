@@ -19,7 +19,7 @@ API pública:
     normalize_from_json()                         → wrapper CLI con entrada/salida JSON
     resolve_entities_for_data_query()             → resolución final para el nodo DATA
     coerce_req_form_from_period_and_frequency()   → ajuste de req_form según período
-    coerce_specific_class_labels()                → degrada cls specific → none si falta entidad
+    coerce_specific_class_labels()                → preserva cls original (specific/general/none) sin degradar
 
 Pipeline de normalización NER (normalize_entities):
     1. Fuzzy matching — Cada entidad se normaliza contra su vocabulario con
@@ -71,9 +71,9 @@ Reglas de negocio sobre clasificaciones (apply_business_rules):
        (PIB mensual no existe; se redirige al último trimestre)
 
 Ajustes adicionales a clasificaciones (fuera de apply_business_rules):
-    - coerce_specific_class_labels(): degrada activity_cls/region_cls/
-      investment_cls de "specific" → "none" cuando la entidad normalizada
-      quedó vacía (el modelo dijo specific pero no hubo match).
+    - coerce_specific_class_labels(): preserva activity_cls/region_cls/
+      investment_cls tal como vienen del clasificador, sin degradar a "none"
+      aunque la entidad normalizada quede vacía.
     - coerce_req_form_from_period_and_frequency(): cambia req_form de
       "point" → "range" si el período resuelto abarca más de un período
       para la frecuencia dada.
@@ -276,30 +276,19 @@ def coerce_specific_class_labels(
     investment_label: Optional[str],
     normalized_entities: Optional[Dict[str, Any]],
 ) -> Tuple[Optional[str], Optional[str], Optional[str]]:
-    """Degrada cls='specific' a 'none' cuando no hay entidad normalizada.
+    """Preserva la clasificación original de cls sin degradar a 'none'.
 
-    Regla: si activity/region/investment viene como "specific" pero luego del
-    matching la entidad normalizada queda vacía, se interpreta como ausencia de
-    match y la clasificación pasa a "none".
+    Aunque la entidad normalizada quede vacía (sin match en vocabulario),
+    se mantiene el cls original (specific/general/none) para que el
+    downstream pueda manejar el caso correctamente.
     """
-    normalized_entities = normalized_entities if isinstance(normalized_entities, dict) else {}
-
-    def _coerce(label: Optional[str], key: str) -> Optional[str]:
-        lbl = str(label or "").strip().lower() or None
-        if lbl != "specific":
-            return lbl
-
-        value = normalized_entities.get(key)
-        if isinstance(value, list):
-            has_value = any(str(v).strip() for v in value if v is not None)
-        else:
-            has_value = bool(str(value).strip()) if value is not None else False
-        return "specific" if has_value else "none"
+    def _coerce(label: Optional[str]) -> Optional[str]:
+        return str(label or "").strip().lower() or None
 
     return (
-        _coerce(activity_label, "activity"),
-        _coerce(region_label, "region"),
-        _coerce(investment_label, "investment"),
+        _coerce(activity_label),
+        _coerce(region_label),
+        _coerce(investment_label),
     )
 
 
