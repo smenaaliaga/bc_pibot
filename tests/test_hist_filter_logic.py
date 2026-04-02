@@ -1,4 +1,4 @@
-from orchestrator.data._business_rules import ResolvedEntities, apply_business_rules
+from orchestrator.normalizer.normalizer import ResolvedEntities, apply_business_rules
 from orchestrator.data.catalog_data_search import search_output_payloads
 
 
