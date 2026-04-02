@@ -2,7 +2,7 @@
 
 Flujo principal (``data_node``):
     1. Extrae entidades y clasificación del estado del grafo.
-    2. Aplica las reglas de negocio (``_business_rules``).
+    2. Resuelve las entidades finales desde el normalizer.
     3. Busca el payload en data_store con ``search_output_payloads``.
     4. Envía question + observations (payload completo) al response.
 """
@@ -18,9 +18,9 @@ from langgraph.types import StreamWriter
 
 from orchestrator.data.response import handle_no_series, stream_data_response
 from ..state import AgentState, _clone_entities, _emit_stream_chunk
-from orchestrator.data._helpers import coerce_period, first_non_empty
-from orchestrator.data._business_rules import ResolvedEntities, apply_business_rules
-from orchestrator.catalog.catalog_data_search import search_output_payloads
+from orchestrator.data._helpers import first_non_empty
+from orchestrator.data.catalog_data_search import search_output_payloads
+from orchestrator.normalizer.normalizer import ResolvedEntities, resolve_entities_for_data_query
 from orchestrator.normalizer.routing_utils import INTENT_CONFIDENCE_THRESHOLD
 
 logger = logging.getLogger(__name__)
@@ -34,59 +34,28 @@ from orchestrator.data._helpers import build_target_series_url as _build_target_
 _DATA_STORE_DIR = Path(__file__).resolve().parent.parent.parent / "memory" / "data_store"
 
 
-# ---------------------------------------------------------------------------
-# Extracción de entidades desde el estado del grafo
-# ---------------------------------------------------------------------------
+def _coerce_class_label(value: Any, *, apply_threshold: bool = True) -> Optional[str]:
+    if value is None:
+        return None
+    if isinstance(value, dict):
+        if apply_threshold:
+            conf_raw = value.get("confidence")
+            if conf_raw is not None:
+                try:
+                    if float(conf_raw) < INTENT_CONFIDENCE_THRESHOLD:
+                        return "none"
+                except (TypeError, ValueError):
+                    pass
+        lbl = value.get("label")
+        return str(lbl).strip().lower() if lbl is not None else None
+    text = str(value).strip().lower()
+    return text or None
 
-def _extract_entities_from_state(
-    state: AgentState,
-) -> tuple[
-    str,                         # question
-    List[Dict[str, Any]],       # entities
-    ResolvedEntities,            # ent (mutable, pre-reglas)
-]:
-    """Extrae y normaliza las entidades desde el estado del grafo."""
 
-    def _coerce_class_label(value: Any, *, apply_threshold: bool = True) -> Optional[str]:
-        if value is None:
-            return None
-        if isinstance(value, dict):
-            if apply_threshold:
-                conf_raw = value.get("confidence")
-                if conf_raw is not None:
-                    try:
-                        if float(conf_raw) < INTENT_CONFIDENCE_THRESHOLD:
-                            return "none"
-                    except (TypeError, ValueError):
-                        pass
-            lbl = value.get("label")
-            return str(lbl).strip().lower() if lbl is not None else None
-        text = str(value).strip().lower()
-        return text or None
-
-    question = state.get("question", "")
-    entities_state = _clone_entities(state.get("entities"))
-
-    classification = state.get("classification")
+def _extract_normalized_entities(classification: Any) -> Dict[str, Any]:
     predict_raw = getattr(classification, "predict_raw", None) if classification else None
     predict_raw = predict_raw if isinstance(predict_raw, dict) else {}
 
-    calc_mode_cls = _coerce_class_label(getattr(classification, "calc_mode", None), apply_threshold=False)
-    activity_cls = _coerce_class_label(getattr(classification, "activity", None), apply_threshold=True)
-    region_cls = _coerce_class_label(getattr(classification, "region", None), apply_threshold=True)
-    investment_cls = _coerce_class_label(getattr(classification, "investment", None), apply_threshold=True)
-    req_form_cls = _coerce_class_label(getattr(classification, "req_form", None), apply_threshold=False)
-
-    classification_entities = getattr(classification, "entities", None) or {}
-    normalized_from_classification = getattr(classification, "normalized", None) or {}
-
-    entities: List[Dict[str, Any]]
-    if isinstance(classification_entities, dict):
-        entities = [dict(classification_entities)]
-    else:
-        entities = entities_state
-
-    # Priorizar entities_normalized del predict_raw (follow-up)
     interpretation_root = predict_raw.get("interpretation")
     if not isinstance(interpretation_root, dict):
         interpretation_root = predict_raw
@@ -97,40 +66,65 @@ def _extract_entities_from_state(
         normalized_from_predict if isinstance(normalized_from_predict, dict) else {}
     )
 
-    normalized = normalized_from_predict or (
-        normalized_from_classification
-        if isinstance(normalized_from_classification, dict)
-        else {}
+    normalized_from_classification = getattr(classification, "normalized", None) or {}
+    normalized_from_classification = (
+        normalized_from_classification if isinstance(normalized_from_classification, dict) else {}
     )
 
+    normalized = normalized_from_predict or normalized_from_classification
     normalized_source = (
         "predict_raw.interpretation.entities_normalized"
         if normalized_from_predict
         else "classification.normalized"
     )
     logger.info("[DATA_NODE] normalized_entities source=%s data=%s", normalized_source, normalized)
+    return normalized
 
-    # Extraer valores de entidades
-    period_ent = coerce_period(normalized.get("period"))
 
-    ent = ResolvedEntities(
-        indicator_ent=first_non_empty(normalized.get("indicator")),
-        seasonality_ent=first_non_empty(normalized.get("seasonality")),
-        frequency_ent=first_non_empty(normalized.get("frequency")),
-        activity_ent=first_non_empty(normalized.get("activity")),
-        region_ent=first_non_empty(normalized.get("region")),
-        investment_ent=first_non_empty(normalized.get("investment")),
-        price_ent=first_non_empty(normalized.get("price")),
-        period_ent=period_ent,
+# ---------------------------------------------------------------------------
+# Extracción de entidades desde el estado del grafo
+# ---------------------------------------------------------------------------
+
+def _extract_entities_from_state(
+    state: AgentState,
+) -> tuple[
+    str,                         # question
+    List[Dict[str, Any]],       # entities
+    ResolvedEntities,            # ent final para búsqueda
+]:
+    """Extrae y normaliza las entidades desde el estado del grafo."""
+
+    question = state.get("question", "")
+    entities_state = _clone_entities(state.get("entities"))
+
+    classification = state.get("classification")
+
+    calc_mode_cls = _coerce_class_label(getattr(classification, "calc_mode", None), apply_threshold=False)
+    activity_cls = _coerce_class_label(getattr(classification, "activity", None), apply_threshold=True)
+    region_cls = _coerce_class_label(getattr(classification, "region", None), apply_threshold=True)
+    investment_cls = _coerce_class_label(getattr(classification, "investment", None), apply_threshold=True)
+    req_form_cls = _coerce_class_label(getattr(classification, "req_form", None), apply_threshold=False)
+
+    classification_entities = getattr(classification, "entities", None) or {}
+
+    entities: List[Dict[str, Any]]
+    if isinstance(classification_entities, dict):
+        entities = [dict(classification_entities)]
+    else:
+        entities = entities_state
+
+    normalized = _extract_normalized_entities(classification)
+
+    ent = resolve_entities_for_data_query(
+        normalized_entities=normalized,
         calc_mode_cls=calc_mode_cls,
         activity_cls=activity_cls,
-        activity_cls_resolved=activity_cls,
         region_cls=region_cls,
         investment_cls=investment_cls,
         req_form_cls=req_form_cls,
     )
 
-    logger.info("[DATA_NODE] resolved entities (pre-rules)=%s", asdict(ent))
+    logger.info("[DATA_NODE] resolved entities=%s", asdict(ent))
 
     return question, entities, ent
 
@@ -258,6 +252,67 @@ def _filter_series_by_entities(
     return cloned
 
 
+def _collect_target_series_ids(
+    observations: Dict[str, Any],
+    ent: ResolvedEntities,
+) -> List[str]:
+    """Extrae los ``series_id`` de las series que coinciden con las entidades
+    de activity, region e investment resueltas (lógica AND).
+
+    Si ninguna de las tres entidades está presente, retorna todos los IDs.
+    Para region, busca primero en ``classification_series`` de cada serie y,
+    si no existe allí, compara contra la clasificación a nivel de cuadro
+    (archivos single-region).
+    """
+    series = observations.get("series") or []
+    if not isinstance(series, list) or not series:
+        return []
+
+    activity = str(ent.activity_ent or "").strip().lower() or None
+    region = str(ent.region_ent or "").strip().lower() or None
+    investment = str(ent.investment_ent or "").strip().lower() or None
+
+    # Sin filtros activos → devolver todos los IDs
+    if not any((activity, region, investment)):
+        return [
+            s["series_id"] for s in series
+            if isinstance(s, dict) and s.get("series_id")
+        ]
+
+    # Region a nivel de cuadro (fallback para archivos single-region)
+    cuadro_cls = observations.get("classification") or {}
+    cuadro_region = str(cuadro_cls.get("region") or "").strip().lower() or None
+
+    ids: List[str] = []
+    for s in series:
+        if not isinstance(s, dict) or not s.get("series_id"):
+            continue
+        cls = s.get("classification_series") or {}
+        if not isinstance(cls, dict):
+            cls = {}
+
+        if activity:
+            val = str(cls.get("activity") or "").strip().lower()
+            if val != activity:
+                continue
+
+        if region:
+            val = str(cls.get("region") or "").strip().lower()
+            if val != region:
+                # Fallback: region vive a nivel de cuadro en archivos single-region
+                if cuadro_region != region:
+                    continue
+
+        if investment:
+            val = str(cls.get("investment") or "").strip().lower()
+            if val != investment:
+                continue
+
+        ids.append(s["series_id"])
+
+    return ids
+
+
 # ---------------------------------------------------------------------------
 # Nodo principal
 # ---------------------------------------------------------------------------
@@ -273,13 +328,13 @@ def make_data_node(memory_adapter: Any):
         # 1. Extraer entidades
         question, entities, ent = _extract_entities_from_state(state)
 
-        # 2. Aplicar reglas de negocio
-        apply_business_rules(ent)
-        logger.info("[DATA_NODE] resolved entities (post-rules)=%s", asdict(ent))
+        # 2. Las entidades ya salen resueltas desde el normalizer
         logger.info("[DATA_NODE] indicator=%s freq=%s activity=%s req_form=%s",
                     ent.indicator_ent, ent.frequency_ent, ent.activity_ent, ent.req_form_cls)
 
-        # 3. Buscar payload en data_store con search_output_payloads
+        # 3. Búsqueda en data_store ─────────────────────────────────
+        # Convierte las entidades resueltas (indicator, frequency, etc.)
+        # en filtros de búsqueda para localizar el payload JSON.
         search_kwargs = _build_search_kwargs(ent)
         logger.info("[DATA_NODE] search_output_payloads kwargs=%s", search_kwargs)
 
@@ -293,6 +348,7 @@ def make_data_node(memory_adapter: Any):
 
         logger.info("[DATA_NODE] search_output_payloads found %d matches", len(matches))
 
+        # Sin resultados → respuesta genérica de "serie no encontrada"
         if not matches:
             return handle_no_series(
                 question=question,
@@ -303,10 +359,20 @@ def make_data_node(memory_adapter: Any):
                 first_non_empty_fn=first_non_empty,
             )
 
-        # El payload completo del data_store ES las observations
+        # Se toma el primer match (mayor score).  El payload completo
+        # del data_store actúa como *observations*: contiene metadatos
+        # del cuadro, la lista de series y sus datos históricos.
         observations = matches[0]["payload"]
+
+        # Filtra series incompatibles con las restricciones del usuario
+        # (price, seasonality, calc_mode) para evitar que el LLM
+        # seleccione variantes incorrectas (ej. nominal vs real).
         observations = _filter_series_by_entities(observations, ent)
-        source_url = observations.get("source_url", "")
+
+        # Recopilar IDs de series que coinciden con las entidades de
+        # activity/region/investment resueltas (lógica AND).
+        target_series_ids = _collect_target_series_ids(observations, ent)
+        logger.info("[DATA_NODE] target_series_ids=%s", target_series_ids)
 
         logger.info("[DATA_NODE] cuadro=%s freq=%s series_count=%d",
                     observations.get("cuadro_name"),
@@ -320,6 +386,7 @@ def make_data_node(memory_adapter: Any):
             "question": question,
             "observations": observations,
             "entities": ent_dict,
+            "target_series_ids": target_series_ids,
         }
 
         collected: List[str] = []

@@ -44,7 +44,9 @@ Reglas de negocio (orden de ejecución):
 from __future__ import annotations
 
 import json
+import logging
 import re
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 # ─── Submódulos internos ───────────────────────────────────────────────────────
@@ -122,6 +124,37 @@ from orchestrator.normalizer._period import (  # noqa: E402, F811
 from orchestrator.normalizer._vocab import PERIOD_LATEST_REGEX, PERIOD_PREVIOUS_REGEX  # noqa: F811
 
 _ENTITY_KEYS = ("indicator", "seasonality", "frequency", "activity", "region", "investment", "price", "period")
+
+logger = logging.getLogger(__name__)
+
+
+def _first_non_empty_value(value: Any) -> Any:
+    if isinstance(value, list):
+        for item in value:
+            if item not in (None, "", [], {}, ()):
+                return item
+        return None
+    if value in (None, "", [], {}, ()):
+        return None
+    return value
+
+
+def _coerce_period_value(period_value: Any) -> List[Any]:
+    if period_value in (None, "", [], {}, ()):
+        return []
+    if isinstance(period_value, list):
+        return period_value
+    return [period_value]
+
+
+def _extract_year_value(value: Any) -> Optional[int]:
+    match = re.search(r"(19|20)\d{2}", str(value or "").strip())
+    if not match:
+        return None
+    try:
+        return int(match.group(0))
+    except Exception:
+        return None
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -239,6 +272,134 @@ def coerce_specific_class_labels(
         _coerce(region_label, "region"),
         _coerce(investment_label, "investment"),
     )
+
+
+@dataclass
+class ResolvedEntities:
+    """Entidades finales listas para consultar catálogo/data_store."""
+
+    indicator_ent: Optional[str] = None
+    seasonality_ent: Optional[str] = None
+    frequency_ent: Optional[str] = None
+    activity_ent: Optional[str] = None
+    region_ent: Optional[str] = None
+    investment_ent: Optional[str] = None
+    price_ent: Optional[str] = None
+    period_ent: List[Any] = field(default_factory=list)
+
+    calc_mode_cls: Any = None
+    activity_cls: Any = None
+    activity_cls_resolved: Any = None
+    region_cls: Any = None
+    investment_cls: Any = None
+    req_form_cls: Any = None
+
+    price: Optional[str] = None
+    hist: Optional[int] = None
+
+
+def apply_business_rules(ent: ResolvedEntities) -> ResolvedEntities:
+    """Aplica reglas de dominio y retorna el mismo objeto mutado."""
+    _rule_contribution_investment_force_general(ent)
+    _rule_imacec_force_monthly(ent)
+    _rule_imacec_default_activity(ent)
+    _rule_assign_price(ent)
+    _rule_pib_hist_flag(ent)
+    _rule_contribution_demanda_interna(ent)
+    _rule_redirect_pib_monthly_to_quarterly(ent)
+    return ent
+
+
+def resolve_entities_for_data_query(
+    *,
+    normalized_entities: Optional[Dict[str, Any]],
+    calc_mode_cls: Any = None,
+    activity_cls: Any = None,
+    region_cls: Any = None,
+    investment_cls: Any = None,
+    req_form_cls: Any = None,
+) -> ResolvedEntities:
+    """Construye y resuelve las entidades finales usadas por el nodo DATA."""
+    normalized_entities = normalized_entities if isinstance(normalized_entities, dict) else {}
+
+    ent = ResolvedEntities(
+        indicator_ent=_first_non_empty_value(normalized_entities.get("indicator")),
+        seasonality_ent=_first_non_empty_value(normalized_entities.get("seasonality")),
+        frequency_ent=_first_non_empty_value(normalized_entities.get("frequency")),
+        activity_ent=_first_non_empty_value(normalized_entities.get("activity")),
+        region_ent=_first_non_empty_value(normalized_entities.get("region")),
+        investment_ent=_first_non_empty_value(normalized_entities.get("investment")),
+        price_ent=_first_non_empty_value(normalized_entities.get("price")),
+        period_ent=_coerce_period_value(normalized_entities.get("period")),
+        calc_mode_cls=calc_mode_cls,
+        activity_cls=activity_cls,
+        activity_cls_resolved=activity_cls,
+        region_cls=region_cls,
+        investment_cls=investment_cls,
+        req_form_cls=req_form_cls,
+    )
+    return apply_business_rules(ent)
+
+
+def _rule_contribution_investment_force_general(ent: ResolvedEntities) -> None:
+    if (
+        ent.calc_mode_cls == "contribution"
+        and ent.investment_cls == "specific"
+        and ent.investment_ent in (None, "none")
+        and ent.region_cls in (None, "none")
+    ):
+        ent.activity_cls_resolved = "general"
+
+
+def _rule_imacec_force_monthly(ent: ResolvedEntities) -> None:
+    if (
+        str(ent.indicator_ent or "").strip().lower() == "imacec"
+        and str(ent.frequency_ent or "").strip().lower() != "m"
+    ):
+        ent.frequency_ent = "m"
+        logger.info("[DATA_NODE] IMACEC: forzando frecuencia mensual (m)")
+
+
+def _rule_imacec_default_activity(ent: ResolvedEntities) -> None:
+    if ent.indicator_ent == "imacec" and ent.activity_ent is None:
+        ent.activity_ent = "imacec"
+
+
+def _rule_assign_price(ent: ResolvedEntities) -> None:
+    if ent.price_ent:
+        ent.price = ent.price_ent
+    else:
+        ent.price = "enc"
+
+
+def _rule_pib_hist_flag(ent: ResolvedEntities) -> None:
+    ref_year = _extract_year_value(ent.period_ent[0]) if ent.period_ent else None
+    ent.hist = 1 if (ref_year is not None and ref_year <= 1996) else 0
+
+
+def _rule_contribution_demanda_interna(ent: ResolvedEntities) -> None:
+    if (
+        ent.calc_mode_cls == "contribution"
+        and ent.investment_cls == "specific"
+        and ent.investment_ent == "demanda_interna"
+    ):
+        ent.investment_cls = "general"
+
+
+def _rule_redirect_pib_monthly_to_quarterly(ent: ResolvedEntities) -> None:
+    if ent.indicator_ent != "pib":
+        return
+    if str(ent.frequency_ent or "").strip().lower() != "m":
+        return
+
+    if str(ent.calc_mode_cls or "").strip().lower() == "contribution":
+        logger.warning("[DATA_NODE] PIB contribución mensual no existe; redirigiendo a trimestral")
+    else:
+        logger.warning("[DATA_NODE] PIB mensual no existe; redirigiendo a trimestral")
+
+    ent.frequency_ent = "q"
+    ent.req_form_cls = "latest"
+    ent.period_ent = []
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
