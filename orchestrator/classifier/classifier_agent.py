@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
@@ -95,17 +94,18 @@ def _extract_confidence(value: Any) -> Optional[float]:
     return value if isinstance(value, (int, float)) else None
 
 
-def _intent_label_from_interpretation(predict_source: Dict[str, Any], key: str) -> Any:
+def _get_intents_dict(predict_source: Dict[str, Any]) -> Dict[str, Any]:
+    """Extrae el dict de intents desde predict_source de forma segura."""
     intents = predict_source.get("intents") if isinstance(predict_source, dict) else {}
-    intents = intents if isinstance(intents, dict) else {}
-    payload = intents.get(key)
-    return _extract_label(payload)
+    return intents if isinstance(intents, dict) else {}
+
+
+def _intent_label_from_interpretation(predict_source: Dict[str, Any], key: str) -> Any:
+    return _extract_label(_get_intents_dict(predict_source).get(key))
 
 
 def _intent_payload_from_interpretation(predict_source: Dict[str, Any], key: str) -> Any:
-    intents = predict_source.get("intents") if isinstance(predict_source, dict) else {}
-    intents = intents if isinstance(intents, dict) else {}
-    payload = intents.get(key)
+    payload = _get_intents_dict(predict_source).get(key)
     if isinstance(payload, dict):
         return payload
     label = _extract_label(payload)
@@ -122,60 +122,63 @@ def _coerce_entities_payload(entities_payload: Any) -> Dict[str, List[str]]:
         if not key_text:
             continue
 
-        values: List[str] = []
         if isinstance(value, list):
-            for item in value:
-                if item is None:
-                    continue
-                item_text = str(item).strip()
-                if item_text:
-                    values.append(item_text)
+            values = [str(v).strip() for v in value if v is not None and str(v).strip()]
         elif value is not None:
-            value_text = str(value).strip()
-            if value_text:
-                values.append(value_text)
+            text = str(value).strip()
+            values = [text] if text else []
+        else:
+            values = []
 
         coerced[key_text] = values
 
     return coerced
 
 
+# ============================================================
+# CLASSIFICATION VIA ENDPOINT
+# ============================================================
+
 def _classify_via_endpoint(question: str) -> ClassificationResult:
     """Clasificación usando el endpoint remoto PREDICT_URL."""
-    predict_payload = {"text": question}
-    predict_result = post_json(PREDICT_URL, predict_payload, timeout=PREDICT_TIMEOUT_SECONDS)
+    # 1. Llamada al endpoint
+    predict_result = post_json(PREDICT_URL, {"text": question}, timeout=PREDICT_TIMEOUT_SECONDS)
     logger.debug("[PREDICT_API] response=%s", predict_result)
     predict_result_dict: Dict[str, Any] = predict_result if isinstance(predict_result, dict) else {}
+
+    # 2. Resolver source e interpretation
     interpretation = predict_result_dict.get("interpretation")
-    predict_raw_for_state: Dict[str, Any] = dict(predict_result_dict) if isinstance(predict_result_dict, dict) else {}
+    predict_raw_for_state: Dict[str, Any] = dict(predict_result_dict)
     if isinstance(interpretation, dict):
         predict_source = interpretation
         if not isinstance(predict_raw_for_state.get("interpretation"), dict):
             predict_raw_for_state["interpretation"] = interpretation
     else:
         predict_source = predict_result_dict
-        fallback_interpretation = predict_source if isinstance(predict_source, dict) else {}
-        predict_raw_for_state = {
-            **predict_raw_for_state,
-            "interpretation": fallback_interpretation,
-        }
-    predict_result = predict_result_dict
+        predict_raw_for_state["interpretation"] = predict_source if isinstance(predict_source, dict) else {}
 
-    entities_api_raw = predict_source.get("entities")
-    if entities_api_raw is None and isinstance(predict_result_dict.get("entities"), dict):
-        entities_api_raw = predict_result_dict.get("entities")
-    entities_api = _coerce_entities_payload(entities_api_raw)
+    # 3. Entidades
+    entities_raw = predict_source.get("entities")
+    if entities_raw is None and isinstance(predict_result_dict.get("entities"), dict):
+        entities_raw = predict_result_dict["entities"]
+    entities = _coerce_entities_payload(entities_raw)
 
-    routing_payload = predict_result_dict.get("routing")
-    if not isinstance(routing_payload, dict):
-        routing_payload = predict_source.get("routing")
-    routing_payload = routing_payload if isinstance(routing_payload, dict) else {}
-    routing_intent = routing_payload.get("intent") if isinstance(routing_payload.get("intent"), dict) else {}
-    routing_macro = routing_payload.get("macro") if isinstance(routing_payload.get("macro"), dict) else {}
-    routing_context = routing_payload.get("context") if isinstance(routing_payload.get("context"), dict) else {}
-    routing_intent_label = _extract_label(routing_intent)
-    routing_context_label = _extract_label(routing_context)
+    # 4. Routing
+    routing = predict_result_dict.get("routing")
+    if not isinstance(routing, dict):
+        routing = predict_source.get("routing")
+    routing = routing if isinstance(routing, dict) else {}
 
+    routing_intent = routing.get("intent") if isinstance(routing.get("intent"), dict) else {}
+    routing_macro = routing.get("macro") if isinstance(routing.get("macro"), dict) else {}
+    routing_context = routing.get("context") if isinstance(routing.get("context"), dict) else {}
+
+    intent = _extract_label(routing_intent)
+    macro = _extract_label(routing_macro)
+    context = _extract_label(routing_context)
+    confidence = _extract_confidence(routing_intent)
+
+    # 5. Clasificadores específicos
     calc_mode_label = _intent_label_from_interpretation(predict_source, "calc_mode")
     req_form_label = _intent_label_from_interpretation(predict_source, "req_form")
     activity_payload = _intent_payload_from_interpretation(predict_source, "activity")
@@ -184,14 +187,21 @@ def _classify_via_endpoint(question: str) -> ClassificationResult:
     activity_label = _extract_label(activity_payload)
     region_label = _extract_label(region_payload)
     investment_label = _extract_label(investment_payload)
+
+    logger.info("[CLASSIFIER_API] intent=%s confidence=%s macro=%s context=%s", intent, confidence, macro, context)
+    logger.debug("[CLASSIFIER_API] Raw classifier: calc_mode=%s, activity_cls=%s, region_cls=%s, investment_cls=%s, req_form_cls=%s",
+                 calc_mode_label, activity_label, region_label, investment_label, req_form_label)
+    logger.debug("[CLASSIFIER_API] Raw entities: %s", entities)
+
+    # 6. Normalización
     try:
         normalized = normalize_entities(
-            entities=entities_api,
+            entities=entities,
             calc_mode=calc_mode_label,
             req_form=req_form_label,
             intents={
-                "intent": routing_intent_label,
-                "context": routing_context_label,
+                "intent": intent,
+                "context": context,
                 "activity": activity_payload,
                 "region": region_payload,
                 "investment": investment_payload,
@@ -201,6 +211,7 @@ def _classify_via_endpoint(question: str) -> ClassificationResult:
         logger.exception("[CLASSIFIER_API] Failed to recompute entities_normalized")
         raise RuntimeError("Failed to recompute entities_normalized from /predict response") from exc
 
+    # 7. Coerción post-normalización
     req_form_label = coerce_req_form_from_period_and_frequency(req_form_label, normalized)
     activity_label, region_label, investment_label = coerce_specific_class_labels(
         activity_label=activity_label,
@@ -209,31 +220,19 @@ def _classify_via_endpoint(question: str) -> ClassificationResult:
         normalized_entities=normalized,
     )
 
-    interpretation_state = predict_raw_for_state.get("interpretation")
-    if isinstance(interpretation_state, dict):
-        interpretation_state = dict(interpretation_state)
-    else:
-        interpretation_state = {}
-    interpretation_state["entities"] = entities_api
+    logger.debug("[CLASSIFIER_API] Normalized classifier: calc_mode=%s, activity_cls=%s, region_cls=%s, investment_cls=%s, req_form_cls=%s",
+                 calc_mode_label, activity_label, region_label, investment_label, req_form_label)
+    logger.debug("[CLASSIFIER_API] Normalized entities: %s", normalized)
+
+    # 8. Armar predict_raw
+    interpretation_state = dict(predict_raw_for_state.get("interpretation")) if isinstance(predict_raw_for_state.get("interpretation"), dict) else {}
+    interpretation_state["entities"] = entities
     interpretation_state["entities_normalized"] = normalized
     predict_raw_for_state["interpretation"] = interpretation_state
 
-    # Extraer intención y entidades desde el payload unificado de PREDICT_URL
-    intent = routing_intent_label
-    entities = entities_api
-    macro = _extract_label(routing_macro)
-    context = routing_context_label
-    confidence = _extract_confidence(routing_intent)
-
-    # Mostrar predicción completa
-    logger.info("[CLASSIFIER_API] intent=%s confidence=%s macro=%s context=%s", intent, confidence, macro, context)
-    logger.debug("[CLASSIFIER_API] Raw entities: %s", entities)
-    logger.debug("[CLASSIFIER_API] Normalized entities: %s", normalized)
-    
+    # 9. Texto
     text = (
-        interpretation.get("text")
-        if isinstance(interpretation, dict)
-        else None
+        interpretation.get("text") if isinstance(interpretation, dict) else None
     ) or predict_result_dict.get("text") or question
 
     return ClassificationResult(
@@ -251,9 +250,13 @@ def _classify_via_endpoint(question: str) -> ClassificationResult:
         req_form=req_form_label,
         macro=macro,
         context=context,
-        intent_raw={"routing": routing_payload},
+        intent_raw={"routing": routing},
         predict_raw=predict_raw_for_state,
     )
+
+# ============================================================
+# PUBLIC API
+# ============================================================
 
 def classify_question_with_history(
     question: str, history: Optional[List[Dict[str, str]]]
@@ -265,99 +268,45 @@ def classify_question_with_history(
     try:
         classification = _classify_via_endpoint(question)
     except Exception as exc:
-        t_end = time.perf_counter()
-        logger.error("[CLASSIFICATION] ERROR al clasificar | time='%s' | error=%s", t_end - t_start, exc)
+        logger.error("[CLASSIFICATION] ERROR al clasificar | time='%.3f' | error=%s", time.perf_counter() - t_start, exc)
         raise
-    
-    # Extraer indicador normalizado
-    indicator: Optional[str] = None
-    if classification.normalized and isinstance(classification.normalized, dict):
-        indicator = _extract_normalized_scalar(classification.normalized.get('indicator'))
-    
-    t_end = time.perf_counter()
+
+    indicator = _extract_indicator(classification)
+
+    t_elapsed = time.perf_counter() - t_start
     logger.info(
         "[CLASSIFICATION] Clasificación finalizada (%.3fs) | intent=%s | confidence=%.3f | indicator=%s",
-        t_end - t_start,
-        classification.intent,
-        classification.confidence or 0.0,
-        indicator,
+        t_elapsed, classification.intent, classification.confidence or 0.0, indicator,
     )
-    
-    
-    # Fallback: asegurarse de que quede registrado en el archivo de log configurado por RUN_MAIN_LOG,
-    # pero sin truncar ni reescribir; solo append.
-    try:
-        logs_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), "..", "logs")
-        os.makedirs(logs_dir, exist_ok=True)
-        fixed = os.getenv("RUN_MAIN_LOG", "").strip() or "run_main.log"
-        path = os.path.join(logs_dir, fixed)
-        predict_raw = classification.predict_raw or {}
-        interpretation = predict_raw.get("interpretation") if isinstance(predict_raw.get("interpretation"), dict) else predict_raw
-        interpretation = interpretation if isinstance(interpretation, dict) else {}
-        interpretation_intents = interpretation.get("intents") or {}
-        entities_normalized = interpretation.get("entities_normalized") or {}
-        routing = predict_raw.get("routing") or {}
 
-        def _first_or_none(value: Any) -> Any:
-            if isinstance(value, list):
-                return next((item for item in value if item not in (None, "")), None)
-            return value
+    norm = classification.normalized or {}
+    logger.debug(
+        "[CLASSIFIER_FILE] MAPPED_PARAMS | indicator=%s seasonality=%s frequency=%s period=%s "
+        "calc_mode_cls=%s activity_cls=%s region_cls=%s investment_cls=%s req_form_cls=%s "
+        "macro=%s intent=%s context=%s",
+        _extract_normalized_scalar(norm.get("indicator")),
+        _extract_normalized_scalar(norm.get("seasonality")),
+        _extract_normalized_scalar(norm.get("frequency")),
+        norm.get("period"),
+        classification.calc_mode,
+        _extract_label(classification.activity),
+        _extract_label(classification.region),
+        _extract_label(classification.investment),
+        classification.req_form,
+        classification.macro,
+        classification.intent,
+        classification.context,
+    )
 
-        def _intent_label(key: str) -> Any:
-            intent_payload = interpretation_intents.get(key)
-            if isinstance(intent_payload, dict):
-                return intent_payload.get("label")
-            return intent_payload
-
-        mapped = {
-            "indicator": _first_or_none(entities_normalized.get("indicator"))
-            or _first_or_none((classification.normalized or {}).get("indicator")),
-            "seasonality": _first_or_none(entities_normalized.get("seasonality"))
-            or _first_or_none((classification.normalized or {}).get("seasonality")),
-            "frequency": _first_or_none(entities_normalized.get("frequency"))
-            or _first_or_none((classification.normalized or {}).get("frequency")),
-            "period": entities_normalized.get("period")
-            or (classification.normalized or {}).get("period"),
-            "calc_mode_cls": _intent_label("calc_mode"),
-            "activity_cls": _intent_label("activity"),
-            "region_cls": _intent_label("region"),
-            "investment_cls": _intent_label("investment"),
-            "req_form_cls": _intent_label("req_form"),
-            "macro_cls": (routing.get("macro") or {}).get("label"),
-            "intent_cls": (routing.get("intent") or {}).get("label"),
-            "context_cls": (routing.get("context") or {}).get("label"),
-        }
-        statuses = {
-            key: "PRESENT" if value not in (None, "", [], {}) else "MISSING"
-            for key, value in mapped.items()
-        }
-        with open(path, "a", encoding="utf-8") as f:
-            f.write(
-                "[CLASSIFIER_FILE] intent=%s confidence=%.3f indicator=%s\n"
-                % (classification.intent, classification.confidence or 0.0, indicator)
-            )
-            f.write("[CLASSIFIER_FILE] PREDICT_RAW=%s\n" % (predict_raw,))
-            f.write("[CLASSIFIER_FILE] MAPPED_PARAMS=\n")
-            f.write("Key                                  | Status     | Value\n")
-            f.write("-------------------------------------+------------+--------------------------\n")
-            for key in sorted(mapped.keys()):
-                status = statuses.get(key, "MISSING")
-                raw_value = mapped.get(key)
-                value = "(empty)" if raw_value in (None, "", [], {}) else str(raw_value)
-                f.write(f"{key:<37} | {status:<10} | {value}\n")
-            f.write("[CLASSIFIER_FILE] PREDICT_RAW=%s\n" % (predict_raw,))
-            f.write("[CLASSIFIER_FILE] MAPPED_PARAMS=\n")
-            f.write("Key                                  | Status     | Value\n")
-            f.write("-------------------------------------+------------+--------------------------\n")
-            for key in sorted(mapped.keys()):
-                status = statuses.get(key, "MISSING")
-                raw_value = mapped.get(key)
-                value = "(empty)" if raw_value in (None, "", [], {}) else str(raw_value)
-                f.write(f"{key:<37} | {status:<10} | {value}\n")
-    except Exception:
-        pass
     history_text = _build_history_text(history)
     return classification, history_text
+
+
+def _extract_indicator(cls: ClassificationResult) -> Optional[str]:
+    """Extrae el indicador normalizado del ClassificationResult."""
+    if cls.normalized and isinstance(cls.normalized, dict):
+        return _extract_normalized_scalar(cls.normalized.get("indicator"))
+    return None
 
 
 def build_intent_info(cls: Optional[ClassificationResult]) -> Optional[Dict[str, Any]]:
@@ -365,11 +314,6 @@ def build_intent_info(cls: Optional[ClassificationResult]) -> Optional[Dict[str,
     if cls is None:
         return None
     try:
-        # Extraer indicador desde normalized
-        indicator: Optional[str] = None
-        if cls.normalized and isinstance(cls.normalized, dict):
-            indicator = _extract_normalized_scalar(cls.normalized.get('indicator'))
-        
         return {
             "intent": cls.intent or "unknown",
             "score": cls.confidence or 0.0,
@@ -377,7 +321,7 @@ def build_intent_info(cls: Optional[ClassificationResult]) -> Optional[Dict[str,
             "normalized": cls.normalized or {},
             "intent_raw": cls.intent_raw or {},
             "predict_raw": cls.predict_raw or {},
-            "indicator": indicator,
+            "indicator": _extract_indicator(cls),
             "spans": [],
             "macro": cls.macro,
             "context": cls.context,
