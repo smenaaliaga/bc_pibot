@@ -73,7 +73,7 @@ def _extract_normalized_entities(classification: Any) -> Dict[str, Any]:
         if normalized_from_predict
         else "classification.normalized"
     )
-    logger.info("[DATA_NODE] normalized_entities source=%s data=%s", normalized_source, normalized)
+
     return normalized
 
 
@@ -177,72 +177,6 @@ def _build_search_kwargs(ent: ResolvedEntities) -> Dict[str, Any]:
     return kwargs
 
 
-def _filter_series_by_entities(
-    observations: Dict[str, Any],
-    ent: ResolvedEntities,
-) -> Dict[str, Any]:
-    """Filtra series por price/seasonality/calc_mode."""
-    series = observations.get("series") or []
-    if not isinstance(series, list) or not series:
-        return observations
-
-    constraints: Dict[str, str] = {}
-    price = str(ent.price or "").strip().lower()
-    seasonality = str(ent.seasonality_ent or "").strip().lower()
-    calc_mode = str(ent.calc_mode_cls or "").strip().lower()
-    if price:
-        constraints["price"] = price
-    if seasonality:
-        constraints["seasonality"] = seasonality
-    if calc_mode:
-        constraints["calc_mode"] = calc_mode
-
-    if not constraints:
-        return observations
-
-    def _matches(series_item: Dict[str, Any]) -> bool:
-        cls = series_item.get("classification_series") or {}
-        if not isinstance(cls, dict):
-            return True
-        for key, expected in constraints.items():
-            current = cls.get(key)
-            # Si se pidió seasonality, exigir metadata explícita.
-            if key == "seasonality" and current is None:
-                return False
-            if current is None:
-                continue
-            if isinstance(current, list):
-                normalized = {str(v).strip().lower() for v in current}
-                if expected not in normalized:
-                    return False
-                continue
-            if str(current).strip().lower() != expected:
-                return False
-        return True
-
-    filtered = [s for s in series if _matches(s)]
-    if not filtered:
-        logger.info(
-            "[DATA_NODE] series filter skipped (0 matches) constraints=%s total=%d",
-            constraints,
-            len(series),
-        )
-        return observations
-
-    if len(filtered) == len(series):
-        return observations
-
-    cloned = dict(observations)
-    cloned["series"] = filtered
-    logger.info(
-        "[DATA_NODE] series filtered by constraints=%s kept=%d total=%d",
-        constraints,
-        len(filtered),
-        len(series),
-    )
-    return cloned
-
-
 def _collect_target_series_ids(
     observations: Dict[str, Any],
     ent: ResolvedEntities,
@@ -316,10 +250,6 @@ def make_data_node(memory_adapter: Any):
         # Extraer entidades.
         question, entities, ent = _extract_entities_from_state(state)
 
-        # Entidades resueltas por normalizer.
-        logger.info("[DATA_NODE] indicator=%s freq=%s activity=%s req_form=%s",
-                    ent.indicator_ent, ent.frequency_ent, ent.activity_ent, ent.req_form_cls)
-
         # Buscar payload en data_store con filtros resueltos.
         search_kwargs = _build_search_kwargs(ent)
         logger.info("[DATA_NODE] search_output_payloads kwargs=%s", search_kwargs)
@@ -348,17 +278,13 @@ def make_data_node(memory_adapter: Any):
         # Tomar el primer match como observations.
         observations = matches[0]["payload"]
 
-        # Filtrar series incompatibles.
-        observations = _filter_series_by_entities(observations, ent)
-
+        logger.info("[DATA_NODE] cuadro=%s | freq=%s",
+                    observations.get("cuadro_name"),
+                    observations.get("frequency"))
+        
         # IDs de series que cumplen activity/region/investment.
         series = _collect_target_series_ids(observations, ent)
         logger.info("[DATA_NODE] series=%s", series)
-
-        logger.info("[DATA_NODE] cuadro=%s freq=%s series_count=%d",
-                    observations.get("cuadro_name"),
-                    observations.get("frequency"),
-                    len(observations.get("series", [])))
 
         ent_dict = asdict(ent)
 

@@ -275,8 +275,8 @@ def classify_question_with_history(
 
     t_elapsed = time.perf_counter() - t_start
     logger.info(
-        "[CLASSIFICATION] Clasificación finalizada (%.3fs) | intent=%s | confidence=%.3f | indicator=%s",
-        t_elapsed, classification.intent, classification.confidence or 0.0, indicator,
+        "[CLASSIFICATION] Clasificación finalizada (%.3fs)",
+        t_elapsed
     )
 
     norm = classification.normalized or {}
