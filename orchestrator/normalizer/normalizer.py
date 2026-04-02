@@ -135,6 +135,15 @@ def _first_non_empty_value(value: Any) -> Any:
     return value
 
 
+def _all_non_empty_values(value: Any) -> List[str]:
+    """Retorna una lista con todos los valores no vacíos."""
+    if isinstance(value, list):
+        return [v for v in value if v not in (None, "", [], {}, ())]
+    if value in (None, "", [], {}, ()):
+        return []
+    return [value]
+
+
 def _coerce_period_value(period_value: Any) -> List[Any]:
     if period_value in (None, "", [], {}, ()):
         return []
@@ -236,6 +245,30 @@ def _intent_label(intent_value: Any, *, key: Optional[str] = None) -> Optional[s
     return str(intent_value).lower()
 
 
+def coerce_class_label(value: Any, *, apply_threshold: bool = True) -> Optional[str]:
+    """Extrae label de un payload de clasificador, aplicando threshold de confianza.
+
+    Si ``value`` es un dict con ``label`` y ``confidence``, devuelve el label
+    como string en lowercase.  Cuando ``apply_threshold=True`` y la confianza
+    es menor a ``INTENT_CONFIDENCE_THRESHOLD``, devuelve ``"none"``.
+    """
+    if value is None:
+        return None
+    if isinstance(value, dict):
+        if apply_threshold:
+            conf_raw = value.get("confidence")
+            if conf_raw is not None:
+                try:
+                    if float(conf_raw) < INTENT_CONFIDENCE_THRESHOLD:
+                        return "none"
+                except (TypeError, ValueError):
+                    pass
+        lbl = value.get("label")
+        return str(lbl).strip().lower() if lbl is not None else None
+    text = str(value).strip().lower()
+    return text or None
+
+
 def coerce_specific_class_labels(
     *,
     activity_label: Optional[str],
@@ -277,9 +310,9 @@ class ResolvedEntities:
     indicator_ent: Optional[str] = None
     seasonality_ent: Optional[str] = None
     frequency_ent: Optional[str] = None
-    activity_ent: Optional[str] = None
-    region_ent: Optional[str] = None
-    investment_ent: Optional[str] = None
+    activity_ent: List[str] = field(default_factory=list)
+    region_ent: List[str] = field(default_factory=list)
+    investment_ent: List[str] = field(default_factory=list)
     price_ent: Optional[str] = None
     period_ent: List[Any] = field(default_factory=list)
 
@@ -322,9 +355,9 @@ def resolve_entities_for_data_query(
         indicator_ent=_first_non_empty_value(normalized_entities.get("indicator")),
         seasonality_ent=_first_non_empty_value(normalized_entities.get("seasonality")),
         frequency_ent=_first_non_empty_value(normalized_entities.get("frequency")),
-        activity_ent=_first_non_empty_value(normalized_entities.get("activity")),
-        region_ent=_first_non_empty_value(normalized_entities.get("region")),
-        investment_ent=_first_non_empty_value(normalized_entities.get("investment")),
+        activity_ent=_all_non_empty_values(normalized_entities.get("activity")),
+        region_ent=_all_non_empty_values(normalized_entities.get("region")),
+        investment_ent=_all_non_empty_values(normalized_entities.get("investment")),
         price_ent=_first_non_empty_value(normalized_entities.get("price")),
         period_ent=_coerce_period_value(normalized_entities.get("period")),
         calc_mode_cls=calc_mode_cls,
@@ -341,7 +374,7 @@ def _rule_contribution_investment_force_general(ent: ResolvedEntities) -> None:
     if (
         ent.calc_mode_cls == "contribution"
         and ent.investment_cls == "specific"
-        and ent.investment_ent in (None, "none")
+        and (not ent.investment_ent or ent.investment_ent == ["none"])
         and ent.region_cls in (None, "none")
     ):
         ent.activity_cls_resolved = "general"
@@ -357,8 +390,8 @@ def _rule_imacec_force_monthly(ent: ResolvedEntities) -> None:
 
 
 def _rule_imacec_default_activity(ent: ResolvedEntities) -> None:
-    if ent.indicator_ent == "imacec" and ent.activity_ent is None:
-        ent.activity_ent = "imacec"
+    if ent.indicator_ent == "imacec" and not ent.activity_ent:
+        ent.activity_ent = ["imacec"]
 
 
 def _rule_assign_price(ent: ResolvedEntities) -> None:
@@ -377,7 +410,7 @@ def _rule_contribution_demanda_interna(ent: ResolvedEntities) -> None:
     if (
         ent.calc_mode_cls == "contribution"
         and ent.investment_cls == "specific"
-        and ent.investment_ent == "demanda_interna"
+        and "demanda_interna" in ent.investment_ent
     ):
         ent.investment_cls = "general"
 

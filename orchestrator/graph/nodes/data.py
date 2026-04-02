@@ -16,8 +16,7 @@ from orchestrator.data.response import handle_no_series, stream_data_response
 from ..state import AgentState, _clone_entities, _emit_stream_chunk
 from orchestrator.data._helpers import first_non_empty
 from orchestrator.catalog.catalog_data_search import search_output_payloads
-from orchestrator.normalizer.normalizer import ResolvedEntities, resolve_entities_for_data_query
-from orchestrator.normalizer.routing_utils import INTENT_CONFIDENCE_THRESHOLD
+from orchestrator.normalizer.normalizer import ResolvedEntities
 
 logger = logging.getLogger(__name__)
 
@@ -28,53 +27,6 @@ from orchestrator.data._helpers import build_target_series_url as _build_target_
 # Rutas
 # ---------------------------------------------------------------------------
 _DATA_STORE_DIR = Path(__file__).resolve().parent.parent.parent / "memory" / "data_store"
-
-
-def _coerce_class_label(value: Any, *, apply_threshold: bool = True) -> Optional[str]:
-    if value is None:
-        return None
-    if isinstance(value, dict):
-        if apply_threshold:
-            conf_raw = value.get("confidence")
-            if conf_raw is not None:
-                try:
-                    if float(conf_raw) < INTENT_CONFIDENCE_THRESHOLD:
-                        return "none"
-                except (TypeError, ValueError):
-                    pass
-        lbl = value.get("label")
-        return str(lbl).strip().lower() if lbl is not None else None
-    text = str(value).strip().lower()
-    return text or None
-
-
-def _extract_normalized_entities(classification: Any) -> Dict[str, Any]:
-    predict_raw = getattr(classification, "predict_raw", None) if classification else None
-    predict_raw = predict_raw if isinstance(predict_raw, dict) else {}
-
-    interpretation_root = predict_raw.get("interpretation")
-    if not isinstance(interpretation_root, dict):
-        interpretation_root = predict_raw
-    interpretation_root = interpretation_root if isinstance(interpretation_root, dict) else {}
-
-    normalized_from_predict = interpretation_root.get("entities_normalized")
-    normalized_from_predict = (
-        normalized_from_predict if isinstance(normalized_from_predict, dict) else {}
-    )
-
-    normalized_from_classification = getattr(classification, "normalized", None) or {}
-    normalized_from_classification = (
-        normalized_from_classification if isinstance(normalized_from_classification, dict) else {}
-    )
-
-    normalized = normalized_from_predict or normalized_from_classification
-    normalized_source = (
-        "predict_raw.interpretation.entities_normalized"
-        if normalized_from_predict
-        else "classification.normalized"
-    )
-
-    return normalized
 
 
 # ---------------------------------------------------------------------------
@@ -88,18 +40,16 @@ def _extract_entities_from_state(
     List[Dict[str, Any]],       # entities
     ResolvedEntities,            # ent final para búsqueda
 ]:
-    """Extrae y normaliza las entidades desde el estado del grafo."""
+    """Extrae entidades desde el estado del grafo.
+
+    El ``ResolvedEntities`` ya viene pre-computado por el clasificador
+    (``classifier_agent.py``), por lo que aquí solo se extrae.
+    """
 
     question = state.get("question", "")
     entities_state = _clone_entities(state.get("entities"))
 
     classification = state.get("classification")
-
-    calc_mode_cls = _coerce_class_label(getattr(classification, "calc_mode", None), apply_threshold=False)
-    activity_cls = _coerce_class_label(getattr(classification, "activity", None), apply_threshold=True)
-    region_cls = _coerce_class_label(getattr(classification, "region", None), apply_threshold=True)
-    investment_cls = _coerce_class_label(getattr(classification, "investment", None), apply_threshold=True)
-    req_form_cls = _coerce_class_label(getattr(classification, "req_form", None), apply_threshold=False)
 
     classification_entities = getattr(classification, "entities", None) or {}
 
@@ -109,16 +59,10 @@ def _extract_entities_from_state(
     else:
         entities = entities_state
 
-    normalized = _extract_normalized_entities(classification)
-
-    ent = resolve_entities_for_data_query(
-        normalized_entities=normalized,
-        calc_mode_cls=calc_mode_cls,
-        activity_cls=activity_cls,
-        region_cls=region_cls,
-        investment_cls=investment_cls,
-        req_form_cls=req_form_cls,
-    )
+    ent = getattr(classification, "resolved_entities", None)
+    if not isinstance(ent, ResolvedEntities):
+        logger.warning("[DATA_NODE] classification.resolved_entities ausente; usando defaults vacíos")
+        ent = ResolvedEntities()
 
     logger.info("[DATA_NODE] resolved entities=%s", asdict(ent))
 
@@ -163,7 +107,7 @@ def _build_search_kwargs(ent: ResolvedEntities) -> Dict[str, Any]:
         kwargs["has_region"] = 0
 
     if ent.region_ent:
-        kwargs["region"] = ent.region_ent
+        kwargs["region"] = ent.region_ent[0]
 
     inv = str(ent.investment_cls or "").strip().lower()
     if inv in ("general", "specific"):
@@ -190,12 +134,12 @@ def _collect_target_series_ids(
     if not isinstance(series, list) or not series:
         return []
 
-    activity = str(ent.activity_ent or "").strip().lower() or None
-    region = str(ent.region_ent or "").strip().lower() or None
-    investment = str(ent.investment_ent or "").strip().lower() or None
+    activity_set = {s.strip().lower() for s in ent.activity_ent if s} or None
+    region_set = {s.strip().lower() for s in ent.region_ent if s} or None
+    investment_set = {s.strip().lower() for s in ent.investment_ent if s} or None
 
     # Sin filtros: devolver todos los IDs.
-    if not any((activity, region, investment)):
+    if not any((activity_set, region_set, investment_set)):
         return [
             s["series_id"] for s in series
             if isinstance(s, dict) and s.get("series_id")
@@ -213,21 +157,21 @@ def _collect_target_series_ids(
         if not isinstance(cls, dict):
             cls = {}
 
-        if activity:
+        if activity_set:
             val = str(cls.get("activity") or "").strip().lower()
-            if val != activity:
+            if val not in activity_set:
                 continue
 
-        if region:
+        if region_set:
             val = str(cls.get("region") or "").strip().lower()
-            if val != region:
+            if val not in region_set:
                 # Si la serie no trae region, usar region de cuadro.
-                if cuadro_region != region:
+                if cuadro_region not in region_set:
                     continue
 
-        if investment:
+        if investment_set:
             val = str(cls.get("investment") or "").strip().lower()
-            if val != investment:
+            if val not in investment_set:
                 continue
 
         ids.append(s["series_id"])

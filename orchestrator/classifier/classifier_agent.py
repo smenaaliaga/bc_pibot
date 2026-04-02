@@ -7,9 +7,11 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 from orchestrator.normalizer.normalizer import (
+    coerce_class_label,
     coerce_specific_class_labels,
     coerce_req_form_from_period_and_frequency,
     normalize_entities,
+    resolve_entities_for_data_query,
 )
 from orchestrator.utils.http_client import post_json
 from config import PREDICT_TIMEOUT_SECONDS, PREDICT_URL
@@ -40,6 +42,7 @@ class ClassificationResult:
     context: Optional[str] = None
     intent_raw: Optional[dict] = None
     predict_raw: Optional[dict] = None
+    resolved_entities: Any = None  # ResolvedEntities pre-computed
 
 
 
@@ -188,7 +191,7 @@ def _classify_via_endpoint(question: str) -> ClassificationResult:
     region_label = _extract_label(region_payload)
     investment_label = _extract_label(investment_payload)
 
-    logger.info("[CLASSIFIER_API] intent=%s confidence=%s macro=%s context=%s", intent, confidence, macro, context)
+    logger.info("[CLASSIFIER_API] intent=%s macro=%s context=%s", intent, macro, context)
     logger.debug("[CLASSIFIER_API] Raw classifier: calc_mode=%s, activity_cls=%s, region_cls=%s, investment_cls=%s, req_form_cls=%s",
                  calc_mode_label, activity_label, region_label, investment_label, req_form_label)
     logger.debug("[CLASSIFIER_API] Raw entities: %s", entities)
@@ -211,26 +214,41 @@ def _classify_via_endpoint(question: str) -> ClassificationResult:
         logger.exception("[CLASSIFIER_API] Failed to recompute entities_normalized")
         raise RuntimeError("Failed to recompute entities_normalized from /predict response") from exc
 
-    # 7. Coerción post-normalización
-    req_form_label = coerce_req_form_from_period_and_frequency(req_form_label, normalized)
-    activity_label, region_label, investment_label = coerce_specific_class_labels(
-        activity_label=activity_label,
-        region_label=region_label,
-        investment_label=investment_label,
+    # 7. Coerción post-normalización: aplicar thresholds y resolver entidades
+    activity_cls = coerce_class_label(activity_payload, apply_threshold=True)
+    region_cls = coerce_class_label(region_payload, apply_threshold=True)
+    investment_cls = coerce_class_label(investment_payload, apply_threshold=True)
+
+    req_form_cls = coerce_req_form_from_period_and_frequency(req_form_label, normalized)
+    activity_cls, region_cls, investment_cls = coerce_specific_class_labels(
+        activity_label=activity_cls,
+        region_label=region_cls,
+        investment_label=investment_cls,
         normalized_entities=normalized,
     )
 
-    logger.debug("[CLASSIFIER_API] Normalized classifier: calc_mode=%s, activity_cls=%s, region_cls=%s, investment_cls=%s, req_form_cls=%s",
-                 calc_mode_label, activity_label, region_label, investment_label, req_form_label)
-    logger.debug("[CLASSIFIER_API] Normalized entities: %s", normalized)
+    # 8. Resolución final de entidades (único paso centralizado)
+    resolved = resolve_entities_for_data_query(
+        normalized_entities=normalized,
+        calc_mode_cls=calc_mode_label,
+        activity_cls=activity_cls,
+        region_cls=region_cls,
+        investment_cls=investment_cls,
+        req_form_cls=req_form_cls,
+    )
 
-    # 8. Armar predict_raw
+    logger.debug("[CLASSIFIER_API] Normalized classifier: calc_mode=%s, activity_cls=%s, region_cls=%s, investment_cls=%s, req_form_cls=%s",
+                 calc_mode_label, activity_cls, region_cls, investment_cls, req_form_cls)
+    logger.debug("[CLASSIFIER_API] Normalized entities: %s", normalized)
+    logger.debug("[CLASSIFIER_API] Resolved entities: %s", resolved)
+
+    # 9. Armar predict_raw
     interpretation_state = dict(predict_raw_for_state.get("interpretation")) if isinstance(predict_raw_for_state.get("interpretation"), dict) else {}
     interpretation_state["entities"] = entities
     interpretation_state["entities_normalized"] = normalized
     predict_raw_for_state["interpretation"] = interpretation_state
 
-    # 9. Texto
+    # 10. Texto
     text = (
         interpretation.get("text") if isinstance(interpretation, dict) else None
     ) or predict_result_dict.get("text") or question
@@ -252,6 +270,7 @@ def _classify_via_endpoint(question: str) -> ClassificationResult:
         context=context,
         intent_raw={"routing": routing},
         predict_raw=predict_raw_for_state,
+        resolved_entities=resolved,
     )
 
 # ============================================================

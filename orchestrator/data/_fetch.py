@@ -283,7 +283,7 @@ def fetch_contribution(
     period_values: List[Any],
     calc_mode_cls: Any,
     activity_cls_resolved: Any,
-    activity_ent: Optional[str],
+    activity_ent: List[str],
     region_cls: Any,
     investment_cls: Any,
 ) -> FetchResult:
@@ -405,7 +405,7 @@ def _filter_contribution_observations(
     source_family_series: Optional[str],
     family_name: Optional[str],
     activity_cls_resolved: Any,
-    activity_ent: Optional[str],
+    activity_ent: List[str],
     region_cls: Any,
     investment_cls: Any,
     period_ent: List[Any],
@@ -445,7 +445,7 @@ def _filter_contribution_observations(
                 or ""
             ).strip()
 
-    if activity_cls_resolved == "general" and activity_ent is None:
+    if activity_cls_resolved == "general" and not activity_ent:
         aggregate_row = _find_row_by_series_id(res.observations, target_series_id)
         if aggregate_row is None:
             for row in res.observations:

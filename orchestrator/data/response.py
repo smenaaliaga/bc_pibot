@@ -1169,7 +1169,11 @@ def _build_missing_activity_instruction(
     if activity_cls != "specific":
         return None
 
-    requested_activity = _normalize_token(entities_ctx.get("activity_ent"))
+    requested_activity_raw = entities_ctx.get("activity_ent")
+    if isinstance(requested_activity_raw, list):
+        requested_activity = _normalize_token(requested_activity_raw[0]) if requested_activity_raw else ""
+    else:
+        requested_activity = _normalize_token(requested_activity_raw)
     if requested_activity in {"", "none", "null"}:
         return None
 

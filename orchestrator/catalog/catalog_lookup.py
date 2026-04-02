@@ -606,14 +606,14 @@ def lookup_series(ent: ResolvedEntities) -> SeriesLookupResult:
         "orchestrator/catalog/catalog.json",
         indicator=ent.indicator_ent,
         activity_value=(
-            ent.activity_ent if ent.activity_ent is not None
+            ent.activity_ent[0] if ent.activity_ent
             else _activity_fallback
         ),
         region_value=(
-            ent.region_ent if ent.region_ent is not None else _region_fallback
+            ent.region_ent[0] if ent.region_ent else _region_fallback
         ),
         investment_value=(
-            ent.investment_ent if ent.investment_ent is not None
+            ent.investment_ent[0] if ent.investment_ent
             else _investment_fallback
         ),
         calc_mode=family_calc_mode,
@@ -638,9 +638,9 @@ def lookup_series(ent: ResolvedEntities) -> SeriesLookupResult:
     series_eq: Dict[str, Any] = {
         "indicator": ent.indicator_ent,
         "seasonality": ent.seasonality_ent,
-        "activity": ent.activity_ent,
-        "region": ent.region_ent,
-        "investment": ent.investment_ent,
+        "activity": ent.activity_ent[0] if ent.activity_ent else None,
+        "region": ent.region_ent[0] if ent.region_ent else None,
+        "investment": ent.investment_ent[0] if ent.investment_ent else None,
     }
 
     # Para contribuciones generales de PIB/IMACEC, ajustar la clave de actividad
@@ -661,7 +661,7 @@ def lookup_series(ent: ResolvedEntities) -> SeriesLookupResult:
                 series_eq.pop("activity", None)
                 series_eq["indicator"] = indicator_norm
 
-    if ent.activity_cls_resolved == "specific" and ent.activity_ent is None:
+    if ent.activity_cls_resolved == "specific" and not ent.activity_ent:
         series_eq["activity"] = "__missing_specific_activity__"
 
     # Consultas agregadas (sin actividad especifica): no forzar filtro activity,
