@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional
 
 if TYPE_CHECKING:
-    from orchestrator.data._business_rules import ResolvedEntities
+    from orchestrator.normalizer.normalizer import ResolvedEntities
 
 logger = logging.getLogger(__name__)
 
