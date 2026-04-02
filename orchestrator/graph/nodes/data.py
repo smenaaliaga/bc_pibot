@@ -1,10 +1,6 @@
-"""Nodo DATA del grafo PIBot — orquesta la obtención de datos económicos.
+"""Nodo DATA del grafo PIBot.
 
-Flujo principal (``data_node``):
-    1. Extrae entidades y clasificación del estado del grafo.
-    2. Resuelve las entidades finales desde el normalizer.
-    3. Busca el payload en data_store con ``search_output_payloads``.
-    4. Envía question + observations (payload completo) al response.
+Extrae entidades, busca el payload en data_store y genera la respuesta.
 """
 
 from __future__ import annotations
@@ -19,7 +15,7 @@ from langgraph.types import StreamWriter
 from orchestrator.data.response import handle_no_series, stream_data_response
 from ..state import AgentState, _clone_entities, _emit_stream_chunk
 from orchestrator.data._helpers import first_non_empty
-from orchestrator.data.catalog_data_search import search_output_payloads
+from orchestrator.catalog.catalog_data_search import search_output_payloads
 from orchestrator.normalizer.normalizer import ResolvedEntities, resolve_entities_for_data_query
 from orchestrator.normalizer.routing_utils import INTENT_CONFIDENCE_THRESHOLD
 
@@ -153,7 +149,7 @@ def _build_search_kwargs(ent: ResolvedEntities) -> Dict[str, Any]:
     if ent.price:
         kwargs["price"] = ent.price
 
-    # has_activity / has_region / has_investment: 1 si cls es "general" o "specific", 0 si "none"
+    # Flags has_*: 1 para general/specific, 0 para none.
     act = str(ent.activity_cls or "").strip().lower()
     if act in ("general", "specific"):
         kwargs["has_activity"] = 1
@@ -185,11 +181,7 @@ def _filter_series_by_entities(
     observations: Dict[str, Any],
     ent: ResolvedEntities,
 ) -> Dict[str, Any]:
-    """Filtra series por restricciones resueltas (price/seasonality/calc_mode) cuando existan.
-
-    Esto evita que el LLM seleccione una serie incompatible cuando un payload
-    contiene múltiples variantes (por ejemplo, enc y co).
-    """
+    """Filtra series por price/seasonality/calc_mode."""
     series = observations.get("series") or []
     if not isinstance(series, list) or not series:
         return observations
@@ -214,8 +206,7 @@ def _filter_series_by_entities(
             return True
         for key, expected in constraints.items():
             current = cls.get(key)
-            # Regla estricta: si se pidió estacionalidad, la serie debe declararla
-            # explícitamente para evitar mezclar SA/NsA por omisión de metadata.
+            # Si se pidió seasonality, exigir metadata explícita.
             if key == "seasonality" and current is None:
                 return False
             if current is None:
@@ -256,13 +247,10 @@ def _collect_target_series_ids(
     observations: Dict[str, Any],
     ent: ResolvedEntities,
 ) -> List[str]:
-    """Extrae los ``series_id`` de las series que coinciden con las entidades
-    de activity, region e investment resueltas (lógica AND).
+    """Retorna los ``series_id`` que cumplen activity/region/investment (AND).
 
-    Si ninguna de las tres entidades está presente, retorna todos los IDs.
-    Para region, busca primero en ``classification_series`` de cada serie y,
-    si no existe allí, compara contra la clasificación a nivel de cuadro
-    (archivos single-region).
+    Si no hay filtros, retorna todos los IDs. Para region usa fallback al
+    nivel de cuadro cuando la serie no trae ese campo.
     """
     series = observations.get("series") or []
     if not isinstance(series, list) or not series:
@@ -272,14 +260,14 @@ def _collect_target_series_ids(
     region = str(ent.region_ent or "").strip().lower() or None
     investment = str(ent.investment_ent or "").strip().lower() or None
 
-    # Sin filtros activos → devolver todos los IDs
+    # Sin filtros: devolver todos los IDs.
     if not any((activity, region, investment)):
         return [
             s["series_id"] for s in series
             if isinstance(s, dict) and s.get("series_id")
         ]
 
-    # Region a nivel de cuadro (fallback para archivos single-region)
+    # Fallback de region a nivel de cuadro (single-region).
     cuadro_cls = observations.get("classification") or {}
     cuadro_region = str(cuadro_cls.get("region") or "").strip().lower() or None
 
@@ -299,7 +287,7 @@ def _collect_target_series_ids(
         if region:
             val = str(cls.get("region") or "").strip().lower()
             if val != region:
-                # Fallback: region vive a nivel de cuadro en archivos single-region
+                # Si la serie no trae region, usar region de cuadro.
                 if cuadro_region != region:
                     continue
 
@@ -325,16 +313,14 @@ def make_data_node(memory_adapter: Any):
         memory_adapter: adaptador de memoria (reservado para uso futuro).
     """
     def data_node(state: AgentState, *, writer: Optional[StreamWriter] = None):
-        # 1. Extraer entidades
+        # Extraer entidades.
         question, entities, ent = _extract_entities_from_state(state)
 
-        # 2. Las entidades ya salen resueltas desde el normalizer
+        # Entidades resueltas por normalizer.
         logger.info("[DATA_NODE] indicator=%s freq=%s activity=%s req_form=%s",
                     ent.indicator_ent, ent.frequency_ent, ent.activity_ent, ent.req_form_cls)
 
-        # 3. Búsqueda en data_store ─────────────────────────────────
-        # Convierte las entidades resueltas (indicator, frequency, etc.)
-        # en filtros de búsqueda para localizar el payload JSON.
+        # Buscar payload en data_store con filtros resueltos.
         search_kwargs = _build_search_kwargs(ent)
         logger.info("[DATA_NODE] search_output_payloads kwargs=%s", search_kwargs)
 
@@ -348,7 +334,7 @@ def make_data_node(memory_adapter: Any):
 
         logger.info("[DATA_NODE] search_output_payloads found %d matches", len(matches))
 
-        # Sin resultados → respuesta genérica de "serie no encontrada"
+        # Sin match: respuesta estandar.
         if not matches:
             return handle_no_series(
                 question=question,
@@ -359,20 +345,15 @@ def make_data_node(memory_adapter: Any):
                 first_non_empty_fn=first_non_empty,
             )
 
-        # Se toma el primer match (mayor score).  El payload completo
-        # del data_store actúa como *observations*: contiene metadatos
-        # del cuadro, la lista de series y sus datos históricos.
+        # Tomar el primer match como observations.
         observations = matches[0]["payload"]
 
-        # Filtra series incompatibles con las restricciones del usuario
-        # (price, seasonality, calc_mode) para evitar que el LLM
-        # seleccione variantes incorrectas (ej. nominal vs real).
+        # Filtrar series incompatibles.
         observations = _filter_series_by_entities(observations, ent)
 
-        # Recopilar IDs de series que coinciden con las entidades de
-        # activity/region/investment resueltas (lógica AND).
-        target_series_ids = _collect_target_series_ids(observations, ent)
-        logger.info("[DATA_NODE] target_series_ids=%s", target_series_ids)
+        # IDs de series que cumplen activity/region/investment.
+        series = _collect_target_series_ids(observations, ent)
+        logger.info("[DATA_NODE] series=%s", series)
 
         logger.info("[DATA_NODE] cuadro=%s freq=%s series_count=%d",
                     observations.get("cuadro_name"),
@@ -381,14 +362,15 @@ def make_data_node(memory_adapter: Any):
 
         ent_dict = asdict(ent)
 
-        # 4. Construir payload: question + observations (payload data_store)
+        # Armar payload para response.
         payload = {
             "question": question,
             "observations": observations,
+            "series": series,
             "entities": ent_dict,
-            "target_series_ids": target_series_ids,
         }
 
+        # Transmitir respuesta en streaming para response.
         collected: List[str] = []
         try:
             for chunk in stream_data_response(payload):
@@ -402,19 +384,10 @@ def make_data_node(memory_adapter: Any):
                 collected.append(fallback)
                 _emit_stream_chunk(fallback, writer)
 
-        pv = ent.period_ent or []
-        rf = str(ent.req_form_cls or "").strip().lower()
-
-        # Extraer serie objetivo del payload para el retorno
-        store_series = observations.get("series") or []
-        target_id = store_series[0].get("series_id") if store_series else None
-
         return {
             "output": "".join(collected),
             "entities": entities,
-            "parsed_point": str(pv[-1]) if (rf != "range" and pv) else None,
-            "parsed_range": (str(pv[0]), str(pv[-1])) if pv else None,
-            "series": target_id,
+            "series": series,
             "data_classification": ent_dict,
         }
 
