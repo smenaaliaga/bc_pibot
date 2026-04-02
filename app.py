@@ -1228,10 +1228,11 @@ def run_app(
     chunk_queue: Queue = Queue()
     stream_done = threading.Event()
     stream_errors: List[Exception] = []
+    stream_session_id = st.session_state.get("session_id", "")
 
-    def _produce_chunks() -> None:
+    def _produce_chunks(session_id: str) -> None:
         try:
-            for _chunk in stream_fn(user_message, history=history, session_id=st.session_state.get("session_id", "")):
+            for _chunk in stream_fn(user_message, history=history, session_id=session_id):
                 chunk_queue.put(_chunk)
         except Exception as _e_stream:
             stream_errors.append(_e_stream)
@@ -1239,7 +1240,7 @@ def run_app(
             stream_done.set()
             chunk_queue.put(None)
 
-    threading.Thread(target=_produce_chunks, daemon=True).start()
+    threading.Thread(target=_produce_chunks, args=(stream_session_id,), daemon=True).start()
 
     while True:
         try:
