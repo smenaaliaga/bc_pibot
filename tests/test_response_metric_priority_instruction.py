@@ -76,7 +76,9 @@ def test_prevalidated_missing_specific_activity_instruction_when_activity_normal
 
     assert text is not None
     assert "VALIDACIÓN PREVIA DEL SISTEMA" in text
-    assert "la actividad consultada no se encuentra dentro del cuadro para el indicador PIB" in text
+    assert "Esta actividad no se encuentra disponible en la Base de datos estadísticos para el indicador PIB" in text
+    assert "PRIMER PÁRRAFO OBLIGATORIO" in text
+    assert "En [PERIODO], esta actividad no se encuentra disponible" in text
     assert "Producción de bienes" in text
     assert "Servicios" in text
     assert "NO escribas una introducción que afirme contribución" in text
@@ -195,8 +197,10 @@ def test_missing_activity_instruction_when_requested_activity_not_available():
         },
     )
     assert text is not None
-    assert "actividad solicitada no existe" in text
-    assert "la actividad consultada no se encuentra dentro del cuadro" in text
+    assert "actividad solicitada no está disponible" in text
+    assert "Esta actividad no se encuentra disponible en la Base de datos estadísticos" in text
+    assert "PRIMER PÁRRAFO OBLIGATORIO" in text
+    assert "En [PERIODO], esta actividad no se encuentra disponible" in text
     assert "NO reemplaces por la serie agregada" in text
 
 
