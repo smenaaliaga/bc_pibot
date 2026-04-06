@@ -259,6 +259,7 @@ def build_target_series_url(
     calc_param = {
         "yoy": "YTYPCT",
         "prev_period": "PCT",
+        "none": "NONE",
     }.get(requested_calc_mode)
 
     def _has_requested_calc_value(rows: List[Dict[str, Any]], mode: str) -> bool:

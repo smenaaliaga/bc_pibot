@@ -262,6 +262,8 @@ PRICE_TERMS: Dict[str, List[str]] = {
         "en términos nominales",
         "serie nominal",
         "valor nominal",
+        "a precios corrientes",
+        "pesos",
     ],
 }
 

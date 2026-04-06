@@ -34,9 +34,87 @@ def test_build_metric_priority_instruction_for_unknown_mode_returns_none():
 def test_build_metric_priority_instruction_for_contribution_enforces_neutral_negative_wording():
     text = response_module._build_metric_priority_instruction("contribution")
     assert text is not None
-    assert "contribución negativa" in text
-    assert "redacción neutral" in text
-    assert "verbo negativo acompañado de signo" in text
+    assert "MATRIZ DE SINÓNIMOS ESTILO INFORME IMACEC" in text
+    assert "NUNCA 'pp'" in text
+    assert "valor absoluto" in text
+    assert "CHEQUEO FINAL OBLIGATORIO" in text
+    assert "'-X,X%'" in text
+    assert "contribuciones negativas de" in text
+    assert "a la baja" in text
+    assert "PLANTILLA OBLIGATORIA POR ACTIVIDAD" in text
+    assert "REGLA OBLIGATORIA POR CADA PORCENTAJE" in text
+
+
+def test_contribution_activity_focus_instruction_forbids_generic_negative_summary():
+    text = response_module._build_contribution_activity_focus_instruction(
+        question="que actividad afecto al aumento del pib de la region del bio bio",
+        entities_ctx={"calc_mode_cls": "contribution"},
+        observations={"latest_available": {"T": "2025-Q3"}},
+    )
+
+    assert text is not None
+    assert "PROHIBIDO resumir como 'contribuciones negativas de varias actividades'" in text
+    assert "PROHIBIDO usar la frase 'a la baja'" in text
+    assert "no dejes porcentajes sueltos" in text
+    assert "plantilla obligatoria" in text.lower()
+
+
+def test_prevalidated_missing_specific_activity_instruction_when_activity_normalized_empty():
+    text = response_module._build_prevalidated_missing_specific_activity_instruction(
+        entities_ctx={
+            "activity_cls": "specific",
+            "indicator_ent": "pib",
+            "activity_ent": "",
+        },
+        observations={
+            "series": [
+                {"classification_series": {"activity": "Producción de bienes"}},
+                {"classification_series": {"activity": "Servicios"}},
+            ]
+        },
+    )
+
+    assert text is not None
+    assert "VALIDACIÓN PREVIA DEL SISTEMA" in text
+    assert "la actividad consultada no se encuentra dentro del cuadro para el indicador PIB" in text
+    assert "Producción de bienes" in text
+    assert "Servicios" in text
+    assert "NO escribas una introducción que afirme contribución" in text
+
+
+def test_prevalidated_missing_specific_activity_instruction_none_when_activity_present():
+    text = response_module._build_prevalidated_missing_specific_activity_instruction(
+        entities_ctx={
+            "activity_cls": "specific",
+            "indicator_ent": "pib",
+            "activity_ent": "mineria",
+        },
+        observations={"series": []},
+    )
+
+    assert text is None
+
+
+def test_humanize_activity_label_removes_underscores_and_hyphens():
+    assert response_module._humanize_activity_label("admin_publica") == "admin publica"
+    assert response_module._humanize_activity_label("servicios-empresariales") == "servicios empresariales"
+
+
+def test_missing_activity_instruction_requests_natural_activity_names():
+    text = response_module._build_missing_activity_instruction(
+        entities_ctx={"activity_ent": "mineria", "activity_cls": "specific", "indicator_ent": "pib"},
+        observations={
+            "series": [
+                {"classification_series": {"activity": "admin_publica"}},
+                {"classification_series": {"activity": "comercio"}},
+            ]
+        },
+    )
+
+    assert text is not None
+    assert "admin publica" in text
+    assert "admin_publica" not in text
+    assert "sin guiones bajos" in text
 
 
 def test_build_incomplete_period_instruction_for_incomplete_quarterly_year():
@@ -118,6 +196,7 @@ def test_missing_activity_instruction_when_requested_activity_not_available():
     )
     assert text is not None
     assert "actividad solicitada no existe" in text
+    assert "la actividad consultada no se encuentra dentro del cuadro" in text
     assert "NO reemplaces por la serie agregada" in text
 
 
@@ -189,6 +268,24 @@ def test_no_explicit_period_instruction_when_req_form_latest_even_with_relative_
     )
     assert text is not None
     assert "req_form_cls='latest'" in text
+
+
+def test_no_explicit_period_instruction_none_for_current_prices_original_query():
+    text = response_module._build_no_explicit_period_latest_instruction(
+        question="Cual es el valor del pib en pesos",
+        entities_ctx={"frequency_ent": "q", "price_ent": "co"},
+        observations={"latest_available": {"T": "2025-Q4"}},
+    )
+    assert text is None
+
+
+def test_no_explicit_period_instruction_none_for_per_capita_original_query():
+    text = response_module._build_no_explicit_period_latest_instruction(
+        question="Cual es el pib per capita",
+        entities_ctx={"frequency_ent": "a", "indicator_ent": "pib_per_capita"},
+        observations={"latest_available": {"A": "2024"}},
+    )
+    assert text is None
 
 
 def test_relative_period_fallback_instruction_none_when_req_form_latest():
@@ -281,3 +378,227 @@ def test_get_series_data_unknown_series_returns_hint_and_catalog():
     assert "Usa list_series" in parsed["hint"]
     assert parsed["available_series"][0]["series_id"] == "SERIE.T"
     assert parsed["available_series"][0]["available_frequencies"] == ["T", "A"]
+
+
+def test_build_filtered_source_url_uses_none_for_original_current_prices_query():
+    observations = {
+        "source_url": "https://example.test/series",
+        "classification": {"calc_mode": "original"},
+        "series": [
+            {
+                "series_id": "SERIE.PIB.CO",
+                "short_title": "PIB precios corrientes",
+                "data": {
+                    "A": {
+                        "records": [
+                            {"period": "2024", "value": 100.0, "pct": 1.2, "yoy_pct": 3.4},
+                        ]
+                    }
+                },
+            }
+        ],
+    }
+    entities_ctx = {
+        "calc_mode_cls": "original",
+        "price_ent": "co",
+        "question": "cuanto fue el pib en pesos",
+        "period_ent": ["2024-01-01", "2024-12-31"],
+    }
+    selected_series_ctx = {"series_id": "SERIE.PIB.CO", "frequency": "A"}
+
+    url = response_module._build_filtered_source_url(observations, entities_ctx, selected_series_ctx)
+
+    assert isinstance(url, str)
+    assert "cbCalculo=NONE" in url
+
+
+def test_build_target_series_url_supports_explicit_none_mode():
+    url = response_module.build_target_series_url(
+        source_url="https://example.test/series",
+        series_id="SERIE.PIB.TEST",
+        period=["2024-01-01", "2024-12-31"],
+        observations=[{"date": "2024-12-31", "value": 100.0}],
+        frequency="a",
+        calc_mode="none",
+    )
+
+    assert isinstance(url, str)
+    assert "cbCalculo=NONE" in url
+
+
+def test_build_filtered_source_url_uses_none_for_original_per_capita_query():
+    observations = {
+        "source_url": "https://example.test/series",
+        "classification": {"calc_mode": "original"},
+        "series": [
+            {
+                "series_id": "SERIE.PIB.PERCAPITA",
+                "short_title": "PIB per cápita",
+                "data": {
+                    "A": {
+                        "records": [
+                            {"period": "2024", "value": 16586.0, "pct": 0.9, "yoy_pct": 2.1},
+                        ]
+                    }
+                },
+            }
+        ],
+    }
+    entities_ctx = {
+        "calc_mode_cls": "original",
+        "indicator_ent": "pib_per_capita",
+        "question": "cual fue el pib per capita",
+        "period_ent": ["2024-01-01", "2024-12-31"],
+    }
+    selected_series_ctx = {"series_id": "SERIE.PIB.PERCAPITA", "frequency": "A"}
+
+    url = response_module._build_filtered_source_url(observations, entities_ctx, selected_series_ctx)
+
+    assert isinstance(url, str)
+    assert "cbCalculo=NONE" in url
+
+
+def test_special_query_mapping_instruction_for_per_capita_forces_single_original_value():
+    text = response_module._build_special_query_mapping_instruction(
+        question="cual fue el pib per capita",
+        entities_ctx={},
+    )
+
+    assert text is not None
+    assert "SIEMPRE valor original (value)" in text
+    assert "nunca yoy_pct ni pct" in text
+    assert "REGLA DE UN SOLO VALOR" in text
+
+
+def test_special_query_mapping_instruction_for_current_prices_forces_single_original_value():
+    text = response_module._build_special_query_mapping_instruction(
+        question="cual fue el pib a precios corrientes",
+        entities_ctx={},
+    )
+
+    assert text is not None
+    assert "CASO PIB EN PESOS / PRECIOS CORRIENTES" in text
+    assert "SIEMPRE valor original (value)" in text
+    assert "nunca yoy_pct ni pct" in text
+    assert "REGLA DE UN SOLO VALOR" in text
+
+
+def test_special_query_mapping_instruction_detects_current_prices_from_entities_ctx():
+    text = response_module._build_special_query_mapping_instruction(
+        question="cual fue el pib",
+        entities_ctx={"price_ent": "co"},
+    )
+
+    assert text is not None
+    assert "CASO PIB EN PESOS / PRECIOS CORRIENTES" in text
+    assert "SIEMPRE valor original (value)" in text
+
+
+def test_value_no_rescale_instruction_forces_original_value_for_current_prices_ctx():
+    text = response_module._build_value_no_rescale_instruction(
+        question="cual fue el pib",
+        entities_ctx={"price_ent": "co"},
+    )
+
+    assert text is not None
+    assert "solo value (serie original)" in text
+    assert "no uses yoy_pct ni pct" in text
+
+
+def test_original_series_force_instruction_for_current_prices_by_entities_ctx():
+    text = response_module._build_original_series_force_instruction(
+        question="cual fue el pib",
+        entities_ctx={"price_ent": "co"},
+    )
+
+    assert text is not None
+    assert "SERIE ORIGINAL OBLIGATORIA" in text
+    assert "SIEMPRE del campo value" in text
+    assert "PROHIBIDO usar yoy_pct o pct" in text
+
+
+def test_original_series_force_instruction_for_per_capita_by_indicator_ctx():
+    text = response_module._build_original_series_force_instruction(
+        question="cual fue el pib",
+        entities_ctx={"indicator_ent": "pib_per_capita"},
+    )
+
+    assert text is not None
+    assert "SERIE ORIGINAL OBLIGATORIA" in text
+    assert "OBLIGATORIO: entrega una sola cifra principal" in text
+
+
+def test_specific_contribution_directness_instruction_uses_absolute_percent_rules():
+    text = response_module._build_specific_contribution_directness_instruction(
+        "cuanto contribuyo mineria al pib"
+    )
+
+    assert text is not None
+    assert "disminuyó **X,X%** respecto al mismo período del año anterior" in text
+    assert "PROHIBIDO usar la frase 'a la baja'" in text
+    assert "toda cifra porcentual escrita en la respuesta" in text
+    assert "PROHIBIDO usar 'pp'" in text
+    assert "PROHIBIDO mostrar signo negativo" in text
+    assert "CHEQUEO FINAL OBLIGATORIO" in text
+
+
+def test_sanitize_contribution_tool_result_rank_series_uses_absolute_value_and_direction():
+    raw = {
+        "frequency": "T",
+        "period": "2025-Q3",
+        "metric": "value",
+        "order": "desc",
+        "ranking": [
+            {"series_id": "A", "short_title": "Servicios", "value": 0.6},
+            {"series_id": "B", "short_title": "Industria", "value": -1.8},
+        ],
+    }
+
+    out = response_module._sanitize_contribution_tool_result(
+        "rank_series",
+        {"frequency": "T", "period": "2025-Q3", "metric": "value", "calc_mode": "contribution"},
+        response_module.json.dumps(raw, ensure_ascii=False),
+    )
+    parsed = response_module.json.loads(out)
+    assert parsed["ranking"][0]["value"] == 0.6
+    assert parsed["ranking"][0]["contribution_direction"] == "alza"
+    assert parsed["ranking"][1]["value"] == 1.8
+    assert parsed["ranking"][1]["value_signed"] == -1.8
+    assert parsed["ranking"][1]["contribution_direction"] == "baja"
+    assert parsed["ranking"][1]["contribution_sign"] == "negative"
+
+
+def test_sanitize_contribution_tool_result_get_series_data_total_negative_to_absolute():
+    raw = {
+        "series_id": "F032.PIB.REGION.BIOBIO",
+        "frequency": "T",
+        "records": [{"period": "2025-Q3", "value": -4.2}],
+    }
+
+    out = response_module._sanitize_contribution_tool_result(
+        "get_series_data",
+        {"series_id": "F032.PIB.REGION.BIOBIO", "frequency": "T", "calc_mode": "contribution"},
+        response_module.json.dumps(raw, ensure_ascii=False),
+    )
+    parsed = response_module.json.loads(out)
+    rec = parsed["records"][0]
+    assert rec["value"] == 4.2
+    assert rec["value_signed"] == -4.2
+    assert rec["contribution_direction"] == "baja"
+
+
+def test_sanitize_contribution_tool_result_no_change_for_non_contribution_modes():
+    raw = {
+        "series_id": "F032.IMACEC.X",
+        "frequency": "M",
+        "records": [{"period": "2025-01", "value": -0.1}],
+    }
+
+    out = response_module._sanitize_contribution_tool_result(
+        "get_series_data",
+        {"series_id": "F032.IMACEC.X", "frequency": "M", "calc_mode": "yoy"},
+        response_module.json.dumps(raw, ensure_ascii=False),
+    )
+    parsed = response_module.json.loads(out)
+    assert parsed["records"][0]["value"] == -0.1
+    assert "contribution_direction" not in parsed["records"][0]

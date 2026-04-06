@@ -788,6 +788,74 @@ def _add_display_fields(record: dict) -> dict:
     return out
 
 
+def _safe_float(value: Any) -> Optional[float]:
+    """Parsea valores numéricos o strings tipo 'X%' a float."""
+    if isinstance(value, (int, float)):
+        return float(value)
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    if not text:
+        return None
+    text = text.replace("%", "").replace(",", ".")
+    try:
+        return float(text)
+    except ValueError:
+        return None
+
+
+def _contribution_direction(value: float) -> str:
+    if value > 0:
+        return "alza"
+    if value < 0:
+        return "baja"
+    return "neutral"
+
+
+def _sanitize_contribution_record(record: Dict[str, Any]) -> Dict[str, Any]:
+    """Entrega un registro de contribución con magnitud absoluta y referencia de signo."""
+    out = dict(record)
+    raw_value = _safe_float(out.get("value"))
+    if raw_value is None:
+        return out
+
+    out["value_signed"] = out.get("value")
+    out["value"] = abs(raw_value)
+    out["value_abs"] = abs(raw_value)
+    out["contribution_direction"] = _contribution_direction(raw_value)
+    out["contribution_sign"] = "positive" if raw_value > 0 else "negative" if raw_value < 0 else "neutral"
+    return out
+
+
+def _sanitize_contribution_tool_result(name: str, args: Dict[str, Any], result: str) -> str:
+    """Sanitiza payload de contribuciones antes de pasarlo al LLM."""
+    try:
+        parsed = json.loads(result)
+    except Exception:
+        return result
+
+    is_contribution = str(args.get("calc_mode") or "").lower() == "contribution"
+    if name == "rank_series":
+        metric = str(parsed.get("metric") or args.get("metric") or "").lower()
+        is_contribution = is_contribution or metric == "value"
+        if is_contribution and isinstance(parsed.get("ranking"), list):
+            parsed["ranking"] = [
+                _sanitize_contribution_record(row) if isinstance(row, dict) else row
+                for row in parsed["ranking"]
+            ]
+    elif name == "get_series_data":
+        if is_contribution and isinstance(parsed.get("records"), list):
+            parsed["records"] = [
+                _sanitize_contribution_record(row) if isinstance(row, dict) else row
+                for row in parsed["records"]
+            ]
+
+    try:
+        return json.dumps(parsed, ensure_ascii=False)
+    except Exception:
+        return result
+
+
 def _canonicalize_period_token(freq: str, raw_period: Any) -> str:
     """Normaliza períodos a la llave esperada por frecuencia.
 
@@ -1056,20 +1124,44 @@ def _build_metric_priority_instruction(calc_mode: str) -> Optional[str]:
     if mode == "contribution":
         return (
             "REGLA ESTRICTA DE REDACCION PARA CONTRIBUCIONES:\n"
+            "0. Estas reglas aplican de forma genérica para consultas de contribución en PIB e IMACEC.\n"
             "1. En el PRIMER PARRAFO comienza mencionando el PERIODO analizado "
             "(ej: 'En el 3er trimestre de 2025, ...').\n"
-            "2. Los datos son CONTRIBUCIONES al crecimiento. La unidad es SIEMPRE "
-            "puntos porcentuales (pp), NUNCA '%'.\n"
-            "   Correcto: '**0,5 pp**'  |  Incorrecto: '**0,5%**'\n"
-            "3. Redondea SIEMPRE a 1 decimal: 0,54 → **0,5 pp**; -0,67 → **-0,7 pp**.\n"
+            "2. Los datos son CONTRIBUCIONES al crecimiento. Usa SIEMPRE la unidad '%' y NUNCA 'pp'.\n"
+            "   Correcto: '**0,5%**'  |  Incorrecto: '**0,5 pp**'.\n"
+            "3. Redondea SIEMPRE a 1 decimal: 0,54 → **0,5%**; -0,67 → 'disminuyó **0,7%**'.\n"
             "4. Ordena por VALOR ABSOLUTO de la contribución (mayor primero).\n"
             "5. Separa claramente contribuciones positivas de negativas.\n"
-            "6. PROHIBIDO usar el símbolo '%' para contribuciones. USA 'pp'.\n"
-            "6.b. Cuando una contribución sea menor a cero, NO uses la frase 'contribución negativa'. "
-            "Usa redacción neutral: 'tuvo una contribución de **-X,X pp**' o "
-            "'registró una variación de **-X,X pp**'.\n"
-            "6.c. También está PROHIBIDO escribir 'contribución negativa de **-X,X pp**', "
-            "'caída de **-X,X pp**' o cualquier verbo negativo acompañado de signo.\n"
+            "6. REGLA DE SIGNO Y LÉXICO (OBLIGATORIA): muestra SIEMPRE valor absoluto y usa redacción consistente con el signo.\n"
+            "   - si dato < 0: usa 'disminuyó **X,X%**' (sin signo '-').\n"
+            "   - si dato > 0: usa 'creció **X,X%**' o 'aumentó **X,X%**'.\n"
+            "   - si dato = 0: usa 'mostró una variación de **0,0%**'.\n"
+            "7. MATRIZ DE SINÓNIMOS ESTILO INFORME IMACEC (ASOCIADA AL SIGNO):\n"
+            "   - positivos: 'creció', 'aumentó', 'registró un incremento de', 'presentó una expansión de'.\n"
+            "   - negativos: 'disminuyó', 'registró una contracción de', 'presentó una disminución de'.\n"
+            "   - neutro: 'mostró una variación de'.\n"
+            "8. PROHIBIDO mostrar valores con signo negativo en contribuciones (ej: '-0,7%').\n"
+            "8.b. También está PROHIBIDO usar 'pp' en cualquier oración de contribución.\n"
+            "8.c. Si usas 'disminuyó/creció/aumentó' o sinónimos, debes complementar con "
+            "'respecto al mismo período del año anterior'.\n"
+            "8.d. CHEQUEO FINAL OBLIGATORIO ANTES DE RESPONDER: si en el borrador aparece cualquier "
+            "porcentaje con signo '-' (por ejemplo '-5,2%'), debes reescribir usando valor absoluto y "
+            "verbo consistente ('disminuyó').\n"
+            "8.e. RESPUESTA INVÁLIDA si incluye patrones de texto con signo negativo en contribución: "
+            "'-X,X%', 'con -X,X%', 'de -X,X%'.\n"
+            "8.e.1. Esta regla aplica a TODAS las menciones de contribución del texto (principal, secundarias y cierre).\n"
+            "8.f. RESPUESTA INVÁLIDA si usa frases como 'contribuciones negativas de ...' o "
+            "'incidencias negativas ... con -X,X%'. Reescribe con plantilla por actividad y valor absoluto.\n"
+            "8.f.1. RESPUESTA INVÁLIDA si usa la frase 'a la baja' en contribuciones. "
+            "Para signo negativo usa únicamente 'disminuyó' o 'disminución'.\n"
+            "8.g. PLANTILLA OBLIGATORIA POR ACTIVIDAD EN CONTRIBUCIÓN: "
+            "'[Actividad]: disminuyó/creció/aumentó **X,X%** respecto al mismo período del año anterior'.\n"
+            "8.g.1. REGLA OBLIGATORIA POR CADA PORCENTAJE: toda cifra porcentual de contribución "
+            "(positiva o negativa) debe ir acompañada explícitamente de la frase "
+            "'respecto al mismo período del año anterior'. Si una actividad queda solo con '0,3%' "
+            "sin esa referencia, la respuesta es inválida.\n"
+            "9. Respuesta objetiva: describe cifras y relaciones de compensación, sin juicios de valor.\n"
+            "10. Mantén longitud habitual de respuesta: no imites un informe extenso; solo ajusta vocabulario y estilo.\n"
             "7. FLUJO OBLIGATORIO: primero llama list_series y luego llama rank_series "
             "con metric='value' y order='desc' para obtener el ranking de contribuciones.\n"
             "7.b. TOOLING MÍNIMO OBLIGATORIO: antes de redactar debes haber ejecutado "
@@ -1077,7 +1169,7 @@ def _build_metric_priority_instruction(calc_mode: str) -> Optional[str]:
             "8. Si calc_mode='contribution', está PROHIBIDO responder solo con la serie "
             "agregada del PIB total. Debes reportar actividades/componentes.\n"
             "8.b. En preguntas del tipo 'qué actividad impulsó', está PROHIBIDO redactar "
-            "el bloque DATOS como 'el PIB registró X%'. Debes listar actividades con su aporte en pp.\n"
+            "el bloque DATOS como 'el PIB registró X%'. Debes listar actividades con su aporte en %.\n"
             "9. Debes reportar al menos 5 actividades (si existen) con mayor aporte y, "
             "si hay aportes negativos, mencionar explícitamente la principal caída.\n"
             "10. Si rank_series no devuelve ranking para el periodo solicitado, debes "
@@ -1152,6 +1244,16 @@ def _normalize_token(value: Any) -> str:
     return text
 
 
+def _humanize_activity_label(label: str) -> str:
+    """Convierte etiquetas técnicas de actividad a texto más natural."""
+    raw = str(label or "").strip()
+    if not raw:
+        return ""
+    humanized = re.sub(r"[_\-]+", " ", raw)
+    humanized = re.sub(r"\s+", " ", humanized).strip()
+    return humanized
+
+
 def _is_req_form_latest(entities_ctx: Dict[str, Any]) -> bool:
     req_form = str(entities_ctx.get("req_form_cls") or "").strip().lower()
     return req_form == "latest"
@@ -1169,7 +1271,8 @@ def _build_missing_activity_instruction(
     if activity_cls != "specific":
         return None
 
-    requested_activity = _normalize_token(entities_ctx.get("activity_ent"))
+    requested_activity_raw = str(entities_ctx.get("activity_ent") or "").strip()
+    requested_activity = _normalize_token(requested_activity_raw)
     if requested_activity in {"", "none", "null"}:
         return None
 
@@ -1177,28 +1280,100 @@ def _build_missing_activity_instruction(
     if requested_activity in {"imacec", "pib"}:
         return None
 
-    available_activities: List[str] = []
+    available_activities: List[Tuple[str, str]] = []
     for series in observations.get("series", []) or []:
         cls = series.get("classification_series", {})
         if not isinstance(cls, dict):
             continue
-        activity = _normalize_token(cls.get("activity"))
-        if activity:
-            available_activities.append(activity)
+        raw_label = str(cls.get("activity") or "").strip()
+        activity = _normalize_token(raw_label)
+        if activity and raw_label:
+            available_activities.append((activity, raw_label))
 
     if not available_activities:
         return None
 
-    available_set = set(available_activities)
+    available_set = {token for token, _ in available_activities}
     if requested_activity in available_set:
         return None
 
-    options = ", ".join(sorted(available_set)[:8])
+    labels_by_token: Dict[str, str] = {}
+    for token, label in available_activities:
+        if token not in labels_by_token:
+            labels_by_token[token] = _humanize_activity_label(label)
+    options = ", ".join(sorted(labels_by_token.values())[:8])
+
+    indicator = str(
+        entities_ctx.get("indicator_ent")
+        or (observations.get("classification") or {}).get("indicator")
+        or ""
+    ).strip().upper()
+    if indicator not in {"PIB", "IMACEC"}:
+        indicator = "PIB o IMACEC"
+
     return (
         "REGLA ESTRICTA DE ACTIVIDAD FALTANTE: la actividad solicitada no existe en este cuadro. "
-        f"Actividad pedida: '{requested_activity}'. Actividades disponibles: {options}. "
-        "Debes responder explícitamente que no hay datos para la actividad solicitada en este cuadro. "
+        f"Debes responder literalmente: 'la actividad consultada no se encuentra dentro del cuadro para el indicador {indicator}'. "
+        f"Actividad pedida: '{requested_activity_raw or requested_activity}'. "
+        "NO escribas una introducción que afirme contribución de la actividad solicitada en el período, "
+        "porque contradice la no disponibilidad. "
+        f"Luego sugiere actividades disponibles del mismo cuadro: {options}. "
+        "Usa nombres naturales de actividades (sin guiones bajos, sin códigos técnicos). "
         "NO reemplaces por la serie agregada (PIB total) ni por otra actividad, y NO inventes valores."
+    )
+
+
+def _build_prevalidated_missing_specific_activity_instruction(
+    entities_ctx: Dict[str, Any],
+    observations: Dict[str, Any],
+) -> Optional[str]:
+    """Construye una instrucción alternativa cuando activity es specific pero viene vacía.
+
+    Esta validación se hace antes de generar el resto de instrucciones para que el
+    LLM no tenga que decidir si la actividad está o no en el cuadro.
+    """
+    activity_cls = str(
+        entities_ctx.get("activity_cls_resolved")
+        or entities_ctx.get("activity_cls")
+        or ""
+    ).strip().lower()
+    if activity_cls != "specific":
+        return None
+
+    requested_activity_raw = str(entities_ctx.get("activity_ent") or "").strip()
+    if requested_activity_raw:
+        return None
+
+    labels_by_token: Dict[str, str] = {}
+    for series in observations.get("series", []) or []:
+        cls = series.get("classification_series", {})
+        if not isinstance(cls, dict):
+            continue
+        raw_label = str(cls.get("activity") or "").strip()
+        token = _normalize_token(raw_label)
+        if token and raw_label and token not in labels_by_token:
+            labels_by_token[token] = _humanize_activity_label(raw_label)
+
+    options = ", ".join(sorted(labels_by_token.values())[:8]) if labels_by_token else "(sin actividades disponibles en este cuadro)"
+
+    indicator = str(
+        entities_ctx.get("indicator_ent")
+        or (observations.get("classification") or {}).get("indicator")
+        or ""
+    ).strip().upper()
+    if indicator not in {"PIB", "IMACEC"}:
+        indicator = "PIB o IMACEC"
+
+    return (
+        "VALIDACIÓN PREVIA DEL SISTEMA: activity_cls='specific' pero activity normalizada vacía. "
+        "No debes inferir ni decidir una actividad alternativa. "
+        f"Debes responder literalmente: 'la actividad consultada no se encuentra dentro del cuadro para el indicador {indicator}'. "
+        "NO escribas una introducción que afirme contribución de la actividad solicitada en el período, "
+        "porque contradice la no disponibilidad. "
+        f"Luego menciona actividades disponibles del cuadro: {options}. "
+        "Usa nombres naturales de actividades (sin guiones bajos, sin códigos técnicos). "
+        "NO reemplaces por PIB total, NO uses actividades proxy y NO inventes cifras. "
+        "Esta regla alternativa reemplaza el flujo de contribución específica para este turno."
     )
 
 
@@ -1228,9 +1403,18 @@ def _build_contribution_activity_focus_instruction(
         f"Si el período mensual pedido no existe para PIB, usa directamente {latest_label}. "
         "NO escribas 'enero no publicado' para este tipo de pregunta; ancla la respuesta al trimestre disponible. "
         "OBLIGATORIO: llama rank_series (metric='value') para ese trimestre y construye el bloque DATOS "
-        "con al menos 5 actividades (si existen) en formato de lista, cada una con su contribución en pp. "
-        "Incluye además el principal aporte con signo negativo, si existe, usando redacción neutral. "
-        "La respuesta es inválida si no incluye lista de actividades con pp. "
+        "con al menos 5 actividades (si existen) en formato de lista, cada una con su contribución en %. "
+        "Para valores negativos, usa verbo negativo ('disminuyó') y valor absoluto sin signo. "
+        "PROHIBIDO resumir como 'contribuciones negativas de varias actividades'. "
+        "PROHIBIDO usar la frase 'a la baja'. En contribuciones negativas usa solo 'disminuyó' o 'disminución'. "
+        "Debes explicitar cada actividad con plantilla obligatoria: "
+        "'[Actividad]: disminuyó/creció/aumentó **X,X%** respecto al mismo período del año anterior'. "
+        "REGLA OBLIGATORIA: cada actividad listada debe incluir explícitamente 'respecto al mismo período del año anterior'; "
+        "no dejes porcentajes sueltos (por ejemplo, 'Servicios financieros, 0,3%'). "
+        "CHEQUEO FINAL OBLIGATORIO: ninguna actividad puede quedar con porcentaje firmado con '-'. "
+        "Esta validación aplica a todas las actividades reportadas, sin excepciones. "
+        "Si aparece '-X,X%', debes convertirlo a 'disminuyó **X,X%** respecto al mismo período del año anterior'. "
+        "La respuesta es inválida si no incluye lista de actividades con %. "
         "Está PROHIBIDO responder solo con 'el PIB registró X%'."
     )
 
@@ -1276,6 +1460,7 @@ def _build_special_query_mapping_instruction(
     text_norm = "".join(ch for ch in text_norm if not unicodedata.combining(ch))
 
     rules: List[str] = []
+    price_ent = str(entities_ctx.get("price_ent") or entities_ctx.get("price") or "").strip().lower()
 
     if "imacec" in text_norm and "ultimo trimestre" in text_norm:
         rules.append(
@@ -1300,16 +1485,31 @@ def _build_special_query_mapping_instruction(
 
     if "pib per capita" in text_norm or "pib per cápita" in text:
         rules.append(
-            "CASO PIB PER CÁPITA: reporta valor original (value), no yoy_pct, salvo que el usuario "
-            "pida explícitamente variación. Redondea a entero sin decimales y con separador de miles '.'."
+            "CASO PIB PER CÁPITA: reporta SIEMPRE valor original (value), nunca yoy_pct ni pct, "
+            "salvo que el usuario pida explícitamente variación. "
+            "REGLA DE UN SOLO VALOR: entrega una única cifra principal para el período solicitado "
+            "(o el último disponible si no hay período explícito); NO listes múltiples años/trimestres/meses "
+            "a menos que el usuario pida explícitamente un rango. "
+            "Redondea a entero sin decimales y con separador de miles '.'."
             " (ej: 16.586). Para rangos anuales, lista cada año con su valor aproximado. "
             "No reemplaces PIB per cápita por PIB total ni por otra serie agregada. "
             "Si no hay serie de PIB per cápita en los resultados, indica esa falta y sugiere reformular."
         )
 
-    if "pib en pesos" in text_norm or "precios corrientes" in text_norm or "a cuanto asciende el pib" in text_norm:
+    if (
+        "pib en pesos" in text_norm
+        or "precios corrientes" in text_norm
+        or "precio corriente" in text_norm
+        or "pib nominal" in text_norm
+        or "a cuanto asciende el pib" in text_norm
+        or price_ent == "co"
+    ):
         rules.append(
-            "CASO PIB EN PESOS / PRECIOS CORRIENTES: reporta valor original (value) en pesos, "
+            "CASO PIB EN PESOS / PRECIOS CORRIENTES: reporta SIEMPRE valor original (value) en pesos, "
+            "nunca yoy_pct ni pct salvo solicitud explícita de variación. "
+            "REGLA DE UN SOLO VALOR: entrega una única cifra principal para el período solicitado "
+            "(o el último disponible si no hay período explícito); NO listes múltiples períodos "
+            "a menos que el usuario pida explícitamente un rango. "
             "redondeado a entero sin decimales y con separador de miles '.'. "
             "NO multipliques ni reescales el valor; úsalo tal como lo entrega get_series_data. "
             "Si la unidad es 'miles de millones de pesos', NO agregues ceros adicionales."
@@ -1348,23 +1548,94 @@ def _build_specific_contribution_directness_instruction(question: str) -> Option
             "REGLA DE CONTRIBUCIÓN DIRECTA: si la pregunta es 'cuánto contribuyó [actividad] ...', "
             "responde de forma directa con ESA actividad y su valor para el período objetivo. "
             "No agregues ranking de otras actividades salvo que el usuario lo pida explícitamente. "
-            "PROHIBIDO usar la palabra 'negativa' o frases equivalentes. Usa redacción neutral "
-            "con signo (ej: 'tuvo una contribución de **-0,5 pp**'). "
+            "PROHIBIDO usar la palabra 'negativa' o frases equivalentes. "
+            "Usa redacción consistente con el signo y valor absoluto: "
+            "si dato<0 usa 'disminuyó **X,X%** respecto al mismo período del año anterior'; "
+            "si dato>0 usa 'creció **X,X%** respecto al mismo período del año anterior'; "
+            "si dato=0 usa 'mostró una variación de **0,0%** respecto al mismo período del año anterior'. "
+            "PROHIBIDO usar la frase 'a la baja'; para signo negativo usa solo 'disminuyó' o 'disminución'. "
+            "REGLA OBLIGATORIA: toda cifra porcentual escrita en la respuesta debe incluir la referencia "
+            "'respecto al mismo período del año anterior'; no dejes porcentajes sin contexto temporal. "
+            "PROHIBIDO usar 'pp' y PROHIBIDO mostrar signo negativo en el valor. "
+            "CHEQUEO FINAL OBLIGATORIO: si redactaste '-X,X%' debes reescribir con valor absoluto y verbo consistente. "
+            "Esta regla aplica a cualquier mención adicional de contribución en la respuesta. "
             "En el bloque DATOS usa solo una oración con la contribución de esa actividad."
         )
     return None
 
 
-def _build_value_no_rescale_instruction(question: str) -> Optional[str]:
+def _build_original_series_force_instruction(
+    question: str,
+    entities_ctx: Dict[str, Any],
+) -> Optional[str]:
+    """Fuerza respuesta de serie original para PIB precios corrientes y PIB per cápita."""
     text = str(question or "").lower()
     text_norm = unicodedata.normalize("NFKD", text)
     text_norm = "".join(ch for ch in text_norm if not unicodedata.combining(ch))
-    if any(token in text_norm for token in ("pib en pesos", "precios corrientes", "pib per capita", "pib per cápita", "a cuanto asciende")):
+
+    price_ent = str(entities_ctx.get("price_ent") or entities_ctx.get("price") or "").strip().lower()
+    indicator_ent = str(entities_ctx.get("indicator_ent") or "").strip().lower()
+    activity_ent = str(entities_ctx.get("activity_ent") or "").strip().lower()
+
+    is_per_capita = (
+        "pib per capita" in text_norm
+        or "pib per cápita" in text
+        or indicator_ent == "pib_per_capita"
+        or activity_ent == "per_capita"
+    )
+    is_current_prices = (
+        "precios corrientes" in text_norm
+        or "precio corriente" in text_norm
+        or "pib en pesos" in text_norm
+        or "pib nominal" in text_norm
+        or "a cuanto asciende el pib" in text_norm
+        or price_ent == "co"
+    )
+
+    if not (is_per_capita or is_current_prices):
+        return None
+
+    return (
+        "REGLA DE MAXIMA PRIORIDAD — SERIE ORIGINAL OBLIGATORIA: para PIB per cápita o PIB a precios corrientes, "
+        "la cifra principal debe salir SIEMPRE del campo value (serie original). "
+        "PROHIBIDO usar yoy_pct o pct como dato principal, salvo que el usuario pida explícitamente variación. "
+        "OBLIGATORIO: llama get_series_data y usa value del período solicitado (o del último disponible). "
+        "OBLIGATORIO: entrega una sola cifra principal en el bloque DATOS. "
+        "Si respondes con yoy_pct/pct en estos casos, la respuesta es inválida y debes rehacerla con value."
+    )
+
+
+def _build_value_no_rescale_instruction(question: str, entities_ctx: Optional[Dict[str, Any]] = None) -> Optional[str]:
+    text = str(question or "").lower()
+    text_norm = unicodedata.normalize("NFKD", text)
+    text_norm = "".join(ch for ch in text_norm if not unicodedata.combining(ch))
+    ctx = entities_ctx or {}
+    price_ent = str(ctx.get("price_ent") or ctx.get("price") or "").strip().lower()
+    indicator_ent = str(ctx.get("indicator_ent") or "").strip().lower()
+    activity_ent = str(ctx.get("activity_ent") or "").strip().lower()
+
+    is_original_value_query = any(
+        token in text_norm
+        for token in (
+            "pib en pesos",
+            "precios corrientes",
+            "precio corriente",
+            "pib nominal",
+            "pib per capita",
+            "pib per cápita",
+            "a cuanto asciende",
+        )
+    ) or price_ent == "co" or indicator_ent == "pib_per_capita" or activity_ent == "per_capita"
+
+    if is_original_value_query:
         return (
             "REGLA DE ESCALA PARA VALORES ORIGINALES: cuando entregues value, conserva exactamente "
             "la escala entregada por get_series_data (no multiplicar, no dividir, no convertir unidades). "
             "Solo redondea y formatea separadores de miles. "
-            "Ejemplo: si get_series_data entrega 57246,76 (miles de millones), reporta 57.247 y nunca 57.247.000."
+            "Ejemplo: si get_series_data entrega 57246,76 (miles de millones), reporta 57.247 y nunca 57.247.000. "
+            "OBLIGATORIO: para PIB a precios corrientes o PIB per cápita, el bloque DATOS debe usar "
+            "solo value (serie original) como cifra principal; no uses yoy_pct ni pct salvo solicitud explícita de variación. "
+            "OBLIGATORIO: entrega una sola cifra principal para el período solicitado (o último disponible si no se especifica período)."
         )
     return None
 
@@ -1690,6 +1961,29 @@ def _build_no_explicit_period_latest_instruction(
     if _question_has_explicit_period(question, entities_ctx):
         return None
 
+    # Evitar conflicto con consultas de serie original (PIB en pesos / precios corrientes / per cápita).
+    # En estos casos otras instrucciones fuerzan value como dato principal; no debemos empujar yoy_pct aquí.
+    text = str(question or "").lower()
+    text_norm = unicodedata.normalize("NFKD", text)
+    text_norm = "".join(ch for ch in text_norm if not unicodedata.combining(ch))
+    price_ent = str(entities_ctx.get("price_ent") or entities_ctx.get("price") or "").strip().lower()
+    indicator_ent = str(entities_ctx.get("indicator_ent") or "").strip().lower()
+    activity_ent = str(entities_ctx.get("activity_ent") or "").strip().lower()
+    is_original_value_query = (
+        "pib en pesos" in text_norm
+        or "precios corrientes" in text_norm
+        or "precio corriente" in text_norm
+        or "pib nominal" in text_norm
+        or "pib per capita" in text_norm
+        or "pib per cápita" in text
+        or "a cuanto asciende el pib" in text_norm
+        or price_ent == "co"
+        or indicator_ent == "pib_per_capita"
+        or activity_ent == "per_capita"
+    )
+    if is_original_value_query:
+        return None
+
     freq_code = _resolve_requested_frequency(entities_ctx, observations)
     latest_available = observations.get("latest_available") or {}
     latest_period = str(latest_available.get(freq_code) or "").strip() if freq_code else ""
@@ -1984,8 +2278,23 @@ def _build_filtered_source_url(
         or (observations.get("classification") or {}).get("calc_mode")
     )
     calc_mode_for_url = str(calc_mode or "").strip().lower()
-    if calc_mode_for_url == "original":
-        calc_mode_for_url = "yoy"
+
+    # En consultas de niveles (PIB per cápita o PIB a precios corrientes),
+    # el enlace debe conservar cálculo NONE para mostrar la serie original.
+    indicator_ent = str(entities_ctx.get("indicator_ent") or "").strip().lower()
+    activity_ent = str(entities_ctx.get("activity_ent") or "").strip().lower()
+    price_ent = str(entities_ctx.get("price_ent") or entities_ctx.get("price") or "").strip().lower()
+    question_text = str(entities_ctx.get("question") or "").strip().lower()
+
+    is_per_capita_query = indicator_ent == "pib_per_capita" or activity_ent == "per_capita"
+    is_current_prices_query = price_ent == "co" or (
+        "precios corrientes" in question_text
+        or "pib en pesos" in question_text
+        or "a cuanto asciende el pib" in question_text
+    )
+
+    if calc_mode_for_url == "original" and (is_per_capita_query or is_current_prices_query):
+        calc_mode_for_url = "none"
 
     frequency_for_url = {
         "M": "m",
@@ -2116,6 +2425,8 @@ def stream_data_response(
     question = payload.get("question", "")
     observations = payload.get("observations") or {}
     entities_ctx = payload.get("entities") if isinstance(payload.get("entities"), dict) else {}
+    if "question" not in entities_ctx:
+        entities_ctx = {**entities_ctx, "question": question}
     timing = payload.get("_timing") if isinstance(payload.get("_timing"), dict) else None
     calc_mode_ctx = str(entities_ctx.get("calc_mode_cls") or "").strip().lower()
     if not calc_mode_ctx:
@@ -2176,6 +2487,12 @@ def stream_data_response(
     )
     if no_explicit_period_instruction:
         messages.append({"role": "system", "content": no_explicit_period_instruction})
+    prevalidated_missing_specific_activity_instruction = _build_prevalidated_missing_specific_activity_instruction(
+        entities_ctx=entities_ctx,
+        observations=observations,
+    )
+    if prevalidated_missing_specific_activity_instruction:
+        messages.append({"role": "system", "content": prevalidated_missing_specific_activity_instruction})
     missing_activity_instruction = _build_missing_activity_instruction(
         entities_ctx=entities_ctx,
         observations=observations,
@@ -2208,9 +2525,16 @@ def stream_data_response(
         messages.append({"role": "system", "content": specific_contribution_directness_instruction})
     value_no_rescale_instruction = _build_value_no_rescale_instruction(
         question=question,
+        entities_ctx=entities_ctx,
     )
     if value_no_rescale_instruction:
         messages.append({"role": "system", "content": value_no_rescale_instruction})
+    original_series_force_instruction = _build_original_series_force_instruction(
+        question=question,
+        entities_ctx=entities_ctx,
+    )
+    if original_series_force_instruction:
+        messages.append({"role": "system", "content": original_series_force_instruction})
     messages.append({"role": "system", "content": _build_recommendation_length_instruction()})
     annual_pib_instruction = _build_annual_pib_completeness_instruction(
         question=question,
@@ -2287,12 +2611,13 @@ def stream_data_response(
                 for _, tc in sorted(tool_calls_by_idx.items()):
                     fn_args = json.loads(tc["arguments"])
                     result = handle_tool_call(tc["name"], fn_args, observations)
+                    tool_content = _sanitize_contribution_tool_result(tc["name"], fn_args, result)
                     logger.debug("[DATA_RESPONSE] tool=%s args=%s result_len=%d",
                                  tc["name"], tc["arguments"][:120], len(result))
                     messages.append({
                         "role": "tool",
                         "tool_call_id": tc["id"],
-                        "content": result,
+                        "content": tool_content,
                     })
                     # Track fetched series data for CSV export
                     if tc["name"] == "get_series_data":

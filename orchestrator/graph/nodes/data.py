@@ -22,6 +22,7 @@ from orchestrator.data._helpers import coerce_period, first_non_empty
 from orchestrator.data._business_rules import ResolvedEntities, apply_business_rules
 from orchestrator.data.catalog_data_search import search_output_payloads
 from orchestrator.normalizer.routing_utils import INTENT_CONFIDENCE_THRESHOLD
+from orchestrator.utils.component_normalizer import normalize_component
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,23 @@ def _extract_entities_from_state(
     ResolvedEntities,            # ent (mutable, pre-reglas)
 ]:
     """Extrae y normaliza las entidades desde el estado del grafo."""
+
+    def _unwrap_first_value(value: Any) -> Any:
+        current = value
+        while isinstance(current, list):
+            current = first_non_empty(current)
+        if current in (None, "", [], {}, ()):  # pragma: no branch
+            return None
+        return current
+
+    def _get_activity_from_dict(source: Any) -> Optional[str]:
+        if not isinstance(source, dict):
+            return None
+        raw = _unwrap_first_value(source.get("activity"))
+        if raw is None:
+            return None
+        text = str(raw).strip()
+        return text or None
 
     def _coerce_class_label(value: Any, *, apply_threshold: bool = True) -> Optional[str]:
         if value is None:
@@ -129,6 +147,27 @@ def _extract_entities_from_state(
         investment_cls=investment_cls,
         req_form_cls=req_form_cls,
     )
+
+    # Fallback conservador: si activity_cls es specific y no hubo actividad
+    # normalizada, intentar derivarla desde entidades crudas.
+    if str(activity_cls or "").strip().lower() == "specific" and not ent.activity_ent:
+        raw_activity = (
+            _get_activity_from_dict(interpretation_root.get("entities"))
+            or _get_activity_from_dict(classification_entities)
+        )
+        if raw_activity is None:
+            for item in entities_state:
+                raw_activity = _get_activity_from_dict(item)
+                if raw_activity:
+                    break
+
+        if raw_activity:
+            ent.activity_ent = normalize_component(raw_activity)
+            logger.info(
+                "[DATA_NODE] activity fallback from raw entities: raw=%s normalized=%s",
+                raw_activity,
+                ent.activity_ent,
+            )
 
     logger.info("[DATA_NODE] resolved entities (pre-rules)=%s", asdict(ent))
 
