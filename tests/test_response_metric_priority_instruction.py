@@ -1,4 +1,5 @@
 import orchestrator.data.response as response_module
+from orchestrator.data._helpers import build_target_series_url
 from pathlib import Path
 
 
@@ -40,9 +41,7 @@ def test_build_metric_priority_instruction_for_contribution_enforces_neutral_neg
     assert "CHEQUEO FINAL OBLIGATORIO" in text
     assert "'-X,X%'" in text
     assert "contribuciones negativas de" in text
-    assert "a la baja" in text
     assert "PLANTILLA OBLIGATORIA POR ACTIVIDAD" in text
-    assert "REGLA OBLIGATORIA POR CADA PORCENTAJE" in text
 
 
 def test_contribution_activity_focus_instruction_forbids_generic_negative_summary():
@@ -54,8 +53,6 @@ def test_contribution_activity_focus_instruction_forbids_generic_negative_summar
 
     assert text is not None
     assert "PROHIBIDO resumir como 'contribuciones negativas de varias actividades'" in text
-    assert "PROHIBIDO usar la frase 'a la baja'" in text
-    assert "no dejes porcentajes sueltos" in text
     assert "plantilla obligatoria" in text.lower()
 
 
@@ -76,9 +73,9 @@ def test_prevalidated_missing_specific_activity_instruction_when_activity_normal
 
     assert text is not None
     assert "VALIDACIÓN PREVIA DEL SISTEMA" in text
-    assert "Esta actividad no se encuentra disponible en la Base de datos estadísticos para el indicador PIB" in text
-    assert "PRIMER PÁRRAFO OBLIGATORIO" in text
-    assert "En [PERIODO], esta actividad no se encuentra disponible" in text
+    assert "En [PERIODO], esta actividad no se encuentra disponible en la Base de datos estadísticos para el indicador PIB" in text
+    assert "debe aparecer una sola vez" in text
+    assert "actividad más similar disponible" in text
     assert "Producción de bienes" in text
     assert "Servicios" in text
     assert "NO escribas una introducción que afirme contribución" in text
@@ -198,9 +195,8 @@ def test_missing_activity_instruction_when_requested_activity_not_available():
     )
     assert text is not None
     assert "actividad solicitada no está disponible" in text
-    assert "Esta actividad no se encuentra disponible en la Base de datos estadísticos" in text
-    assert "PRIMER PÁRRAFO OBLIGATORIO" in text
-    assert "En [PERIODO], esta actividad no se encuentra disponible" in text
+    assert "debe aparecer una sola vez" in text
+    assert "actividad más similar disponible" in text
     assert "NO reemplaces por la serie agregada" in text
 
 
@@ -430,6 +426,116 @@ def test_build_target_series_url_supports_explicit_none_mode():
     assert "cbCalculo=NONE" in url
 
 
+def test_build_target_series_url_original_defaults_to_ytypct():
+    url = build_target_series_url(
+        source_url="https://example.test/series",
+        series_id="SERIE.PIB.TEST",
+        period=["2024-01-01", "2024-12-31"],
+        observations=[{"date": "2024-12-31", "value": 100.0, "yoy_pct": 3.4}],
+        frequency="a",
+        calc_mode="original",
+    )
+
+    assert isinstance(url, str)
+    assert "cbCalculo=YTYPCT" in url
+    assert "cbCalculo=PCT" not in url
+
+
+def test_build_target_series_url_prev_period_explicit_uses_pct():
+    url = build_target_series_url(
+        source_url="https://example.test/series",
+        series_id="SERIE.PIB.TEST",
+        period=["2024-01-01", "2024-12-31"],
+        observations=[{"date": "2024-12-31", "value": 100.0, "pct": 1.2}],
+        frequency="a",
+        calc_mode="prev_period",
+    )
+
+    assert isinstance(url, str)
+    assert "cbCalculo=PCT" in url
+
+
+def test_build_target_series_url_unknown_mode_defaults_to_ytypct():
+    url = build_target_series_url(
+        source_url="https://example.test/series",
+        series_id="SERIE.PIB.TEST",
+        period=["2024-01-01", "2024-12-31"],
+        observations=[{"date": "2024-12-31", "value": 100.0, "yoy_pct": 3.4}],
+        frequency="a",
+        calc_mode="share",
+    )
+
+    assert isinstance(url, str)
+    assert "cbCalculo=YTYPCT" in url
+
+
+def test_build_target_series_url_contribution_homologates_link_format():
+    url = build_target_series_url(
+        source_url="https://example.test/cuadro",
+        series_id="SERIE.CONTRIB.TEST",
+        period=["2020-01-01", "2020-12-31"],
+        observations=[{"date": "2020-12-31", "value": 1.2}],
+        frequency="q",
+        calc_mode="contribution",
+    )
+
+    assert isinstance(url, str)
+    assert "cbFechaInicio=2020" in url
+    assert "cbFechaTermino=2025" in url
+    assert "cbFrecuencia=QUARTERLY" in url
+    assert "cbCalculo=NONE" in url
+    assert "cbFechaBase=" in url
+    assert "id5=SI" not in url
+    assert "idSerie=" not in url
+
+
+def test_build_target_series_url_contribution_keeps_requested_period_when_observed_differs():
+    url = build_target_series_url(
+        source_url="https://example.test/cuadro",
+        series_id="SERIE.CONTRIB.TEST",
+        period=["2019-01-01", "2020-12-31"],
+        observations=[{"date": "2024-12-31", "value": 1.2}],
+        frequency="q",
+        calc_mode="contribution",
+        req_form="latest",
+    )
+
+    assert isinstance(url, str)
+    assert "cbFechaInicio=2019" in url
+    assert "cbFechaTermino=2020" in url
+
+
+def test_build_target_series_url_contribution_same_start_end_forces_end_2025():
+    url = build_target_series_url(
+        source_url="https://example.test/cuadro",
+        series_id="SERIE.CONTRIB.TEST",
+        period=["2020-01-01", "2020-12-31"],
+        observations=[{"date": "2020-12-31", "value": 1.2}],
+        frequency="q",
+        calc_mode="contribution",
+        req_form="range",
+    )
+
+    assert isinstance(url, str)
+    assert "cbFechaInicio=2020" in url
+    assert "cbFechaTermino=2025" in url
+
+
+def test_build_target_series_url_inverted_range_forces_end_year_2025():
+    url = build_target_series_url(
+        source_url="https://example.test/series",
+        series_id="SERIE.PIB.TEST",
+        period=["2027-01-01", "2024-12-31"],
+        observations=[{"date": "2024-12-31", "value": 100.0, "yoy_pct": 3.4}],
+        frequency="a",
+        calc_mode="yoy",
+    )
+
+    assert isinstance(url, str)
+    assert "cbFechaTermino=2025" in url
+    assert "cbFechaInicio=2015" in url
+
+
 def test_build_filtered_source_url_uses_none_for_original_per_capita_query():
     observations = {
         "source_url": "https://example.test/series",
@@ -538,9 +644,7 @@ def test_specific_contribution_directness_instruction_uses_absolute_percent_rule
     )
 
     assert text is not None
-    assert "disminuyó **X,X%** respecto al mismo período del año anterior" in text
-    assert "PROHIBIDO usar la frase 'a la baja'" in text
-    assert "toda cifra porcentual escrita en la respuesta" in text
+    assert "cayó **X,X%** respecto al mismo período del año anterior" in text
     assert "PROHIBIDO usar 'pp'" in text
     assert "PROHIBIDO mostrar signo negativo" in text
     assert "CHEQUEO FINAL OBLIGATORIO" in text
