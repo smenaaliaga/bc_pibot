@@ -2359,6 +2359,7 @@ def _build_filtered_source_url(
     entities_ctx: Dict[str, Any],
     selected_series_ctx: Optional[Dict[str, str]],
     debug_out: Optional[Dict[str, Any]] = None,
+    llm_period_hint: Optional[Any] = None,
 ) -> Optional[str]:
     if not selected_series_ctx:
         return None
@@ -2404,10 +2405,21 @@ def _build_filtered_source_url(
     effective_idx: Optional[int] = None
     effective_date: Optional[str] = None
     effective_period: Optional[str] = None
+    point_effective_date: Optional[str] = None
+
+    req_form_norm = str(req_form or "").strip().lower()
+
+    # Para point, alinear URL al período efectivo que usó el LLM en get_series_data.
+    # Esto evita desalineaciones cuando se pidió 2026 pero el dato efectivo existe en 2025.
+    if req_form_norm == "point":
+        hint_text = str(llm_period_hint or "").strip()
+        if hint_text:
+            point_effective_date = _period_token_to_iso_date(hint_text, frequency) or hint_text
+            period = [point_effective_date, point_effective_date]
 
     # Para latest, alinear año del link al período efectivo usado para el dato
     # (ej: yoy válido en 2025 aunque exista 2026 con yoy nulo).
-    if str(req_form or "").strip().lower() == "latest" and isinstance(records_for_url, list):
+    if req_form_norm == "latest" and isinstance(records_for_url, list):
         effective_idx = _find_latest_effective_record_index(records_for_url, calc_mode_for_url)
         if effective_idx is not None and 0 <= effective_idx < len(records_for_url):
             effective_row = records_for_url[effective_idx]
@@ -2443,6 +2455,8 @@ def _build_filtered_source_url(
             "calc_mode_for_url": calc_mode_for_url,
             "period_before_transform": period_before_transform,
             "period_after_transform": period,
+            "llm_period_hint": llm_period_hint,
+            "point_effective_date": point_effective_date,
             "latest_effective_idx": effective_idx,
             "latest_effective_date": effective_date,
             "latest_effective_period": effective_period,
@@ -2686,6 +2700,7 @@ def stream_data_response(
     selected_series_ctx: Optional[Dict[str, str]] = None
     tool_calls_elapsed_ms = 0.0
     url_debug: Dict[str, Any] = {"llm_url_params": []}
+    llm_period_hint: Optional[str] = None
 
     try:
         for _ in range(max_tool_loops):
@@ -2751,6 +2766,9 @@ def stream_data_response(
                     result = handle_tool_call(tc["name"], fn_args, observations)
                     if tc["name"] == "get_series_data":
                         url_debug["llm_url_params"].append(dict(fn_args))
+                        hint = str(fn_args.get("period") or "").strip()
+                        if hint:
+                            llm_period_hint = hint
                     tool_content = _sanitize_contribution_tool_result(tc["name"], fn_args, result)
                     logger.debug("[DATA_RESPONSE] tool=%s args=%s result_len=%d",
                                  tc["name"], tc["arguments"][:120], len(result))
@@ -2787,6 +2805,7 @@ def stream_data_response(
                     entities_ctx=entities_ctx,
                     selected_series_ctx=final_series_ctx,
                     debug_out=url_debug,
+                    llm_period_hint=llm_period_hint,
                 )
                 source_footer = _build_source_footer(
                     observations,

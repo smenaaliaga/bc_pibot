@@ -672,6 +672,45 @@ def test_build_filtered_source_url_explicit_range_keeps_requested_period():
     assert "cbFechaTermino=2026" in url
 
 
+def test_build_filtered_source_url_point_uses_llm_effective_period_hint_when_requested_year_has_no_data():
+    observations = {
+        "source_url": "https://example.test/series",
+        "classification": {"calc_mode": "original"},
+        "series": [
+            {
+                "series_id": "SERIE.PIB.A",
+                "short_title": "PIB anual",
+                "data": {
+                    "A": {
+                        "records": [
+                            {"period": "2025", "value": 100.0, "yoy_pct": 2.5},
+                        ]
+                    }
+                },
+            }
+        ],
+    }
+    entities_ctx = {
+        "calc_mode_cls": "original",
+        "req_form_cls": "point",
+        "question": "cual es el valor del pib 2026",
+        "period_ent": ["2026-01-01", "2026-12-31"],
+    }
+    selected_series_ctx = {"series_id": "SERIE.PIB.A", "frequency": "A"}
+
+    url = response_module._build_filtered_source_url(
+        observations,
+        entities_ctx,
+        selected_series_ctx,
+        llm_period_hint="2025",
+    )
+
+    assert isinstance(url, str)
+    assert "cbFechaInicio=2025" in url
+    assert "cbFechaTermino=2025" in url
+    assert "cbFrecuencia=ANNUAL" in url
+
+
 def test_special_query_mapping_instruction_for_per_capita_forces_single_original_value():
     text = response_module._build_special_query_mapping_instruction(
         question="cual fue el pib per capita",
