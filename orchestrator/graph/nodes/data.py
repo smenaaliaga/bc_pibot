@@ -381,13 +381,19 @@ def make_data_node(memory_adapter: Any):
         store_series = observations.get("series") or []
         target_id = store_series[0].get("series_id") if store_series else None
 
+        data_classification = dict(ent_dict)
+        url_debug = payload.get("_url_debug")
+        if isinstance(url_debug, dict):
+            data_classification["__url_debug"] = url_debug
+
         return {
             "output": "".join(collected),
             "entities": entities,
             "parsed_point": str(pv[-1]) if (rf != "range" and pv) else None,
             "parsed_range": (str(pv[0]), str(pv[-1])) if pv else None,
             "series": target_id,
-            "data_classification": ent_dict,
+            "data_classification": data_classification,
+            "url_debug": payload.get("_url_debug"),
         }
 
     return data_node

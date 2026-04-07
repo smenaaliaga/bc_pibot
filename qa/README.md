@@ -40,16 +40,15 @@ Opcionalmente puedes definir input/output:
 "/Users/hernanfernandez/Documents/01 Workspace/Notebooks/pibot/.venv/bin/python" qa_batch.py --input questions.txt --output response.txt
 ```
 
-## Solución permanente conflicto Postgres local vs Docker (puertos separados)
+## Solución permanente conflicto Postgres local vs Docker (puerto 5432)
 
-Si `qa.py` falla con `database "pibot" does not exist`, normalmente `Postgres.app` local está tomando `localhost:5432`.
-En este repo, Docker queda publicado en `localhost:5433` para evitar choque de puertos.
+Si `qa.py` falla con `database "pibot" does not exist`, normalmente `Postgres.app` local está tomando `localhost:5432` y Docker quedó expuesto en otro puerto.
 
-### 1) Confirmar que Docker usa 5433 (contenedor 5432)
+### 1) Confirmar que Docker usa 5432 por defecto
 
 En este proyecto, `docker/docker-compose.yml` ya publica:
 
-- `5433:5432` para `pibot-postgres2`
+- `5432:5432` para `pibot-postgres2`
 
 Levantar servicios:
 
@@ -70,8 +69,8 @@ pkill -f '/Applications/Postgres.app' || true
 ### 3) Verificar que `localhost:5433` apunta a Docker
 
 ```bash
-lsof -nP -iTCP:5433 -sTCP:LISTEN
-PGPASSWORD=postgres psql -P pager=off -h localhost -p 5433 -U postgres -d pibot -c 'select current_database(), inet_server_addr();'
+lsof -nP -iTCP:5432 -sTCP:LISTEN
+PGPASSWORD=postgres psql -P pager=off -h localhost -p 5432 -U postgres -d pibot -c 'select current_database(), inet_server_addr();'
 ```
 
 Si devuelve `pibot`, ya no estás conectando al Postgres local.

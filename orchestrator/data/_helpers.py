@@ -222,7 +222,10 @@ def build_target_series_url(
         return match.group(0) if match else None
 
     period_values = period or []
+    requested_start_year = _extract_year_local(period_values[0]) if period_values else None
     requested_end_year = _extract_year_local(period_values[-1]) if period_values else None
+    requested_calc_mode = str(calc_mode or "").strip().lower()
+    is_contribution_link = requested_calc_mode == "contribution"
     req = str(req_form or "").strip().lower()
     observed_rows = [
         row for row in (observations or [])
@@ -232,19 +235,44 @@ def build_target_series_url(
         _extract_year_local(observed_rows[-1].get("date")) if observed_rows else None
     )
 
-    use_observed_end = req == "latest"
-    if requested_end_year and observed_end_year and requested_end_year != observed_end_year:
+    use_observed_end = req == "latest" and not is_contribution_link
+    if (
+        not is_contribution_link
+        and requested_end_year
+        and observed_end_year
+        and requested_end_year != observed_end_year
+    ):
         use_observed_end = True
 
     end_year = (
         observed_end_year if use_observed_end and observed_end_year else requested_end_year
     )
-    start_year = None
-    if end_year is not None:
+    start_year = requested_start_year
+    if start_year is None and end_year is not None:
         try:
             start_year = str(int(end_year) - 10)
         except Exception:
             start_year = None
+
+    # Solo para contribution en URL: si inicio y término quedan iguales,
+    # abrir el término al 2025 para mostrar ventana útil de datos.
+    if is_contribution_link and start_year and end_year and start_year == end_year:
+        end_year = "2025"
+
+    # Solo para URL de referencia: asegurar rango válido en el cuadro.
+    # Si fecha inicio > fecha término, forzar término a 2025.
+    if start_year and end_year:
+        try:
+            start_num = int(start_year)
+            end_num = int(end_year)
+            if start_num > end_num:
+                end_num = 2025
+                if start_num > end_num:
+                    start_num = 2015
+                start_year = str(start_num)
+                end_year = str(end_num)
+        except Exception:
+            pass
 
     frequency_param = {
         "a": "ANNUAL",
@@ -252,15 +280,23 @@ def build_target_series_url(
         "m": "MONTHLY",
     }.get(str(frequency or "").strip().lower())
 
-    requested_calc_mode = str(calc_mode or "").strip().lower()
-    if requested_calc_mode == "original":
-        requested_calc_mode = "prev_period"
-
-    calc_param = {
-        "yoy": "YTYPCT",
-        "prev_period": "PCT",
-        "none": "NONE",
-    }.get(requested_calc_mode)
+    # Regla para URL de referencia:
+    # - PCT solo cuando se pidió explícitamente prev_period.
+    # - NONE solo cuando se pide explícitamente none (o se mapea upstream
+    #   para casos especiales como precios corrientes / PIB per cápita).
+    # - Todo lo demás, incluido original, cae a YTYPCT por defecto.
+    if requested_calc_mode == "prev_period":
+        resolved_calc_mode = "prev_period"
+        calc_param = "PCT"
+    elif is_contribution_link:
+        resolved_calc_mode = "none"
+        calc_param = "NONE"
+    elif requested_calc_mode == "none":
+        resolved_calc_mode = "none"
+        calc_param = "NONE"
+    else:
+        resolved_calc_mode = "yoy"
+        calc_param = "YTYPCT"
 
     def _has_requested_calc_value(rows: List[Dict[str, Any]], mode: str) -> bool:
         if mode == "yoy":
@@ -278,11 +314,13 @@ def build_target_series_url(
         return False
 
     if calc_param and observations is not None:
-        if not _has_requested_calc_value(observations, requested_calc_mode):
+        if not _has_requested_calc_value(observations, resolved_calc_mode):
             calc_param = "NONE"
 
     separator = "&" if "?" in str(source_url) else "?"
-    query_parts = [f"id5=SI", f"idSerie={series_id}"]
+    query_parts: List[str] = []
+    if not is_contribution_link:
+        query_parts.extend([f"id5=SI", f"idSerie={series_id}"])
     if start_year:
         query_parts.append(f"cbFechaInicio={start_year}")
     if end_year:
@@ -291,5 +329,7 @@ def build_target_series_url(
         query_parts.append(f"cbFrecuencia={frequency_param}")
     if calc_param:
         query_parts.append(f"cbCalculo={calc_param}")
+    if is_contribution_link:
+        query_parts.append("cbFechaBase=")
 
     return f"{source_url}{separator}{'&'.join(query_parts)}"

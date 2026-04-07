@@ -568,6 +568,110 @@ def test_build_filtered_source_url_uses_none_for_original_per_capita_query():
     assert "cbCalculo=NONE" in url
 
 
+def test_build_filtered_source_url_latest_uses_effective_yoy_period_for_year_range():
+    observations = {
+        "source_url": "https://example.test/series",
+        "classification": {"calc_mode": "original"},
+        "series": [
+            {
+                "series_id": "SERIE.PIB.T",
+                "short_title": "PIB trimestral",
+                "data": {
+                    "T": {
+                        "records": [
+                            {"date": "2025-12-31", "value": 100.0, "yoy_pct": 1.6, "pct": 0.4},
+                            {"date": "2026-03-31", "value": 101.0, "yoy_pct": None, "pct": 0.1},
+                        ]
+                    }
+                },
+            }
+        ],
+    }
+    entities_ctx = {
+        "calc_mode_cls": "original",
+        "req_form_cls": "latest",
+        "question": "cual es el valor del pib",
+        "period_ent": ["2026-01-01", "2026-03-31"],
+    }
+    selected_series_ctx = {"series_id": "SERIE.PIB.T", "frequency": "T"}
+
+    url = response_module._build_filtered_source_url(observations, entities_ctx, selected_series_ctx)
+
+    assert isinstance(url, str)
+    assert "cbFechaInicio=2025" in url
+    assert "cbFechaTermino=2025" in url
+    assert "cbCalculo=YTYPCT" in url
+
+
+def test_build_filtered_source_url_latest_uses_effective_yoy_period_when_records_only_have_period():
+    observations = {
+        "source_url": "https://example.test/series",
+        "classification": {"calc_mode": "original"},
+        "series": [
+            {
+                "series_id": "SERIE.PIB.T",
+                "short_title": "PIB trimestral",
+                "data": {
+                    "T": {
+                        "records": [
+                            {"period": "2025-Q4", "value": 100.0, "yoy_pct": 1.6, "pct": 0.4},
+                            {"period": "2026-Q1", "value": 101.0, "yoy_pct": None, "pct": 0.1},
+                        ]
+                    }
+                },
+            }
+        ],
+    }
+    entities_ctx = {
+        "calc_mode_cls": "original",
+        "req_form_cls": "latest",
+        "question": "cual es el valor del pib",
+        "period_ent": ["2026-01-01", "2026-03-31"],
+    }
+    selected_series_ctx = {"series_id": "SERIE.PIB.T", "frequency": "T"}
+
+    url = response_module._build_filtered_source_url(observations, entities_ctx, selected_series_ctx)
+
+    assert isinstance(url, str)
+    assert "cbFechaInicio=2025" in url
+    assert "cbFechaTermino=2025" in url
+    assert "cbCalculo=YTYPCT" in url
+
+
+def test_build_filtered_source_url_explicit_range_keeps_requested_period():
+    observations = {
+        "source_url": "https://example.test/series",
+        "classification": {"calc_mode": "original"},
+        "series": [
+            {
+                "series_id": "SERIE.PIB.T",
+                "short_title": "PIB trimestral",
+                "data": {
+                    "T": {
+                        "records": [
+                            {"date": "2025-12-31", "value": 100.0, "yoy_pct": 1.6, "pct": 0.4},
+                            {"date": "2026-03-31", "value": 101.0, "yoy_pct": None, "pct": 0.1},
+                        ]
+                    }
+                },
+            }
+        ],
+    }
+    entities_ctx = {
+        "calc_mode_cls": "original",
+        "req_form_cls": "range",
+        "question": "cual fue el pib en 2026",
+        "period_ent": ["2026-01-01", "2026-03-31"],
+    }
+    selected_series_ctx = {"series_id": "SERIE.PIB.T", "frequency": "T"}
+
+    url = response_module._build_filtered_source_url(observations, entities_ctx, selected_series_ctx)
+
+    assert isinstance(url, str)
+    assert "cbFechaInicio=2026" in url
+    assert "cbFechaTermino=2026" in url
+
+
 def test_special_query_mapping_instruction_for_per_capita_forces_single_original_value():
     text = response_module._build_special_query_mapping_instruction(
         question="cual fue el pib per capita",

@@ -70,10 +70,10 @@ class _InProcessMemoryAdapter:
 
 def _safe_memory_adapter() -> Any:
     require_pg = os.getenv("REQUIRE_PG_MEMORY", "0").lower() in {"1", "true", "yes", "on"}
-    force_local = os.getenv("PG_FORCE_LOCALHOST", "0").lower() in {"1", "true", "yes", "on"}
+    force_local = os.getenv("PG_FORCE_LOCALHOST", "1").lower() in {"1", "true", "yes", "on"}
     pg_dsn = None
     if force_local:
-        pg_dsn = os.getenv("PG_LOCALHOST_DSN") or "postgresql://postgres:postgres@localhost:5432/pibot"
+        pg_dsn = os.getenv("PG_LOCALHOST_DSN") or "postgresql://postgres:postgres@localhost:5433/pibot"
     else:
         pg_dsn = os.getenv("PG_DSN") or os.getenv("DATABASE_URL")
     try:

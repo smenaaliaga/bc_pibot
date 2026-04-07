@@ -2266,10 +2266,99 @@ def _build_full_history_csv_marker(
     )
 
 
+def _effective_metric_keys_for_calc_mode(calc_mode: str) -> Tuple[str, ...]:
+    mode = str(calc_mode or "").strip().lower()
+    if mode == "prev_period":
+        return ("pct", "prev_period")
+    if mode in {"none", "contribution"}:
+        return ("value",)
+    # Default (original/yoy/otros): priorizar variación anual
+    return ("yoy_pct", "yoy", "YTYPCT")
+
+
+def _find_latest_effective_record_index(
+    records: List[Dict[str, Any]],
+    calc_mode: str,
+) -> Optional[int]:
+    if not records:
+        return None
+
+    metric_keys = _effective_metric_keys_for_calc_mode(calc_mode)
+    for idx in range(len(records) - 1, -1, -1):
+        row = records[idx]
+        if not isinstance(row, dict):
+            continue
+        has_metric = any(row.get(key) not in (None, "", "null") for key in metric_keys)
+        if has_metric:
+            return idx
+
+    # Fallback conservador: si no hay métrica válida para ese cálculo,
+    # usar el último registro con valor para no romper la URL.
+    for idx in range(len(records) - 1, -1, -1):
+        row = records[idx]
+        if isinstance(row, dict) and row.get("value") not in (None, "", "null"):
+            return idx
+    return None
+
+
+def _period_token_to_iso_date(period_token: Any, frequency: str) -> Optional[str]:
+    token = str(period_token or "").strip()
+    if not token:
+        return None
+
+    # Already in ISO date format.
+    iso_match = re.fullmatch(r"((?:19|20)\d{2})-(\d{2})-(\d{2})", token)
+    if iso_match:
+        return token
+
+    yearly_match = re.fullmatch(r"((?:19|20)\d{2})", token)
+    if yearly_match:
+        return f"{yearly_match.group(1)}-12-31"
+
+    monthly_match = re.fullmatch(r"((?:19|20)\d{2})-(0[1-9]|1[0-2])", token)
+    if monthly_match:
+        year = int(monthly_match.group(1))
+        month = int(monthly_match.group(2))
+        if month == 2:
+            is_leap = (year % 4 == 0 and year % 100 != 0) or (year % 400 == 0)
+            last_day = 29 if is_leap else 28
+        elif month in {4, 6, 9, 11}:
+            last_day = 30
+        else:
+            last_day = 31
+        return f"{year:04d}-{month:02d}-{last_day:02d}"
+
+    quarterly_match = re.fullmatch(r"((?:19|20)\d{2})-Q([1-4])", token, re.IGNORECASE)
+    if quarterly_match:
+        year = int(quarterly_match.group(1))
+        quarter = int(quarterly_match.group(2))
+        month = quarter * 3
+        day = 30 if month in {6, 9} else 31
+        return f"{year:04d}-{month:02d}-{day:02d}"
+
+    freq = str(frequency or "").strip().upper()
+    if freq == "A":
+        year_match = re.search(r"((?:19|20)\d{2})", token)
+        if year_match:
+            return f"{year_match.group(1)}-12-31"
+
+    return None
+
+
+def _resolve_effective_record_date(record: Dict[str, Any], frequency: str) -> Optional[str]:
+    if not isinstance(record, dict):
+        return None
+    date_text = str(record.get("date") or "").strip()
+    if date_text:
+        return date_text
+    return _period_token_to_iso_date(record.get("period"), frequency)
+
+
 def _build_filtered_source_url(
     observations: Dict[str, Any],
     entities_ctx: Dict[str, Any],
     selected_series_ctx: Optional[Dict[str, str]],
+    debug_out: Optional[Dict[str, Any]] = None,
 ) -> Optional[str]:
     if not selected_series_ctx:
         return None
@@ -2284,8 +2373,6 @@ def _build_filtered_source_url(
     if not series_data:
         return None
 
-    period_values = entities_ctx.get("period_ent")
-    period: Optional[List[Any]] = period_values if isinstance(period_values, list) else None
     req_form = entities_ctx.get("req_form_cls")
     calc_mode = (
         entities_ctx.get("calc_mode_cls")
@@ -2310,6 +2397,26 @@ def _build_filtered_source_url(
     if calc_mode_for_url == "original" and (is_per_capita_query or is_current_prices_query):
         calc_mode_for_url = "none"
 
+    period_values = entities_ctx.get("period_ent")
+    period: Optional[List[Any]] = period_values if isinstance(period_values, list) else None
+    records_for_url = series_data.get("records") or []
+    period_before_transform = list(period) if isinstance(period, list) else period
+    effective_idx: Optional[int] = None
+    effective_date: Optional[str] = None
+    effective_period: Optional[str] = None
+
+    # Para latest, alinear año del link al período efectivo usado para el dato
+    # (ej: yoy válido en 2025 aunque exista 2026 con yoy nulo).
+    if str(req_form or "").strip().lower() == "latest" and isinstance(records_for_url, list):
+        effective_idx = _find_latest_effective_record_index(records_for_url, calc_mode_for_url)
+        if effective_idx is not None and 0 <= effective_idx < len(records_for_url):
+            effective_row = records_for_url[effective_idx]
+            effective_period = str(effective_row.get("period") or "").strip() or None
+            effective_date = _resolve_effective_record_date(effective_row, frequency)
+            if effective_date:
+                period = [effective_date, effective_date]
+                records_for_url = records_for_url[: effective_idx + 1]
+
     frequency_for_url = {
         "M": "m",
         "T": "q",
@@ -2321,10 +2428,26 @@ def _build_filtered_source_url(
         series_id=series_id,
         period=period,
         req_form=req_form,
-        observations=series_data.get("records") or [],
+        observations=records_for_url,
         frequency=frequency_for_url,
         calc_mode=calc_mode_for_url,
     )
+    if debug_out is not None:
+        debug_out["url_builder_input"] = {
+            "source_url": source_url,
+            "series_id": series_id,
+            "frequency": frequency,
+            "frequency_for_url": frequency_for_url,
+            "req_form": req_form,
+            "calc_mode_input": calc_mode,
+            "calc_mode_for_url": calc_mode_for_url,
+            "period_before_transform": period_before_transform,
+            "period_after_transform": period,
+            "latest_effective_idx": effective_idx,
+            "latest_effective_date": effective_date,
+            "latest_effective_period": effective_period,
+        }
+        debug_out["filtered_source_url"] = str(filtered or "").strip() or None
     return str(filtered or "").strip() or None
 
 
@@ -2562,6 +2685,7 @@ def stream_data_response(
     fetched_series: List[Dict[str, Any]] = []  # track get_series_data results
     selected_series_ctx: Optional[Dict[str, str]] = None
     tool_calls_elapsed_ms = 0.0
+    url_debug: Dict[str, Any] = {"llm_url_params": []}
 
     try:
         for _ in range(max_tool_loops):
@@ -2625,6 +2749,8 @@ def stream_data_response(
                 for _, tc in sorted(tool_calls_by_idx.items()):
                     fn_args = json.loads(tc["arguments"])
                     result = handle_tool_call(tc["name"], fn_args, observations)
+                    if tc["name"] == "get_series_data":
+                        url_debug["llm_url_params"].append(dict(fn_args))
                     tool_content = _sanitize_contribution_tool_result(tc["name"], fn_args, result)
                     logger.debug("[DATA_RESPONSE] tool=%s args=%s result_len=%d",
                                  tc["name"], tc["arguments"][:120], len(result))
@@ -2654,10 +2780,13 @@ def stream_data_response(
                     entities_ctx=entities_ctx,
                     selected_from_tools=selected_series_ctx,
                 )
+                if final_series_ctx:
+                    url_debug["selected_series"] = dict(final_series_ctx)
                 filtered_source_url = _build_filtered_source_url(
                     observations=observations,
                     entities_ctx=entities_ctx,
                     selected_series_ctx=final_series_ctx,
+                    debug_out=url_debug,
                 )
                 source_footer = _build_source_footer(
                     observations,
@@ -2684,6 +2813,7 @@ def stream_data_response(
                 if timing is not None:
                     timing["openai_tool_calls_ms"] = round(tool_calls_elapsed_ms, 2)
                     timing["post_response_blocks_ms"] = round((time.perf_counter() - post_t0) * 1000.0, 2)
+                payload["_url_debug"] = url_debug
                 return
         else:
             # Se agotó el loop de herramientas

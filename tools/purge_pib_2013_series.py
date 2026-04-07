@@ -2,7 +2,7 @@
 Purge series from series_metadata whose cod_serie matches F035.PIB.*.2013.*
 
 Usage:
-  PG_DSN=postgresql://postgres:postgres@localhost:5432/pibot python tools/purge_pib_2013_series.py
+    PG_DSN=postgresql://postgres:postgres@localhost:5433/pibot python tools/purge_pib_2013_series.py
 """
 import os
 import psycopg  # type: ignore
@@ -10,7 +10,7 @@ import re
 
 
 def main() -> None:
-    dsn = os.getenv("PG_DSN", "postgresql://postgres:postgres@localhost:5432/pibot")
+    dsn = os.getenv("PG_DSN", "postgresql://postgres:postgres@localhost:5433/pibot")
     pattern = re.compile(r"^F035\.PIB\..*\.2013\..*")
     with psycopg.connect(dsn) as conn:
         with conn.cursor() as cur:

@@ -125,7 +125,7 @@ def upsert_rows(conn, rows: List[Dict[str, Any]]) -> None:
 
 
 def main() -> None:
-    dsn = os.getenv("PG_DSN", "postgresql://postgres:postgres@localhost:5432/pibot")
+    dsn = os.getenv("PG_DSN", "postgresql://postgres:postgres@localhost:5433/pibot")
     meta_path = Path(os.getenv("SERIES_METADATA_JSON", "series/series_pibot_con_metadata.json")).resolve()
     if not meta_path.exists():
         raise SystemExit(f"Metadata JSON not found: {meta_path}")

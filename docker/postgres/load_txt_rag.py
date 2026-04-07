@@ -488,7 +488,7 @@ def main() -> None:
     args = parse_args()
     setup_logging(args.log_file)
 
-    dsn = os.getenv("PG_DSN", "postgresql://postgres:postgres@localhost:5432/pibot")
+    dsn = os.getenv("PG_DSN", "postgresql://postgres:postgres@localhost:5433/pibot")
     collection = os.getenv("RAG_PGVECTOR_COLLECTION", "methodology")
     model = os.getenv("OPENAI_EMBEDDINGS_MODEL", "text-embedding-3-large")
 

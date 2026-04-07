@@ -53,7 +53,7 @@ class MemoryAdapter:
     """Adapter that exposes a minimal MemoryInterface using LangGraph checkpointers."""
 
     def __init__(self, pg_dsn: Optional[str] = None):
-        self.pg_dsn = pg_dsn or os.getenv("PG_DSN", "postgresql://postgres:postgres@localhost:5432/pibot")
+        self.pg_dsn = pg_dsn or os.getenv("PG_DSN", "postgresql://postgres:postgres@localhost:5433/pibot")
         self._require_pg = os.getenv("REQUIRE_PG_MEMORY", "0").lower() in ("1", "true", "yes", "on")
         self._fallback_turns: Dict[str, List[Dict[str, Any]]] = {}
         self._fallback_turn_seq: Dict[str, int] = {}

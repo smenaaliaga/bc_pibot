@@ -171,6 +171,8 @@ class OpenAICapture:
             t0 = time.perf_counter()
             for chunk in original_stream(instrumented_payload):
                 yield chunk
+            if "_url_debug" in instrumented_payload:
+                payload["_url_debug"] = instrumented_payload.get("_url_debug")
             capture.elapsed_seconds = time.perf_counter() - t0
             capture.stage_ms = {
                 "openai_tool_calls_ms": float(timing.get("openai_tool_calls_ms", 0.0) or 0.0),
@@ -208,6 +210,7 @@ class DetailTracer:
         self._data_classification: Optional[Dict] = None
         self._memory_input: Dict[str, Any] = {}
         self._current_state: Dict[str, Any] = {}
+        self._url_debug: Dict[str, Any] = {}
         self._openai_capture: Optional[OpenAICapture] = None
         self._datastore_capture: Optional[DataStoreCapture] = None
         self._t0 = time.perf_counter()
@@ -245,6 +248,13 @@ class DetailTracer:
             self._data_classification = (
                 delta.get("data_classification")
                 or self._current_state.get("data_classification")
+            )
+            data_classification = self._data_classification if isinstance(self._data_classification, dict) else {}
+            self._url_debug = (
+                delta.get("url_debug")
+                or self._current_state.get("url_debug")
+                or data_classification.get("__url_debug")
+                or {}
             )
             self._memory_input = {
                 "output": delta.get("output", ""),
@@ -305,6 +315,22 @@ class DetailTracer:
         self._add(f"  3. GENERACIÓN RESPUESTAS FUENTE,CSV y BLOQUE SUGERENCIAS: {timings.get('post_response_blocks_s', 0.0):.2f} s")
         self._add(f"  4. ORQUESTACIÓN GENERAL (INGEST/CLASSIFY/INTENT/ROUTER/MEMORY): {timings.get('general_orchestration_s', 0.0):.2f} s")
         self._add(f"  5. TIEMPO TOTAL: {timings.get('total_s', 0.0):.2f} s")
+        self._add("")
+
+        self._add("TRAZA URL (PRE-RESPUESTA):")
+        llm_url_params = []
+        url_builder_input = {}
+        filtered_source_url = None
+        if isinstance(self._url_debug, dict):
+            llm_url_params = self._url_debug.get("llm_url_params") or []
+            url_builder_input = self._url_debug.get("url_builder_input") or {}
+            filtered_source_url = self._url_debug.get("filtered_source_url")
+        self._add("  PARAMETROS URL PASADOS AL LLM (tool get_series_data):")
+        self._add(_indent(_pretty_json(llm_url_params), 4))
+        self._add("  PARAMETROS URL ANTES DE CONSTRUIR LINK FINAL:")
+        self._add(_indent(_pretty_json(url_builder_input), 4))
+        self._add("  URL FILTRADA GENERADA:")
+        self._add(_indent(str(filtered_source_url or "—"), 4))
         self._add("")
 
     def _write_response(self):

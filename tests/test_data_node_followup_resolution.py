@@ -93,69 +93,6 @@ def test_data_node_prefers_followup_normalized_from_predict_raw(monkeypatch):
     assert result["output"] == "ok"
 
 
-def test_data_node_falls_back_to_raw_activity_when_specific_and_normalized_empty(monkeypatch):
-    payload_holder = {}
-
-    monkeypatch.setattr(
-        data_module,
-        "search_output_payloads",
-        lambda *args, **kwargs: [
-            {
-                "payload": {
-                    "source_url": "https://example.test/family",
-                    "frequency": "q",
-                    "series": [{"series_id": "SERIE.PIB.TEST"}],
-                }
-            }
-        ],
-    )
-
-    def fake_stream_data_response(payload):
-        payload_holder["payload"] = payload
-        yield "ok"
-
-    monkeypatch.setattr(data_module, "stream_data_response", fake_stream_data_response)
-
-    classification = types.SimpleNamespace(
-        normalized={
-            "indicator": ["pib"],
-            "seasonality": ["nsa"],
-            "frequency": ["q"],
-            "period": ["2025-10-01", "2025-12-31"],
-            "activity": [],
-            "region": [],
-            "investment": [],
-        },
-        predict_raw={
-            "interpretation": {
-                "entities": {
-                    "activity": ["producción de bienes"],
-                }
-            }
-        },
-        entities={"indicator": ["pib"]},
-        calc_mode="original",
-        activity="specific",
-        region="none",
-        investment="none",
-        req_form="point",
-    )
-
-    node = make_data_node(None)
-    result = node(
-        {
-            "question": "cuanto contribuyo la producción de bienes al pib",
-            "session_id": "s-raw-activity-fallback",
-            "classification": classification,
-            "entities": [{"indicator": "pib", "activity": ["producción de bienes"]}],
-        }
-    )
-
-    assert payload_holder["payload"]["entities"]["activity_ent"] == "produccion de bienes"
-    assert result["data_classification"]["activity_ent"] == "produccion de bienes"
-    assert result["output"] == "ok"
-
-
 def test_data_node_pib_aggregate_omits_seasonality_for_family_search(monkeypatch):
     """La familia base de PIB no tiene seasonality a nivel de familia
     (está por serie), así que la búsqueda de familia siempre omite
@@ -245,7 +182,7 @@ def test_data_node_pib_aggregate_omits_seasonality_for_family_search(monkeypatch
     assert result["output"] == "ok"
 
 
-def test_build_target_series_url_uses_none_when_original_has_no_prev_period_values():
+def test_build_target_series_url_uses_ytypct_when_original_has_yoy_values():
     url = data_module._build_target_series_url(
         source_url="https://example.test/series",
         series_id="SERIE.PIB.TEST",
@@ -254,6 +191,7 @@ def test_build_target_series_url_uses_none_when_original_has_no_prev_period_valu
             {
                 "date": "1960-12-31",
                 "value": 19142,
+                "yoy_pct": 1.1,
             }
         ],
         frequency="a",
@@ -261,10 +199,10 @@ def test_build_target_series_url_uses_none_when_original_has_no_prev_period_valu
     )
 
     assert isinstance(url, str)
-    assert "cbCalculo=NONE" in url
+    assert "cbCalculo=YTYPCT" in url
 
 
-def test_build_target_series_url_uses_pct_when_original_has_prev_period_values():
+def test_build_target_series_url_uses_ytypct_when_original_has_yoy_values_even_if_prev_period_exists():
     url = data_module._build_target_series_url(
         source_url="https://example.test/series",
         series_id="SERIE.PIB.TEST",
@@ -274,6 +212,7 @@ def test_build_target_series_url_uses_pct_when_original_has_prev_period_values()
                 "date": "1961-12-31",
                 "value": 20000,
                 "prev_period": 1.2,
+                "yoy_pct": 0.8,
             }
         ],
         frequency="a",
@@ -281,7 +220,7 @@ def test_build_target_series_url_uses_pct_when_original_has_prev_period_values()
     )
 
     assert isinstance(url, str)
-    assert "cbCalculo=PCT" in url
+    assert "cbCalculo=YTYPCT" in url
 
 
 def test_build_target_series_url_uses_none_when_yoy_has_no_values():

@@ -170,7 +170,7 @@ def main() -> None:
     args = parse_args()
     setup_logging()
 
-    dsn = os.getenv("PG_DSN", "postgresql://postgres:postgres@localhost:5432/pibot")
+    dsn = os.getenv("PG_DSN", "postgresql://postgres:postgres@localhost:5433/pibot")
     model = os.getenv("OPENAI_EMBEDDINGS_MODEL", "text-embedding-3-large")
     doc_id = args.doc_id or args.excel.stem
     tags = _parse_tags(args.tags)

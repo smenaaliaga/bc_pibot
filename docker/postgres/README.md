@@ -4,7 +4,7 @@ This folder hosts the tooling required to refresh the LangChain/PGVector collect
 
 ## Prerequisites
 - `.env` or shell exports for:
-  - `PG_DSN` (e.g. `postgresql://postgres:postgres@localhost:5432/pibot`)
+  - `PG_DSN` (e.g. `postgresql://postgres:postgres@localhost:5433/pibot`)
   - `RAG_PGVECTOR_COLLECTION` (defaults to `methodology`).
   - `OPENAI_API_KEY` (for embeddings).
   - Optional: `RAG_LANGUAGE`, `RAG_DOCS_DIR`, `RAG_PURGE_MODE`.
