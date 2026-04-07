@@ -81,6 +81,35 @@ def _log_remote_model_health(logger: logging.LoggerAdapter) -> None:
     )
 
 
+def _run_hidden_streamlit_warmup(
+    stream_fn,
+    logger: logging.LoggerAdapter,
+) -> None:
+    """Ejecuta una consulta de warmup al iniciar Streamlit, sin mostrarla en UI."""
+    enabled = os.getenv("STREAMLIT_WARMUP_ON_START", "1").lower() in {"1", "true", "yes", "on"}
+    if not enabled:
+        return
+    if getattr(main, "_warmup_done", False):
+        return
+
+    warmup_question = os.getenv(
+        "STREAMLIT_WARMUP_QUESTION",
+        "cual es el valor del ultimo imacec",
+    ).strip() or "cual es el valor del ultimo imacec"
+    warmup_session = os.getenv("STREAMLIT_WARMUP_SESSION_ID", "streamlit-warmup")
+
+    t0 = datetime.datetime.now()
+    try:
+        # Consumimos el stream completo para forzar inicialización de cliente/modelo/tools.
+        _ = "".join(stream_fn(warmup_question, history=[], session_id=warmup_session))
+        elapsed_ms = (datetime.datetime.now() - t0).total_seconds() * 1000.0
+        logger.info("[WARMUP] completado en %.0f ms | question=%s", elapsed_ms, warmup_question)
+    except Exception as exc:
+        logger.warning("[WARMUP] falló: %s", exc)
+    finally:
+        main._warmup_done = True
+
+
 def main() -> None:
     """Punto de entrada principal."""
     # Cargar variables de entorno desde .env
@@ -354,6 +383,9 @@ def main() -> None:
     def invoke_fn(question: str, history: Optional[List[Dict[str, str]]] = None) -> str:
         logger.info(f"[INVOKE] question={question[:80]}")
         return "".join(stream_fn(question, history=history, session_id=None))
+
+    # Warmup oculto para evitar latencia/error de primera consulta en UI.
+    _run_hidden_streamlit_warmup(stream_fn=stream_fn, logger=logger)
 
     # Guardar en session_state para evitar reinicialización en reruns
     st.session_state.settings = settings
