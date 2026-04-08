@@ -1465,6 +1465,57 @@ def _build_recommendation_length_instruction() -> str:
     )
 
 
+def _build_historical_floor_instruction(
+    entities_ctx: Dict[str, Any],
+    observations: Optional[Dict[str, Any]] = None,
+) -> Optional[str]:
+    """Inyecta instrucción histórica con parámetros explícitos para evitar ambigüedad del LLM."""
+    text = str(entities_ctx.get("historical_floor_instruction") or "").strip()
+    if not text:
+        return None
+
+    indicator = str(entities_ctx.get("indicator_ent") or "").strip().lower()
+    req_form = str(entities_ctx.get("req_form_cls") or "").strip().lower()
+    period_ent = entities_ctx.get("period_ent")
+    period_list = period_ent if isinstance(period_ent, list) else []
+
+    # Refuerzo de salida para históricos de PIB/IMACEC en rangos.
+    if indicator in {"pib", "imacec"} and req_form == "range":
+        text = (
+            f"{text}\n"
+            "REGLA DE PRIORIZACIÓN HISTÓRICA (SALIDA): prioriza siempre variaciones interanuales "
+            "en el resumen principal del rango. Solo puedes usar nivel/valor de la serie original "
+            "para el año de inicio histórico (1960 en PIB, 1996 en IMACEC) cuando no existe variación "
+            "interanual previa para ese punto de arranque."
+        )
+
+    # Refuerzo paramétrico acotado: IMACEC histórico en consultas de rango.
+    if indicator != "imacec" or req_form != "range" or len(period_list) < 2:
+        return text
+
+    latest_available = (observations or {}).get("latest_available") or {}
+    latest_m = str(latest_available.get("M") or "").strip()
+    if not latest_m:
+        return text
+
+    floor_start = str(period_list[0])
+    floor_end = str(period_list[-1])
+    return (
+        f"{text}\n"
+        "REGLA PARAMÉTRICA OBLIGATORIA (NO SEMÁNTICA): usa exactamente estos parámetros de control\n"
+        f"- indicator=imacec\n"
+        f"- req_form={req_form}\n"
+        f"- floor_period_start={floor_start}\n"
+        f"- floor_period_end={floor_end}\n"
+        f"- latest_available_m={latest_m}\n"
+        "OBLIGATORIO:\n"
+        "1. Indicar explícitamente que el año solicitado no está disponible y que la serie parte en 1996.\n"
+        "2. Para el dato principal, usar el último mes disponible (latest_available_m) y reportar su variación anual.\n"
+        "3. No reemplazar la respuesta principal por resumen del año piso (1996) ni por rangos 1996-1996.\n"
+        "4. No inferir períodos alternativos distintos de latest_available_m para el dato principal."
+    )
+
+
 def _build_special_query_mapping_instruction(
     question: str,
     entities_ctx: Dict[str, Any],
@@ -1763,6 +1814,56 @@ def _extract_requested_year(entities_ctx: Dict[str, Any], question: str) -> Opti
     if match:
         return match.group(1)
     return None
+
+
+def _build_no_data_available_response(
+    *,
+    question: str,
+    entities_ctx: Dict[str, Any],
+    observations: Dict[str, Any],
+    tool_args: Dict[str, Any],
+) -> str:
+    """Respuesta determinística cuando get_series_data no retorna registros."""
+    indicator = str(entities_ctx.get("indicator_ent") or "").strip().upper() or "la serie"
+    requested_year = _extract_requested_year(entities_ctx, question)
+    requested_label = requested_year or "el período solicitado"
+
+    series_id = str(tool_args.get("series_id") or "").strip()
+    freq_code = str(tool_args.get("frequency") or "").strip().upper()
+
+    coverage_start_label = ""
+    if series_id and freq_code:
+        series = _find_series(observations.get("series", []), series_id)
+        block = (series or {}).get("data", {}).get(freq_code)
+        records = (block or {}).get("records") or []
+        if records:
+            first_period = str(records[0].get("period") or "").strip()
+            if first_period:
+                first_period_label_source = first_period
+                if freq_code == "M" and re.fullmatch(r"\d{4}-\d{2}", first_period):
+                    first_period_label_source = f"{first_period}-01"
+                elif freq_code == "A" and re.fullmatch(r"\d{4}", first_period):
+                    first_period_label_source = f"{first_period}-01-01"
+                elif freq_code == "T":
+                    quarter_match = re.fullmatch(r"(\d{4})-Q([1-4])", first_period, re.IGNORECASE)
+                    if quarter_match:
+                        quarter_start_month = {"1": "01", "2": "04", "3": "07", "4": "10"}[quarter_match.group(2)]
+                        first_period_label_source = f"{quarter_match.group(1)}-{quarter_start_month}-01"
+                coverage_start_label = _natural_period_label(first_period_label_source, freq_code)
+
+    lines = [
+        f"No tengo datos disponibles de {indicator} para {requested_label} en esta serie.",
+    ]
+    if coverage_start_label:
+        lines.append(
+            f"La cobertura disponible de esta serie comienza en {coverage_start_label}, por lo que el período solicitado queda fuera de rango."
+        )
+    else:
+        lines.append(
+            "El período solicitado queda fuera de la cobertura disponible en esta serie."
+        )
+    lines.append("Puedes profundizar revisando la BDE para consultar períodos con datos disponibles.")
+    return "\n\n".join(lines)
 
 
 def _extract_requested_semester(question: str) -> Tuple[Optional[int], Optional[str]]:
@@ -2408,6 +2509,15 @@ def _build_filtered_source_url(
     point_effective_date: Optional[str] = None
 
     req_form_norm = str(req_form or "").strip().lower()
+    question_text = str(entities_ctx.get("question") or "").strip().lower()
+    historical_floor_applied = bool(
+        str(entities_ctx.get("historical_floor_instruction") or "").strip()
+    )
+    open_ended_range_requested = "en adelante" in question_text
+
+    def _extract_year_token(value: Any) -> Optional[str]:
+        match = re.search(r"(19|20)\d{2}", str(value or "").strip())
+        return match.group(0) if match else None
 
     # Para point, alinear URL al período efectivo que usó el LLM en get_series_data.
     # Esto evita desalineaciones cuando se pidió 2026 pero el dato efectivo existe en 2025.
@@ -2428,6 +2538,25 @@ def _build_filtered_source_url(
             if effective_date:
                 period = [effective_date, effective_date]
                 records_for_url = records_for_url[: effective_idx + 1]
+
+    # Si el rango quedó colapsado (ej. 1960..1960), extender solo el fin del link
+    # al último período disponible del cuadro para históricos y consultas "en adelante".
+    if (
+        req_form_norm == "range"
+        and (historical_floor_applied or open_ended_range_requested)
+        and isinstance(period, list)
+        and len(period) >= 2
+    ):
+        start_year = _extract_year_token(period[0])
+        end_year = _extract_year_token(period[-1])
+        if start_year and end_year and start_year == end_year:
+            latest_available = observations.get("latest_available") or {}
+            latest_token = str(latest_available.get(str(frequency or "").upper()) or "").strip()
+            latest_date = _period_token_to_iso_date(latest_token, str(frequency or "").upper()) if latest_token else None
+            if latest_date:
+                period = [period[0], latest_date]
+                effective_period = latest_token or effective_period
+                effective_date = latest_date or effective_date
 
     frequency_for_url = {
         "M": "m",
@@ -2686,6 +2815,12 @@ def stream_data_response(
     )
     if original_series_force_instruction:
         messages.append({"role": "system", "content": original_series_force_instruction})
+    historical_floor_instruction = _build_historical_floor_instruction(
+        entities_ctx,
+        observations,
+    )
+    if historical_floor_instruction:
+        messages.append({"role": "system", "content": historical_floor_instruction})
     messages.append({"role": "system", "content": _build_recommendation_length_instruction()})
     annual_pib_instruction = _build_annual_pib_completeness_instruction(
         question=question,
@@ -2701,6 +2836,7 @@ def stream_data_response(
     tool_calls_elapsed_ms = 0.0
     url_debug: Dict[str, Any] = {"llm_url_params": []}
     llm_period_hint: Optional[str] = None
+    no_data_tool_args: Optional[Dict[str, Any]] = None
 
     try:
         for _ in range(max_tool_loops):
@@ -2761,10 +2897,13 @@ def stream_data_response(
                         for _, tc in sorted(tool_calls_by_idx.items())
                     ],
                 })
+                has_get_series_data_call = False
+                has_successful_series_data = False
                 for _, tc in sorted(tool_calls_by_idx.items()):
                     fn_args = json.loads(tc["arguments"])
                     result = handle_tool_call(tc["name"], fn_args, observations)
                     if tc["name"] == "get_series_data":
+                        has_get_series_data_call = True
                         url_debug["llm_url_params"].append(dict(fn_args))
                         hint = str(fn_args.get("period") or "").strip()
                         if hint:
@@ -2781,14 +2920,62 @@ def stream_data_response(
                     if tc["name"] == "get_series_data":
                         try:
                             parsed = json.loads(result)
-                            if "records" in parsed:
+                            if "records" in parsed and parsed.get("records"):
+                                has_successful_series_data = True
                                 fetched_series.append(parsed)
                                 selected_series_ctx = {
                                     "series_id": str(parsed.get("series_id") or fn_args.get("series_id") or ""),
                                     "frequency": str(parsed.get("frequency") or fn_args.get("frequency") or "").upper(),
                                 }
+                            elif str(parsed.get("error") or "").strip() == "Sin datos para los parámetros dados":
+                                no_data_tool_args = dict(fn_args)
                         except Exception:
                             pass
+
+                is_open_ended_query = "en adelante" in str(question or "").lower()
+                if (
+                    has_get_series_data_call
+                    and not has_successful_series_data
+                    and no_data_tool_args
+                    and not is_open_ended_query
+                ):
+                    post_t0 = time.perf_counter()
+                    yield _build_no_data_available_response(
+                        question=question,
+                        entities_ctx=entities_ctx,
+                        observations=observations,
+                        tool_args=no_data_tool_args,
+                    )
+
+                    final_series_ctx = _resolve_selected_series_context(
+                        observations=observations,
+                        entities_ctx=entities_ctx,
+                        selected_from_tools=selected_series_ctx,
+                    )
+                    if final_series_ctx:
+                        url_debug["selected_series"] = dict(final_series_ctx)
+                    filtered_source_url = _build_filtered_source_url(
+                        observations=observations,
+                        entities_ctx=entities_ctx,
+                        selected_series_ctx=final_series_ctx,
+                        debug_out=url_debug,
+                        llm_period_hint=llm_period_hint,
+                    )
+                    source_footer = _build_source_footer(
+                        observations,
+                        source_url_override=filtered_source_url,
+                    )
+                    if source_footer:
+                        yield source_footer
+                    csv_block = _build_fallback_csv_marker(observations)
+                    if csv_block:
+                        yield "\n" + csv_block
+                    if timing is not None:
+                        timing["openai_tool_calls_ms"] = round(tool_calls_elapsed_ms, 2)
+                        timing["post_response_blocks_ms"] = round((time.perf_counter() - post_t0) * 1000.0, 2)
+                    payload["_url_debug"] = url_debug
+                    return
+
                 tool_calls_elapsed_ms += (time.perf_counter() - loop_t0) * 1000.0
             else:
                 # Sin tool calls → respuesta final ya fue yielded via content_chunks

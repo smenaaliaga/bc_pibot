@@ -9,6 +9,7 @@ Cada regla está documentada con su justificación.
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 from typing import Any, List, Optional
 
@@ -47,6 +48,7 @@ class ResolvedEntities:
     # Campos derivados por reglas
     price: Optional[str] = None
     hist: Optional[int] = None
+    historical_floor_instruction: Optional[str] = None
 
 
 def apply_business_rules(ent: ResolvedEntities) -> ResolvedEntities:
@@ -122,10 +124,73 @@ def _rule_assign_price(ent: ResolvedEntities) -> None:
 
 
 def _rule_pib_hist_flag(ent: ResolvedEntities) -> None:
-    """Define hist para el filtro: 1 si period[0] <= 1996, en otro caso 0."""
+    """Aplica pisos históricos por indicador y ajusta filtro/periodo.
+
+    - IMACEC: piso 1996. Nunca usa ``hist=1``; se normaliza a ``hist=0``.
+    - PIB: piso 1960. Usa ``hist=1`` solo cuando el año de referencia queda < 1996.
+    """
     from orchestrator.data._helpers import extract_year
-    ref_year = extract_year(ent.period_ent[0]) if ent.period_ent else None
+
+    indicator = str(ent.indicator_ent or "").strip().lower()
+    period = list(ent.period_ent or [])
+    ref_year = extract_year(period[0]) if period else None
+
+    if indicator == "imacec":
+        ent.hist = 0
+        if ref_year is not None and ref_year < 1996:
+            ent.period_ent = _rewrite_period_to_floor(period, floor_year=1996)
+            ent.historical_floor_instruction = (
+                "REGLA DE DISPONIBILIDAD HISTÓRICA (IMACEC): solo hay datos empalmados "
+                "de IMACEC desde 1996. Debes indicarlo explícitamente y reportar 1996 "
+                "(o rango desde 1996, según corresponda)."
+            )
+        return
+
+    # Default histórico para PIB y otros indicadores compatibles.
     ent.hist = 1 if (ref_year is not None and ref_year < 1996) else 0
+
+    if indicator == "pib" and ref_year is not None and ref_year < 1960:
+        ent.period_ent = _rewrite_period_to_floor(period, floor_year=1960)
+        ent.historical_floor_instruction = (
+            "REGLA DE DISPONIBILIDAD HISTÓRICA (PIB): hay datos empalmados desde 1960. "
+            "Debes indicarlo explícitamente y reportar 1960 "
+            "(o rango desde 1960, según corresponda)."
+        )
+        adjusted_year = extract_year(ent.period_ent[0]) if ent.period_ent else None
+        ent.hist = 1 if (adjusted_year is not None and adjusted_year < 1996) else 0
+
+
+def _rewrite_period_to_floor(period_ent: List[Any], floor_year: int) -> List[Any]:
+    """Reescribe período al año piso manteniendo forma point/range cuando aplica."""
+    if not period_ent:
+        return []
+
+    if len(period_ent) == 1:
+        return [_replace_year_token(period_ent[0], floor_year)]
+
+    start_raw = period_ent[0]
+    end_raw = period_ent[-1]
+    start = _replace_year_token(start_raw, floor_year)
+
+    # Evita rangos invertidos cuando el fin también cae antes del piso.
+    from orchestrator.data._helpers import extract_year
+
+    end_year = extract_year(end_raw)
+    if end_year is not None and end_year < floor_year:
+        end = _replace_year_token(end_raw, floor_year)
+    else:
+        end = end_raw
+    return [start, end]
+
+
+def _replace_year_token(value: Any, year: int) -> str:
+    """Reemplaza el año del token por ``year`` preservando el resto del formato."""
+    text = str(value or "").strip()
+    if not text:
+        return str(year)
+    if re.fullmatch(r"(19|20)\d{2}", text):
+        return str(year)
+    return re.sub(r"(19|20)\d{2}", str(year), text, count=1)
 
 
 def _rule_contribution_demanda_interna(ent: ResolvedEntities) -> None:

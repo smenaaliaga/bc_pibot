@@ -260,6 +260,37 @@ def test_no_explicit_period_instruction_none_when_relative_date_is_explicit():
     assert text is None
 
 
+def test_build_no_data_available_response_mentions_coverage_start():
+    text = response_module._build_no_data_available_response(
+        question="entregame el valor del imacec del año 1986",
+        entities_ctx={"indicator_ent": "imacec", "period_ent": ["1986-01-01", "1986-12-31"]},
+        observations={
+            "series": [
+                {
+                    "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+                    "data": {
+                        "M": {
+                            "records": [
+                                {"period": "1996-01"},
+                                {"period": "1996-02"},
+                            ]
+                        }
+                    },
+                }
+            ]
+        },
+        tool_args={
+            "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
+            "frequency": "M",
+            "period": "1986-01",
+        },
+    )
+
+    assert text.startswith("No tengo datos disponibles de IMACEC para 1986")
+    assert "comienza en enero de 1996" in text
+    assert "BDE" in text
+
+
 def test_no_explicit_period_instruction_when_req_form_latest_even_with_relative_date():
     text = response_module._build_no_explicit_period_latest_instruction(
         question="dame la contribucion del sector minero el mes pasado",
@@ -711,6 +742,146 @@ def test_build_filtered_source_url_point_uses_llm_effective_period_hint_when_req
     assert "cbFrecuencia=ANNUAL" in url
 
 
+def test_build_filtered_source_url_historical_floor_range_expands_end_to_latest_annual():
+    observations = {
+        "source_url": "https://example.test/series",
+        "classification": {"calc_mode": "original"},
+        "latest_available": {"A": "2025"},
+        "series": [
+            {
+                "series_id": "SERIE.PIB.A",
+                "short_title": "PIB anual",
+                "data": {
+                    "A": {
+                        "records": [
+                            {"period": "1960", "value": 10.0, "yoy_pct": None},
+                            {"period": "2025", "value": 100.0, "yoy_pct": 2.5},
+                        ]
+                    }
+                },
+            }
+        ],
+    }
+    entities_ctx = {
+        "calc_mode_cls": "original",
+        "req_form_cls": "range",
+        "period_ent": ["1960-01-01", "1960-12-31"],
+        "historical_floor_instruction": "PIB desde 1960",
+    }
+    selected_series_ctx = {"series_id": "SERIE.PIB.A", "frequency": "A"}
+
+    url = response_module._build_filtered_source_url(observations, entities_ctx, selected_series_ctx)
+
+    assert isinstance(url, str)
+    assert "cbFechaInicio=1960" in url
+    assert "cbFechaTermino=2025" in url
+
+
+def test_build_filtered_source_url_historical_floor_range_expands_end_to_latest_monthly():
+    observations = {
+        "source_url": "https://example.test/series",
+        "classification": {"calc_mode": "original"},
+        "latest_available": {"M": "2026-02"},
+        "series": [
+            {
+                "series_id": "SERIE.IMACEC.M",
+                "short_title": "IMACEC mensual",
+                "data": {
+                    "M": {
+                        "records": [
+                            {"period": "1996-01", "value": 10.0, "yoy_pct": None},
+                            {"period": "2026-02", "value": 100.0, "yoy_pct": 2.5},
+                        ]
+                    }
+                },
+            }
+        ],
+    }
+    entities_ctx = {
+        "calc_mode_cls": "original",
+        "req_form_cls": "range",
+        "period_ent": ["1996-01-01", "1996-12-31"],
+        "historical_floor_instruction": "IMACEC desde 1996",
+    }
+    selected_series_ctx = {"series_id": "SERIE.IMACEC.M", "frequency": "M"}
+
+    url = response_module._build_filtered_source_url(observations, entities_ctx, selected_series_ctx)
+
+    assert isinstance(url, str)
+    assert "cbFechaInicio=1996" in url
+    assert "cbFechaTermino=2026" in url
+
+
+def test_build_filtered_source_url_open_ended_range_expands_end_without_historical_flag():
+    observations = {
+        "source_url": "https://example.test/series",
+        "classification": {"calc_mode": "original"},
+        "latest_available": {"A": "2025"},
+        "series": [
+            {
+                "series_id": "SERIE.PIB.A",
+                "short_title": "PIB anual",
+                "data": {
+                    "A": {
+                        "records": [
+                            {"period": "1960", "value": 10.0, "yoy_pct": None},
+                            {"period": "2025", "value": 100.0, "yoy_pct": 2.5},
+                        ]
+                    }
+                },
+            }
+        ],
+    }
+    entities_ctx = {
+        "calc_mode_cls": "original",
+        "req_form_cls": "range",
+        "period_ent": ["1960-01-01", "1960-12-31"],
+        "question": "cual es el valor del pib de 1960 en adelante",
+    }
+    selected_series_ctx = {"series_id": "SERIE.PIB.A", "frequency": "A"}
+
+    url = response_module._build_filtered_source_url(observations, entities_ctx, selected_series_ctx)
+
+    assert isinstance(url, str)
+    assert "cbFechaInicio=1960" in url
+    assert "cbFechaTermino=2025" in url
+
+
+def test_build_filtered_source_url_closed_single_year_range_does_not_expand_without_open_ended_or_floor():
+    observations = {
+        "source_url": "https://example.test/series",
+        "classification": {"calc_mode": "original"},
+        "latest_available": {"A": "2025"},
+        "series": [
+            {
+                "series_id": "SERIE.PIB.A",
+                "short_title": "PIB anual",
+                "data": {
+                    "A": {
+                        "records": [
+                            {"period": "1960", "value": 10.0, "yoy_pct": None},
+                            {"period": "2025", "value": 100.0, "yoy_pct": 2.5},
+                        ]
+                    }
+                },
+            }
+        ],
+    }
+    entities_ctx = {
+        "calc_mode_cls": "original",
+        "req_form_cls": "range",
+        "period_ent": ["1960-01-01", "1960-12-31"],
+        "question": "cual es el valor del pib de 1960",
+    }
+    selected_series_ctx = {"series_id": "SERIE.PIB.A", "frequency": "A"}
+
+    url = response_module._build_filtered_source_url(observations, entities_ctx, selected_series_ctx)
+
+    assert isinstance(url, str)
+    assert "cbFechaInicio=1960" in url
+    assert "cbFechaTermino=1960" in url
+
+
 def test_special_query_mapping_instruction_for_per_capita_forces_single_original_value():
     text = response_module._build_special_query_mapping_instruction(
         question="cual fue el pib per capita",
@@ -779,6 +950,35 @@ def test_original_series_force_instruction_for_per_capita_by_indicator_ctx():
     assert text is not None
     assert "SERIE ORIGINAL OBLIGATORIA" in text
     assert "OBLIGATORIO: entrega una sola cifra principal" in text
+
+
+def test_build_historical_floor_instruction_returns_text_when_present():
+    text = response_module._build_historical_floor_instruction(
+        {"historical_floor_instruction": "usar piso 1996"}
+    )
+
+    assert text == "usar piso 1996"
+
+
+def test_build_historical_floor_instruction_returns_none_when_absent():
+    assert response_module._build_historical_floor_instruction({}) is None
+
+
+def test_build_historical_floor_instruction_imacec_is_parameter_driven_with_latest_available():
+    text = response_module._build_historical_floor_instruction(
+        {
+            "historical_floor_instruction": "IMACEC desde 1996",
+            "indicator_ent": "imacec",
+            "req_form_cls": "range",
+            "period_ent": ["1996-01-01", "1996-12-31"],
+        },
+        {"latest_available": {"M": "2026-02"}},
+    )
+
+    assert text is not None
+    assert "REGLA PARAMÉTRICA OBLIGATORIA" in text
+    assert "latest_available_m=2026-02" in text
+    assert "No reemplazar la respuesta principal por resumen del año piso" in text
 
 
 def test_specific_contribution_directness_instruction_uses_absolute_percent_rules():
