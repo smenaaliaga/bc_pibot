@@ -125,21 +125,31 @@ def _collect_target_series_ids(
     observations: Dict[str, Any],
     ent: ResolvedEntities,
 ) -> List[str]:
-    """Retorna los ``series_id`` que cumplen activity/region/investment (AND).
+    """Retorna los ``series_id`` que cumplen los filtros de clasificación (AND).
 
-    Si no hay filtros, retorna todos los IDs. Para region usa fallback al
-    nivel de cuadro cuando la serie no trae ese campo.
+    Siempre filtra por seasonality y price cuando están disponibles en
+    ``classification_series`` de cada serie. Adicionalmente filtra por
+    activity/region/investment cuando hay entidades específicas.
+    Para region usa fallback al nivel de cuadro cuando la serie no trae
+    ese campo.
     """
     series = observations.get("series") or []
     if not isinstance(series, list) or not series:
         return []
 
+    # Filtros siempre activos (seasonality, price).
+    wanted_seasonality = str(ent.seasonality_ent or "").strip().lower() or None
+    wanted_price = str(ent.price or "").strip().lower() or None
+
+    # Filtros condicionales (activity, region, investment).
     activity_set = {s.strip().lower() for s in ent.activity_ent if s} or None
     region_set = {s.strip().lower() for s in ent.region_ent if s} or None
     investment_set = {s.strip().lower() for s in ent.investment_ent if s} or None
 
-    # Sin filtros: devolver todos los IDs.
-    if not any((activity_set, region_set, investment_set)):
+    has_any_filter = any((wanted_seasonality, wanted_price, activity_set, region_set, investment_set))
+
+    # Sin ningún filtro: devolver todos los IDs.
+    if not has_any_filter:
         return [
             s["series_id"] for s in series
             if isinstance(s, dict) and s.get("series_id")
@@ -156,6 +166,18 @@ def _collect_target_series_ids(
         cls = s.get("classification_series") or {}
         if not isinstance(cls, dict):
             cls = {}
+
+        # Seasonality: excluir solo si la serie declara un valor distinto.
+        if wanted_seasonality:
+            val = str(cls.get("seasonality") or "").strip().lower()
+            if val and val != wanted_seasonality:
+                continue
+
+        # Price: excluir solo si la serie declara un valor distinto.
+        if wanted_price:
+            val = str(cls.get("price") or "").strip().lower()
+            if val and val != wanted_price:
+                continue
 
         if activity_set:
             val = str(cls.get("activity") or "").strip().lower()
