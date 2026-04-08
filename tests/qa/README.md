@@ -42,7 +42,7 @@ Opcionalmente puedes definir input/output:
 
 ## Solución permanente conflicto Postgres local vs Docker (puerto 5432)
 
-Si `qa.py` falla con `database "pibot" does not exist`, normalmente `Postgres.app` local está tomando `localhost:5432`.
+Si `qa.py` falla con `database "pibot" does not exist`, normalmente `Postgres.app` local está tomando `localhost:5432` y Docker quedó expuesto en otro puerto.
 
 ### 1) Confirmar que Docker usa 5432 por defecto
 
@@ -66,7 +66,7 @@ launchctl disable "gui/$uid/com.postgresapp.Postgres2LoginHelper" 2>/dev/null ||
 pkill -f '/Applications/Postgres.app' || true
 ```
 
-### 3) Verificar que `localhost:5432` apunta a Docker
+### 3) Verificar que `localhost:5433` apunta a Docker
 
 ```bash
 lsof -nP -iTCP:5432 -sTCP:LISTEN
