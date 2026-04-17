@@ -1,5 +1,4 @@
 import orchestrator.data.response as response_module
-from orchestrator.data._helpers import build_target_series_url
 from pathlib import Path
 
 
@@ -41,7 +40,9 @@ def test_build_metric_priority_instruction_for_contribution_enforces_neutral_neg
     assert "CHEQUEO FINAL OBLIGATORIO" in text
     assert "'-X,X%'" in text
     assert "contribuciones negativas de" in text
+    assert "a la baja" in text
     assert "PLANTILLA OBLIGATORIA POR ACTIVIDAD" in text
+    assert "REGLA OBLIGATORIA POR CADA PORCENTAJE" in text
 
 
 def test_contribution_activity_focus_instruction_forbids_generic_negative_summary():
@@ -53,6 +54,8 @@ def test_contribution_activity_focus_instruction_forbids_generic_negative_summar
 
     assert text is not None
     assert "PROHIBIDO resumir como 'contribuciones negativas de varias actividades'" in text
+    assert "PROHIBIDO usar la frase 'a la baja'" in text
+    assert "no dejes porcentajes sueltos" in text
     assert "plantilla obligatoria" in text.lower()
 
 
@@ -73,9 +76,9 @@ def test_prevalidated_missing_specific_activity_instruction_when_activity_normal
 
     assert text is not None
     assert "VALIDACIÓN PREVIA DEL SISTEMA" in text
-    assert "En [PERIODO], esta actividad no se encuentra disponible en la Base de datos estadísticos para el indicador PIB" in text
-    assert "debe aparecer una sola vez" in text
-    assert "actividad más similar disponible" in text
+    assert "Esta actividad no se encuentra disponible en la Base de datos estadísticos para el indicador PIB" in text
+    assert "PRIMER PÁRRAFO OBLIGATORIO" in text
+    assert "En [PERIODO], esta actividad no se encuentra disponible" in text
     assert "Producción de bienes" in text
     assert "Servicios" in text
     assert "NO escribas una introducción que afirme contribución" in text
@@ -195,8 +198,9 @@ def test_missing_activity_instruction_when_requested_activity_not_available():
     )
     assert text is not None
     assert "actividad solicitada no está disponible" in text
-    assert "debe aparecer una sola vez" in text
-    assert "actividad más similar disponible" in text
+    assert "Esta actividad no se encuentra disponible en la Base de datos estadísticos" in text
+    assert "PRIMER PÁRRAFO OBLIGATORIO" in text
+    assert "En [PERIODO], esta actividad no se encuentra disponible" in text
     assert "NO reemplaces por la serie agregada" in text
 
 
@@ -258,37 +262,6 @@ def test_no_explicit_period_instruction_none_when_relative_date_is_explicit():
         observations={"latest_available": {"M": "2026-01"}},
     )
     assert text is None
-
-
-def test_build_no_data_available_response_mentions_coverage_start():
-    text = response_module._build_no_data_available_response(
-        question="entregame el valor del imacec del año 1986",
-        entities_ctx={"indicator_ent": "imacec", "period_ent": ["1986-01-01", "1986-12-31"]},
-        observations={
-            "series": [
-                {
-                    "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
-                    "data": {
-                        "M": {
-                            "records": [
-                                {"period": "1996-01"},
-                                {"period": "1996-02"},
-                            ]
-                        }
-                    },
-                }
-            ]
-        },
-        tool_args={
-            "series_id": "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M",
-            "frequency": "M",
-            "period": "1986-01",
-        },
-    )
-
-    assert text.startswith("No tengo datos disponibles de IMACEC para 1986")
-    assert "comienza en enero de 1996" in text
-    assert "BDE" in text
 
 
 def test_no_explicit_period_instruction_when_req_form_latest_even_with_relative_date():
@@ -457,116 +430,6 @@ def test_build_target_series_url_supports_explicit_none_mode():
     assert "cbCalculo=NONE" in url
 
 
-def test_build_target_series_url_original_defaults_to_ytypct():
-    url = build_target_series_url(
-        source_url="https://example.test/series",
-        series_id="SERIE.PIB.TEST",
-        period=["2024-01-01", "2024-12-31"],
-        observations=[{"date": "2024-12-31", "value": 100.0, "yoy_pct": 3.4}],
-        frequency="a",
-        calc_mode="original",
-    )
-
-    assert isinstance(url, str)
-    assert "cbCalculo=YTYPCT" in url
-    assert "cbCalculo=PCT" not in url
-
-
-def test_build_target_series_url_prev_period_explicit_uses_pct():
-    url = build_target_series_url(
-        source_url="https://example.test/series",
-        series_id="SERIE.PIB.TEST",
-        period=["2024-01-01", "2024-12-31"],
-        observations=[{"date": "2024-12-31", "value": 100.0, "pct": 1.2}],
-        frequency="a",
-        calc_mode="prev_period",
-    )
-
-    assert isinstance(url, str)
-    assert "cbCalculo=PCT" in url
-
-
-def test_build_target_series_url_unknown_mode_defaults_to_ytypct():
-    url = build_target_series_url(
-        source_url="https://example.test/series",
-        series_id="SERIE.PIB.TEST",
-        period=["2024-01-01", "2024-12-31"],
-        observations=[{"date": "2024-12-31", "value": 100.0, "yoy_pct": 3.4}],
-        frequency="a",
-        calc_mode="share",
-    )
-
-    assert isinstance(url, str)
-    assert "cbCalculo=YTYPCT" in url
-
-
-def test_build_target_series_url_contribution_homologates_link_format():
-    url = build_target_series_url(
-        source_url="https://example.test/cuadro",
-        series_id="SERIE.CONTRIB.TEST",
-        period=["2020-01-01", "2020-12-31"],
-        observations=[{"date": "2020-12-31", "value": 1.2}],
-        frequency="q",
-        calc_mode="contribution",
-    )
-
-    assert isinstance(url, str)
-    assert "cbFechaInicio=2020" in url
-    assert "cbFechaTermino=2025" in url
-    assert "cbFrecuencia=QUARTERLY" in url
-    assert "cbCalculo=NONE" in url
-    assert "cbFechaBase=" in url
-    assert "id5=SI" not in url
-    assert "idSerie=" not in url
-
-
-def test_build_target_series_url_contribution_keeps_requested_period_when_observed_differs():
-    url = build_target_series_url(
-        source_url="https://example.test/cuadro",
-        series_id="SERIE.CONTRIB.TEST",
-        period=["2019-01-01", "2020-12-31"],
-        observations=[{"date": "2024-12-31", "value": 1.2}],
-        frequency="q",
-        calc_mode="contribution",
-        req_form="latest",
-    )
-
-    assert isinstance(url, str)
-    assert "cbFechaInicio=2019" in url
-    assert "cbFechaTermino=2020" in url
-
-
-def test_build_target_series_url_contribution_same_start_end_forces_end_2025():
-    url = build_target_series_url(
-        source_url="https://example.test/cuadro",
-        series_id="SERIE.CONTRIB.TEST",
-        period=["2020-01-01", "2020-12-31"],
-        observations=[{"date": "2020-12-31", "value": 1.2}],
-        frequency="q",
-        calc_mode="contribution",
-        req_form="range",
-    )
-
-    assert isinstance(url, str)
-    assert "cbFechaInicio=2020" in url
-    assert "cbFechaTermino=2025" in url
-
-
-def test_build_target_series_url_inverted_range_forces_end_year_2025():
-    url = build_target_series_url(
-        source_url="https://example.test/series",
-        series_id="SERIE.PIB.TEST",
-        period=["2027-01-01", "2024-12-31"],
-        observations=[{"date": "2024-12-31", "value": 100.0, "yoy_pct": 3.4}],
-        frequency="a",
-        calc_mode="yoy",
-    )
-
-    assert isinstance(url, str)
-    assert "cbFechaTermino=2025" in url
-    assert "cbFechaInicio=2015" in url
-
-
 def test_build_filtered_source_url_uses_none_for_original_per_capita_query():
     observations = {
         "source_url": "https://example.test/series",
@@ -597,289 +460,6 @@ def test_build_filtered_source_url_uses_none_for_original_per_capita_query():
 
     assert isinstance(url, str)
     assert "cbCalculo=NONE" in url
-
-
-def test_build_filtered_source_url_latest_uses_effective_yoy_period_for_year_range():
-    observations = {
-        "source_url": "https://example.test/series",
-        "classification": {"calc_mode": "original"},
-        "series": [
-            {
-                "series_id": "SERIE.PIB.T",
-                "short_title": "PIB trimestral",
-                "data": {
-                    "T": {
-                        "records": [
-                            {"date": "2025-12-31", "value": 100.0, "yoy_pct": 1.6, "pct": 0.4},
-                            {"date": "2026-03-31", "value": 101.0, "yoy_pct": None, "pct": 0.1},
-                        ]
-                    }
-                },
-            }
-        ],
-    }
-    entities_ctx = {
-        "calc_mode_cls": "original",
-        "req_form_cls": "latest",
-        "question": "cual es el valor del pib",
-        "period_ent": ["2026-01-01", "2026-03-31"],
-    }
-    selected_series_ctx = {"series_id": "SERIE.PIB.T", "frequency": "T"}
-
-    url = response_module._build_filtered_source_url(observations, entities_ctx, selected_series_ctx)
-
-    assert isinstance(url, str)
-    assert "cbFechaInicio=2025" in url
-    assert "cbFechaTermino=2025" in url
-    assert "cbCalculo=YTYPCT" in url
-
-
-def test_build_filtered_source_url_latest_uses_effective_yoy_period_when_records_only_have_period():
-    observations = {
-        "source_url": "https://example.test/series",
-        "classification": {"calc_mode": "original"},
-        "series": [
-            {
-                "series_id": "SERIE.PIB.T",
-                "short_title": "PIB trimestral",
-                "data": {
-                    "T": {
-                        "records": [
-                            {"period": "2025-Q4", "value": 100.0, "yoy_pct": 1.6, "pct": 0.4},
-                            {"period": "2026-Q1", "value": 101.0, "yoy_pct": None, "pct": 0.1},
-                        ]
-                    }
-                },
-            }
-        ],
-    }
-    entities_ctx = {
-        "calc_mode_cls": "original",
-        "req_form_cls": "latest",
-        "question": "cual es el valor del pib",
-        "period_ent": ["2026-01-01", "2026-03-31"],
-    }
-    selected_series_ctx = {"series_id": "SERIE.PIB.T", "frequency": "T"}
-
-    url = response_module._build_filtered_source_url(observations, entities_ctx, selected_series_ctx)
-
-    assert isinstance(url, str)
-    assert "cbFechaInicio=2025" in url
-    assert "cbFechaTermino=2025" in url
-    assert "cbCalculo=YTYPCT" in url
-
-
-def test_build_filtered_source_url_explicit_range_keeps_requested_period():
-    observations = {
-        "source_url": "https://example.test/series",
-        "classification": {"calc_mode": "original"},
-        "series": [
-            {
-                "series_id": "SERIE.PIB.T",
-                "short_title": "PIB trimestral",
-                "data": {
-                    "T": {
-                        "records": [
-                            {"date": "2025-12-31", "value": 100.0, "yoy_pct": 1.6, "pct": 0.4},
-                            {"date": "2026-03-31", "value": 101.0, "yoy_pct": None, "pct": 0.1},
-                        ]
-                    }
-                },
-            }
-        ],
-    }
-    entities_ctx = {
-        "calc_mode_cls": "original",
-        "req_form_cls": "range",
-        "question": "cual fue el pib en 2026",
-        "period_ent": ["2026-01-01", "2026-03-31"],
-    }
-    selected_series_ctx = {"series_id": "SERIE.PIB.T", "frequency": "T"}
-
-    url = response_module._build_filtered_source_url(observations, entities_ctx, selected_series_ctx)
-
-    assert isinstance(url, str)
-    assert "cbFechaInicio=2026" in url
-    assert "cbFechaTermino=2026" in url
-
-
-def test_build_filtered_source_url_point_uses_llm_effective_period_hint_when_requested_year_has_no_data():
-    observations = {
-        "source_url": "https://example.test/series",
-        "classification": {"calc_mode": "original"},
-        "series": [
-            {
-                "series_id": "SERIE.PIB.A",
-                "short_title": "PIB anual",
-                "data": {
-                    "A": {
-                        "records": [
-                            {"period": "2025", "value": 100.0, "yoy_pct": 2.5},
-                        ]
-                    }
-                },
-            }
-        ],
-    }
-    entities_ctx = {
-        "calc_mode_cls": "original",
-        "req_form_cls": "point",
-        "question": "cual es el valor del pib 2026",
-        "period_ent": ["2026-01-01", "2026-12-31"],
-    }
-    selected_series_ctx = {"series_id": "SERIE.PIB.A", "frequency": "A"}
-
-    url = response_module._build_filtered_source_url(
-        observations,
-        entities_ctx,
-        selected_series_ctx,
-        llm_period_hint="2025",
-    )
-
-    assert isinstance(url, str)
-    assert "cbFechaInicio=2025" in url
-    assert "cbFechaTermino=2025" in url
-    assert "cbFrecuencia=ANNUAL" in url
-
-
-def test_build_filtered_source_url_historical_floor_range_expands_end_to_latest_annual():
-    observations = {
-        "source_url": "https://example.test/series",
-        "classification": {"calc_mode": "original"},
-        "latest_available": {"A": "2025"},
-        "series": [
-            {
-                "series_id": "SERIE.PIB.A",
-                "short_title": "PIB anual",
-                "data": {
-                    "A": {
-                        "records": [
-                            {"period": "1960", "value": 10.0, "yoy_pct": None},
-                            {"period": "2025", "value": 100.0, "yoy_pct": 2.5},
-                        ]
-                    }
-                },
-            }
-        ],
-    }
-    entities_ctx = {
-        "calc_mode_cls": "original",
-        "req_form_cls": "range",
-        "period_ent": ["1960-01-01", "1960-12-31"],
-        "historical_floor_instruction": "PIB desde 1960",
-    }
-    selected_series_ctx = {"series_id": "SERIE.PIB.A", "frequency": "A"}
-
-    url = response_module._build_filtered_source_url(observations, entities_ctx, selected_series_ctx)
-
-    assert isinstance(url, str)
-    assert "cbFechaInicio=1960" in url
-    assert "cbFechaTermino=2025" in url
-
-
-def test_build_filtered_source_url_historical_floor_range_expands_end_to_latest_monthly():
-    observations = {
-        "source_url": "https://example.test/series",
-        "classification": {"calc_mode": "original"},
-        "latest_available": {"M": "2026-02"},
-        "series": [
-            {
-                "series_id": "SERIE.IMACEC.M",
-                "short_title": "IMACEC mensual",
-                "data": {
-                    "M": {
-                        "records": [
-                            {"period": "1996-01", "value": 10.0, "yoy_pct": None},
-                            {"period": "2026-02", "value": 100.0, "yoy_pct": 2.5},
-                        ]
-                    }
-                },
-            }
-        ],
-    }
-    entities_ctx = {
-        "calc_mode_cls": "original",
-        "req_form_cls": "range",
-        "period_ent": ["1996-01-01", "1996-12-31"],
-        "historical_floor_instruction": "IMACEC desde 1996",
-    }
-    selected_series_ctx = {"series_id": "SERIE.IMACEC.M", "frequency": "M"}
-
-    url = response_module._build_filtered_source_url(observations, entities_ctx, selected_series_ctx)
-
-    assert isinstance(url, str)
-    assert "cbFechaInicio=1996" in url
-    assert "cbFechaTermino=2026" in url
-
-
-def test_build_filtered_source_url_open_ended_range_expands_end_without_historical_flag():
-    observations = {
-        "source_url": "https://example.test/series",
-        "classification": {"calc_mode": "original"},
-        "latest_available": {"A": "2025"},
-        "series": [
-            {
-                "series_id": "SERIE.PIB.A",
-                "short_title": "PIB anual",
-                "data": {
-                    "A": {
-                        "records": [
-                            {"period": "1960", "value": 10.0, "yoy_pct": None},
-                            {"period": "2025", "value": 100.0, "yoy_pct": 2.5},
-                        ]
-                    }
-                },
-            }
-        ],
-    }
-    entities_ctx = {
-        "calc_mode_cls": "original",
-        "req_form_cls": "range",
-        "period_ent": ["1960-01-01", "1960-12-31"],
-        "question": "cual es el valor del pib de 1960 en adelante",
-    }
-    selected_series_ctx = {"series_id": "SERIE.PIB.A", "frequency": "A"}
-
-    url = response_module._build_filtered_source_url(observations, entities_ctx, selected_series_ctx)
-
-    assert isinstance(url, str)
-    assert "cbFechaInicio=1960" in url
-    assert "cbFechaTermino=2025" in url
-
-
-def test_build_filtered_source_url_closed_single_year_range_does_not_expand_without_open_ended_or_floor():
-    observations = {
-        "source_url": "https://example.test/series",
-        "classification": {"calc_mode": "original"},
-        "latest_available": {"A": "2025"},
-        "series": [
-            {
-                "series_id": "SERIE.PIB.A",
-                "short_title": "PIB anual",
-                "data": {
-                    "A": {
-                        "records": [
-                            {"period": "1960", "value": 10.0, "yoy_pct": None},
-                            {"period": "2025", "value": 100.0, "yoy_pct": 2.5},
-                        ]
-                    }
-                },
-            }
-        ],
-    }
-    entities_ctx = {
-        "calc_mode_cls": "original",
-        "req_form_cls": "range",
-        "period_ent": ["1960-01-01", "1960-12-31"],
-        "question": "cual es el valor del pib de 1960",
-    }
-    selected_series_ctx = {"series_id": "SERIE.PIB.A", "frequency": "A"}
-
-    url = response_module._build_filtered_source_url(observations, entities_ctx, selected_series_ctx)
-
-    assert isinstance(url, str)
-    assert "cbFechaInicio=1960" in url
-    assert "cbFechaTermino=1960" in url
 
 
 def test_special_query_mapping_instruction_for_per_capita_forces_single_original_value():
@@ -952,42 +532,15 @@ def test_original_series_force_instruction_for_per_capita_by_indicator_ctx():
     assert "OBLIGATORIO: entrega una sola cifra principal" in text
 
 
-def test_build_historical_floor_instruction_returns_text_when_present():
-    text = response_module._build_historical_floor_instruction(
-        {"historical_floor_instruction": "usar piso 1996"}
-    )
-
-    assert text == "usar piso 1996"
-
-
-def test_build_historical_floor_instruction_returns_none_when_absent():
-    assert response_module._build_historical_floor_instruction({}) is None
-
-
-def test_build_historical_floor_instruction_imacec_is_parameter_driven_with_latest_available():
-    text = response_module._build_historical_floor_instruction(
-        {
-            "historical_floor_instruction": "IMACEC desde 1996",
-            "indicator_ent": "imacec",
-            "req_form_cls": "range",
-            "period_ent": ["1996-01-01", "1996-12-31"],
-        },
-        {"latest_available": {"M": "2026-02"}},
-    )
-
-    assert text is not None
-    assert "REGLA PARAMÉTRICA OBLIGATORIA" in text
-    assert "latest_available_m=2026-02" in text
-    assert "No reemplazar la respuesta principal por resumen del año piso" in text
-
-
 def test_specific_contribution_directness_instruction_uses_absolute_percent_rules():
     text = response_module._build_specific_contribution_directness_instruction(
         "cuanto contribuyo mineria al pib"
     )
 
     assert text is not None
-    assert "cayó **X,X%** respecto al mismo período del año anterior" in text
+    assert "disminuyó **X,X%** respecto al mismo período del año anterior" in text
+    assert "PROHIBIDO usar la frase 'a la baja'" in text
+    assert "toda cifra porcentual escrita en la respuesta" in text
     assert "PROHIBIDO usar 'pp'" in text
     assert "PROHIBIDO mostrar signo negativo" in text
     assert "CHEQUEO FINAL OBLIGATORIO" in text

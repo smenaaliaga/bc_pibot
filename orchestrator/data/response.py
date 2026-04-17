@@ -845,10 +845,24 @@ def _sanitize_contribution_tool_result(name: str, args: Dict[str, Any], result: 
             ]
     elif name == "get_series_data":
         if is_contribution and isinstance(parsed.get("records"), list):
-            parsed["records"] = [
-                _sanitize_contribution_record(row) if isinstance(row, dict) else row
-                for row in parsed["records"]
-            ]
+            sanitized_records: List[Any] = []
+            for row in parsed["records"]:
+                if not isinstance(row, dict):
+                    sanitized_records.append(row)
+                    continue
+                out = dict(row)
+                raw_value = _safe_float(out.get("value"))
+                if raw_value is not None:
+                    # For specific contribution queries keep signed value and expose pp helpers.
+                    out["value_signed"] = raw_value
+                    out["value_pp_signed"] = raw_value
+                    out["value_pp_abs"] = abs(raw_value)
+                    out["contribution_direction"] = _contribution_direction(raw_value)
+                    out["contribution_sign"] = (
+                        "positive" if raw_value > 0 else "negative" if raw_value < 0 else "neutral"
+                    )
+                sanitized_records.append(out)
+            parsed["records"] = sanitized_records
 
     try:
         return json.dumps(parsed, ensure_ascii=False)
@@ -1123,11 +1137,11 @@ def _build_metric_priority_instruction(calc_mode: str) -> Optional[str]:
     mode = str(calc_mode or "").strip().lower()
     if mode == "contribution":
         return (
-            "REGLA ESTRICTA DE REDACCION PARA CONTRIBUCIONES:\n"
-            "0. Estas reglas aplican de forma genérica para consultas de contribución en PIB e IMACEC.\n"
+            "REGLA ESTRICTA DE REDACCION PARA CONTRIBUCIONES (MODO RANKING):\n"
+            "0. Estas reglas aplican SOLO cuando la respuesta requiera ranking/comparación entre actividades.\n"
             "1. En el PRIMER PARRAFO comienza mencionando el PERIODO analizado "
             "(ej: 'En el 3er trimestre de 2025, ...').\n"
-            "2. Los datos son CONTRIBUCIONES al crecimiento. Usa SIEMPRE la unidad '%' y NUNCA 'pp'.\n"
+            "2. Los datos son CONTRIBUCIONES al crecimiento. En ranking usa SIEMPRE la unidad '%'.\n"
             "   Correcto: '**0,5%**'  |  Incorrecto: '**0,5 pp**'.\n"
             "3. Redondea SIEMPRE a 1 decimal: 0,54 → **0,5%**; -0,67 → 'disminuyó **0,7%**'.\n"
             "4. Ordena por VALOR ABSOLUTO de la contribución (mayor primero).\n"
@@ -1141,7 +1155,7 @@ def _build_metric_priority_instruction(calc_mode: str) -> Optional[str]:
             "   - negativos: 'disminuyó', 'registró una contracción de', 'presentó una disminución de'.\n"
             "   - neutro: 'mostró una variación de'.\n"
             "8. PROHIBIDO mostrar valores con signo negativo en contribuciones (ej: '-0,7%').\n"
-            "8.b. También está PROHIBIDO usar 'pp' en cualquier oración de contribución.\n"
+            "8.b. También está PROHIBIDO usar 'pp' en el modo ranking.\n"
             "8.c. Si usas 'disminuyó/creció/aumentó' o sinónimos, debes complementar con "
             "'respecto al mismo período del año anterior'.\n"
             "8.d. CHEQUEO FINAL OBLIGATORIO ANTES DE RESPONDER: si en el borrador aparece cualquier "
@@ -1162,11 +1176,11 @@ def _build_metric_priority_instruction(calc_mode: str) -> Optional[str]:
             "sin esa referencia, la respuesta es inválida.\n"
             "9. Respuesta objetiva: describe cifras y relaciones de compensación, sin juicios de valor.\n"
             "10. Mantén longitud habitual de respuesta: no imites un informe extenso; solo ajusta vocabulario y estilo.\n"
-            "7. FLUJO OBLIGATORIO: primero llama list_series y luego llama rank_series "
+            "7. FLUJO OBLIGATORIO EN RANKING: primero llama list_series y luego llama rank_series "
             "con metric='value' y order='desc' para obtener el ranking de contribuciones.\n"
-            "7.b. TOOLING MÍNIMO OBLIGATORIO: antes de redactar debes haber ejecutado "
+            "7.b. TOOLING MÍNIMO OBLIGATORIO EN RANKING: antes de redactar debes haber ejecutado "
             "get_metadata y rank_series para el periodo objetivo.\n"
-            "8. Si calc_mode='contribution', está PROHIBIDO responder solo con la serie "
+            "8. Si calc_mode='contribution' y estás en modo ranking, está PROHIBIDO responder solo con la serie "
             "agregada del PIB total. Debes reportar actividades/componentes.\n"
             "8.b. En preguntas del tipo 'qué actividad impulsó', está PROHIBIDO redactar "
             "el bloque DATOS como 'el PIB registró X%'. Debes listar actividades con su aporte en %.\n"
@@ -1313,18 +1327,20 @@ def _build_missing_activity_instruction(
 
     return (
         "REGLA ESTRICTA DE ACTIVIDAD FALTANTE: la actividad solicitada no está disponible para este indicador en la Base de datos estadísticos. "
+        f"Debes responder literalmente: 'Esta actividad no se encuentra disponible en la Base de datos estadísticos para el indicador {indicator}'. "
         "PRIMER PÁRRAFO OBLIGATORIO: inicia con la estructura exacta "
         "'En [PERIODO], esta actividad no se encuentra disponible en la Base de datos estadísticos para el indicador "
         f"{indicator}'. "
-        "La frase de no disponibilidad debe aparecer una sola vez en toda la respuesta. "
         "PROHIBIDO agregar en ese primer párrafo frases como 'no corresponde a la actividad solicitada' "
-        "o repetir la frase de no disponibilidad en párrafos siguientes. "
+        "o mencionar una actividad proxy/cercana por nombre. "
         f"Actividad pedida: '{requested_activity_raw or requested_activity}'. "
         "NO escribas una introducción que afirme contribución de la actividad solicitada en el período, "
         "porque contradice la no disponibilidad. "
-        "SEGUNDO PÁRRAFO OBLIGATORIO: comienza con 'Como referencia,' y explicita la actividad más similar disponible del mismo cuadro, "
-        "aclarando que es una referencia y no la actividad solicitada. "
-        f"Luego sugiere actividades disponibles del mismo cuadro: {options}. "
+        "SEGUNDO PÁRRAFO OBLIGATORIO: lista SOLO actividades disponibles del mismo cuadro, "
+        "sin reemplazos ni equivalencias. "
+        f"Usa literalmente esta lista (en el mismo idioma y sin reinterpretar): {options}. "
+        "PROHIBIDO usar expresiones como 'actividad similar', 'más cercana', 'proxy' o "
+        "'como referencia usar ...'. "
         "Usa nombres naturales de actividades (sin guiones bajos, sin códigos técnicos). "
         "NO reemplaces por la serie agregada (PIB total) ni por otra actividad, y NO inventes valores."
     )
@@ -1374,19 +1390,21 @@ def _build_prevalidated_missing_specific_activity_instruction(
     return (
         "VALIDACIÓN PREVIA DEL SISTEMA: activity_cls='specific' pero activity normalizada vacía. "
         "No debes inferir ni decidir una actividad alternativa. "
+        f"Debes responder literalmente: 'Esta actividad no se encuentra disponible en la Base de datos estadísticos para el indicador {indicator}'. "
         "PRIMER PÁRRAFO OBLIGATORIO: inicia con la estructura exacta "
         "'En [PERIODO], esta actividad no se encuentra disponible en la Base de datos estadísticos para el indicador "
         f"{indicator}'. "
-        "La frase de no disponibilidad debe aparecer una sola vez en toda la respuesta. "
         "PROHIBIDO agregar en ese primer párrafo frases como 'no corresponde a la actividad solicitada' "
-        "o repetir la frase de no disponibilidad en párrafos siguientes. "
+        "o mencionar una actividad proxy/cercana por nombre. "
         "NO escribas una introducción que afirme contribución de la actividad solicitada en el período, "
         "porque contradice la no disponibilidad. "
-        "SEGUNDO PÁRRAFO OBLIGATORIO: comienza con 'Como referencia,' y explicita la actividad más similar disponible del cuadro, "
-        "aclarando que es una referencia y no la actividad solicitada. "
-        f"Luego menciona actividades disponibles del cuadro: {options}. "
+        "SEGUNDO PÁRRAFO OBLIGATORIO: lista SOLO actividades disponibles del cuadro, "
+        "sin reemplazos ni equivalencias. "
+        f"Usa literalmente esta lista (en el mismo idioma y sin reinterpretar): {options}. "
+        "PROHIBIDO usar expresiones como 'actividad similar', 'más cercana', 'proxy' o "
+        "'como referencia usar ...'. "
         "Usa nombres naturales de actividades (sin guiones bajos, sin códigos técnicos). "
-        "NO reemplaces por PIB total y NO inventes cifras. "
+        "NO reemplaces por PIB total, NO uses actividades proxy y NO inventes cifras. "
         "Esta regla alternativa reemplaza el flujo de contribución específica para este turno."
     )
 
@@ -1433,6 +1451,180 @@ def _build_contribution_activity_focus_instruction(
     )
 
 
+def _build_contribution_ranking_polarity_instruction(
+    question: str,
+    entities_ctx: Dict[str, Any],
+    observations: Dict[str, Any],
+) -> Optional[str]:
+    """Construye una instrucción de ranking condicionada por el signo del agregado.
+
+    Aplica solo a consultas de contribución por actividades (ranking) para PIB/IMACEC.
+    """
+    calc_mode = str(
+        entities_ctx.get("calc_mode_cls")
+        or entities_ctx.get("calc_mode")
+        or ""
+    ).strip().lower()
+    if calc_mode != "contribution":
+        return None
+
+    indicator = str(entities_ctx.get("indicator_ent") or "").strip().lower()
+    if indicator not in {"pib", "imacec"}:
+        return None
+
+    activity_cls = str(
+        entities_ctx.get("activity_cls_resolved")
+        or entities_ctx.get("activity_cls")
+        or ""
+    ).strip().lower()
+    # Solo ranking/general; para consultas específicas se usa otra instrucción.
+    if activity_cls == "specific":
+        return None
+
+    text = str(question or "").lower()
+    text_norm = unicodedata.normalize("NFKD", text)
+    text_norm = "".join(ch for ch in text_norm if not unicodedata.combining(ch))
+    if not any(token in text_norm for token in ("actividad", "afect", "impuls", "aporte", "contribu")):
+        return None
+
+    asks_increase = any(token in text_norm for token in ("aumento", "aument", "alza", "subi", "impuls"))
+    asks_decrease = any(token in text_norm for token in ("dismin", "caida", "cayo", "baja", "retroces"))
+
+    freq_code = _resolve_requested_frequency(entities_ctx, observations)
+    if not freq_code:
+        return None
+
+    target_period = ""
+    period_values = entities_ctx.get("period_ent")
+    if isinstance(period_values, list) and period_values:
+        for candidate in period_values:
+            period_token = _canonicalize_period_token(freq_code, candidate)
+            if period_token:
+                target_period = period_token
+                break
+    if not target_period:
+        target_period = str((observations.get("latest_available") or {}).get(freq_code) or "").strip()
+    if not target_period:
+        return None
+
+    def _norm_text(value: Any) -> str:
+        norm = unicodedata.normalize("NFKD", str(value or "").lower())
+        norm = "".join(ch for ch in norm if not unicodedata.combining(ch))
+        return re.sub(r"\s+", " ", norm).strip()
+
+    aggregate_series: Optional[Dict[str, Any]] = None
+    for series in observations.get("series", []) or []:
+        short_title = _norm_text(series.get("short_title"))
+        if short_title == indicator or short_title.startswith(f"{indicator} "):
+            aggregate_series = series
+            break
+    if aggregate_series is None:
+        # Fallback: usar serie con actividad igual al indicador (si existe)
+        for series in observations.get("series", []) or []:
+            cls = series.get("classification_series", {})
+            activity = _normalize_token((cls or {}).get("activity")) if isinstance(cls, dict) else ""
+            if activity == indicator:
+                aggregate_series = series
+                break
+    if aggregate_series is None:
+        return None
+
+    block = (aggregate_series.get("data") or {}).get(freq_code)
+    records = (block or {}).get("records") or []
+    if not isinstance(records, list) or not records:
+        return None
+
+    aggregate_value: Optional[float] = None
+    for row in records:
+        if not isinstance(row, dict):
+            continue
+        row_period = _canonicalize_period_token(freq_code, row.get("period"))
+        if row_period == target_period:
+            aggregate_value = _safe_float(row.get("value"))
+            if aggregate_value is not None:
+                break
+    if aggregate_value is None:
+        for row in reversed(records):
+            if isinstance(row, dict):
+                aggregate_value = _safe_float(row.get("value"))
+                if aggregate_value is not None:
+                    break
+    if aggregate_value is None:
+        return None
+
+    indicator_label = "PIB" if indicator == "pib" else "IMACEC"
+    period_label = target_period if freq_code == "A" else _natural_period_label(target_period, freq_code)
+    aggregate_abs = round(abs(float(aggregate_value)), 1)
+    aggregate_abs_text = f"{aggregate_abs:.1f}".replace(".", ",")
+
+    language_rule = (
+        "VARIACIÓN DE LENGUAJE PERMITIDA: en contribuciones al alza puedes usar indistintamente "
+        "'creció' o 'aumentó'; en contribuciones a la baja puedes usar 'disminuyó' o 'cayó'. "
+        "Mantén el mismo formato numérico y referencia temporal."
+    )
+
+    if aggregate_value < 0:
+        intro_rule = (
+            "REGLA DE MÁXIMA PRIORIDAD EN INTRODUCCIÓN: "
+            f"la primera oración debe decir explícitamente: 'En {period_label}, el {indicator_label} disminuyó "
+            f"**{aggregate_abs_text}%** respecto al mismo período del año anterior.' "
+            "Se permite solo variación de verbo equivalente ('cayó'). "
+            "RESPUESTA INVÁLIDA si la introducción no explicita signo y magnitud del agregado. "
+            "PROHIBIDO iniciar con frases ambiguas como 'resultado mixto', 'hubo actividades al alza y a la baja' "
+            "o formulaciones por negación como 'no aumentó'/'no creció'."
+        )
+        order_rule = (
+            "ORDEN OBLIGATORIO POR POLARIDAD: como el indicador agregado del período es negativo, "
+            "el bloque principal debe comenzar con actividades que disminuyen/cayeron, "
+            "ordenadas por valor absoluto descendente. Luego lista las actividades positivas."
+        )
+        rebuttal_rule = ""
+        if asks_increase:
+            rebuttal_rule = (
+                " REBATE OBLIGATORIO: la pregunta sugiere aumento, pero el resultado agregado es negativo; "
+                "debes explicitar esta corrección antes del ranking."
+            )
+        return (
+            "REGLA DE RANKING CONDICIONADA POR EL AGREGADO: "
+            f"{language_rule} {intro_rule} {order_rule}{rebuttal_rule}"
+        )
+
+    if aggregate_value > 0:
+        intro_rule = (
+            "REGLA DE MÁXIMA PRIORIDAD EN INTRODUCCIÓN: "
+            f"la primera oración debe decir explícitamente: 'En {period_label}, el {indicator_label} aumentó "
+            f"**{aggregate_abs_text}%** respecto al mismo período del año anterior.' "
+            "Se permite solo variación de verbo equivalente ('creció'). "
+            "RESPUESTA INVÁLIDA si la introducción no explicita signo y magnitud del agregado. "
+            "PROHIBIDO iniciar con frases ambiguas como 'resultado mixto', 'hubo actividades al alza y a la baja' "
+            "o formulaciones por negación como 'no cayó'/'no disminuyó'."
+        )
+        order_rule = (
+            "ORDEN OBLIGATORIO POR POLARIDAD: como el indicador agregado del período es positivo, "
+            "el bloque principal debe comenzar con actividades que crecieron/aumentaron, "
+            "ordenadas por valor absoluto descendente. Luego lista las actividades negativas."
+        )
+        rebuttal_rule = ""
+        if asks_decrease:
+            rebuttal_rule = (
+                " REBATE OBLIGATORIO: la pregunta sugiere caída, pero el resultado agregado es positivo; "
+                "debes explicitar esta corrección antes del ranking."
+            )
+        return (
+            "REGLA DE RANKING CONDICIONADA POR EL AGREGADO: "
+            f"{language_rule} {intro_rule} {order_rule}{rebuttal_rule}"
+        )
+
+    return (
+        "REGLA DE RANKING CONDICIONADA POR EL AGREGADO: "
+        f"{language_rule} REGLA DE MÁXIMA PRIORIDAD EN INTRODUCCIÓN: la primera oración debe declarar explícitamente que en {period_label} "
+        f"el {indicator_label} registró una variación de **0,0%** respecto al mismo período del año anterior. "
+        "RESPUESTA INVÁLIDA si la introducción no explicita signo y magnitud del agregado. "
+        "Luego, como el indicador agregado del período es 0,0%, "
+        "ordena por valor absoluto descendente y separa explícitamente actividades positivas y negativas."
+    )
+
+
 def _build_economy_wording_instruction(
     question: str,
     entities_ctx: Dict[str, Any],
@@ -1462,57 +1654,6 @@ def _build_recommendation_length_instruction() -> str:
         "REGLA DE RECOMENDACIÓN: el bloque final de recomendación debe tener una sola oración, "
         "pero más desarrollada (mínimo 16 palabras), conectada con la consulta del usuario, "
         "sin opiniones ni proyecciones."
-    )
-
-
-def _build_historical_floor_instruction(
-    entities_ctx: Dict[str, Any],
-    observations: Optional[Dict[str, Any]] = None,
-) -> Optional[str]:
-    """Inyecta instrucción histórica con parámetros explícitos para evitar ambigüedad del LLM."""
-    text = str(entities_ctx.get("historical_floor_instruction") or "").strip()
-    if not text:
-        return None
-
-    indicator = str(entities_ctx.get("indicator_ent") or "").strip().lower()
-    req_form = str(entities_ctx.get("req_form_cls") or "").strip().lower()
-    period_ent = entities_ctx.get("period_ent")
-    period_list = period_ent if isinstance(period_ent, list) else []
-
-    # Refuerzo de salida para históricos de PIB/IMACEC en rangos.
-    if indicator in {"pib", "imacec"} and req_form == "range":
-        text = (
-            f"{text}\n"
-            "REGLA DE PRIORIZACIÓN HISTÓRICA (SALIDA): prioriza siempre variaciones interanuales "
-            "en el resumen principal del rango. Solo puedes usar nivel/valor de la serie original "
-            "para el año de inicio histórico (1960 en PIB, 1996 en IMACEC) cuando no existe variación "
-            "interanual previa para ese punto de arranque."
-        )
-
-    # Refuerzo paramétrico acotado: IMACEC histórico en consultas de rango.
-    if indicator != "imacec" or req_form != "range" or len(period_list) < 2:
-        return text
-
-    latest_available = (observations or {}).get("latest_available") or {}
-    latest_m = str(latest_available.get("M") or "").strip()
-    if not latest_m:
-        return text
-
-    floor_start = str(period_list[0])
-    floor_end = str(period_list[-1])
-    return (
-        f"{text}\n"
-        "REGLA PARAMÉTRICA OBLIGATORIA (NO SEMÁNTICA): usa exactamente estos parámetros de control\n"
-        f"- indicator=imacec\n"
-        f"- req_form={req_form}\n"
-        f"- floor_period_start={floor_start}\n"
-        f"- floor_period_end={floor_end}\n"
-        f"- latest_available_m={latest_m}\n"
-        "OBLIGATORIO:\n"
-        "1. Indicar explícitamente que el año solicitado no está disponible y que la serie parte en 1996.\n"
-        "2. Para el dato principal, usar el último mes disponible (latest_available_m) y reportar su variación anual.\n"
-        "3. No reemplazar la respuesta principal por resumen del año piso (1996) ni por rangos 1996-1996.\n"
-        "4. No inferir períodos alternativos distintos de latest_available_m para el dato principal."
     )
 
 
@@ -1613,20 +1754,38 @@ def _build_specific_contribution_directness_instruction(question: str) -> Option
             "REGLA DE CONTRIBUCIÓN DIRECTA: si la pregunta es 'cuánto contribuyó [actividad] ...', "
             "responde de forma directa con ESA actividad y su valor para el período objetivo. "
             "No agregues ranking de otras actividades salvo que el usuario lo pida explícitamente. "
-            "PROHIBIDO usar la palabra 'negativa' o frases equivalentes. "
-            "Usa redacción consistente con el signo y valor absoluto: "
-            "si dato<0 usa 'disminuyó **X,X%** respecto al mismo período del año anterior'; "
-            "si dato>0 usa 'creció **X,X%** respecto al mismo período del año anterior'; "
-            "si dato=0 usa 'mostró una variación de **0,0%** respecto al mismo período del año anterior'. "
-            "PROHIBIDO usar la frase 'a la baja'; para signo negativo usa solo 'disminuyó' o 'disminución'. "
-            "REGLA OBLIGATORIA: toda cifra porcentual escrita en la respuesta debe incluir la referencia "
-            "'respecto al mismo período del año anterior'; no dejes porcentajes sin contexto temporal. "
-            "PROHIBIDO usar 'pp' y PROHIBIDO mostrar signo negativo en el valor. "
-            "CHEQUEO FINAL OBLIGATORIO: si redactaste '-X,X%' debes reescribir con valor absoluto y verbo consistente. "
-            "Esta regla aplica a cualquier mención adicional de contribución en la respuesta. "
+            "FORMATO OBLIGATORIO PARA CONTRIBUCIÓN INDIVIDUAL: reporta en puntos porcentuales (pp) "
+            "y conserva el signo del dato. "
+            "Ejemplos válidos: '**0,6 pp**', '**-0,7 pp**'. "
+            "No conviertas contribución individual a porcentaje '%'. "
             "En el bloque DATOS usa solo una oración con la contribución de esa actividad."
         )
     return None
+
+
+def _is_specific_contribution_query(question: str, entities_ctx: Dict[str, Any]) -> bool:
+    calc_mode = str(
+        entities_ctx.get("calc_mode_cls")
+        or entities_ctx.get("calc_mode")
+        or ""
+    ).strip().lower()
+    if calc_mode != "contribution":
+        return False
+
+    activity_cls = str(
+        entities_ctx.get("activity_cls_resolved")
+        or entities_ctx.get("activity_cls")
+        or ""
+    ).strip().lower()
+    if activity_cls == "specific":
+        return True
+
+    text = str(question or "").lower()
+    text_norm = unicodedata.normalize("NFKD", text)
+    text_norm = "".join(ch for ch in text_norm if not unicodedata.combining(ch))
+    mentions_direct_contribution = "contribuy" in text_norm or "contribuyo" in text_norm
+    mentions_indicator = "imacec" in text_norm or "pib" in text_norm
+    return mentions_direct_contribution and mentions_indicator
 
 
 def _build_original_series_force_instruction(
@@ -1814,56 +1973,6 @@ def _extract_requested_year(entities_ctx: Dict[str, Any], question: str) -> Opti
     if match:
         return match.group(1)
     return None
-
-
-def _build_no_data_available_response(
-    *,
-    question: str,
-    entities_ctx: Dict[str, Any],
-    observations: Dict[str, Any],
-    tool_args: Dict[str, Any],
-) -> str:
-    """Respuesta determinística cuando get_series_data no retorna registros."""
-    indicator = str(entities_ctx.get("indicator_ent") or "").strip().upper() or "la serie"
-    requested_year = _extract_requested_year(entities_ctx, question)
-    requested_label = requested_year or "el período solicitado"
-
-    series_id = str(tool_args.get("series_id") or "").strip()
-    freq_code = str(tool_args.get("frequency") or "").strip().upper()
-
-    coverage_start_label = ""
-    if series_id and freq_code:
-        series = _find_series(observations.get("series", []), series_id)
-        block = (series or {}).get("data", {}).get(freq_code)
-        records = (block or {}).get("records") or []
-        if records:
-            first_period = str(records[0].get("period") or "").strip()
-            if first_period:
-                first_period_label_source = first_period
-                if freq_code == "M" and re.fullmatch(r"\d{4}-\d{2}", first_period):
-                    first_period_label_source = f"{first_period}-01"
-                elif freq_code == "A" and re.fullmatch(r"\d{4}", first_period):
-                    first_period_label_source = f"{first_period}-01-01"
-                elif freq_code == "T":
-                    quarter_match = re.fullmatch(r"(\d{4})-Q([1-4])", first_period, re.IGNORECASE)
-                    if quarter_match:
-                        quarter_start_month = {"1": "01", "2": "04", "3": "07", "4": "10"}[quarter_match.group(2)]
-                        first_period_label_source = f"{quarter_match.group(1)}-{quarter_start_month}-01"
-                coverage_start_label = _natural_period_label(first_period_label_source, freq_code)
-
-    lines = [
-        f"No tengo datos disponibles de {indicator} para {requested_label} en esta serie.",
-    ]
-    if coverage_start_label:
-        lines.append(
-            f"La cobertura disponible de esta serie comienza en {coverage_start_label}, por lo que el período solicitado queda fuera de rango."
-        )
-    else:
-        lines.append(
-            "El período solicitado queda fuera de la cobertura disponible en esta serie."
-        )
-    lines.append("Puedes profundizar revisando la BDE para consultar períodos con datos disponibles.")
-    return "\n\n".join(lines)
 
 
 def _extract_requested_semester(question: str) -> Tuple[Optional[int], Optional[str]]:
@@ -2367,100 +2476,10 @@ def _build_full_history_csv_marker(
     )
 
 
-def _effective_metric_keys_for_calc_mode(calc_mode: str) -> Tuple[str, ...]:
-    mode = str(calc_mode or "").strip().lower()
-    if mode == "prev_period":
-        return ("pct", "prev_period")
-    if mode in {"none", "contribution"}:
-        return ("value",)
-    # Default (original/yoy/otros): priorizar variación anual
-    return ("yoy_pct", "yoy", "YTYPCT")
-
-
-def _find_latest_effective_record_index(
-    records: List[Dict[str, Any]],
-    calc_mode: str,
-) -> Optional[int]:
-    if not records:
-        return None
-
-    metric_keys = _effective_metric_keys_for_calc_mode(calc_mode)
-    for idx in range(len(records) - 1, -1, -1):
-        row = records[idx]
-        if not isinstance(row, dict):
-            continue
-        has_metric = any(row.get(key) not in (None, "", "null") for key in metric_keys)
-        if has_metric:
-            return idx
-
-    # Fallback conservador: si no hay métrica válida para ese cálculo,
-    # usar el último registro con valor para no romper la URL.
-    for idx in range(len(records) - 1, -1, -1):
-        row = records[idx]
-        if isinstance(row, dict) and row.get("value") not in (None, "", "null"):
-            return idx
-    return None
-
-
-def _period_token_to_iso_date(period_token: Any, frequency: str) -> Optional[str]:
-    token = str(period_token or "").strip()
-    if not token:
-        return None
-
-    # Already in ISO date format.
-    iso_match = re.fullmatch(r"((?:19|20)\d{2})-(\d{2})-(\d{2})", token)
-    if iso_match:
-        return token
-
-    yearly_match = re.fullmatch(r"((?:19|20)\d{2})", token)
-    if yearly_match:
-        return f"{yearly_match.group(1)}-12-31"
-
-    monthly_match = re.fullmatch(r"((?:19|20)\d{2})-(0[1-9]|1[0-2])", token)
-    if monthly_match:
-        year = int(monthly_match.group(1))
-        month = int(monthly_match.group(2))
-        if month == 2:
-            is_leap = (year % 4 == 0 and year % 100 != 0) or (year % 400 == 0)
-            last_day = 29 if is_leap else 28
-        elif month in {4, 6, 9, 11}:
-            last_day = 30
-        else:
-            last_day = 31
-        return f"{year:04d}-{month:02d}-{last_day:02d}"
-
-    quarterly_match = re.fullmatch(r"((?:19|20)\d{2})-Q([1-4])", token, re.IGNORECASE)
-    if quarterly_match:
-        year = int(quarterly_match.group(1))
-        quarter = int(quarterly_match.group(2))
-        month = quarter * 3
-        day = 30 if month in {6, 9} else 31
-        return f"{year:04d}-{month:02d}-{day:02d}"
-
-    freq = str(frequency or "").strip().upper()
-    if freq == "A":
-        year_match = re.search(r"((?:19|20)\d{2})", token)
-        if year_match:
-            return f"{year_match.group(1)}-12-31"
-
-    return None
-
-
-def _resolve_effective_record_date(record: Dict[str, Any], frequency: str) -> Optional[str]:
-    if not isinstance(record, dict):
-        return None
-    date_text = str(record.get("date") or "").strip()
-    if date_text:
-        return date_text
-    return _period_token_to_iso_date(record.get("period"), frequency)
-
-
 def _build_filtered_source_url(
     observations: Dict[str, Any],
     entities_ctx: Dict[str, Any],
     selected_series_ctx: Optional[Dict[str, str]],
-    debug_out: Optional[Dict[str, Any]] = None,
-    llm_period_hint: Optional[Any] = None,
 ) -> Optional[str]:
     if not selected_series_ctx:
         return None
@@ -2475,6 +2494,8 @@ def _build_filtered_source_url(
     if not series_data:
         return None
 
+    period_values = entities_ctx.get("period_ent")
+    period: Optional[List[Any]] = period_values if isinstance(period_values, list) else None
     req_form = entities_ctx.get("req_form_cls")
     calc_mode = (
         entities_ctx.get("calc_mode_cls")
@@ -2499,65 +2520,6 @@ def _build_filtered_source_url(
     if calc_mode_for_url == "original" and (is_per_capita_query or is_current_prices_query):
         calc_mode_for_url = "none"
 
-    period_values = entities_ctx.get("period_ent")
-    period: Optional[List[Any]] = period_values if isinstance(period_values, list) else None
-    records_for_url = series_data.get("records") or []
-    period_before_transform = list(period) if isinstance(period, list) else period
-    effective_idx: Optional[int] = None
-    effective_date: Optional[str] = None
-    effective_period: Optional[str] = None
-    point_effective_date: Optional[str] = None
-
-    req_form_norm = str(req_form or "").strip().lower()
-    question_text = str(entities_ctx.get("question") or "").strip().lower()
-    historical_floor_applied = bool(
-        str(entities_ctx.get("historical_floor_instruction") or "").strip()
-    )
-    open_ended_range_requested = "en adelante" in question_text
-
-    def _extract_year_token(value: Any) -> Optional[str]:
-        match = re.search(r"(19|20)\d{2}", str(value or "").strip())
-        return match.group(0) if match else None
-
-    # Para point, alinear URL al período efectivo que usó el LLM en get_series_data.
-    # Esto evita desalineaciones cuando se pidió 2026 pero el dato efectivo existe en 2025.
-    if req_form_norm == "point":
-        hint_text = str(llm_period_hint or "").strip()
-        if hint_text:
-            point_effective_date = _period_token_to_iso_date(hint_text, frequency) or hint_text
-            period = [point_effective_date, point_effective_date]
-
-    # Para latest, alinear año del link al período efectivo usado para el dato
-    # (ej: yoy válido en 2025 aunque exista 2026 con yoy nulo).
-    if req_form_norm == "latest" and isinstance(records_for_url, list):
-        effective_idx = _find_latest_effective_record_index(records_for_url, calc_mode_for_url)
-        if effective_idx is not None and 0 <= effective_idx < len(records_for_url):
-            effective_row = records_for_url[effective_idx]
-            effective_period = str(effective_row.get("period") or "").strip() or None
-            effective_date = _resolve_effective_record_date(effective_row, frequency)
-            if effective_date:
-                period = [effective_date, effective_date]
-                records_for_url = records_for_url[: effective_idx + 1]
-
-    # Si el rango quedó colapsado (ej. 1960..1960), extender solo el fin del link
-    # al último período disponible del cuadro para históricos y consultas "en adelante".
-    if (
-        req_form_norm == "range"
-        and (historical_floor_applied or open_ended_range_requested)
-        and isinstance(period, list)
-        and len(period) >= 2
-    ):
-        start_year = _extract_year_token(period[0])
-        end_year = _extract_year_token(period[-1])
-        if start_year and end_year and start_year == end_year:
-            latest_available = observations.get("latest_available") or {}
-            latest_token = str(latest_available.get(str(frequency or "").upper()) or "").strip()
-            latest_date = _period_token_to_iso_date(latest_token, str(frequency or "").upper()) if latest_token else None
-            if latest_date:
-                period = [period[0], latest_date]
-                effective_period = latest_token or effective_period
-                effective_date = latest_date or effective_date
-
     frequency_for_url = {
         "M": "m",
         "T": "q",
@@ -2569,28 +2531,10 @@ def _build_filtered_source_url(
         series_id=series_id,
         period=period,
         req_form=req_form,
-        observations=records_for_url,
+        observations=series_data.get("records") or [],
         frequency=frequency_for_url,
         calc_mode=calc_mode_for_url,
     )
-    if debug_out is not None:
-        debug_out["url_builder_input"] = {
-            "source_url": source_url,
-            "series_id": series_id,
-            "frequency": frequency,
-            "frequency_for_url": frequency_for_url,
-            "req_form": req_form,
-            "calc_mode_input": calc_mode,
-            "calc_mode_for_url": calc_mode_for_url,
-            "period_before_transform": period_before_transform,
-            "period_after_transform": period,
-            "llm_period_hint": llm_period_hint,
-            "point_effective_date": point_effective_date,
-            "latest_effective_idx": effective_idx,
-            "latest_effective_date": effective_date,
-            "latest_effective_period": effective_period,
-        }
-        debug_out["filtered_source_url"] = str(filtered or "").strip() or None
     return str(filtered or "").strip() or None
 
 
@@ -2737,8 +2681,12 @@ def stream_data_response(
             ),
         }
     )
+    is_specific_contribution_query = _is_specific_contribution_query(
+        question=question,
+        entities_ctx=entities_ctx,
+    )
     strict_priority_instruction = _build_metric_priority_instruction(calc_mode_ctx)
-    if strict_priority_instruction:
+    if strict_priority_instruction and not is_specific_contribution_query:
         messages.append({"role": "system", "content": strict_priority_instruction})
     seasonality_strict_instruction = _build_seasonality_strict_instruction(
         entities_ctx=entities_ctx,
@@ -2786,6 +2734,13 @@ def stream_data_response(
     )
     if contribution_activity_focus_instruction:
         messages.append({"role": "system", "content": contribution_activity_focus_instruction})
+    contribution_ranking_polarity_instruction = _build_contribution_ranking_polarity_instruction(
+        question=question,
+        entities_ctx=entities_ctx,
+        observations=observations,
+    )
+    if contribution_ranking_polarity_instruction:
+        messages.append({"role": "system", "content": contribution_ranking_polarity_instruction})
     economy_wording_instruction = _build_economy_wording_instruction(
         question=question,
         entities_ctx=entities_ctx,
@@ -2815,12 +2770,6 @@ def stream_data_response(
     )
     if original_series_force_instruction:
         messages.append({"role": "system", "content": original_series_force_instruction})
-    historical_floor_instruction = _build_historical_floor_instruction(
-        entities_ctx,
-        observations,
-    )
-    if historical_floor_instruction:
-        messages.append({"role": "system", "content": historical_floor_instruction})
     messages.append({"role": "system", "content": _build_recommendation_length_instruction()})
     annual_pib_instruction = _build_annual_pib_completeness_instruction(
         question=question,
@@ -2834,9 +2783,6 @@ def stream_data_response(
     fetched_series: List[Dict[str, Any]] = []  # track get_series_data results
     selected_series_ctx: Optional[Dict[str, str]] = None
     tool_calls_elapsed_ms = 0.0
-    url_debug: Dict[str, Any] = {"llm_url_params": []}
-    llm_period_hint: Optional[str] = None
-    no_data_tool_args: Optional[Dict[str, Any]] = None
 
     try:
         for _ in range(max_tool_loops):
@@ -2897,17 +2843,9 @@ def stream_data_response(
                         for _, tc in sorted(tool_calls_by_idx.items())
                     ],
                 })
-                has_get_series_data_call = False
-                has_successful_series_data = False
                 for _, tc in sorted(tool_calls_by_idx.items()):
                     fn_args = json.loads(tc["arguments"])
                     result = handle_tool_call(tc["name"], fn_args, observations)
-                    if tc["name"] == "get_series_data":
-                        has_get_series_data_call = True
-                        url_debug["llm_url_params"].append(dict(fn_args))
-                        hint = str(fn_args.get("period") or "").strip()
-                        if hint:
-                            llm_period_hint = hint
                     tool_content = _sanitize_contribution_tool_result(tc["name"], fn_args, result)
                     logger.debug("[DATA_RESPONSE] tool=%s args=%s result_len=%d",
                                  tc["name"], tc["arguments"][:120], len(result))
@@ -2920,62 +2858,14 @@ def stream_data_response(
                     if tc["name"] == "get_series_data":
                         try:
                             parsed = json.loads(result)
-                            if "records" in parsed and parsed.get("records"):
-                                has_successful_series_data = True
+                            if "records" in parsed:
                                 fetched_series.append(parsed)
                                 selected_series_ctx = {
                                     "series_id": str(parsed.get("series_id") or fn_args.get("series_id") or ""),
                                     "frequency": str(parsed.get("frequency") or fn_args.get("frequency") or "").upper(),
                                 }
-                            elif str(parsed.get("error") or "").strip() == "Sin datos para los parámetros dados":
-                                no_data_tool_args = dict(fn_args)
                         except Exception:
                             pass
-
-                is_open_ended_query = "en adelante" in str(question or "").lower()
-                if (
-                    has_get_series_data_call
-                    and not has_successful_series_data
-                    and no_data_tool_args
-                    and not is_open_ended_query
-                ):
-                    post_t0 = time.perf_counter()
-                    yield _build_no_data_available_response(
-                        question=question,
-                        entities_ctx=entities_ctx,
-                        observations=observations,
-                        tool_args=no_data_tool_args,
-                    )
-
-                    final_series_ctx = _resolve_selected_series_context(
-                        observations=observations,
-                        entities_ctx=entities_ctx,
-                        selected_from_tools=selected_series_ctx,
-                    )
-                    if final_series_ctx:
-                        url_debug["selected_series"] = dict(final_series_ctx)
-                    filtered_source_url = _build_filtered_source_url(
-                        observations=observations,
-                        entities_ctx=entities_ctx,
-                        selected_series_ctx=final_series_ctx,
-                        debug_out=url_debug,
-                        llm_period_hint=llm_period_hint,
-                    )
-                    source_footer = _build_source_footer(
-                        observations,
-                        source_url_override=filtered_source_url,
-                    )
-                    if source_footer:
-                        yield source_footer
-                    csv_block = _build_fallback_csv_marker(observations)
-                    if csv_block:
-                        yield "\n" + csv_block
-                    if timing is not None:
-                        timing["openai_tool_calls_ms"] = round(tool_calls_elapsed_ms, 2)
-                        timing["post_response_blocks_ms"] = round((time.perf_counter() - post_t0) * 1000.0, 2)
-                    payload["_url_debug"] = url_debug
-                    return
-
                 tool_calls_elapsed_ms += (time.perf_counter() - loop_t0) * 1000.0
             else:
                 # Sin tool calls → respuesta final ya fue yielded via content_chunks
@@ -2985,14 +2875,10 @@ def stream_data_response(
                     entities_ctx=entities_ctx,
                     selected_from_tools=selected_series_ctx,
                 )
-                if final_series_ctx:
-                    url_debug["selected_series"] = dict(final_series_ctx)
                 filtered_source_url = _build_filtered_source_url(
                     observations=observations,
                     entities_ctx=entities_ctx,
                     selected_series_ctx=final_series_ctx,
-                    debug_out=url_debug,
-                    llm_period_hint=llm_period_hint,
                 )
                 source_footer = _build_source_footer(
                     observations,
@@ -3019,7 +2905,6 @@ def stream_data_response(
                 if timing is not None:
                     timing["openai_tool_calls_ms"] = round(tool_calls_elapsed_ms, 2)
                     timing["post_response_blocks_ms"] = round((time.perf_counter() - post_t0) * 1000.0, 2)
-                payload["_url_debug"] = url_debug
                 return
         else:
             # Se agotó el loop de herramientas
