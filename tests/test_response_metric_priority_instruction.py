@@ -33,7 +33,7 @@ def test_build_metric_priority_instruction_for_unknown_mode_returns_none():
 def test_build_metric_priority_instruction_for_share():
     text = response_module._build_metric_priority_instruction("share")
     assert text is not None
-    assert "'value'" in text
+    assert "'yoy_pct'" in text
     assert "PERIODO analizado" in text
     assert "participación" in text.lower() or "PARTICIPACIONES" in text
 

@@ -673,7 +673,7 @@ def build_cuadro_output(cuadro_name: str, cuadro_data: Dict, client: BDEClient) 
     classification = cuadro_data.get("classification", {})
     series_list = cuadro_data.get("series", [])
 
-    skip_derived = is_contribution(classification) or is_share(classification)
+    skip_derived = is_contribution(classification)
 
     series_outputs = []
     for i, s_info in enumerate(series_list):
