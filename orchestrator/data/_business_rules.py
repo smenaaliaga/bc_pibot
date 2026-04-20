@@ -50,12 +50,16 @@ class ResolvedEntities:
     hist: Optional[int] = None
     historical_floor_instruction: Optional[str] = None
 
+    # Texto original de la pregunta (usado por reglas basadas en intención)
+    question: Optional[str] = None
+
 
 def apply_business_rules(ent: ResolvedEntities) -> ResolvedEntities:
     """Aplica las reglas de negocio secuencialmente y retorna el mismo objeto mutado.
 
     Reglas implementadas:
 
+    0. **Detección de intención *share***: redirige a participación si el texto lo indica.
     1. **Contribución + inversión específica sin región**: forzar actividad "general".
     2. **IMACEC → frecuencia mensual**: IMACEC solo se publica mensual.
     3. **IMACEC sin actividad**: se asigna "imacec" como actividad por defecto.
@@ -64,6 +68,7 @@ def apply_business_rules(ent: ResolvedEntities) -> ResolvedEntities:
     6. **Contribución + inversión específica = demanda_interna**: reclasificar a general.
     7. **PIB mensual no existe**: se redirige a trimestral con nota informativa.
     """
+    _rule_detect_share_intent(ent)
     _rule_contribution_investment_force_general(ent)
     _rule_imacec_force_monthly(ent)
     _rule_imacec_default_activity(ent)
@@ -77,6 +82,43 @@ def apply_business_rules(ent: ResolvedEntities) -> ResolvedEntities:
 # ---------------------------------------------------------------------------
 # Reglas individuales
 # ---------------------------------------------------------------------------
+
+_SHARE_INTENT_RE = re.compile(
+    r"(?:cu[aá]nto\s+pesa|qu[eé]\s+porcentaje|participaci[oó]n|peso\s+(?:del?|en))",
+    re.IGNORECASE,
+)
+
+
+def _rule_detect_share_intent(ent: ResolvedEntities) -> None:
+    """Detecta intención de participación (share) a partir del texto de la pregunta.
+
+    Si el texto contiene patrones como 'cuánto pesa', 'qué porcentaje',
+    'participación' o 'peso del/en' y el indicador es PIB con desglose de
+    inversión, se redirige a calc_mode='share' y frecuencia anual.
+    """
+    q = str(ent.question or "").strip()
+    if not q or not _SHARE_INTENT_RE.search(q):
+        return
+
+    indicator = str(ent.indicator_ent or "").strip().lower()
+    if indicator not in ("pib", ""):
+        return
+
+    has_investment_context = ent.investment_cls in ("specific", "general") or ent.investment_ent is not None
+    if not has_investment_context:
+        return
+
+    logger.info(
+        "[DATA_NODE] share intent detected from question text; "
+        "switching calc_mode_cls=%s -> 'share', frequency -> 'a', price -> 'co'",
+        ent.calc_mode_cls,
+    )
+    ent.calc_mode_cls = "share"
+    ent.frequency_ent = "a"
+    ent.price_ent = "co"
+    if ent.investment_cls == "none":
+        ent.investment_cls = "general"
+
 
 def _rule_contribution_investment_force_general(ent: ResolvedEntities) -> None:
     """Si es contribución con inversión específica pero sin inversión ni región

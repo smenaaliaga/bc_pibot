@@ -146,6 +146,7 @@ def _extract_entities_from_state(
         region_cls=region_cls,
         investment_cls=investment_cls,
         req_form_cls=req_form_cls,
+        question=question,
     )
 
     # Fallback conservador: si activity_cls es specific y no hubo actividad

@@ -221,28 +221,31 @@ def build_target_series_url(
         match = re.search(r"(19|20)\d{2}", str(value or "").strip())
         return match.group(0) if match else None
 
+    def _extract_row_year(row: Dict[str, Any]) -> Optional[str]:
+        return _extract_year_local(row.get("date") or row.get("period"))
+
     period_values = period or []
     requested_start_year = _extract_year_local(period_values[0]) if period_values else None
     requested_end_year = _extract_year_local(period_values[-1]) if period_values else None
     requested_calc_mode = str(calc_mode or "").strip().lower()
     is_contribution_link = requested_calc_mode == "contribution"
     req = str(req_form or "").strip().lower()
-    observed_rows = [
-        row for row in (observations or [])
-        if isinstance(row, dict) and row.get("date")
+    observed_rows = [row for row in (observations or []) if isinstance(row, dict)]
+    observed_years = [
+        int(year)
+        for year in (_extract_row_year(row) for row in observed_rows)
+        if year is not None
     ]
+    observed_start_year_num = min(observed_years) if observed_years else None
+    observed_end_year_num = max(observed_years) if observed_years else None
+    observed_start_year = (
+        str(observed_start_year_num) if observed_start_year_num is not None else None
+    )
     observed_end_year = (
-        _extract_year_local(observed_rows[-1].get("date")) if observed_rows else None
+        str(observed_end_year_num) if observed_end_year_num is not None else None
     )
 
     use_observed_end = req == "latest" and not is_contribution_link
-    if (
-        not is_contribution_link
-        and requested_end_year
-        and observed_end_year
-        and requested_end_year != observed_end_year
-    ):
-        use_observed_end = True
 
     end_year = (
         observed_end_year if use_observed_end and observed_end_year else requested_end_year
@@ -316,6 +319,68 @@ def build_target_series_url(
     if calc_param and observations is not None:
         if not _has_requested_calc_value(observations, resolved_calc_mode):
             calc_param = "NONE"
+
+    def _row_has_requested_calc_value(row: Dict[str, Any], mode: str) -> bool:
+        if mode == "yoy":
+            keys = ("yoy", "yoy_pct")
+        elif mode == "prev_period":
+            keys = ("prev_period", "pct")
+        else:
+            return False
+        return any(row.get(key) is not None for key in keys)
+
+    # Para referencias URL en consultas fuera de rango (o con cálculo no disponible
+    # en el año pedido), anclar al último período observable de la serie para evitar
+    # enlaces que abran años sin dato útil en el cuadro BDE.
+    if (
+        not is_contribution_link
+        and observed_start_year_num is not None
+        and observed_end_year_num is not None
+        and start_year
+        and end_year
+    ):
+        try:
+            start_num = int(start_year)
+            end_num = int(end_year)
+
+            latest_calc_year_num = observed_end_year_num
+            if resolved_calc_mode in {"yoy", "prev_period"}:
+                calc_years = [
+                    int(year)
+                    for year in (
+                        _extract_row_year(row)
+                        for row in observed_rows
+                        if _row_has_requested_calc_value(row, resolved_calc_mode)
+                    )
+                    if year is not None
+                ]
+                if calc_years:
+                    latest_calc_year_num = max(calc_years)
+
+            no_overlap = end_num < observed_start_year_num or start_num > observed_end_year_num
+            if no_overlap:
+                start_num = latest_calc_year_num
+                end_num = latest_calc_year_num
+
+            # Caso típico de PIB 1960 con YTYPCT: año válido, pero sin variación
+            # interanual en el primer punto; URL debe apuntar al último dato con cálculo.
+            if (
+                resolved_calc_mode in {"yoy", "prev_period"}
+                and start_num == end_num
+            ):
+                has_calc_in_requested_year = any(
+                    _extract_row_year(row) == str(start_num)
+                    and _row_has_requested_calc_value(row, resolved_calc_mode)
+                    for row in observed_rows
+                )
+                if not has_calc_in_requested_year:
+                    start_num = latest_calc_year_num
+                    end_num = latest_calc_year_num
+
+            start_year = str(start_num)
+            end_year = str(end_num)
+        except Exception:
+            pass
 
     separator = "&" if "?" in str(source_url) else "?"
     query_parts: List[str] = []

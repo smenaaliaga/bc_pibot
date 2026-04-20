@@ -1016,7 +1016,15 @@ def handle_tool_call(name: str, args: dict, payload: dict) -> str:
                     debug_params["period_start"] = _canonicalize_period_token(freq_code, args.get("period_start"))
                 if args.get("period_end"):
                     debug_params["period_end"] = _canonicalize_period_token(freq_code, args.get("period_end"))
-            return json.dumps({"error": "Sin datos para los parámetros dados", "params": debug_params})
+            all_records = block.get("records", [])
+            no_data_result: Dict[str, Any] = {"error": "Sin datos para los parámetros dados", "params": debug_params}
+            if all_records:
+                no_data_result["available_range"] = {
+                    "from": all_records[0]["period"],
+                    "to": all_records[-1]["period"],
+                }
+                no_data_result["latest_record"] = _add_display_fields(all_records[-1])
+            return json.dumps(no_data_result, ensure_ascii=False)
         return json.dumps(
             {
                 "series_id": series["series_id"],
@@ -1200,6 +1208,20 @@ def _build_metric_priority_instruction(calc_mode: str) -> Optional[str]:
             "comienza mencionando el PERIODO analizado (ej: 'En el 3er trimestre de 2025, ...') "
             "y reporta PRIMERO el valor de 'pct'. "
             "No comiences con 'value' ni con 'yoy_pct'."
+        )
+    if mode == "share":
+        return (
+            "REGLA ESTRICTA DE REDACCION PARA PARTICIPACIONES (% SOBRE EL PIB):\n"
+            "1. En el PRIMER PARRAFO comienza mencionando el PERIODO analizado "
+            "(ej: 'En 2024, ...').\n"
+            "2. Los datos representan PARTICIPACIÓN porcentual de cada componente "
+            "sobre el PIB total. La métrica principal es 'value' (que ya es un porcentaje).\n"
+            "3. Reporta SIEMPRE 'value' como dato principal. "
+            "NO uses 'yoy_pct' ni variaciones interanuales.\n"
+            "4. Usa la unidad '%' o 'del PIB' al citar cifras: ej. '**24,5% del PIB**'.\n"
+            "5. Si el usuario pregunta por un componente específico, destaca ese componente "
+            "y compáralo con el PIB total u otros componentes relevantes.\n"
+            "6. Respuesta objetiva: describe cifras y composición, sin juicios de valor."
         )
     # Para "original", "yoy" y cualquier otro: siempre yoy_pct por defecto
     return (
@@ -2778,6 +2800,9 @@ def stream_data_response(
     )
     if annual_pib_instruction:
         messages.append({"role": "system", "content": annual_pib_instruction})
+    hist_floor = entities_ctx.get("historical_floor_instruction")
+    if hist_floor:
+        messages.append({"role": "system", "content": hist_floor})
     messages.append({"role": "user", "content": question})
 
     fetched_series: List[Dict[str, Any]] = []  # track get_series_data results

@@ -26,7 +26,12 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-LOG_PATH = ROOT / "logs" / "run_detail.log"
+def _resolve_daily_log_path(now_utc: Optional[datetime] = None) -> Path:
+    ts = (now_utc or datetime.now(UTC)).strftime("%Y%m%d")
+    return ROOT / "logs" / f"run_detail_{ts}.log"
+
+
+LOG_PATH = _resolve_daily_log_path()
 SEPARATOR = "—" * 90
 
 
@@ -63,6 +68,29 @@ def _extract_classification_info(classification: Any) -> Dict[str, Any]:
         "req_form": getattr(classification, "req_form", None),
         "predict_raw": getattr(classification, "predict_raw", None),
     }
+
+
+def _extract_entities_normalized(info: Dict[str, Any]) -> Dict[str, Any]:
+    if not isinstance(info, dict):
+        return {}
+
+    predict_raw = info.get("predict_raw")
+    interpretation: Dict[str, Any] = {}
+    if isinstance(predict_raw, dict):
+        candidate = predict_raw.get("interpretation")
+        if isinstance(candidate, dict):
+            interpretation = candidate
+        else:
+            interpretation = predict_raw
+
+    from_predict = interpretation.get("entities_normalized")
+    if isinstance(from_predict, dict):
+        return from_predict
+
+    normalized = info.get("normalized")
+    if isinstance(normalized, dict):
+        return normalized
+    return {}
 
 
 def _as_yes_no(value: bool) -> str:
@@ -202,7 +230,7 @@ class DetailTracer:
 
     def __init__(self, question: str, log_path: Optional[Path] = None):
         self._question = question
-        self._log_path = log_path or LOG_PATH
+        self._log_path = log_path or _resolve_daily_log_path()
         self._lines: List[str] = []
         self._classification = None
         self._predict_raw = None
@@ -307,6 +335,8 @@ class DetailTracer:
         self._add(f"  FALLBACK    : {_as_yes_no(fallback)}")
         self._add("  CLASIFICACION (predict_raw):")
         self._add(_indent(_pretty_json(info.get("predict_raw") or {}), 4))
+        self._add("  ENTIDADES NORMALIZADAS (por pregunta):")
+        self._add(_indent(_pretty_json(_extract_entities_normalized(info)), 4))
         self._add("")
         self._add("TIEMPOS POR ETAPA (s):")
         timings = self._compute_stage_timings_seconds()
@@ -454,7 +484,7 @@ def run_detail_standalone(question: str) -> str:
                 tracer.on_node_update(node_name, delta)
 
         tracer.flush()
-        print(f"Log generado en: {LOG_PATH}")
+        print(f"Log generado en: {tracer._log_path}")
         return _format_final_response(tracer._current_state.get("output", ""))
     finally:
         capture.uninstall()

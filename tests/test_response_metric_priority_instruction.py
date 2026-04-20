@@ -27,8 +27,15 @@ def test_build_metric_priority_instruction_for_original():
 
 
 def test_build_metric_priority_instruction_for_unknown_mode_returns_none():
-    assert response_module._build_metric_priority_instruction("share") is None
     assert response_module._build_metric_priority_instruction("") is None
+
+
+def test_build_metric_priority_instruction_for_share():
+    text = response_module._build_metric_priority_instruction("share")
+    assert text is not None
+    assert "'value'" in text
+    assert "PERIODO analizado" in text
+    assert "participación" in text.lower() or "PARTICIPACIONES" in text
 
 
 def test_build_metric_priority_instruction_for_contribution_enforces_neutral_negative_wording():
@@ -428,6 +435,46 @@ def test_build_target_series_url_supports_explicit_none_mode():
 
     assert isinstance(url, str)
     assert "cbCalculo=NONE" in url
+
+
+def test_build_target_series_url_uses_latest_year_when_requested_year_is_out_of_range():
+    url = response_module.build_target_series_url(
+        source_url="https://example.test/series",
+        series_id="SERIE.PIB.HIST",
+        period=["1900-01-01", "1900-12-31"],
+        req_form="range",
+        observations=[
+            {"period": "1960", "value": 100.0, "yoy_pct": None},
+            {"period": "2025", "value": 200.0, "yoy_pct": "2.5%"},
+        ],
+        frequency="a",
+        calc_mode="original",
+    )
+
+    assert isinstance(url, str)
+    assert "cbFechaInicio=2025" in url
+    assert "cbFechaTermino=2025" in url
+
+
+def test_build_target_series_url_uses_latest_year_when_requested_year_lacks_yoy_value():
+    url = response_module.build_target_series_url(
+        source_url="https://example.test/series",
+        series_id="SERIE.PIB.HIST",
+        period=["1960-01-01", "1960-12-31"],
+        req_form="range",
+        observations=[
+            {"period": "1960", "value": 100.0, "yoy_pct": None},
+            {"period": "1961", "value": 110.0, "yoy_pct": "5.0%"},
+            {"period": "2025", "value": 200.0, "yoy_pct": "2.5%"},
+        ],
+        frequency="a",
+        calc_mode="original",
+    )
+
+    assert isinstance(url, str)
+    assert "cbFechaInicio=2025" in url
+    assert "cbFechaTermino=2025" in url
+    assert "cbCalculo=YTYPCT" in url
 
 
 def test_build_filtered_source_url_uses_none_for_original_per_capita_query():
