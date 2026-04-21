@@ -1667,22 +1667,50 @@ def _build_contribution_ranking_polarity_instruction(
     )
 
     # (D) Orden del cuerpo: tabla polaridad_agregado × polaridad_pregunta.
+    # Reglas transversales (sign-purity) inyectadas en cada rama para impedir
+    # que el LLM mezcle actividades negativas dentro del grupo "que más
+    # impulsaron el aumento" o viceversa.
+    sign_purity_rule = (
+        "REGLA DE PUREZA DE SIGNO POR GRUPO (OBLIGATORIA): "
+        "el grupo etiquetado como 'que más aportaron al alza', 'que más impulsaron el aumento', "
+        "'principales incidencias positivas' debe contener EXCLUSIVAMENTE actividades con "
+        "contribución > 0 (verbo 'creció'/'aumentó'). El grupo etiquetado como "
+        "'principales incidencias a la baja', 'que más restaron al crecimiento', "
+        "'que más incidieron en la caída' debe contener EXCLUSIVAMENTE actividades con "
+        "contribución < 0 (verbo 'disminuyó'/'cayó'). "
+        "RESPUESTA INVÁLIDA si dentro del grupo de alza aparece una actividad con verbo "
+        "'disminuyó' o 'cayó', o si dentro del grupo a la baja aparece una actividad con "
+        "verbo 'creció' o 'aumentó'. PROHIBIDO listar una actividad negativa bajo la etiqueta "
+        "'que más impulsaron' aunque tenga mayor magnitud absoluta. "
+        "ORDEN INTRA-GRUPO: dentro de cada grupo, las actividades se ordenan por valor "
+        "absoluto descendente, pero la pertenencia al grupo la determina el SIGNO, no la magnitud."
+    )
+
     if polarity == "positive" and asks_decrease:
         order_rule = (
             "ORDEN DEL CUERPO (polaridad cruzada: pregunta sugiere caída pero el agregado es positivo). "
             "Tras la apertura, añade una oración de rebate explícita: "
             f"'Aunque la pregunta sugiere una caída, el {indicator_label} aumentó en el período. "
-            "Las actividades que restaron al crecimiento fueron...'. "
-            "Luego lista PRIMERO las actividades con contribución NEGATIVA, ordenadas por valor absoluto "
-            "descendente, en el formato obligatorio por actividad. Al final, menciona como mucho 1-2 "
-            "actividades positivas destacadas, si aportan contexto."
+            "Las actividades que más restaron al crecimiento fueron...'. "
+            "Luego lista PRIMERO las actividades con contribución NEGATIVA (verbo 'disminuyó'/'cayó'), "
+            "ordenadas por valor absoluto descendente, en el formato obligatorio por actividad. "
+            "Al final, menciona como mucho 1-2 actividades positivas destacadas, si aportan contexto, "
+            "bajo etiqueta separada 'En sentido contrario, aportaron al alza...'. "
+            f"{sign_purity_rule}"
         )
     elif polarity == "positive":
         order_rule = (
             "ORDEN DEL CUERPO (agregado positivo, pregunta por alza o neutra). "
-            "Lista PRIMERO las actividades que crecieron/aumentaron, ordenadas por valor absoluto "
-            "descendente, en el formato obligatorio por actividad. Al final, menciona las principales "
-            "actividades con contribución negativa, si existen."
+            "Usa la etiqueta literal 'Las actividades que más aportaron al alza fueron:' "
+            "(o equivalente 'que más impulsaron el aumento') y bajo esa etiqueta lista SOLO "
+            "actividades con contribución POSITIVA (verbo 'creció'/'aumentó'), ordenadas por "
+            "valor absoluto descendente, en el formato obligatorio por actividad. "
+            "Está PROHIBIDO incluir bajo esta etiqueta actividades con verbo 'disminuyó'/'cayó' "
+            "aunque tengan mayor magnitud absoluta (ej. una minería que cayó 0,9% NO puede aparecer "
+            "como 'la que más impulsó el aumento'). "
+            "Al final, bajo etiqueta separada 'En sentido contrario, las principales incidencias "
+            "a la baja fueron...', menciona las principales actividades NEGATIVAS si existen. "
+            f"{sign_purity_rule}"
         )
     elif polarity == "negative" and asks_increase:
         order_rule = (
@@ -1690,23 +1718,37 @@ def _build_contribution_ranking_polarity_instruction(
             "Tras la apertura, añade una oración de rebate explícita: "
             f"'Aunque la pregunta sugiere un aumento, el {indicator_label} disminuyó en el período. "
             "Las actividades que aportaron al alza fueron...'. "
-            "Luego lista PRIMERO las actividades con contribución POSITIVA, ordenadas por valor absoluto "
-            "descendente, en el formato obligatorio por actividad. Al final, menciona como mucho 1-2 "
-            "actividades negativas destacadas, si aportan contexto."
+            "Luego lista PRIMERO las actividades con contribución POSITIVA (verbo 'creció'/'aumentó'), "
+            "ordenadas por valor absoluto descendente, en el formato obligatorio por actividad. "
+            "Al final, menciona como mucho 1-2 actividades negativas destacadas, si aportan contexto, "
+            "bajo etiqueta separada 'En sentido contrario, las principales incidencias a la baja fueron...'. "
+            f"{sign_purity_rule}"
         )
     elif polarity == "negative":
         order_rule = (
             "ORDEN DEL CUERPO (agregado negativo, pregunta por caída o neutra). "
-            "Lista PRIMERO las actividades que disminuyeron/cayeron, ordenadas por valor absoluto "
-            "descendente, en el formato obligatorio por actividad. Al final, menciona las principales "
-            "actividades con contribución positiva, si existen."
+            "Usa la etiqueta literal 'Las actividades que más incidieron en la caída fueron:' "
+            "(o equivalente 'que más restaron al crecimiento') y bajo esa etiqueta lista SOLO "
+            "actividades con contribución NEGATIVA (verbo 'disminuyó'/'cayó'), ordenadas por "
+            "valor absoluto descendente, en el formato obligatorio por actividad. "
+            "Está PROHIBIDO incluir bajo esta etiqueta actividades con verbo 'creció'/'aumentó'. "
+            "Al final, bajo etiqueta separada 'En sentido contrario, aportaron al alza...', "
+            "menciona las principales actividades POSITIVAS si existen. "
+            f"{sign_purity_rule}"
         )
     else:  # neutral
         order_rule = (
             "ORDEN DEL CUERPO (agregado 0,0%). "
-            "Separa explícitamente actividades positivas y negativas; cada grupo ordenado por valor "
-            "absoluto descendente, en el formato obligatorio por actividad."
+            "Separa explícitamente actividades positivas y negativas en dos grupos con etiquetas "
+            "distintas ('aportaron al alza' vs 'incidieron a la baja'); cada grupo ordenado por "
+            "valor absoluto descendente, en el formato obligatorio por actividad. "
+            f"{sign_purity_rule}"
         )
+
+    return (
+        "REGLA DE RANKING CONDICIONADA POR EL AGREGADO: "
+        f"{language_rule} {intro_rule} {order_rule}"
+    )
 
     return (
         "REGLA DE RANKING CONDICIONADA POR EL AGREGADO: "
