@@ -527,9 +527,9 @@
   },
   "Gasto del producto interno bruto, a precios corrientes, series empalmadas, referencia 2018 (miles de millones de pesos)": {
     "classification": {
-      "indicator": "pib ################################ REVISAR ################################ ",
+      "indicator": "pib",
       "calc_mode": ["original", "prev_period", "yoy"],
-      "seasonality": "nsa ################################ REVISAR ################################ ",
+      "seasonality": "nsa",
       "price": "co",
       "has_activity": 0,
       "has_region": 0,
@@ -537,7 +537,33 @@
     },
     "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_G1",
     "series": [
-    
+      {"id": "F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T", "short_title": "PIB", "classification": {"indicator": "pib"}, "long_title": "Producto Interno Bruto a precios corrientes"},
+      {"id": "F033.DDI.FLU.N.CLP.EP18.0.T", "short_title": "Demanda Interna", "classification": {"investment": "demanda_interna"}, "long_title": "Demanda interna a precios corrientes"},
+      {"id": "F033.CTO.FLU.N.CLP.EP18.0.T", "short_title": "Consumo total", "classification": {}, "long_title": "Consumo total a precios corrientes"},
+      {"id": "F033.CPR.FLU.N.CLP.EP18.0.T", "short_title": "Consumo de hogares e IPSFL", "classification": {"investment": "consumo"}, "long_title": "Consumo de hogares e IPSFL a precios corrientes"},
+      {"id": "F033.CDU.FLU.N.CLP.EP18.0.T", "short_title": "Bienes durables", "classification": {}, "long_title": "Consumo de bienes durables a precios corrientes"},
+      {"id": "F033.CND.FLU.N.CLP.EP18.0.T", "short_title": "Bienes no durables", "classification": {}, "long_title": "Consumo de bienes no durables a precios corrientes"},
+      {"id": "F033.CSE.FLU.N.CLP.EP18.0.T", "short_title": "Servicios", "classification": {}, "long_title": "Consumo de servicios a precios corrientes"},
+      {"id": "F033.COG.FLU.N.CLP.EP18.0.T", "short_title": "Consumo Gobierno", "classification": {"investment": "consumo_gobierno"}, "long_title": "Consumo de gobierno a precios corrientes"},
+      {"id": "F033.FBK.FLU.N.CLP.EP18.0.T", "short_title": "Formación bruta de capital", "classification": {"investment": "inversion"}, "long_title": "Formación bruta de capital a precios corrientes"},
+      {"id": "F033.FKF.FLU.N.CLP.EP18.0.T", "short_title": "Formación bruta de capital fijo", "classification": {"investment": "inversion_fijo"}, "long_title": "Formación bruta de capital fijo a precios corrientes"},
+      {"id": "F033.FKK.FLU.N.CLP.EP18.0.T", "short_title": "Construcción y otras obras", "classification": {}, "long_title": "Formación bruta de capital fijo en construcción y otras obras a precios corrientes"},
+      {"id": "F033.FKO.FLU.N.CLP.EP18.0.T", "short_title": "Maquinaria y equipo", "classification": {}, "long_title": "Formación bruta de capital fijo en maquinaria y equipo a precios corrientes"},
+      {"id": "F033.VAX.FLU.N.CLP.EP18.0.T", "short_title": "Variación de existencias", "classification": {}, "long_title": "Variación de existencias a precios corrientes"},
+      {"id": "F033.XBS.FLU.N.CLP.EP18.0.T", "short_title": "Exportaciones de bienes y servicios", "classification": {"investment": "exportacion"}, "long_title": "Exportaciones de bienes y servicios a precios corrientes"},
+      {"id": "F033.XBI.FLU.N.CLP.2018.0.T", "short_title": "Exportación Bienes", "classification": {"investment": "exportacion"}, "long_title": "Exportación de bienes a precios corrientes"},
+      {"id": "F033.XAP.FLU.N.CLP.2018.0.T", "short_title": "Agropecuario-silvícola-pesca", "classification": {}, "long_title": "Exportación de bienes agropecuario-silvícola-pesca a precios corrientes"},
+      {"id": "F033.XMI.FLU.N.CLP.2018.0.T", "short_title": "Minería", "classification": {}, "long_title": "Exportación de bienes de minería a precios corrientes"},
+      {"id": "F033.XCO.FLU.N.CLP.2018.0.T", "short_title": "Cobre", "classification": {}, "long_title": "Exportación de cobre a precios corrientes"},
+      {"id": "F033.XRM.FLU.N.CLP.2018.0.T", "short_title": "Resto", "classification": {}, "long_title": "Resto de exportaciones de bienes a precios corrientes"},
+      {"id": "F033.XIN.FLU.N.CLP.2018.0.T", "short_title": "Industria", "classification": {}, "long_title": "Exportación de bienes industriales a precios corrientes"},
+      {"id": "F033.XSE.FLU.N.CLP.2018.0.T", "short_title": "Exportación servicios", "classification": {}, "long_title": "Exportación de servicios a precios corrientes"},
+      {"id": "F033.IBS.FLU.N.CLP.EP18.0.T", "short_title": "Importaciones de bienes y servicios", "classification": {"investment": "importacion"}, "long_title": "Importaciones de bienes y servicios a precios corrientes"},
+      {"id": "F033.IBI.FLU.N.CLP.2018.0.T", "short_title": "Importación bienes", "classification": {}, "long_title": "Importación de bienes a precios corrientes"},
+      {"id": "F033.IAP.FLU.N.CLP.2018.0.T", "short_title": "Agropecuario-silvícola-pesca", "classification": {}, "long_title": "Importación de bienes agropecuario-silvícola-pesca a precios corrientes"},
+      {"id": "F033.IMI.FLU.N.CLP.2018.0.T", "short_title": "Minería", "classification": {}, "long_title": "Importación de bienes de minería a precios corrientes"},
+      {"id": "F033.IIN.FLU.N.CLP.2018.0.T", "short_title": "Industria", "classification": {}, "long_title": "Importación de bienes industriales a precios corrientes"},
+      {"id": "F033.ISE.FLU.N.CLP.2018.0.T", "short_title": "Importación servicios", "classification": {}, "long_title": "Importación de servicios a precios corrientes"}
     ]
   },
   "Participación de los componentes del gasto en el PIB, series empalmadas, referencia 2018 (porcentaje sobre el PIB)": {
@@ -582,9 +608,9 @@
   },
   "Gasto del producto interno bruto, a precios corrientes, series empalmadas, desestacionalizado, referencia 2018 (miles de millones de pesos)": {
     "classification": {
-      "indicator": "pib ################################ REVISAR ################################ ",
+      "indicator": "pib",
       "calc_mode": ["original", "prev_period", "yoy"],
-      "seasonality": "sa ################################ REVISAR ################################ ",
+      "seasonality": "sa",
       "price": "co",
       "has_activity": 0,
       "has_region": 0,
@@ -592,7 +618,29 @@
     },
     "source_url": "https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_G1_DES",
     "series": [
-    
+      {"id": "F032.PIB.FLU.N.CLP.EP18.Z.Z.1.T", "short_title": "Producto Interno Bruto", "classification": {"indicator": "pib"}, "long_title": "Producto Interno Bruto a precios corrientes desestacionalizado"},
+      {"id": "F033.DDI.FLU.N.CLP.EP18.3.T", "short_title": "Demanda interna", "classification": {"investment": "demanda_interna"}, "long_title": "Demanda interna a precios corrientes desestacionalizado"},
+      {"id": "F033.CTO.FLU.N.CLP.EP18.3.T", "short_title": "Consumo total", "classification": {}, "long_title": "Consumo total a precios corrientes desestacionalizado"},
+      {"id": "F033.CPR.FLU.N.CLP.EP18.3.T", "short_title": "Consumo de hogares e IPSFL", "classification": {"investment": "consumo"}, "long_title": "Consumo de hogares e IPSFL a precios corrientes desestacionalizado"},
+      {"id": "F033.CDU.FLU.N.CLP.EP18.3.T", "short_title": "Bienes durables", "classification": {}, "long_title": "Bienes durables a precios corrientes desestacionalizado"},
+      {"id": "F033.CND.FLU.N.CLP.EP18.3.T", "short_title": "Bienes no durables", "classification": {}, "long_title": "Bienes no durables a precios corrientes desestacionalizado"},
+      {"id": "F033.CSE.FLU.N.CLP.EP18.3.T", "short_title": "Servicios", "classification": {}, "long_title": "Servicios a precios corrientes desestacionalizado"},
+      {"id": "F033.COG.FLU.N.CLP.EP18.3.T", "short_title": "Consumo Gobierno", "classification": {"investment": "consumo_gobierno"}, "long_title": "Consumo Gobierno a precios corrientes desestacionalizado"},
+      {"id": "F033.FKF.FLU.N.CLP.EP18.3.T", "short_title": "Formación bruta de capital fijo", "classification": {"investment": "inversion_fijo"}, "long_title": "Formación bruta de capital fijo a precios corrientes desestacionalizado"},
+      {"id": "F033.FKK.FLU.N.CLP.EP18.3.T", "short_title": "Construcción y otras obras", "classification": {}, "long_title": "Construcción y otras obras a precios corrientes desestacionalizado"},
+      {"id": "F033.FKO.FLU.N.CLP.EP18.3.T", "short_title": "Maquinaria y Equipo", "classification": {}, "long_title": "Maquinaria y Equipo a precios corrientes desestacionalizado"},
+      {"id": "F033.XBS.FLU.N.CLP.EP18.3.T", "short_title": "Exportaciones de bienes y servicios", "classification": {"investment": "exportacion"}, "long_title": "Exportaciones de bienes y servicios a precios corrientes desestacionalizado"},
+      {"id": "F033.XBI.FLU.N.CLP.2018.1.T", "short_title": "Exportación bienes", "classification": {"investment": "exportacion"}, "long_title": "Exportación bienes a precios corrientes desestacionalizado"},
+      {"id": "F033.XAP.FLU.N.CLP.2018.1.T", "short_title": "Agropecuario-silvícola-pesca", "classification": {}, "long_title": "Agropecuario-silvícola-pesca a precios corrientes desestacionalizado"},
+      {"id": "F033.XMI.FLU.N.CLP.2018.1.T", "short_title": "Minería", "classification": {}, "long_title": "Minería a precios corrientes desestacionalizado"},
+      {"id": "F033.XIN.FLU.N.CLP.2018.1.T", "short_title": "Industria", "classification": {}, "long_title": "Industria a precios corrientes desestacionalizado"},
+      {"id": "F033.XSE.FLU.N.CLP.2018.1.T", "short_title": "Exportación servicios", "classification": {}, "long_title": "Exportación servicios a precios corrientes desestacionalizado"},
+      {"id": "F033.IBS.FLU.N.CLP.EP18.3.T", "short_title": "Importaciones de bienes y servicios", "classification": {"investment": "importacion"}, "long_title": "Importaciones de bienes y servicios a precios corrientes desestacionalizado"},
+      {"id": "F033.IBI.FLU.N.CLP.2018.1.T", "short_title": "Importación bienes", "classification": {}, "long_title": "Importación bienes a precios corrientes desestacionalizado"},
+      {"id": "F033.IAP.FLU.N.CLP.2018.1.T", "short_title": "Agropecuario-silvícola-pesca", "classification": {}, "long_title": "Agropecuario-silvícola-pesca a precios corrientes desestacionalizado"},
+      {"id": "F033.IMI.FLU.N.CLP.2018.1.T", "short_title": "Minería", "classification": {}, "long_title": "Minería a precios corrientes desestacionalizado"},
+      {"id": "F033.IIN.FLU.N.CLP.2018.1.T", "short_title": "Industria", "classification": {}, "long_title": "Industria a precios corrientes desestacionalizado"},
+      {"id": "F033.ISE.FLU.N.CLP.2018.1.T", "short_title": "Importación servicios", "classification": {}, "long_title": "Importación servicios a precios corrientes desestacionalizado"}
     ]
   },
   "PIB trimestral por región, volumen a precios del año anterior encadenado, series empalmadas, referencia 2018 (miles de millones de pesos encadenados)": {

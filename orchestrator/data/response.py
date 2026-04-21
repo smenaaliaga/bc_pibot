@@ -452,15 +452,26 @@ REGLA CARDINAL
 - NUNCA preguntes "¿quieres que consulte los datos?" ni "¿quieres que lo haga?".
   Si ya identificaste la serie y el período, consulta los datos y preséntalos directamente.
 - PRIORIZACIÓN DE MÉTRICAS — REGLA GENERAL:
-    · POR DEFECTO reporta SIEMPRE "yoy_pct" (variación respecto al mismo período del año
-      anterior). Esto aplica independientemente del calc_mode.
+    · JERARQUÍA DE REGLAS (CRÍTICA): si un mensaje 'system' posterior contiene una
+      "REGLA DE MAXIMA PRIORIDAD" o una "REGLA ESPECIAL" / "CASO ..." que indique reportar
+      value (nivel) u otra métrica específica, esa regla GANA sobre la regla por defecto.
+      Nunca uses el default para justificar reportar yoy_pct cuando existe una regla especial
+      que pide value; eso invalida la respuesta.
+    · POR DEFECTO (solo si NO hay regla especial que indique lo contrario) reporta "yoy_pct"
+      (variación respecto al mismo período del año anterior).
     · EXCEPCIÓN 1 — VARIACIÓN PERÍODO ANTERIOR: si el usuario dice "en el margen",
       "respecto al período anterior", "variación mensual/trimestral anterior", reporta "pct".
-    · EXCEPCIÓN 2 — CIFRA ORIGINAL / NIVELES: reporta "value" con su unidad
-      SOLO si el usuario pide explícitamente "PIB en pesos", "PIB en dólares",
-      "PIB per cápita", "a precios corrientes" o "a cuánto asciende".
-      Expresiones como "el valor", "la cifra", "el dato", "cuánto fue" NO son
+    · EXCEPCIÓN 2 — CIFRA ORIGINAL / NIVELES: reporta "value" con su unidad SI el usuario
+      pide explícitamente el NIVEL / MONTO ABSOLUTO. Señales que activan esta excepción:
+        — Palabra "nivel" o "niveles" seguida de de/del + indicador
+          (ej: "nivel de las exportaciones", "niveles del PIB", "nivel del IMACEC").
+        — "a cuánto asciende" aplicado a cualquier indicador.
+        — "PIB en pesos", "PIB en dólares", "PIB per cápita", "a precios corrientes".
+        — Para IMACEC específicamente: "el nivel del índice", "el índice", "IMACEC en nivel".
+      Expresiones genéricas como "el valor", "la cifra", "el dato", "cuánto fue" NO son
       solicitud de nivel; en esos casos reporta yoy_pct como métrica principal.
+      Tampoco son solicitud de nivel frases como "nivel de variación", "nivel de crecimiento"
+      o "nivel de caída" (ahí se está hablando de la variación, no del monto).
       Para PIB per cápita: muestra el valor aproximado SIN decimales.
     · En CUALQUIER otro caso (incluidos "cuánto creció", "cuánto cayó", "variación",
       "crecimiento", preguntas genéricas), reporta "yoy_pct".
@@ -475,8 +486,9 @@ ESTILO DE RESPUESTA
     · En esas oraciones, NO uses "aceleración", "aceleró", "desaceleró", "cambio",
         "delta" ni "variación del cambio".
     · En respuestas de variación, NO incluyas niveles ni montos absolutos.
-    · Redacta solo en términos de "variación mensual/trimestral" o "variación interanual"
-        y su valor numérico.
+    · Redacta solo en términos de "variación mensual/trimestral" o "variación respecto al
+        mismo período del año anterior" y su valor numérico. Evita "variación interanual"
+        cuando la frase ya incluya "respecto al mismo período del año anterior".
 - ORDEN DEL PRIMER ENUNCIADO (OBLIGATORIO): la primera oración del primer párrafo
     debe comenzar mencionando explícitamente el período analizado (ej: "En el 3er trimestre
     de 2025,..." o "En enero de 2026,..."). No inicies la oración sin anclar primero el período.
@@ -533,7 +545,7 @@ ESTILO DE RESPUESTA
     ---
     Los datos de febrero de 2026 aún no han sido publicados según los datos de la Base de Datos Estadísticos. El último dato disponible corresponde a enero de 2026.
 
-    El IMACEC registró una variación interanual de **-0,1%** respecto al mismo período del año anterior.
+    El IMACEC registró una variación de **-0,1%** respecto al mismo período del año anterior.
 
     Puedes profundizar revisando el desglose sectorial del IMACEC y su trayectoria reciente.
     ---
@@ -1229,7 +1241,7 @@ def _build_metric_priority_instruction(calc_mode: str) -> Optional[str]:
         "REGLA ESTRICTA DE REDACCION:\n"
         "1. En el PRIMER PARRAFO comienza mencionando el PERIODO analizado "
         "(ej: 'En el 3er trimestre de 2025, ...').\n"
-        "2. Reporta SOLO la variación interanual (yoy_pct) como dato principal.\n"
+        "2. Reporta SOLO la variación respecto al mismo período del año anterior (yoy_pct) como dato principal.\n"
         "3. PROHIBIDO incluir niveles (value) o cifras de índice en la respuesta. "
         "NO uses get_series_data con metric='value' ni menciones niveles de índice.\n"
         "4. La única excepción para reportar 'value' es si el usuario pide explícitamente "
@@ -1691,6 +1703,30 @@ def _build_special_query_mapping_instruction(
     rules: List[str] = []
     price_ent = str(entities_ctx.get("price_ent") or entities_ctx.get("price") or "").strip().lower()
 
+    # Detector genérico de solicitud de NIVEL / MONTO ABSOLUTO (aplica a cualquier indicador).
+    # Exige construcción "nivel de/del X" para evitar falsos positivos con "a nivel regional",
+    # "a nivel país", etc. Excluye "nivel de variación/crecimiento/caída/aceleración" porque
+    # en esos casos el usuario habla de la variación, no del monto.
+    _level_request_re = re.compile(
+        r"\bnivel(?:es)?\s+de[l]?\s+(?!variaci|crecimient|ca[ií]da|aceleraci|alza|subid|bajad)\w+|"
+        r"\ba\s+cu[aá]nto\s+asciend|"
+        r"\bvalor\s+en\s+pesos\b|"
+        r"\bvalor\s+en\s+d[oó]lares\b|"
+        r"\bcifra\s+en\s+pesos\b",
+        re.IGNORECASE,
+    )
+    if _level_request_re.search(text_norm):
+        rules.append(
+            "CASO SOLICITUD DE NIVEL: el usuario pidió explícitamente el NIVEL / MONTO de la serie "
+            "(no una variación). Reporta SIEMPRE 'value' con su unidad correspondiente. "
+            "PROHIBIDO reportar yoy_pct o pct como métrica principal salvo que el usuario pida "
+            "explícitamente una variación. Incluye siempre la unidad (p. ej. 'millones de dólares', "
+            "'miles de millones de pesos', 'miles de millones de pesos encadenados'). "
+            "REGLA DE UN SOLO VALOR: entrega una única cifra principal para el período solicitado "
+            "(o el último disponible si no hay período explícito); NO listes múltiples períodos "
+            "a menos que el usuario pida explícitamente un rango."
+        )
+
     if "imacec" in text_norm and "ultimo trimestre" in text_norm:
         rules.append(
             "CASO IMACEC TRIMESTRAL: cuando pregunten por 'IMACEC del último trimestre', "
@@ -1729,12 +1765,14 @@ def _build_special_query_mapping_instruction(
         "pib en pesos" in text_norm
         or "precios corrientes" in text_norm
         or "precio corriente" in text_norm
-        or "pib nominal" in text_norm
+        or re.search(r"\bnominal(?:es)?\b", text_norm)
         or "a cuanto asciende el pib" in text_norm
         or price_ent == "co"
     ):
         rules.append(
-            "CASO PIB EN PESOS / PRECIOS CORRIENTES: reporta SIEMPRE valor original (value) en pesos, "
+            "CASO PIB EN PESOS / PRECIOS CORRIENTES / NOMINAL: reporta SIEMPRE valor original (value) en pesos, "
+            "aplica también cuando el usuario mencione 'nominal'/'nominales' para cualquier indicador "
+            "(exportaciones nominales, importaciones nominales, consumo nominal, etc.). "
             "nunca yoy_pct ni pct salvo solicitud explícita de variación. "
             "REGLA DE UN SOLO VALOR: entrega una única cifra principal para el período solicitado "
             "(o el último disponible si no hay período explícito); NO listes múltiples períodos "
@@ -1811,6 +1849,400 @@ def _is_specific_contribution_query(question: str, entities_ctx: Dict[str, Any])
     return mentions_direct_contribution and mentions_indicator
 
 
+# ---------------------------------------------------------------------------
+# Precomputación determinista de respuestas de NIVEL (bypass LLM)
+# ---------------------------------------------------------------------------
+
+_VARIATION_REQUEST_RE = re.compile(
+    r"\bvariaci[oó]n|crecimient|cayo|ca[ií]da|aceleraci|"
+    r"respecto\s+al\s+a[nñ]o\s+anterior|en\s+el\s+margen\b|"
+    r"\b(?:cuanto|cu[aá]nto)\s+crec|\b(?:cuanto|cu[aá]nto)\s+(?:cay|bajo|subi)",
+    re.IGNORECASE,
+)
+
+
+def _is_level_only_query(question: str, entities_ctx: Dict[str, Any]) -> bool:
+    """True si el usuario pregunta por el NIVEL (no variación) de una serie."""
+    text = str(question or "")
+    text_norm = unicodedata.normalize("NFKD", text.lower())
+    text_norm = "".join(ch for ch in text_norm if not unicodedata.combining(ch))
+    if _VARIATION_REQUEST_RE.search(text_norm):
+        return False
+
+    price_ent = str(entities_ctx.get("price_ent") or entities_ctx.get("price") or "").strip().lower()
+    indicator_ent = str(entities_ctx.get("indicator_ent") or "").strip().lower()
+    activity_ent = str(entities_ctx.get("activity_ent") or "").strip().lower()
+
+    if price_ent == "co":
+        return True
+    if indicator_ent == "pib_per_capita" or activity_ent == "per_capita":
+        return True
+    if bool(re.search(r"\bnominal(?:es)?\b", text_norm)):
+        return True
+    if any(tok in text_norm for tok in (
+        "precios corrientes", "precio corriente", "per capita",
+        "a cuanto asciende", "a cuanto ascendio",
+    )):
+        return True
+    if re.search(r"\bnivel(?:es)?\s+de[l]?\s+(?!variaci|crecimient|ca[ií]da|aceleraci|alza|subid|bajad)\w+", text_norm):
+        return True
+    return False
+
+
+def _pick_level_target_series(
+    question: str,
+    entities_ctx: Dict[str, Any],
+    observations: Dict[str, Any],
+) -> Optional[Dict[str, Any]]:
+    """Selecciona la serie objetivo para una consulta de nivel."""
+    series_list = observations.get("series") or []
+    if not series_list:
+        return None
+
+    def _norm(value: Any) -> str:
+        txt = unicodedata.normalize("NFKD", str(value or "").lower())
+        return "".join(ch for ch in txt if not unicodedata.combining(ch)).strip()
+
+    text_norm = _norm(question)
+    indicator_ent = _norm(entities_ctx.get("indicator_ent"))
+    activity_ent = _norm(entities_ctx.get("activity_ent"))
+    investment_ent = _norm(entities_ctx.get("investment_ent"))
+
+    # 1. PIB per cápita
+    if (
+        "per capita" in text_norm
+        or indicator_ent == "pib_per_capita"
+        or activity_ent == "per_capita"
+    ):
+        for s in series_list:
+            if "per capita" in _norm(s.get("short_title")):
+                return s
+
+    # 2. Exportaciones de bienes y servicios (total)
+    if "exportac" in text_norm or investment_ent in ("exportacion", "exportaciones"):
+        for s in series_list:
+            st = _norm(s.get("short_title"))
+            if st.startswith("exportaciones de bienes y servicios"):
+                return s
+
+    # 3. Importaciones de bienes y servicios (total)
+    if "importac" in text_norm or investment_ent in ("importacion", "importaciones"):
+        for s in series_list:
+            st = _norm(s.get("short_title"))
+            if st.startswith("importaciones de bienes y servicios"):
+                return s
+
+    # 4. PIB total (nominal / a cuánto asciende)
+    if "pib" in text_norm or indicator_ent == "pib":
+        for s in series_list:
+            st = _norm(s.get("short_title"))
+            if st == "pib" or st.startswith("producto interno bruto"):
+                return s
+
+    return None
+
+
+def _format_level_value(value: float) -> str:
+    """Formatea valor numérico a formato español (miles con '.', sin decimales)."""
+    rounded = int(round(float(value)))
+    return f"{rounded:,}".replace(",", ".")
+
+
+def _unit_from_cuadro_name(cuadro_name: str) -> str:
+    lower = str(cuadro_name or "").lower()
+    if "miles de millones de pesos encadenados" in lower:
+        return "miles de millones de pesos encadenados"
+    if "miles de millones de pesos" in lower:
+        return "miles de millones de pesos"
+    if "millones de dolares" in lower or "millones de dólares" in lower:
+        return "millones de dólares"
+    if "usd" in lower:
+        return "USD"
+    if "millones de pesos" in lower:
+        return "millones de pesos"
+    return ""
+
+
+def _precompute_level_answer(
+    question: str,
+    entities_ctx: Dict[str, Any],
+    observations: Dict[str, Any],
+) -> Optional[Tuple[str, Dict[str, str]]]:
+    """Calcula la respuesta de nivel deterministicamente y retorna (texto, series_ctx)."""
+    if not _is_level_only_query(question, entities_ctx):
+        return None
+    series = _pick_level_target_series(question, entities_ctx, observations)
+    if not series:
+        return None
+    freq = _resolve_requested_frequency(entities_ctx, observations)
+    if not freq:
+        return None
+    block = (series.get("data") or {}).get(freq) or {}
+    records = block.get("records") or []
+    if not records:
+        return None
+
+    # Resolver período: explícito → entities_ctx.period_ent; else latest_available[freq]
+    target_period = ""
+    period_values = entities_ctx.get("period_ent")
+    if isinstance(period_values, list):
+        for candidate in period_values:
+            tok = _canonicalize_period_token(freq, candidate)
+            if tok:
+                target_period = tok
+                break
+    if not target_period:
+        target_period = str((observations.get("latest_available") or {}).get(freq) or "").strip()
+    if not target_period:
+        return None
+
+    record = None
+    for r in records:
+        if not isinstance(r, dict):
+            continue
+        if _canonicalize_period_token(freq, r.get("period")) == target_period:
+            record = r
+            break
+    if record is None:
+        return None
+
+    value = _safe_float(record.get("value"))
+    if value is None:
+        return None
+
+    value_text = _format_level_value(value)
+    unit = _unit_from_cuadro_name(observations.get("cuadro_name") or "")
+    period_label = target_period if freq == "A" else _natural_period_label(target_period, freq)
+
+    def _norm(v: Any) -> str:
+        txt = unicodedata.normalize("NFKD", str(v or "").lower())
+        return "".join(ch for ch in txt if not unicodedata.combining(ch)).strip()
+
+    short_title = str(series.get("short_title") or "").strip()
+    st_norm = _norm(short_title)
+    cuadro_norm = _norm(observations.get("cuadro_name"))
+
+    # Calificador de precios / per cápita
+    is_per_capita = "per capita" in st_norm or "per capita" in cuadro_norm
+    is_current_prices = (
+        "precios corrientes" in cuadro_norm
+        or "a precios corrientes" in cuadro_norm
+        or "corriente" in cuadro_norm
+    )
+
+    qualifier = ""
+    if is_per_capita:
+        qualifier = ""  # el short_title ya dice "per cápita"
+    elif is_current_prices:
+        qualifier = " a precios corrientes"
+
+    # Sujeto en minúscula con plural "nominales" cuando la pregunta lo usa
+    subject = short_title
+    q_norm = _norm(question)
+
+    def _lower_first(s: str) -> str:
+        # Solo baja la inicial si la palabra NO es una sigla en mayúsculas (PIB, IMACEC).
+        if not s:
+            return s
+        first_word = s.split(" ", 1)[0]
+        if first_word.isupper() and len(first_word) > 1:
+            return s
+        return s[0].lower() + s[1:]
+
+    if "nominal" in q_norm and not is_per_capita:
+        subject_lower = _lower_first(short_title)
+        if any(subject_lower.startswith(p) for p in ("exportaciones", "importaciones")):
+            parts = subject_lower.split(" de ", 1)
+            if len(parts) == 2:
+                subject_rendered = f"las {parts[0]} nominales de {parts[1]}"
+            else:
+                subject_rendered = f"las {subject_lower} nominales"
+        else:
+            subject_rendered = f"el {subject_lower} nominal"
+    else:
+        subject_lower = _lower_first(short_title)
+        if subject_lower.startswith(("exportaciones", "importaciones")):
+            subject_rendered = f"las {subject_lower}"
+        else:
+            subject_rendered = f"el {subject_lower}"
+
+    verb = "alcanzó" if subject_rendered.startswith("el ") else "alcanzaron"
+    intro_prefix = "En" if freq == "A" else "En el"
+
+    first_line = (
+        f"{intro_prefix} {period_label}, {subject_rendered} {verb} {value_text}"
+        + (f" {unit}" if unit else "")
+        + f"{qualifier}."
+    )
+
+    # Sugerencia de profundización (sin mencionar variación)
+    suggestion = ""
+    if st_norm.startswith("exportaciones de bienes y servicios"):
+        period_ref = "el mismo trimestre" if freq == "T" else ("ese mismo año" if freq == "A" else "el mismo período")
+        suggestion = (
+            f"Puedes profundizar revisando el desglose entre exportaciones de bienes y de servicios en {period_ref}."
+        )
+    elif st_norm.startswith("importaciones de bienes y servicios"):
+        period_ref = "el mismo trimestre" if freq == "T" else ("ese mismo año" if freq == "A" else "el mismo período")
+        suggestion = (
+            f"Puedes profundizar revisando el desglose entre importaciones de bienes y de servicios en {period_ref}."
+        )
+    elif is_per_capita:
+        suggestion = "Puedes profundizar revisando la evolución histórica del indicador."
+
+    text = first_line + ("\n\n" + suggestion if suggestion else "")
+
+    logger.info(
+        "[DATA_RESPONSE] level_precompute series_id=%s freq=%s period=%s value=%s",
+        series.get("series_id"), freq, target_period, value_text,
+    )
+
+    ctx = {
+        "series_id": str(series.get("series_id") or ""),
+        "frequency": freq,
+    }
+    return text, ctx
+
+
+def _build_level_prefetch_messages(
+    question: str,
+    entities_ctx: Dict[str, Any],
+    observations: Dict[str, Any],
+) -> Optional[Dict[str, Any]]:
+    """Construye un par assistant(tool_calls) + tool(content) sintético con el
+    resultado de get_series_data pre-calculado para consultas de NIVEL.
+
+    Devuelve dict con:
+      - assistant_msg: dict para messages.append
+      - tool_msg:      dict para messages.append
+      - series_ctx:    {series_id, frequency}
+      - fetched:       dict con los records (para tracking CSV)
+    Retorna None si no corresponde inyectar prefetch.
+    """
+    if not _is_level_only_query(question, entities_ctx):
+        return None
+    series = _pick_level_target_series(question, entities_ctx, observations)
+    if not series:
+        return None
+    freq = _resolve_requested_frequency(entities_ctx, observations)
+    if not freq:
+        return None
+    block = (series.get("data") or {}).get(freq) or {}
+    records = block.get("records") or []
+    if not records:
+        return None
+
+    # Si la pregunta menciona "último/última", preferir el último publicado
+    # por sobre period_ent (que suele resolver al período calendario actual,
+    # aún no publicado).
+    q_norm = unicodedata.normalize("NFKD", str(question or "").lower())
+    q_norm = "".join(c for c in q_norm if not unicodedata.combining(c))
+    prefer_latest = bool(re.search(r"\bultim[oa]s?\b", q_norm))
+
+    target_period = ""
+    if not prefer_latest:
+        period_values = entities_ctx.get("period_ent")
+        if isinstance(period_values, list):
+            for candidate in period_values:
+                tok = _canonicalize_period_token(freq, candidate)
+                if tok:
+                    target_period = tok
+                    break
+    if not target_period:
+        target_period = str((observations.get("latest_available") or {}).get(freq) or "").strip()
+    if not target_period:
+        return None
+
+    # Construir payload filtrado (sin claves variacionales)
+    strip_keys = (
+        "pct", "yoy_pct", "delta_abs", "yoy_delta_abs",
+        "acceleration_pct", "acceleration_yoy",
+    )
+
+    target_record: Optional[Dict[str, Any]] = None
+    clean_records: List[Dict[str, Any]] = []
+    last_clean: Optional[Dict[str, Any]] = None
+    for r in records:
+        if not isinstance(r, dict):
+            continue
+        clean = {k: v for k, v in r.items() if k not in strip_keys}
+        display = clean.get("display")
+        if isinstance(display, dict):
+            clean["display"] = {k: v for k, v in display.items() if k not in strip_keys}
+        clean_records.append(clean)
+        last_clean = clean
+        if _canonicalize_period_token(freq, r.get("period")) == target_period:
+            target_record = clean
+
+    # Fallback: si el período pedido (p.ej. trimestre calendario actual aún
+    # no publicado, o futuro) no matchea ningún record, usar el último record
+    # disponible. Esto asegura que "último trimestre" devuelva Q4 publicado
+    # aunque el classifier resuelva period_ent al trimestre en curso.
+    if target_record is None and last_clean is not None:
+        fallback_period = (
+            _canonicalize_period_token(freq, last_clean.get("period"))
+            or str(last_clean.get("period") or "")
+        )
+        logger.info(
+            "[DATA_RESPONSE] level_prefetch period_fallback requested=%s -> using=%s",
+            target_period, fallback_period,
+        )
+        target_record = last_clean
+        target_period = fallback_period
+
+    if target_record is None:
+        return None
+
+    series_id = str(series.get("series_id") or "")
+    short_title = str(series.get("short_title") or "")
+    unit = _unit_from_cuadro_name(observations.get("cuadro_name") or "")
+
+    payload = {
+        "series_id": series_id,
+        "short_title": short_title,
+        "frequency": freq,
+        "unit": unit,
+        "period_requested": target_period,
+        "latest_record": target_record,
+        "records": clean_records[-8:],  # cola suficiente para contexto
+        "_level_only_prefetch": True,
+    }
+
+    call_id = f"call_level_prefetch_{series_id or 'series'}"
+    args = {"series_id": series_id, "frequency": freq}
+    assistant_msg = {
+        "role": "assistant",
+        "content": None,
+        "tool_calls": [
+            {
+                "id": call_id,
+                "type": "function",
+                "function": {
+                    "name": "get_series_data",
+                    "arguments": json.dumps(args, ensure_ascii=False),
+                },
+            }
+        ],
+    }
+    tool_msg = {
+        "role": "tool",
+        "tool_call_id": call_id,
+        "content": json.dumps(payload, ensure_ascii=False),
+    }
+
+    logger.info(
+        "[DATA_RESPONSE] level_prefetch_injected series_id=%s freq=%s period=%s",
+        series_id, freq, target_period,
+    )
+
+    return {
+        "assistant_msg": assistant_msg,
+        "tool_msg": tool_msg,
+        "series_ctx": {"series_id": series_id, "frequency": freq},
+        "fetched": payload,
+    }
+
+
 def _build_original_series_force_instruction(
     question: str,
     entities_ctx: Dict[str, Any],
@@ -1834,13 +2266,47 @@ def _build_original_series_force_instruction(
         "precios corrientes" in text_norm
         or "precio corriente" in text_norm
         or "pib en pesos" in text_norm
-        or "pib nominal" in text_norm
+        # 'nominal' / 'nominales' aplica a cualquier indicador, no solo PIB
+        # (ej: 'exportaciones nominales', 'importaciones nominales', 'consumo nominal').
+        or bool(re.search(r"\bnominal(?:es)?\b", text_norm))
         or "a cuanto asciende el pib" in text_norm
         or price_ent == "co"
     )
 
-    if not (is_per_capita or is_current_prices):
+    # Solicitud genérica de NIVEL / MONTO ABSOLUTO para cualquier indicador
+    # (exportaciones, importaciones, inversión, consumo, etc.). Exige "nivel de/del X"
+    # para evitar falsos positivos con "a nivel regional/país". Excluye "nivel de
+    # variación/crecimiento/caída/aceleración" donde el usuario habla de la variación.
+    _level_request_re = re.compile(
+        r"\bnivel(?:es)?\s+de[l]?\s+(?!variaci|crecimient|ca[ií]da|aceleraci|alza|subid|bajad)\w+|"
+        r"\ba\s+cu[aá]nto\s+asciend|"
+        r"\bvalor\s+en\s+pesos\b|"
+        r"\bvalor\s+en\s+d[oó]lares\b|"
+        r"\bcifra\s+en\s+pesos\b",
+        re.IGNORECASE,
+    )
+    is_level_request = bool(_level_request_re.search(text_norm))
+
+    if not (is_per_capita or is_current_prices or is_level_request):
         return None
+
+    if is_level_request and not (is_per_capita or is_current_prices):
+        return (
+            "REGLA DE MAXIMA PRIORIDAD — SERIE ORIGINAL OBLIGATORIA (NIVEL): el usuario pidió "
+            "explícitamente el NIVEL / MONTO de la serie. La cifra principal debe salir SIEMPRE "
+            "del campo value (serie original) con su unidad correspondiente (p. ej. 'millones de "
+            "dólares', 'miles de millones de pesos', 'miles de millones de pesos encadenados'). "
+            "PROHIBIDO usar yoy_pct o pct como dato principal, salvo que el usuario pida "
+            "explícitamente una variación. "
+            "OBLIGATORIO: llama get_series_data y usa value del período solicitado (o del último "
+            "disponible). "
+            "OBLIGATORIO: entrega una sola cifra principal en el bloque DATOS. "
+            "OBLIGATORIO: NO redactes la oración en términos de variación anual; redáctala como "
+            "nivel absoluto del período (ej: 'En el 4to trimestre de 2025, las exportaciones "
+            "alcanzaron un nivel de X millones de dólares'). "
+            "Si respondes con yoy_pct/pct en estos casos, la respuesta es inválida y debes "
+            "rehacerla con value."
+        )
 
     return (
         "REGLA DE MAXIMA PRIORIDAD — SERIE ORIGINAL OBLIGATORIA: para PIB per cápita o PIB a precios corrientes, "
@@ -2538,6 +3004,7 @@ def _build_filtered_source_url(
         "precios corrientes" in question_text
         or "pib en pesos" in question_text
         or "a cuanto asciende el pib" in question_text
+        or bool(re.search(r"\bnominal(?:es)?\b", question_text))
     )
 
     if calc_mode_for_url == "original" and (is_per_capita_query or is_current_prices_query):
@@ -2680,7 +3147,10 @@ def stream_data_response(
         calc_mode_ctx = str((observations.get("classification") or {}).get("calc_mode") or "").strip().lower()
 
     model = os.getenv("OPENAI_MODEL", "gpt-4.1")
-    temperature = float(os.getenv("DATA_RESPONSE_TEMPERATURE", "0.35"))
+    # Temperatura baja para maximizar reproducibilidad en respuestas factúales.
+    # Con temperatura > 0 el modelo a veces violaba reglas especiales (ej. nivel vs yoy_pct)
+    # entre ejecuciones idénticas del mismo prompt.
+    temperature = float(os.getenv("DATA_RESPONSE_TEMPERATURE", "0.0"))
     max_tool_loops = int(os.getenv("MAX_TOOL_LOOPS", "16"))
 
     try:
@@ -2810,16 +3280,35 @@ def stream_data_response(
     selected_series_ctx: Optional[Dict[str, str]] = None
     tool_calls_elapsed_ms = 0.0
 
+    # --- Prefetch determinista para consultas de NIVEL ---
+    # Si la pregunta pide NIVEL (precios corrientes / nominal / per cápita) y
+    # podemos resolver serie + período desde observations, inyectamos un par
+    # assistant(tool_calls) + tool(content) sintético con el payload ya filtrado
+    # (sin yoy_pct/pct). La primera llamada al LLM se hace con tool_choice="none"
+    # para obligarlo a redactar con ese payload sin pedir más tool calls.
+    level_prefetch = _build_level_prefetch_messages(question, entities_ctx, observations)
+    first_call_tool_choice: Any = None
+    if level_prefetch is not None:
+        messages.append(level_prefetch["assistant_msg"])
+        messages.append(level_prefetch["tool_msg"])
+        first_call_tool_choice = "none"
+        # Registrar para CSV / URL filtrada
+        fetched_series.append(level_prefetch["fetched"])
+        selected_series_ctx = level_prefetch["series_ctx"]
+
     try:
-        for _ in range(max_tool_loops):
+        for iteration_idx in range(max_tool_loops):
             loop_t0 = time.perf_counter()
-            stream = client.chat.completions.create(
-                model=model,
-                messages=messages,
-                tools=TOOLS,
-                temperature=temperature,
-                stream=True,
-            )
+            call_kwargs: Dict[str, Any] = {
+                "model": model,
+                "messages": messages,
+                "tools": TOOLS,
+                "temperature": temperature,
+                "stream": True,
+            }
+            if iteration_idx == 0 and first_call_tool_choice is not None:
+                call_kwargs["tool_choice"] = first_call_tool_choice
+            stream = client.chat.completions.create(**call_kwargs)
 
             # Acumular respuesta streameada
             tool_calls_by_idx: Dict[int, Dict[str, str]] = {}

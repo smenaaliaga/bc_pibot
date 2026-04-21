@@ -382,6 +382,22 @@ def normalize_ner_entities(
     norm_inv, fail_inv = normalize_investment(investment_raw)
     norm_price = normalize_price(price_raw)
 
+    # Fallback: el NER a veces absorbe "nominal(es)" o "precios corrientes" dentro
+    # de otra entidad (ej: slot 'investment' = "exportaciones nominales"), dejando
+    # entities.price vacío. Si price quedó None pero el texto original contiene
+    # señales explícitas, inferimos price='co' (valores corrientes / nominales).
+    if norm_price is None:
+        _text_blob = " ".join(
+            s for s in (
+                ner_output.get("text") or "",
+                investment_raw or "",
+                activity_raw or "",
+                indicator_raw or "",
+            ) if s
+        ).lower()
+        if re.search(r"\bnominal(?:es|mente)?\b|\bprecios?\s+corrientes?\b", _text_blob):
+            norm_price = "co"
+
     # Indicador faltante + contexto regional/inversión → PIB.
     if not indicator_raw and (norm_region is not None or norm_inv is not None):
         norm_ind = "pib"

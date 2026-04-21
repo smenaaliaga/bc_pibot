@@ -68,5 +68,15 @@
       "preferred_filename": "imacec_chunks.json",
       "link": "https://si3.bcentral.cl/estadisticas/Principal1/Metodologias/CCNN/imacec/Imacec.pdf",
       "docname": "Índice Mensual de Actividad Económica - IMACEC"
+    },
+    {
+      "id": "calendario_publicaciones_2026",
+      "path": "calendario_publicaciones_2026.txt",
+      "topic": "metodologia",
+      "version": "2026.04",
+      "tags": ["calendario", "publicaciones", "imacec", "pib"],
+      "preferred_filename": "calendario_2026_chunks.json",
+      "link": "https://www.bcentral.cl/calendario-estadistico?p_p_id=bcentral_calendario_global_CalendarioGlobalPortlet_INSTANCE_gvZr3D7oZBKa&p_p_lifecycle=0&p_p_state=normal&p_p_mode=view&categoria=Cuentas%20Nacionales&nowYear=2026",
+      "docname": "Calendario de Publicaciones 2026"
     }  ]
 }

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any, Dict, List, Optional, Tuple
 
 import uuid
@@ -18,6 +19,26 @@ from ..state import (
 from ..session import extract_latest_entity_from_history, load_previous_agent_state
 
 logger = logging.getLogger(__name__)
+
+# Deterministic override: questions about publication calendar / dates must be
+# routed to the RAG branch regardless of the ML classifier's prediction. The
+# classifier has been observed to oscillate between `value` and `methodology`
+# for semantically equivalent prompts (e.g. "cuándo se publica el próximo PIB"
+# vs "cuándo se publica el próximo IMACEC").
+_CALENDAR_INTENT_RE = re.compile(
+    r"\bcalendario\b|"
+    r"cu[aá]ndo\s+se\s+publica|"
+    r"cu[aá]ndo\s+sale|"
+    r"cu[aá]ndo\s+publican|"
+    r"pr[oó]xim[oa]\s+publicaci[oó]n|"
+    r"fecha.*publicaci[oó]n|"
+    r"pr[oó]xim[oa]\s+(imacec|pib|cuentas\s+nacionales)",
+    re.IGNORECASE,
+)
+
+
+def _is_calendar_intent(question: str) -> bool:
+    return bool(question) and bool(_CALENDAR_INTENT_RE.search(question))
 
 _PIB_ACTIVITY_HINTS = {
     "agropecuario",
@@ -267,6 +288,22 @@ def make_intent_node(memory_adapter: Any, intent_store: Any = None, predict_with
 
         context_label = str(context_label or "").strip().lower()
         normalized_intent = _normalize_intent_label(intent_label)
+
+        # Deterministic override for calendar/publication-date questions.
+        # The ML classifier is inconsistent across indicators for the same
+        # semantic intent, so we force methodology routing here.
+        if _is_calendar_intent(question):
+            if normalized_intent != "method":
+                logger.info(
+                    "[INTENT_NODE] Calendar override: forcing intent 'method' (was=%s) for question=%r",
+                    normalized_intent,
+                    question[:120],
+                )
+            normalized_intent = "method"
+            # Calendar questions are always self-contained; don't let the
+            # follow-up branch swallow them.
+            if context_label != "standalone":
+                context_label = "standalone"
 
         payload_root = _predict_payload_root(predict_raw)
         current_intents = _as_dict(payload_root.get("intents"))

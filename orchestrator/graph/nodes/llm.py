@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import logging
 from typing import List, Optional
 
@@ -13,8 +14,82 @@ from ..state import (
     _emit_stream_chunk,
     _ensure_text,
 )
+from ...llm.llm_adapter import (
+    CALENDAR_URL,
+    CALENDAR_LINK_MD,
+    CALENDAR_LINK_LABEL,
+    _CALENDAR_KEYWORDS,
+)
 
 logger = logging.getLogger(__name__)
+
+_OLD_CALENDAR_URL = "https://www.bcentral.cl/web/banco-central/areas/estadisticas/calendario-de-publicaciones"
+
+# Regex to detect the raw CALENDAR_URL NOT already inside a markdown link
+_RAW_URL_RE = re.compile(
+    r"(?<!\]\()(?<!\()"           # not preceded by '](' or '('
+    + re.escape(CALENDAR_URL)
+    + r"(?!\))"                    # not followed by ')'
+)
+
+
+def _fix_calendar_url(text: str) -> str:
+    """Replace hallucinated / raw calendar URLs with a clean markdown link."""
+    # 1. Replace old hallucinated URL (inside markdown links or raw)
+    if _OLD_CALENDAR_URL in text:
+        text = text.replace(_OLD_CALENDAR_URL, CALENDAR_URL)
+
+    # 2. Replace any standalone raw CALENDAR_URL with markdown link
+    text = _RAW_URL_RE.sub(CALENDAR_LINK_MD, text)
+    return text
+
+
+# Regex for a markdown link whose text contains "calendario"
+_CALENDAR_LINK_RE = re.compile(
+    r"-?\s*\[([^\]]*calendario[^\]]*)\]\([^\)]+\)\s*\n?",
+    re.IGNORECASE,
+)
+
+# Matches a sentence or list bullet in the body that references the calendar link.
+_BODY_CALENDAR_SENTENCE_RE = re.compile(
+    r"(?:(?<=[.!?\n])|^)[^.!?\n]*\[[^\]]*calendario[^\]]*\]\([^)]+\)[^.!?\n]*[.!?]?\s*",
+    re.IGNORECASE,
+)
+
+_FOOTER_MARKER = "para mayor información"
+
+
+def _strip_calendar_from_body(text: str) -> str:
+    """Remove any sentence/bullet in the body that references the calendar link.
+
+    The calendar reference is always surfaced via the methodology footer instead,
+    so we avoid showing it twice.
+    """
+    marker_pos = text.lower().find(_FOOTER_MARKER)
+    if marker_pos < 0:
+        body, footer = text, ""
+    else:
+        body, footer = text[:marker_pos], text[marker_pos:]
+    cleaned_body = _BODY_CALENDAR_SENTENCE_RE.sub("", body)
+    cleaned_body = re.sub(r"\n{3,}", "\n\n", cleaned_body)
+    return cleaned_body + footer
+
+
+def _dedup_calendar_refs(text: str) -> str:
+    """If the calendar link appears both in the body and the footer, remove it from the footer."""
+    marker_pos = text.lower().find(_FOOTER_MARKER)
+    if marker_pos < 0:
+        return text
+    body = text[:marker_pos]
+    footer = text[marker_pos:]
+
+    # Only deduplicate if body already contains a calendar link
+    if not _CALENDAR_LINK_RE.search(body):
+        return text
+
+    # Remove calendar-link lines from footer only
+    cleaned_footer = _CALENDAR_LINK_RE.sub("", footer)
+    return body + cleaned_footer
 
 
 def _is_generation_error_output(text: str) -> bool:
@@ -39,15 +114,30 @@ def _has_existing_methodology_footer(output: str, footer: str) -> bool:
     return False
 
 
-def _build_methodology_footer(adapter, max_sources: int = 2) -> str:
+def _build_methodology_footer(adapter, question: str = "", max_sources: int = 2) -> str:
     if adapter is None or not hasattr(adapter, "get_last_rag_sources"):
-        return ""
-    try:
-        sources = adapter.get_last_rag_sources()  # type: ignore[attr-defined]
-    except Exception:
-        return ""
+        sources: List = []
+    else:
+        try:
+            sources = adapter.get_last_rag_sources()  # type: ignore[attr-defined]
+        except Exception:
+            sources = []
     if not isinstance(sources, list):
-        return ""
+        sources = []
+
+    # If the user asked about the calendar, the canonical calendar reference
+    # must ALWAYS be the first entry in the footer. We strip any retrieved
+    # duplicate (regardless of position) and prepend the canonical one, so it
+    # is never truncated by `max_sources`.
+    if question and _CALENDAR_KEYWORDS.search(question):
+        sources = [
+            s for s in sources
+            if not (
+                isinstance(s, dict)
+                and CALENDAR_URL in _ensure_text(s.get("link"))
+            )
+        ]
+        sources = [{"docname": CALENDAR_LINK_LABEL, "link": CALENDAR_URL}] + list(sources)
 
     lines: List[str] = []
     seen: set[tuple[str, str]] = set()
@@ -138,8 +228,12 @@ def make_rag_node(llm_adapter):
         )
 
         result = _run_llm(state, llm_adapter, writer=writer)
-        footer = _build_methodology_footer(llm_adapter, max_sources=2)
         current_output = _ensure_text(result.get("output"))
+        current_output = _fix_calendar_url(current_output)
+        current_output = _strip_calendar_from_body(current_output)
+        current_output = _dedup_calendar_refs(current_output)
+        result["output"] = current_output
+        footer = _build_methodology_footer(llm_adapter, question=question, max_sources=2)
         if footer and not _is_generation_error_output(current_output) and not _has_existing_methodology_footer(current_output, footer):
             result["output"] = f"{current_output}{footer}"
             _emit_stream_chunk(footer, writer)
@@ -155,7 +249,12 @@ def make_rag_node(llm_adapter):
 
 def make_fallback_node(llm_adapter):
     def fallback_node(state: AgentState, *, writer: Optional[StreamWriter] = None):
-        return _run_llm(state, llm_adapter, writer=writer)
+        result = _run_llm(state, llm_adapter, writer=writer)
+        current_output = _ensure_text(result.get("output"))
+        current_output = _strip_calendar_from_body(current_output)
+        current_output = _fix_calendar_url(current_output)
+        result["output"] = _dedup_calendar_refs(current_output)
+        return result
 
     return fallback_node
 
