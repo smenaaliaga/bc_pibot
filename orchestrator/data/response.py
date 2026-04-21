@@ -1228,15 +1228,19 @@ def _build_metric_priority_instruction(calc_mode: str) -> Optional[str]:
             "REGLA ESTRICTA DE REDACCION PARA PARTICIPACIONES (% SOBRE EL PIB):\n"
             "1. En el PRIMER PARRAFO comienza mencionando el PERIODO analizado "
             "(ej: 'En 2024, ...').\n"
-            "2. Los datos representan la VARIACIÓN INTERANUAL de la participación "
-            "porcentual de cada componente sobre el PIB total. "
-            "La métrica principal es 'yoy_pct'.\n"
-            "3. Reporta SIEMPRE 'yoy_pct' como dato principal. "
-            "NO uses 'value' (que es el nivel de participación en % del PIB).\n"
-            "4. Redondea a 1 decimal y usa formato con coma decimal: ej. '**1,8**'.\n"
-            "5. Si el usuario pregunta por un componente específico, destaca ese componente "
+            "2. Los datos representan el NIVEL DE PARTICIPACIÓN del componente "
+            "sobre el PIB total. La métrica principal es 'value' "
+            "(porcentaje del PIB, ej: 24,1%).\n"
+            "3. Reporta SIEMPRE 'value' como dato principal usando redacción "
+            "de nivel: 'representó un **X,X%** del PIB', 'pesó un **X,X%** del PIB' "
+            "o 'su participación fue **X,X%** del PIB'. PROHIBIDO usar 'variación', "
+            "'variación de X puntos porcentuales' o 'pp' para la métrica principal.\n"
+            "4. Redondea a 1 decimal y usa formato con coma decimal: ej. '**24,1%**'.\n"
+            "5. NO uses 'yoy_pct' ni 'pct' como métrica principal salvo que el "
+            "usuario pida explícitamente 'variación', 'cuanto varió', 'cuanto subió/bajó'.\n"
+            "6. Si el usuario pregunta por un componente específico, destaca ese componente "
             "y compáralo con otros componentes relevantes.\n"
-            "6. Respuesta objetiva: describe cifras y composición, sin juicios de valor."
+            "7. Respuesta objetiva: describe cifras y composición, sin juicios de valor."
         )
     # Para "original", "yoy" y cualquier otro: siempre yoy_pct por defecto
     return (
@@ -2089,6 +2093,43 @@ _VARIATION_REQUEST_RE = re.compile(
 )
 
 
+def _is_participation_cuadro(observations: Dict[str, Any]) -> bool:
+    """True si el cuadro corresponde a participación/porcentaje sobre el PIB."""
+    if not isinstance(observations, dict):
+        return False
+    calc_mode_obs = str(
+        (observations.get("classification") or {}).get("calc_mode") or ""
+    ).strip().lower()
+    if calc_mode_obs == "share":
+        return True
+    name_norm = unicodedata.normalize(
+        "NFKD", str(observations.get("cuadro_name") or "").lower()
+    )
+    name_norm = "".join(c for c in name_norm if not unicodedata.combining(c))
+    return (
+        "porcentaje sobre el pib" in name_norm
+        or "participacion" in name_norm
+    )
+
+
+def _is_participation_level_query(
+    question: str, observations: Dict[str, Any]
+) -> bool:
+    """True si la consulta es de nivel de participación sobre el PIB.
+
+    Aplica cuando el cuadro es de participación/share y la pregunta NO pide
+    variación explícita. Ejemplos: 'cuanto pesa la inversion', 'que % del
+    PIB son las exportaciones', 'cual es la participacion del consumo'.
+    """
+    if not _is_participation_cuadro(observations):
+        return False
+    q_norm = unicodedata.normalize("NFKD", str(question or "").lower())
+    q_norm = "".join(c for c in q_norm if not unicodedata.combining(c))
+    if _VARIATION_REQUEST_RE.search(q_norm):
+        return False
+    return True
+
+
 def _is_level_only_query(question: str, entities_ctx: Dict[str, Any]) -> bool:
     """True si el usuario pregunta por el NIVEL (no variación) de una serie."""
     text = str(question or "")
@@ -2578,19 +2619,18 @@ def _build_share_prefetch_messages(
 ) -> Optional[Dict[str, Any]]:
     """Prefetch determinista para cuadros de participación/share.
 
-    El cuadro BDE 'Participación de los componentes del gasto en el PIB
-    (porcentaje sobre el PIB)' con Cálculo 'Serie original' muestra el
-    campo ``pct`` (variación interanual de la participación), NO el share
-    absoluto (``value``). Este helper inyecta el payload con ``pct`` como
-    valor principal para que el LLM redacte el número que coincide con el
-    cuadro de referencia.
+    Para preguntas de nivel ("cuanto pesa X en el PIB", "que porcentaje del
+    PIB son las exportaciones") se inyecta el campo ``value`` (nivel de
+    participación como % del PIB, ej: 24,1). El cuadro BDE con Cálculo
+    'Serie original' (sin YTYPCT) coincide con ese nivel.
 
     Retorna None si el cuadro no es share, la pregunta pide variación
     explícita, o no se puede identificar el componente (en ese caso el LLM
     resuelve con las tools).
     """
-    # Si piden variación explícita, no aplicamos: pct ya ES una variación
-    # del share; reportarlo como "variación del consumo" sería equívoco.
+    # Si piden variación explícita, dejar que el LLM resuelva con las tools:
+    # el share cuadro también tiene pct/yoy_pct para la variación de la
+    # participación. Evita redactar "pesa X%" cuando preguntaron por cambio.
     q_norm = unicodedata.normalize("NFKD", str(question or "").lower())
     q_norm = "".join(c for c in q_norm if not unicodedata.combining(c))
     if _VARIATION_REQUEST_RE.search(q_norm):
@@ -2639,17 +2679,17 @@ def _build_share_prefetch_messages(
     if not target_period:
         return None
 
-    # Construir records donde value=pct (descartar el primer record sin pct).
+    # Construir records donde value=nivel de participación (% del PIB).
     clean_records: List[Dict[str, Any]] = []
     target_record: Optional[Dict[str, Any]] = None
     last_clean: Optional[Dict[str, Any]] = None
     for r in records:
         if not isinstance(r, dict):
             continue
-        pct = r.get("pct")
-        if pct is None:
+        level = r.get("value")
+        if level is None:
             continue
-        clean = {"period": r.get("period"), "value": pct}
+        clean = {"period": r.get("period"), "value": level}
         clean_records.append(clean)
         last_clean = clean
         if _canonicalize_period_token(freq, r.get("period")) == target_period:
@@ -2677,13 +2717,13 @@ def _build_share_prefetch_messages(
         "series_id": series_id,
         "short_title": short_title,
         "frequency": freq,
-        "unit": "puntos porcentuales",
+        "unit": "porcentaje del PIB",
         "metric_description": (
-            f"Variación interanual de la participación de '{short_title}' "
-            "en el PIB, expresada en puntos porcentuales. Corresponde al "
-            "valor que muestra el cuadro BDE 'Participación de los "
+            f"Participación de '{short_title}' sobre el PIB, "
+            "expresada como porcentaje del PIB total (nivel). Corresponde "
+            "al valor que muestra el cuadro BDE 'Participación de los "
             "componentes del gasto en el PIB (porcentaje sobre el PIB)' "
-            "con Cálculo 'Serie original'."
+            "con Cálculo 'Serie original' (sin variación YoY)."
         ),
         "period_requested": target_period,
         "latest_record": target_record,
@@ -2712,7 +2752,7 @@ def _build_share_prefetch_messages(
         "content": json.dumps(payload, ensure_ascii=False),
     }
     logger.info(
-        "[DATA_RESPONSE] share_prefetch_injected series_id=%s freq=%s period=%s pct=%s",
+        "[DATA_RESPONSE] share_prefetch_injected series_id=%s freq=%s period=%s value=%s",
         series_id, freq, target_period, target_record.get("value"),
     )
     return {
@@ -3493,6 +3533,16 @@ def _build_filtered_source_url(
     if calc_mode_for_url == "original" and (is_per_capita_query or is_current_prices_query):
         calc_mode_for_url = "none"
 
+    # En cuadros de participación (porcentaje sobre el PIB), el "Cálculo"
+    # por defecto (YTYPCT) aplica una variación YoY sobre el ratio, lo que
+    # transforma 24,1% en 1,8 pp. Para consultas de NIVEL ('cuanto pesa',
+    # 'que % del PIB') la URL debe abrir la vista 'Serie original' (NONE).
+    if (
+        calc_mode_for_url == "original"
+        and _is_participation_level_query(question_text, observations)
+    ):
+        calc_mode_for_url = "none"
+
     frequency_for_url = {
         "M": "m",
         "T": "q",
@@ -3661,7 +3711,14 @@ def stream_data_response(
         question=question,
         entities_ctx=entities_ctx,
     )
-    strict_priority_instruction = _build_metric_priority_instruction(calc_mode_ctx)
+    # Override: en cuadros de participación (porcentaje sobre el PIB), si la
+    # pregunta NO pide variación explícita, tratar como calc_mode='share'
+    # aunque el classifier lo haya rotulado 'original'. El usuario pregunta
+    # por el NIVEL (ej: 'cuanto pesa el consumo', '% del PIB').
+    effective_calc_mode = calc_mode_ctx
+    if _is_participation_level_query(question, observations):
+        effective_calc_mode = "share"
+    strict_priority_instruction = _build_metric_priority_instruction(effective_calc_mode)
     if strict_priority_instruction and not is_specific_contribution_query:
         messages.append({"role": "system", "content": strict_priority_instruction})
     seasonality_strict_instruction = _build_seasonality_strict_instruction(
