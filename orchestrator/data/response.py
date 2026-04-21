@@ -1504,13 +1504,19 @@ def _build_contribution_activity_focus_instruction(
     latest_t = str((observations.get("latest_available") or {}).get("T") or "").strip()
     latest_label = _natural_period_label(latest_t, "T") if latest_t else "el último trimestre disponible"
 
+    try:
+        top_n = max(1, int(os.getenv("RULE_CONTRIBUTION_TOP_N", "3")))
+    except ValueError:
+        top_n = 3
+
     return (
         "REGLA ESTRICTA PARA PREGUNTAS DE ACTIVIDAD-CONTRIBUCIÓN: "
         "esta pregunta exige DESGLOSE POR ACTIVIDADES, no variación agregada del PIB. "
         f"Si el período mensual pedido no existe para PIB, usa directamente {latest_label}. "
         "NO escribas 'enero no publicado' para este tipo de pregunta; ancla la respuesta al trimestre disponible. "
         "OBLIGATORIO: llama rank_series (metric='value') para ese trimestre y construye el bloque DATOS "
-        "con al menos 5 actividades (si existen) en formato de lista, cada una con su contribución en %. "
+        f"con EXACTAMENTE {top_n} actividades por grupo (si existen) en formato de lista, cada una con su contribución en %. "
+        f"PROHIBIDO listar más de {top_n} actividades en un mismo grupo; no uses 'entre otras' ni 'además'. "
         "Para valores negativos, usa verbo negativo ('disminuyó') y valor absoluto sin signo. "
         "PROHIBIDO resumir como 'contribuciones negativas de varias actividades'. "
         "PROHIBIDO usar la frase 'a la baja'. En contribuciones negativas usa solo 'disminuyó' o 'disminución'. "
@@ -1726,6 +1732,19 @@ def _build_contribution_ranking_polarity_instruction(
         "absoluto descendente, pero la pertenencia al grupo la determina el SIGNO, no la magnitud."
     )
 
+    try:
+        top_n = max(1, int(os.getenv("RULE_CONTRIBUTION_TOP_N", "3")))
+    except ValueError:
+        top_n = 3
+    top_n_rule = (
+        f"REGLA DE TOP-{top_n} POR GRUPO (OBLIGATORIA): lista EXACTAMENTE {top_n} actividades en "
+        f"el grupo principal (las {top_n} de mayor valor absoluto con el signo correspondiente). "
+        f"En el grupo de rebate/contrario, lista EXACTAMENTE {top_n} actividades si existen; si el "
+        f"cuadro tiene menos de {top_n} con ese signo, usa todas las disponibles. "
+        f"PROHIBIDO listar más de {top_n} actividades en cualquier grupo. "
+        "No uses 'entre otras', 'además', ni enumeraciones extensas."
+    )
+
     if polarity == "positive" and asks_decrease:
         order_rule = (
             "ORDEN DEL CUERPO (polaridad cruzada: pregunta sugiere caída pero el agregado es positivo). "
@@ -1737,7 +1756,7 @@ def _build_contribution_ranking_polarity_instruction(
             "ordenadas por valor absoluto descendente, en el formato obligatorio por actividad. "
             "Al final, bajo etiqueta separada 'En sentido contrario, las principales incidencias a la "
             "baja fueron...', menciona las actividades NEGATIVAS destacadas. "
-            f"{sign_purity_rule}"
+            f"{sign_purity_rule} {top_n_rule}"
         )
     elif polarity == "positive":
         order_rule = (
@@ -1751,7 +1770,7 @@ def _build_contribution_ranking_polarity_instruction(
             "como 'la que más impulsó el aumento'). "
             "Al final, bajo etiqueta separada 'En sentido contrario, las principales incidencias "
             "a la baja fueron...', menciona las principales actividades NEGATIVAS si existen. "
-            f"{sign_purity_rule}"
+            f"{sign_purity_rule} {top_n_rule}"
         )
     elif polarity == "negative" and asks_increase:
         order_rule = (
@@ -1764,7 +1783,7 @@ def _build_contribution_ranking_polarity_instruction(
             "ordenadas por valor absoluto descendente, en el formato obligatorio por actividad. "
             "Al final, bajo etiqueta separada 'En sentido contrario, aportaron al alza...', menciona "
             "las actividades POSITIVAS destacadas. "
-            f"{sign_purity_rule}"
+            f"{sign_purity_rule} {top_n_rule}"
         )
     elif polarity == "negative":
         order_rule = (
@@ -1776,7 +1795,7 @@ def _build_contribution_ranking_polarity_instruction(
             "Está PROHIBIDO incluir bajo esta etiqueta actividades con verbo 'creció'/'aumentó'. "
             "Al final, bajo etiqueta separada 'En sentido contrario, aportaron al alza...', "
             "menciona las principales actividades POSITIVAS si existen. "
-            f"{sign_purity_rule}"
+            f"{sign_purity_rule} {top_n_rule}"
         )
     else:  # neutral
         order_rule = (
@@ -1784,7 +1803,7 @@ def _build_contribution_ranking_polarity_instruction(
             "Separa explícitamente actividades positivas y negativas en dos grupos con etiquetas "
             "distintas ('aportaron al alza' vs 'incidieron a la baja'); cada grupo ordenado por "
             "valor absoluto descendente, en el formato obligatorio por actividad. "
-            f"{sign_purity_rule}"
+            f"{sign_purity_rule} {top_n_rule}"
         )
 
     return (
