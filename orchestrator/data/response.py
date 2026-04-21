@@ -3643,10 +3643,9 @@ def _build_fallback_csv_marker(
     safe_cuadro_id = re.sub(r"[^A-Za-z0-9._-]+", "_", cuadro_id).strip("_") or "cuadro"
     if is_contribution:
         filename = f"cuadro_{safe_cuadro_id}_contribuciones.csv"
-        label = "Descargar CSV de contribuciones (cuadro completo)"
     else:
         filename = f"cuadro_{safe_cuadro_id}.csv"
-        label = "Descargar CSV"
+    label = "Descargar CSV"
     return (
         "##CSV_DOWNLOAD_START\n"
         f"path={path}\n"
