@@ -2266,6 +2266,235 @@ def _build_level_prefetch_messages(
     }
 
 
+# Mapeo componente → substring de short_title para cuadros de participación.
+# Cada entrada: (tokens que pueden aparecer en la pregunta, valores válidos
+# de investment_ent, valores válidos de activity_ent, substring a buscar en
+# short_title normalizado). La primera coincidencia gana, por eso las más
+# específicas van primero (ej: "consumo hogares" antes que "consumo").
+_SHARE_COMPONENT_MAPPINGS: Tuple[Tuple[frozenset, frozenset, frozenset, str], ...] = (
+    (frozenset({"consumo de hogares", "consumo hogares", "hogares"}),
+     frozenset({"consumo_hogares", "hogares"}), frozenset(), "consumo de hogares"),
+    (frozenset({"consumo gobierno", "consumo de gobierno", "consumo publico", "gasto gobierno"}),
+     frozenset({"consumo_gobierno", "gobierno"}), frozenset(), "consumo gobierno"),
+    (frozenset({"consumo total", "consumo"}),
+     frozenset({"consumo"}), frozenset(), "consumo total"),
+    (frozenset({"formacion bruta de capital", "fbcf", "inversion"}),
+     frozenset({"inversion", "fbcf", "formacion_bruta"}), frozenset(), "formacion bruta de capital fijo"),
+    (frozenset({"construccion y otras obras", "construccion"}),
+     frozenset({"construccion"}), frozenset(), "construccion y otras obras"),
+    (frozenset({"maquinaria y equipo", "maquinaria"}),
+     frozenset({"maquinaria"}), frozenset(), "maquinaria y equipo"),
+    (frozenset({"exportacion bienes", "exportaciones bienes"}),
+     frozenset(), frozenset(), "exportacion bienes"),
+    (frozenset({"exportacion servicios", "exportaciones servicios"}),
+     frozenset(), frozenset(), "exportacion servicios"),
+    (frozenset({"exportaciones de bienes y servicios", "exportaciones", "exportacion"}),
+     frozenset({"exportacion", "exportaciones"}), frozenset(), "exportaciones de bienes y servicios"),
+    (frozenset({"importacion bienes", "importaciones bienes"}),
+     frozenset(), frozenset(), "importacion bienes"),
+    (frozenset({"importacion servicios", "importaciones servicios"}),
+     frozenset(), frozenset(), "importacion servicios"),
+    (frozenset({"importaciones de bienes y servicios", "importaciones", "importacion"}),
+     frozenset({"importacion", "importaciones"}), frozenset(), "importaciones de bienes y servicios"),
+    (frozenset({"demanda interna"}),
+     frozenset({"demanda_interna", "demanda"}), frozenset(), "demanda interna"),
+    (frozenset({"bienes durables"}), frozenset(), frozenset(), "bienes durables"),
+    (frozenset({"bienes no durables"}), frozenset(), frozenset(), "bienes no durables"),
+    (frozenset({"mineria", "cobre"}), frozenset(),
+     frozenset({"mineria"}), "mineria"),
+    (frozenset({"industria", "industrial"}), frozenset(),
+     frozenset({"industria"}), "industria"),
+    (frozenset({"agropecuario", "silvicola", "pesca"}), frozenset(),
+     frozenset({"agropecuario", "silvicola_pesca", "agropecuario_silvicola_pesca"}),
+     "agropecuario"),
+)
+
+
+def _pick_share_target_series(
+    question: str,
+    entities_ctx: Dict[str, Any],
+    observations: Dict[str, Any],
+) -> Optional[Dict[str, Any]]:
+    """Selecciona la serie componente para un cuadro de participación/share."""
+    series_list = observations.get("series") or []
+    if not series_list:
+        return None
+
+    def _norm(value: Any) -> str:
+        txt = unicodedata.normalize("NFKD", str(value or "").lower())
+        return "".join(ch for ch in txt if not unicodedata.combining(ch)).strip()
+
+    text_norm = _norm(question)
+    investment_ent = _norm(entities_ctx.get("investment_ent"))
+    activity_ent = _norm(entities_ctx.get("activity_ent"))
+
+    for q_tokens, inv_vals, act_vals, st_sub in _SHARE_COMPONENT_MAPPINGS:
+        matched = (
+            any(tok in text_norm for tok in q_tokens)
+            or (investment_ent and investment_ent in inv_vals)
+            or (activity_ent and activity_ent in act_vals)
+        )
+        if not matched:
+            continue
+        for s in series_list:
+            st_norm = _norm(s.get("short_title"))
+            if st_sub in st_norm:
+                return s
+    return None
+
+
+def _build_share_prefetch_messages(
+    question: str,
+    entities_ctx: Dict[str, Any],
+    observations: Dict[str, Any],
+) -> Optional[Dict[str, Any]]:
+    """Prefetch determinista para cuadros de participación/share.
+
+    El cuadro BDE 'Participación de los componentes del gasto en el PIB
+    (porcentaje sobre el PIB)' con Cálculo 'Serie original' muestra el
+    campo ``pct`` (variación interanual de la participación), NO el share
+    absoluto (``value``). Este helper inyecta el payload con ``pct`` como
+    valor principal para que el LLM redacte el número que coincide con el
+    cuadro de referencia.
+
+    Retorna None si el cuadro no es share, la pregunta pide variación
+    explícita, o no se puede identificar el componente (en ese caso el LLM
+    resuelve con las tools).
+    """
+    # Si piden variación explícita, no aplicamos: pct ya ES una variación
+    # del share; reportarlo como "variación del consumo" sería equívoco.
+    q_norm = unicodedata.normalize("NFKD", str(question or "").lower())
+    q_norm = "".join(c for c in q_norm if not unicodedata.combining(c))
+    if _VARIATION_REQUEST_RE.search(q_norm):
+        return None
+
+    calc_mode_obs = str(
+        (observations.get("classification") or {}).get("calc_mode") or ""
+    ).strip().lower()
+    cuadro_name_norm = unicodedata.normalize(
+        "NFKD", str(observations.get("cuadro_name") or "").lower()
+    )
+    cuadro_name_norm = "".join(
+        c for c in cuadro_name_norm if not unicodedata.combining(c)
+    )
+    is_share = (
+        calc_mode_obs == "share"
+        or "porcentaje sobre el pib" in cuadro_name_norm
+        or "participacion" in cuadro_name_norm
+    )
+    if not is_share:
+        return None
+
+    series = _pick_share_target_series(question, entities_ctx, observations)
+    if not series:
+        return None
+
+    freq = _resolve_requested_frequency(entities_ctx, observations) or "A"
+    block = (series.get("data") or {}).get(freq) or {}
+    records = block.get("records") or []
+    if not records:
+        return None
+
+    prefer_latest = bool(re.search(r"\bultim[oa]s?\b", q_norm))
+
+    target_period = ""
+    if not prefer_latest:
+        period_values = entities_ctx.get("period_ent")
+        if isinstance(period_values, list):
+            for candidate in period_values:
+                tok = _canonicalize_period_token(freq, candidate)
+                if tok:
+                    target_period = tok
+                    break
+    if not target_period:
+        target_period = str((observations.get("latest_available") or {}).get(freq) or "").strip()
+    if not target_period:
+        return None
+
+    # Construir records donde value=pct (descartar el primer record sin pct).
+    clean_records: List[Dict[str, Any]] = []
+    target_record: Optional[Dict[str, Any]] = None
+    last_clean: Optional[Dict[str, Any]] = None
+    for r in records:
+        if not isinstance(r, dict):
+            continue
+        pct = r.get("pct")
+        if pct is None:
+            continue
+        clean = {"period": r.get("period"), "value": pct}
+        clean_records.append(clean)
+        last_clean = clean
+        if _canonicalize_period_token(freq, r.get("period")) == target_period:
+            target_record = clean
+
+    # Fallback: período pedido no existe (p.ej. futuro) → último disponible.
+    if target_record is None and last_clean is not None:
+        fallback_period = (
+            _canonicalize_period_token(freq, last_clean.get("period"))
+            or str(last_clean.get("period") or "")
+        )
+        logger.info(
+            "[DATA_RESPONSE] share_prefetch period_fallback requested=%s -> using=%s",
+            target_period, fallback_period,
+        )
+        target_record = last_clean
+        target_period = fallback_period
+
+    if target_record is None:
+        return None
+
+    series_id = str(series.get("series_id") or "")
+    short_title = str(series.get("short_title") or "")
+    payload = {
+        "series_id": series_id,
+        "short_title": short_title,
+        "frequency": freq,
+        "unit": "puntos porcentuales",
+        "metric_description": (
+            f"Variación interanual de la participación de '{short_title}' "
+            "en el PIB, expresada en puntos porcentuales. Corresponde al "
+            "valor que muestra el cuadro BDE 'Participación de los "
+            "componentes del gasto en el PIB (porcentaje sobre el PIB)' "
+            "con Cálculo 'Serie original'."
+        ),
+        "period_requested": target_period,
+        "latest_record": target_record,
+        "records": clean_records[-8:],
+        "_share_prefetch": True,
+    }
+    call_id = f"call_share_prefetch_{series_id or 'series'}"
+    args = {"series_id": series_id, "frequency": freq}
+    assistant_msg = {
+        "role": "assistant",
+        "content": None,
+        "tool_calls": [
+            {
+                "id": call_id,
+                "type": "function",
+                "function": {
+                    "name": "get_series_data",
+                    "arguments": json.dumps(args, ensure_ascii=False),
+                },
+            }
+        ],
+    }
+    tool_msg = {
+        "role": "tool",
+        "tool_call_id": call_id,
+        "content": json.dumps(payload, ensure_ascii=False),
+    }
+    logger.info(
+        "[DATA_RESPONSE] share_prefetch_injected series_id=%s freq=%s period=%s pct=%s",
+        series_id, freq, target_period, target_record.get("value"),
+    )
+    return {
+        "assistant_msg": assistant_msg,
+        "tool_msg": tool_msg,
+        "series_ctx": {"series_id": series_id, "frequency": freq},
+        "fetched": payload,
+    }
+
+
 def _build_original_series_force_instruction(
     question: str,
     entities_ctx: Dict[str, Any],
@@ -3309,7 +3538,10 @@ def stream_data_response(
     # assistant(tool_calls) + tool(content) sintético con el payload ya filtrado
     # (sin yoy_pct/pct). La primera llamada al LLM se hace con tool_choice="none"
     # para obligarlo a redactar con ese payload sin pedir más tool calls.
-    level_prefetch = _build_level_prefetch_messages(question, entities_ctx, observations)
+    level_prefetch = (
+        _build_share_prefetch_messages(question, entities_ctx, observations)
+        or _build_level_prefetch_messages(question, entities_ctx, observations)
+    )
     first_call_tool_choice: Any = None
     if level_prefetch is not None:
         messages.append(level_prefetch["assistant_msg"])
