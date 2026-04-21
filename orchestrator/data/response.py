@@ -3536,10 +3536,11 @@ def _build_filtered_source_url(
 
     # En cuadros de participación (porcentaje sobre el PIB), el "Cálculo"
     # por defecto (YTYPCT) aplica una variación YoY sobre el ratio, lo que
-    # transforma 24,1% en 1,8 pp. Para consultas de NIVEL ('cuanto pesa',
+    # transforma 24,1 pp en 1,8 pp. Para consultas de NIVEL ('cuanto pesa',
     # 'que % del PIB') la URL debe abrir la vista 'Serie original' (NONE).
+    # Se aplica tanto si el classifier puso calc_mode='original' como 'share'.
     if (
-        calc_mode_for_url == "original"
+        calc_mode_for_url in {"original", "share", ""}
         and _is_participation_level_query(question_text, observations)
     ):
         calc_mode_for_url = "none"
