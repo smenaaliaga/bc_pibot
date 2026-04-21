@@ -3624,8 +3624,16 @@ def _export_cuadro_csv(observations: Dict[str, Any]) -> Optional[str]:
         return None
 
 
-def _build_fallback_csv_marker(observations: Dict[str, Any]) -> str:
-    """Build a fallback marker so the UI can always render one download button."""
+def _build_fallback_csv_marker(
+    observations: Dict[str, Any],
+    is_contribution: bool = False,
+) -> str:
+    """Build a fallback marker so the UI can always render one download button.
+
+    Si *is_contribution* es True, el archivo se renombra y etiqueta como
+    'contribuciones' para dejar claro que trae todas las series del cuadro
+    (no solo la actividad individual sobre la que se preguntó).
+    """
     path = _export_cuadro_csv(observations)
     if not path:
         return ""
@@ -3633,13 +3641,18 @@ def _build_fallback_csv_marker(observations: Dict[str, Any]) -> str:
     cuadro_id = str(observations.get("cuadro_id") or "cuadro")
     cuadro_name = str(observations.get("cuadro_name") or "")
     safe_cuadro_id = re.sub(r"[^A-Za-z0-9._-]+", "_", cuadro_id).strip("_") or "cuadro"
-    filename = f"cuadro_{safe_cuadro_id}.csv"
+    if is_contribution:
+        filename = f"cuadro_{safe_cuadro_id}_contribuciones.csv"
+        label = "Descargar CSV de contribuciones (cuadro completo)"
+    else:
+        filename = f"cuadro_{safe_cuadro_id}.csv"
+        label = "Descargar CSV"
     return (
         "##CSV_DOWNLOAD_START\n"
         f"path={path}\n"
         f"filename={filename}\n"
         f"title={cuadro_name}\n"
-        "label=Descargar CSV\n"
+        f"label={label}\n"
         "mimetype=text/csv\n"
         "##CSV_DOWNLOAD_END"
     )
@@ -3947,7 +3960,21 @@ def stream_data_response(
                 if source_footer:
                     yield source_footer
                 csv_block = ""
-                if final_series_ctx:
+                # En preguntas de contribucion conviene entregar el cuadro
+                # completo (todas las series, historico completo) para que el
+                # usuario pueda comparar el ranking de actividades que se
+                # mostro en la respuesta. Saltamos el CSV por-serie.
+                is_contribution_query = (
+                    calc_mode_ctx == "contribution"
+                    or str(
+                        (observations.get("classification") or {}).get("calc_mode") or ""
+                    ).strip().lower() == "contribution"
+                )
+                if is_contribution_query:
+                    csv_block = _build_fallback_csv_marker(
+                        observations, is_contribution=True
+                    )
+                if not csv_block and final_series_ctx:
                     csv_block = _build_full_history_csv_marker(
                         observations,
                         selected_series_ctx=final_series_ctx,
