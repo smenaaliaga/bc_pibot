@@ -1690,12 +1690,13 @@ def _build_contribution_ranking_polarity_instruction(
         order_rule = (
             "ORDEN DEL CUERPO (polaridad cruzada: pregunta sugiere caída pero el agregado es positivo). "
             "Tras la apertura, añade una oración de rebate explícita: "
-            f"'Aunque la pregunta sugiere una caída, el {indicator_label} aumentó en el período. "
-            "Las actividades que más restaron al crecimiento fueron...'. "
-            "Luego lista PRIMERO las actividades con contribución NEGATIVA (verbo 'disminuyó'/'cayó'), "
+            f"'Aunque la pregunta sugiere una caída, el {indicator_label} aumentó en el período.'. "
+            "REGLA DE ORDEN DICTADA POR EL AGREGADO (prioriza sobre la pregunta): como el agregado "
+            "es POSITIVO, lista PRIMERO las actividades con contribución POSITIVA (verbo "
+            "'creció'/'aumentó'), bajo la etiqueta 'Las actividades que más aportaron al alza fueron:', "
             "ordenadas por valor absoluto descendente, en el formato obligatorio por actividad. "
-            "Al final, menciona como mucho 1-2 actividades positivas destacadas, si aportan contexto, "
-            "bajo etiqueta separada 'En sentido contrario, aportaron al alza...'. "
+            "Al final, bajo etiqueta separada 'En sentido contrario, las principales incidencias a la "
+            "baja fueron...', menciona las actividades NEGATIVAS destacadas. "
             f"{sign_purity_rule}"
         )
     elif polarity == "positive":
@@ -1716,12 +1717,13 @@ def _build_contribution_ranking_polarity_instruction(
         order_rule = (
             "ORDEN DEL CUERPO (polaridad cruzada: pregunta sugiere alza pero el agregado es negativo). "
             "Tras la apertura, añade una oración de rebate explícita: "
-            f"'Aunque la pregunta sugiere un aumento, el {indicator_label} disminuyó en el período. "
-            "Las actividades que aportaron al alza fueron...'. "
-            "Luego lista PRIMERO las actividades con contribución POSITIVA (verbo 'creció'/'aumentó'), "
+            f"'Aunque la pregunta sugiere un aumento, el {indicator_label} disminuyó en el período.'. "
+            "REGLA DE ORDEN DICTADA POR EL AGREGADO (prioriza sobre la pregunta): como el agregado "
+            "es NEGATIVO, lista PRIMERO las actividades con contribución NEGATIVA (verbo "
+            "'disminuyó'/'cayó'), bajo la etiqueta 'Las actividades que más incidieron en la caída fueron:', "
             "ordenadas por valor absoluto descendente, en el formato obligatorio por actividad. "
-            "Al final, menciona como mucho 1-2 actividades negativas destacadas, si aportan contexto, "
-            "bajo etiqueta separada 'En sentido contrario, las principales incidencias a la baja fueron...'. "
+            "Al final, bajo etiqueta separada 'En sentido contrario, aportaron al alza...', menciona "
+            "las actividades POSITIVAS destacadas. "
             f"{sign_purity_rule}"
         )
     elif polarity == "negative":
