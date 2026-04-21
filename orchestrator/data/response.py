@@ -2121,6 +2121,29 @@ def _build_level_prefetch_messages(
     """
     if not _is_level_only_query(question, entities_ctx):
         return None
+    # Skip en cuadros de participación/share: sus series son porcentajes sobre
+    # el PIB (la serie "PIB" siempre vale 100) y requieren selección de
+    # componente específico (consumo/FBCF/exportaciones). Dejar que el LLM
+    # maneje estos casos con las tools.
+    calc_mode_obs = str(
+        (observations.get("classification") or {}).get("calc_mode") or ""
+    ).strip().lower()
+    cuadro_name_norm = unicodedata.normalize(
+        "NFKD", str(observations.get("cuadro_name") or "").lower()
+    )
+    cuadro_name_norm = "".join(
+        c for c in cuadro_name_norm if not unicodedata.combining(c)
+    )
+    if (
+        calc_mode_obs == "share"
+        or "porcentaje sobre el pib" in cuadro_name_norm
+        or "participacion" in cuadro_name_norm
+    ):
+        logger.info(
+            "[DATA_RESPONSE] level_prefetch skipped (share cuadro) calc_mode=%s",
+            calc_mode_obs,
+        )
+        return None
     series = _pick_level_target_series(question, entities_ctx, observations)
     if not series:
         return None
