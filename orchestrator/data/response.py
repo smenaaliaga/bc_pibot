@@ -1230,12 +1230,13 @@ def _build_metric_priority_instruction(calc_mode: str) -> Optional[str]:
             "(ej: 'En 2024, ...').\n"
             "2. Los datos representan el NIVEL DE PARTICIPACIÓN del componente "
             "sobre el PIB total. La métrica principal es 'value' "
-            "(porcentaje del PIB, ej: 24,1%).\n"
-            "3. Reporta SIEMPRE 'value' como dato principal usando redacción "
-            "de nivel: 'representó un **X,X%** del PIB', 'pesó un **X,X%** del PIB' "
-            "o 'su participación fue **X,X%** del PIB'. PROHIBIDO usar 'variación', "
-            "'variación de X puntos porcentuales' o 'pp' para la métrica principal.\n"
-            "4. Redondea a 1 decimal y usa formato con coma decimal: ej. '**24,1%**'.\n"
+            "(puntos porcentuales del PIB, ej: 24,1 pp).\n"
+            "3. Reporta SIEMPRE 'value' como dato principal usando la unidad 'pp' "
+            "(puntos porcentuales) y redacción de nivel: 'representó **X,X pp** del PIB', "
+            "'pesó **X,X pp** del PIB' o 'su participación fue de **X,X pp** del PIB'. "
+            "PROHIBIDO usar '%' o 'por ciento' para la métrica principal; usa SIEMPRE 'pp'. "
+            "PROHIBIDO hablar de 'variación' o 'variación de X puntos porcentuales'.\n"
+            "4. Redondea a 1 decimal y usa formato con coma decimal: ej. '**24,1 pp**'.\n"
             "5. NO uses 'yoy_pct' ni 'pct' como métrica principal salvo que el "
             "usuario pida explícitamente 'variación', 'cuanto varió', 'cuanto subió/bajó'.\n"
             "6. Si el usuario pregunta por un componente específico, destaca ese componente "
@@ -2717,13 +2718,13 @@ def _build_share_prefetch_messages(
         "series_id": series_id,
         "short_title": short_title,
         "frequency": freq,
-        "unit": "porcentaje del PIB",
+        "unit": "pp",
         "metric_description": (
             f"Participación de '{short_title}' sobre el PIB, "
-            "expresada como porcentaje del PIB total (nivel). Corresponde "
-            "al valor que muestra el cuadro BDE 'Participación de los "
-            "componentes del gasto en el PIB (porcentaje sobre el PIB)' "
-            "con Cálculo 'Serie original' (sin variación YoY)."
+            "expresada en puntos porcentuales del PIB (nivel, ej: 24,1 pp). "
+            "Corresponde al valor que muestra el cuadro BDE 'Participación "
+            "de los componentes del gasto en el PIB (porcentaje sobre el "
+            "PIB)' con Cálculo 'Serie original' (sin variación YoY)."
         ),
         "period_requested": target_period,
         "latest_record": target_record,
