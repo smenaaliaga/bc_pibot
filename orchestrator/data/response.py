@@ -1493,7 +1493,11 @@ def _build_contribution_ranking_polarity_instruction(
 ) -> Optional[str]:
     """Construye una instrucción de ranking condicionada por el signo del agregado.
 
-    Aplica solo a consultas de contribución por actividades (ranking) para PIB/IMACEC.
+    Aplica a consultas de contribución por actividades (ranking) para PIB/IMACEC
+    nacional y para PIB regional. La regla define:
+    - apertura literal obligatoria con verbo ligado al signo del agregado;
+    - orden del cuerpo condicionado por polaridad del agregado y polaridad
+      de la pregunta (alza/baja/neutra), con rebate cuando se contradicen.
     """
     calc_mode = str(
         entities_ctx.get("calc_mode_cls")
@@ -1503,8 +1507,18 @@ def _build_contribution_ranking_polarity_instruction(
     if calc_mode != "contribution":
         return None
 
+    def _norm_text(value: Any) -> str:
+        norm = unicodedata.normalize("NFKD", str(value or "").lower())
+        norm = "".join(ch for ch in norm if not unicodedata.combining(ch))
+        return re.sub(r"\s+", " ", norm).strip()
+
     indicator = str(entities_ctx.get("indicator_ent") or "").strip().lower()
-    if indicator not in {"pib", "imacec"}:
+    region_ent_raw = str(entities_ctx.get("region_ent") or "").strip()
+    cuadro_name_norm = _norm_text(observations.get("cuadro_name"))
+    is_regional = bool(region_ent_raw) or "region" in cuadro_name_norm
+
+    # Gate ampliado: PIB/IMACEC nacional OR cuadro regional.
+    if not is_regional and indicator not in {"pib", "imacec"}:
         return None
 
     activity_cls = str(
@@ -1516,9 +1530,7 @@ def _build_contribution_ranking_polarity_instruction(
     if activity_cls == "specific":
         return None
 
-    text = str(question or "").lower()
-    text_norm = unicodedata.normalize("NFKD", text)
-    text_norm = "".join(ch for ch in text_norm if not unicodedata.combining(ch))
+    text_norm = _norm_text(question)
     if not any(token in text_norm for token in ("actividad", "afect", "impuls", "aporte", "contribu")):
         return None
 
@@ -1542,23 +1554,26 @@ def _build_contribution_ranking_polarity_instruction(
     if not target_period:
         return None
 
-    def _norm_text(value: Any) -> str:
-        norm = unicodedata.normalize("NFKD", str(value or "").lower())
-        norm = "".join(ch for ch in norm if not unicodedata.combining(ch))
-        return re.sub(r"\s+", " ", norm).strip()
-
+    # Resolver serie agregada (PIB nacional / IMACEC / PIB regional).
     aggregate_series: Optional[Dict[str, Any]] = None
     for series in observations.get("series", []) or []:
         short_title = _norm_text(series.get("short_title"))
-        if short_title == indicator or short_title.startswith(f"{indicator} "):
+        if indicator and (short_title == indicator or short_title.startswith(f"{indicator} ")):
+            aggregate_series = series
+            break
+        if is_regional and (
+            short_title == "pib"
+            or short_title.startswith("pib ")
+            or "producto interno bruto" in short_title
+        ):
             aggregate_series = series
             break
     if aggregate_series is None:
-        # Fallback: usar serie con actividad igual al indicador (si existe)
+        # Fallback: serie con activity == indicador (solo para nacional).
         for series in observations.get("series", []) or []:
             cls = series.get("classification_series", {})
             activity = _normalize_token((cls or {}).get("activity")) if isinstance(cls, dict) else ""
-            if activity == indicator:
+            if indicator and activity == indicator:
                 aggregate_series = series
                 break
     if aggregate_series is None:
@@ -1587,10 +1602,27 @@ def _build_contribution_ranking_polarity_instruction(
     if aggregate_value is None:
         return None
 
-    indicator_label = "PIB" if indicator == "pib" else "IMACEC"
+    # Label del indicador (nacional vs regional).
+    if is_regional:
+        agg_short = str((aggregate_series or {}).get("short_title") or "").strip()
+        if region_ent_raw and _norm_text(region_ent_raw) not in _norm_text(agg_short):
+            indicator_label = f"PIB de la {region_ent_raw}".replace("  ", " ").strip()
+        else:
+            indicator_label = agg_short or "PIB regional"
+    else:
+        indicator_label = "PIB" if indicator == "pib" else "IMACEC"
+
     period_label = target_period if freq_code == "A" else _natural_period_label(target_period, freq_code)
     aggregate_abs = round(abs(float(aggregate_value)), 1)
     aggregate_abs_text = f"{aggregate_abs:.1f}".replace(".", ",")
+
+    # Polaridad del agregado.
+    if aggregate_value > 0:
+        polarity = "positive"
+    elif aggregate_value < 0:
+        polarity = "negative"
+    else:
+        polarity = "neutral"
 
     language_rule = (
         "VARIACIÓN DE LENGUAJE PERMITIDA: en contribuciones al alza puedes usar indistintamente "
@@ -1598,65 +1630,87 @@ def _build_contribution_ranking_polarity_instruction(
         "Mantén el mismo formato numérico y referencia temporal."
     )
 
-    if aggregate_value < 0:
-        intro_rule = (
-            "REGLA DE MÁXIMA PRIORIDAD EN INTRODUCCIÓN: "
-            f"la primera oración debe decir explícitamente: 'En {period_label}, el {indicator_label} disminuyó "
-            f"**{aggregate_abs_text}%** respecto al mismo período del año anterior.' "
-            "Se permite solo variación de verbo equivalente ('cayó'). "
-            "RESPUESTA INVÁLIDA si la introducción no explicita signo y magnitud del agregado. "
-            "PROHIBIDO iniciar con frases ambiguas como 'resultado mixto', 'hubo actividades al alza y a la baja' "
-            "o formulaciones por negación como 'no aumentó'/'no creció'."
-        )
-        order_rule = (
-            "ORDEN OBLIGATORIO POR POLARIDAD: como el indicador agregado del período es negativo, "
-            "el bloque principal debe comenzar con actividades que disminuyen/cayeron, "
-            "ordenadas por valor absoluto descendente. Luego lista las actividades positivas."
-        )
-        rebuttal_rule = ""
-        if asks_increase:
-            rebuttal_rule = (
-                " REBATE OBLIGATORIO: la pregunta sugiere aumento, pero el resultado agregado es negativo; "
-                "debes explicitar esta corrección antes del ranking."
-            )
-        return (
-            "REGLA DE RANKING CONDICIONADA POR EL AGREGADO: "
-            f"{language_rule} {intro_rule} {order_rule}{rebuttal_rule}"
-        )
+    forbidden_phrases = (
+        "PROHIBIDAS EN LA APERTURA Y CUERPO estas frases ambiguas o por negación: "
+        "'resultado mixto', 'comportamiento mixto', 'aportes mixtos', "
+        "'hubo actividades al alza y a la baja', 'algunas aportaron al alza y otras restaron', "
+        "'no aumentó', 'no creció', 'no cayó', 'no disminuyó', "
+        "'no registró aumento', 'no registró caída', 'no subió', 'no bajó'. "
+        "Siempre declara el signo y magnitud del agregado en la primera oración."
+    )
 
-    if aggregate_value > 0:
-        intro_rule = (
-            "REGLA DE MÁXIMA PRIORIDAD EN INTRODUCCIÓN: "
-            f"la primera oración debe decir explícitamente: 'En {period_label}, el {indicator_label} aumentó "
-            f"**{aggregate_abs_text}%** respecto al mismo período del año anterior.' "
-            "Se permite solo variación de verbo equivalente ('creció'). "
-            "RESPUESTA INVÁLIDA si la introducción no explicita signo y magnitud del agregado. "
-            "PROHIBIDO iniciar con frases ambiguas como 'resultado mixto', 'hubo actividades al alza y a la baja' "
-            "o formulaciones por negación como 'no cayó'/'no disminuyó'."
+    # (C) Apertura LITERAL obligatoria.
+    if polarity == "positive":
+        apertura = (
+            f"En {period_label}, el {indicator_label} aumentó "
+            f"**{aggregate_abs_text}%** respecto al mismo período del año anterior."
         )
+        sinonimo = "Se permite como única variación el sinónimo verbal 'creció'."
+    elif polarity == "negative":
+        apertura = (
+            f"En {period_label}, el {indicator_label} disminuyó "
+            f"**{aggregate_abs_text}%** respecto al mismo período del año anterior."
+        )
+        sinonimo = "Se permite como única variación el sinónimo verbal 'cayó'."
+    else:
+        apertura = (
+            f"En {period_label}, el {indicator_label} registró una variación de "
+            f"**0,0%** respecto al mismo período del año anterior."
+        )
+        sinonimo = ""
+
+    intro_rule = (
+        "APERTURA LITERAL OBLIGATORIA (copia textual; única variación permitida: sinónimo verbal): "
+        f"\"{apertura}\" {sinonimo} "
+        "RESPUESTA INVÁLIDA si la primera oración de la respuesta no corresponde a esta apertura literal. "
+        f"{forbidden_phrases}"
+    )
+
+    # (D) Orden del cuerpo: tabla polaridad_agregado × polaridad_pregunta.
+    if polarity == "positive" and asks_decrease:
         order_rule = (
-            "ORDEN OBLIGATORIO POR POLARIDAD: como el indicador agregado del período es positivo, "
-            "el bloque principal debe comenzar con actividades que crecieron/aumentaron, "
-            "ordenadas por valor absoluto descendente. Luego lista las actividades negativas."
+            "ORDEN DEL CUERPO (polaridad cruzada: pregunta sugiere caída pero el agregado es positivo). "
+            "Tras la apertura, añade una oración de rebate explícita: "
+            f"'Aunque la pregunta sugiere una caída, el {indicator_label} aumentó en el período. "
+            "Las actividades que restaron al crecimiento fueron...'. "
+            "Luego lista PRIMERO las actividades con contribución NEGATIVA, ordenadas por valor absoluto "
+            "descendente, en el formato obligatorio por actividad. Al final, menciona como mucho 1-2 "
+            "actividades positivas destacadas, si aportan contexto."
         )
-        rebuttal_rule = ""
-        if asks_decrease:
-            rebuttal_rule = (
-                " REBATE OBLIGATORIO: la pregunta sugiere caída, pero el resultado agregado es positivo; "
-                "debes explicitar esta corrección antes del ranking."
-            )
-        return (
-            "REGLA DE RANKING CONDICIONADA POR EL AGREGADO: "
-            f"{language_rule} {intro_rule} {order_rule}{rebuttal_rule}"
+    elif polarity == "positive":
+        order_rule = (
+            "ORDEN DEL CUERPO (agregado positivo, pregunta por alza o neutra). "
+            "Lista PRIMERO las actividades que crecieron/aumentaron, ordenadas por valor absoluto "
+            "descendente, en el formato obligatorio por actividad. Al final, menciona las principales "
+            "actividades con contribución negativa, si existen."
+        )
+    elif polarity == "negative" and asks_increase:
+        order_rule = (
+            "ORDEN DEL CUERPO (polaridad cruzada: pregunta sugiere alza pero el agregado es negativo). "
+            "Tras la apertura, añade una oración de rebate explícita: "
+            f"'Aunque la pregunta sugiere un aumento, el {indicator_label} disminuyó en el período. "
+            "Las actividades que aportaron al alza fueron...'. "
+            "Luego lista PRIMERO las actividades con contribución POSITIVA, ordenadas por valor absoluto "
+            "descendente, en el formato obligatorio por actividad. Al final, menciona como mucho 1-2 "
+            "actividades negativas destacadas, si aportan contexto."
+        )
+    elif polarity == "negative":
+        order_rule = (
+            "ORDEN DEL CUERPO (agregado negativo, pregunta por caída o neutra). "
+            "Lista PRIMERO las actividades que disminuyeron/cayeron, ordenadas por valor absoluto "
+            "descendente, en el formato obligatorio por actividad. Al final, menciona las principales "
+            "actividades con contribución positiva, si existen."
+        )
+    else:  # neutral
+        order_rule = (
+            "ORDEN DEL CUERPO (agregado 0,0%). "
+            "Separa explícitamente actividades positivas y negativas; cada grupo ordenado por valor "
+            "absoluto descendente, en el formato obligatorio por actividad."
         )
 
     return (
         "REGLA DE RANKING CONDICIONADA POR EL AGREGADO: "
-        f"{language_rule} REGLA DE MÁXIMA PRIORIDAD EN INTRODUCCIÓN: la primera oración debe declarar explícitamente que en {period_label} "
-        f"el {indicator_label} registró una variación de **0,0%** respecto al mismo período del año anterior. "
-        "RESPUESTA INVÁLIDA si la introducción no explicita signo y magnitud del agregado. "
-        "Luego, como el indicador agregado del período es 0,0%, "
-        "ordena por valor absoluto descendente y separa explícitamente actividades positivas y negativas."
+        f"{language_rule} {intro_rule} {order_rule}"
     )
 
 
