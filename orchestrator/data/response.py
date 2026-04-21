@@ -1342,6 +1342,77 @@ def _is_req_form_latest(entities_ctx: Dict[str, Any]) -> bool:
     return req_form == "latest"
 
 
+# Orden de prioridad para sugerir actividades cuando la solicitada no existe
+# en el cuadro. Cada entrada es una lista de substrings (en minúscula y sin
+# tildes) que se buscan dentro del label humanizado; gana el primer match.
+_PREFERRED_ACTIVITY_KEYWORDS: Tuple[Tuple[str, ...], ...] = (
+    ("servicios personales", "servicios empresariales", "servicios financieros",
+     "servicios de vivienda", "servicios"),
+    ("industria",),
+    ("mineria del cobre", "mineria"),
+    ("comercio",),
+    ("construccion",),
+)
+
+
+def _format_suggested_activities(labels_by_token: Dict[str, str], max_items: int = 5) -> str:
+    """Devuelve una lista corta de actividades sugeridas para el segundo párrafo.
+
+    Prioriza actividades macro relevantes (Servicios, Industria, Minería, Comercio,
+    Construcción) sobre las demás del cuadro. Si quedan otras fuera, agrega 'entre
+    otras' al final.
+    """
+    if not labels_by_token:
+        return "(sin actividades disponibles en este cuadro)"
+
+    available_labels = list(labels_by_token.values())
+
+    def _norm(value: str) -> str:
+        norm = unicodedata.normalize("NFKD", value.lower())
+        return "".join(ch for ch in norm if not unicodedata.combining(ch))
+
+    def _matches(label_norm: str, keyword: str) -> bool:
+        # 'servicios' como token genérico solo matchea si el label EMPIEZA por
+        # 'servicios' (Servicios personales/empresariales/etc), para evitar
+        # capturar 'Comunicaciones y servicios de información'.
+        if keyword == "servicios":
+            return label_norm.startswith("servicios")
+        # Para tokens monopalabra (comercio, industria, mineria, construccion)
+        # exigir palabra completa.
+        if " " not in keyword:
+            return bool(re.search(rf"\b{re.escape(keyword)}\b", label_norm))
+        return keyword in label_norm
+
+    chosen: List[str] = []
+    chosen_norm: set = set()
+    for keyword_group in _PREFERRED_ACTIVITY_KEYWORDS:
+        if len(chosen) >= max_items:
+            break
+        for keyword in keyword_group:
+            match = next(
+                (lbl for lbl in available_labels
+                 if _matches(_norm(lbl), keyword) and _norm(lbl) not in chosen_norm),
+                None,
+            )
+            if match:
+                chosen.append(match)
+                chosen_norm.add(_norm(match))
+                break
+
+    # Si no se llenó con las preferidas, completar con el resto en orden alfabético.
+    if len(chosen) < max_items:
+        for lbl in sorted(available_labels):
+            if len(chosen) >= max_items:
+                break
+            if _norm(lbl) not in chosen_norm:
+                chosen.append(lbl)
+                chosen_norm.add(_norm(lbl))
+
+    remaining = [lbl for lbl in available_labels if _norm(lbl) not in chosen_norm]
+    suffix = ", entre otras" if remaining else ""
+    return ", ".join(chosen) + suffix
+
+
 def _build_missing_activity_instruction(
     entities_ctx: Dict[str, Any],
     observations: Dict[str, Any],
@@ -1384,7 +1455,7 @@ def _build_missing_activity_instruction(
     for token, label in available_activities:
         if token not in labels_by_token:
             labels_by_token[token] = _humanize_activity_label(label)
-    options = ", ".join(sorted(labels_by_token.values())[:8])
+    options = _format_suggested_activities(labels_by_token, max_items=5)
 
     indicator = str(
         entities_ctx.get("indicator_ent")
@@ -1449,7 +1520,7 @@ def _build_prevalidated_missing_specific_activity_instruction(
         if token and raw_label and token not in labels_by_token:
             labels_by_token[token] = _humanize_activity_label(raw_label)
 
-    options = ", ".join(sorted(labels_by_token.values())[:8]) if labels_by_token else "(sin actividades disponibles en este cuadro)"
+    options = _format_suggested_activities(labels_by_token, max_items=5)
 
     indicator = str(
         entities_ctx.get("indicator_ent")
