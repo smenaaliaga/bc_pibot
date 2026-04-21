@@ -371,7 +371,7 @@ DATOS NO DISPONIBLES (FALLBACK)
   Compara el período solicitado contra latest_available de la frecuencia correspondiente.
 - CASO 1 — El usuario NO mencionó fecha ni período:
   Usa el último período disponible y responde directamente.
-  Ejemplo: "El último dato disponible corresponde a enero de 2026. La variación anual
+  Ejemplo: "El último dato disponible corresponde a enero de 2026. La variación
   fue **-0,5%** respecto al mismo período del año anterior."
 - CASO 2 — El usuario pidió un período SIN DATOS (explícito o por referencia relativa):
   Las referencias temporales relativas también cuentan como período EXPLÍCITO
@@ -379,11 +379,11 @@ DATOS NO DISPONIBLES (FALLBACK)
   Formato OBLIGATORIO:
   1. "Los datos de [período solicitado] aún no han sido publicados según los datos de la Base de Datos Estadísticos."
   2. "El último dato disponible corresponde a [período]. Con esa referencia, [indicador]
-     registró una variación anual de **X,X%** respecto al [indicador] del mismo período
+     registró una variación de **X,X%** respecto al [indicador] del mismo período
      del año anterior."
   Ejemplo: "Los datos de febrero de 2026 aún no han sido publicados según los datos de la Base de Datos Estadísticos.
   El último dato disponible corresponde a enero de 2026. Con esa referencia, el IMACEC
-  registró una variación anual de **-0,5%** respecto al IMACEC del mismo período del año anterior."
+  registró una variación de **-0,5%** respecto al IMACEC del mismo período del año anterior."
   NUNCA termines solo diciendo que no hay datos. SIEMPRE entrega el último dato disponible.
 
 DESAMBIGUACIÓN
@@ -488,7 +488,9 @@ ESTILO DE RESPUESTA
     · En respuestas de variación, NO incluyas niveles ni montos absolutos.
     · Redacta solo en términos de "variación mensual/trimestral" o "variación respecto al
         mismo período del año anterior" y su valor numérico. Evita "variación interanual"
-        cuando la frase ya incluya "respecto al mismo período del año anterior".
+        y "variación anual" cuando la frase ya incluya "respecto al mismo período del año
+        anterior" (es redundante). En ese caso usa simplemente "variación" o reformula como
+        "creció/disminuyó **X,X%** respecto al mismo período del año anterior".
 - ORDEN DEL PRIMER ENUNCIADO (OBLIGATORIO): la primera oración del primer párrafo
     debe comenzar mencionando explícitamente el período analizado (ej: "En el 3er trimestre
     de 2025,..." o "En enero de 2026,..."). No inicies la oración sin anclar primero el período.
@@ -3061,7 +3063,10 @@ def _build_no_explicit_period_latest_instruction(
         f"usa el ultimo periodo disponible ({latest_label}). "
         f"USA get_series_data para obtener la cifra de {latest_label} antes de responder. "
         f"En la INTRODUCCION incluye literalmente esta oración: 'La serie se reporta con frecuencia {freq_label}.' "
-        "Cuando reportes yoy_pct, usa la expresión 'variación anual'. "
+        "Cuando reportes yoy_pct, exprésalo como 'variación respecto al mismo período del año "
+        "anterior' o directamente con el verbo ('creció/disminuyó **X,X%** respecto al mismo "
+        "período del año anterior'). EVITA 'variación anual' e 'interanual' cuando la frase ya "
+        "incluya 'respecto al mismo período del año anterior' (redundancia prohibida). "
         "NO menciones falta de datos para meses/trimestres/años no solicitados y NO infieras "
         "automaticamente el mes/trimestre actual como periodo pedido. "
         "Mantén la estructura de 3 bloques: INTRODUCCIÓN (ancla indicador y período), DATOS, RECOMENDACIÓN."
