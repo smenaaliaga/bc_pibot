@@ -1296,13 +1296,45 @@ def _normalize_token(value: Any) -> str:
 
 
 def _humanize_activity_label(label: str) -> str:
-    """Convierte etiquetas técnicas de actividad a texto más natural."""
+    """Convierte etiquetas técnicas de actividad a texto más natural.
+
+    Restaura tildes/capitalización habituales para tokens comunes del
+    cuadro PIB/IMACEC por actividad económica, y capitaliza la primera
+    letra del resto.
+    """
     raw = str(label or "").strip()
     if not raw:
         return ""
     humanized = re.sub(r"[_\-]+", " ", raw)
     humanized = re.sub(r"\s+", " ", humanized).strip()
-    return humanized
+    # Mapa de alias para tokens comunes (clave en lower sin tilde).
+    alias = {
+        "admin publica": "Administración pública",
+        "administracion publica": "Administración pública",
+        "agropecuario": "Agropecuario-silvícola",
+        "agropecuario silvicola": "Agropecuario-silvícola",
+        "agropecuario silvicola pesca": "Agropecuario-silvícola-pesca",
+        "comercio": "Comercio",
+        "comunicaciones": "Comunicaciones y servicios de información",
+        "construccion": "Construcción",
+        "electricidad": "Electricidad, gas y agua",
+        "impuestos": "Impuestos sobre los productos",
+        "industria": "Industria manufacturera",
+        "mineria": "Minería",
+        "cobre": "Minería del cobre",
+        "transporte": "Transporte",
+        "restaurantes y hoteles": "Restaurantes y hoteles",
+        "servicios personales": "Servicios personales",
+        "servicios empresariales": "Servicios empresariales",
+        "servicios financieros": "Servicios financieros",
+        "servicios de vivienda": "Servicios de vivienda e inmobiliarios",
+        "pesca": "Pesca",
+    }
+    key = humanized.lower()
+    if key in alias:
+        return alias[key]
+    # Fallback: capitalizar solo la primera letra.
+    return humanized[:1].upper() + humanized[1:]
 
 
 def _is_req_form_latest(entities_ctx: Dict[str, Any]) -> bool:
@@ -1373,9 +1405,12 @@ def _build_missing_activity_instruction(
         f"Actividad pedida: '{requested_activity_raw or requested_activity}'. "
         "NO escribas una introducción que afirme contribución de la actividad solicitada en el período, "
         "porque contradice la no disponibilidad. "
-        "SEGUNDO PÁRRAFO OBLIGATORIO: lista SOLO actividades disponibles del mismo cuadro, "
-        "sin reemplazos ni equivalencias. "
-        f"Usa literalmente esta lista (en el mismo idioma y sin reinterpretar): {options}. "
+        "SEGUNDO PÁRRAFO OBLIGATORIO: debe iniciar EXACTAMENTE con la frase "
+        "'Las actividades disponibles en este cuadro son: ' seguida de la lista, y luego un cierre breve. "
+        "PROHIBIDO repetir en este segundo párrafo la oración del primer párrafo "
+        "('esta actividad no se encuentra disponible ...') ni volver a mencionar el indicador. "
+        "PROHIBIDO escribir la lista sin encabezado (la lista no puede aparecer como texto suelto). "
+        f"Usa literalmente esta lista (en el mismo idioma y sin reinterpretar), separada por comas: {options}. "
         "PROHIBIDO usar expresiones como 'actividad similar', 'más cercana', 'proxy' o "
         "'como referencia usar ...'. "
         "Usa nombres naturales de actividades (sin guiones bajos, sin códigos técnicos). "
@@ -1435,9 +1470,12 @@ def _build_prevalidated_missing_specific_activity_instruction(
         "o mencionar una actividad proxy/cercana por nombre. "
         "NO escribas una introducción que afirme contribución de la actividad solicitada en el período, "
         "porque contradice la no disponibilidad. "
-        "SEGUNDO PÁRRAFO OBLIGATORIO: lista SOLO actividades disponibles del cuadro, "
-        "sin reemplazos ni equivalencias. "
-        f"Usa literalmente esta lista (en el mismo idioma y sin reinterpretar): {options}. "
+        "SEGUNDO PÁRRAFO OBLIGATORIO: debe iniciar EXACTAMENTE con la frase "
+        "'Las actividades disponibles en este cuadro son: ' seguida de la lista, y luego un cierre breve. "
+        "PROHIBIDO repetir en este segundo párrafo la oración del primer párrafo "
+        "('esta actividad no se encuentra disponible ...') ni volver a mencionar el indicador. "
+        "PROHIBIDO escribir la lista sin encabezado (la lista no puede aparecer como texto suelto). "
+        f"Usa literalmente esta lista (en el mismo idioma y sin reinterpretar), separada por comas: {options}. "
         "PROHIBIDO usar expresiones como 'actividad similar', 'más cercana', 'proxy' o "
         "'como referencia usar ...'. "
         "Usa nombres naturales de actividades (sin guiones bajos, sin códigos técnicos). "
