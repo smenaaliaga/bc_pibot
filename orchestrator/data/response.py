@@ -3252,6 +3252,51 @@ def _build_no_explicit_period_latest_instruction(
 # Columns to exclude from the exported CSV
 _CSV_EXCLUDE_COLS = {"delta_abs", "yoy_delta_abs", "acceleration_pct", "acceleration_yoy"}
 
+_XLSX_MIMETYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+def _write_xlsx_workbook(
+    meta_rows: List[Tuple[str, Any]],
+    fieldnames: List[str],
+    data_rows: List[Dict[str, Any]],
+    filename_prefix: str,
+) -> Optional[str]:
+    """Write a 2-sheet XLSX (Metadatos + Datos) and return the temp path."""
+    try:
+        from openpyxl import Workbook  # type: ignore
+    except Exception:
+        logger.exception("[DATA_RESPONSE] openpyxl no disponible para exportar XLSX")
+        return None
+    try:
+        wb = Workbook()
+        meta_ws = wb.active
+        meta_ws.title = "Metadatos"
+        meta_ws.append(["Campo", "Valor"])
+        for campo, valor in meta_rows:
+            meta_ws.append([str(campo), "" if valor is None else str(valor)])
+        # Ajuste de ancho razonable para la hoja de metadatos
+        meta_ws.column_dimensions["A"].width = 18
+        meta_ws.column_dimensions["B"].width = 80
+
+        data_ws = wb.create_sheet("Datos")
+        data_ws.append(list(fieldnames))
+        for row in data_rows:
+            data_ws.append([row.get(col) for col in fieldnames])
+        # Ajuste de ancho basado en el nombre de columna
+        for idx, col in enumerate(fieldnames, start=1):
+            letter = data_ws.cell(row=1, column=idx).column_letter
+            data_ws.column_dimensions[letter].width = max(12, min(32, len(str(col)) + 4))
+
+        tmp = tempfile.NamedTemporaryFile(
+            suffix=".xlsx", prefix=filename_prefix, delete=False
+        )
+        tmp.close()
+        wb.save(tmp.name)
+        return tmp.name
+    except Exception:
+        logger.exception("[DATA_RESPONSE] Error escribiendo XLSX")
+        return None
+
 
 def _export_series_csv(
     series_id: str,
@@ -3259,9 +3304,10 @@ def _export_series_csv(
     short_title: str = "",
     cuadro_name: str = "",
 ) -> Optional[str]:
-    """Write *records* to a temporary CSV and return its path.
+    """Write *records* to a temporary XLSX workbook (Metadatos + Datos) and return its path.
 
-    Adds ASCII-safe metadata header and strips internal diagnostic columns.
+    Se mantiene el nombre histórico *_csv* para minimizar el diff en los
+    callers; el archivo real es .xlsx con dos hojas.
     """
     if not records:
         return None
@@ -3289,26 +3335,17 @@ def _export_series_csv(
                 fieldnames.append(key)
         if not fieldnames:
             return None
-        buf = io.StringIO()
-        meta_writer = csv.writer(buf)
-        meta_writer.writerow([f"# Nombre: {cuadro_name}"])
-        meta_writer.writerow([f"# Serie: {short_title}"])
-        meta_writer.writerow([f"# Serie ID: {series_id}"])
-        meta_writer.writerow(["# YTYPCT: alias BDE de variación porcentual interanual"])
-        meta_writer.writerow(["# pct: variación porcentual respecto al periodo anterior"])
-        meta_writer.writerow(["#"])
-        writer = csv.DictWriter(buf, fieldnames=fieldnames, extrasaction="ignore")
-        writer.writeheader()
-        writer.writerows(normalized_records)
-        tmp = tempfile.NamedTemporaryFile(
-            mode="w", suffix=".csv", prefix="serie_",
-            delete=False, encoding="utf-8-sig", newline="",
-        )
-        tmp.write(buf.getvalue())
-        tmp.close()
-        return tmp.name
+
+        meta_rows: List[Tuple[str, Any]] = [
+            ("Nombre", cuadro_name),
+            ("Serie", short_title),
+            ("Serie ID", series_id),
+            ("YTYPCT", "alias BDE de variación porcentual interanual"),
+            ("pct", "variación porcentual respecto al periodo anterior"),
+        ]
+        return _write_xlsx_workbook(meta_rows, fieldnames, normalized_records, "serie_")
     except Exception:
-        logger.exception("[DATA_RESPONSE] Error exportando CSV para %s", series_id)
+        logger.exception("[DATA_RESPONSE] Error exportando XLSX para %s", series_id)
         return None
 
 
@@ -3321,14 +3358,14 @@ def _build_csv_markers(fetched_series: List[Dict[str, Any]], cuadro_name: str = 
         path = _export_series_csv(series_id, records, short_title=short_title, cuadro_name=cuadro_name)
         if not path:
             continue
-        filename = f"serie_{series_id}.csv" if series_id else os.path.basename(path)
+        filename = f"serie_{series_id}.xlsx" if series_id else os.path.basename(path)
         return (
             f"##CSV_DOWNLOAD_START\n"
             f"path={path}\n"
             f"filename={filename}\n"
             f"title={short_title}\n"
-            f"label=Descargar CSV\n"
-            f"mimetype=text/csv\n"
+            f"label=Descargar Excel\n"
+            f"mimetype={_XLSX_MIMETYPE}\n"
             f"##CSV_DOWNLOAD_END"
         )
     return ""
@@ -3481,14 +3518,14 @@ def _build_full_history_csv_marker(
         return ""
 
     safe_series_id = re.sub(r"[^A-Za-z0-9._-]+", "_", str(series_id)).strip("_") or "serie"
-    filename = f"serie_{safe_series_id}_{frequency}.csv"
+    filename = f"serie_{safe_series_id}_{frequency}.xlsx"
     return (
         f"##CSV_DOWNLOAD_START\n"
         f"path={path}\n"
         f"filename={filename}\n"
         f"title={short_title}\n"
-        f"label=Descargar CSV\n"
-        f"mimetype=text/csv\n"
+        f"label=Descargar Excel\n"
+        f"mimetype={_XLSX_MIMETYPE}\n"
         f"##CSV_DOWNLOAD_END"
     )
 
@@ -3608,24 +3645,16 @@ def _export_cuadro_csv(observations: Dict[str, Any]) -> Optional[str]:
         cuadro_name = str(observations.get("cuadro_name") or "")
         cuadro_id = str(observations.get("cuadro_id") or "")
         fieldnames = ["series_id", "short_title", "frequency", *dynamic_fields]
-        buf = io.StringIO()
-        meta_writer = csv.writer(buf)
-        meta_writer.writerow([f"# Nombre: {cuadro_name}"])
-        meta_writer.writerow([f"# Cuadro ID: {cuadro_id}"])
-        meta_writer.writerow(["# Export: cuadro completo"])
-        meta_writer.writerow(["#"])
-        writer = csv.DictWriter(buf, fieldnames=fieldnames, extrasaction="ignore")
-        writer.writeheader()
-        writer.writerows(rows)
-        tmp = tempfile.NamedTemporaryFile(
-            mode="w", suffix=".csv", prefix="cuadro_",
-            delete=False, encoding="utf-8-sig", newline="",
-        )
-        tmp.write(buf.getvalue())
-        tmp.close()
-        return tmp.name
+        meta_rows: List[Tuple[str, Any]] = [
+            ("Nombre", cuadro_name),
+            ("Cuadro ID", cuadro_id),
+            ("Export", "cuadro completo"),
+            ("YTYPCT", "alias BDE de variación porcentual interanual"),
+            ("pct", "variación porcentual respecto al periodo anterior"),
+        ]
+        return _write_xlsx_workbook(meta_rows, fieldnames, rows, "cuadro_")
     except Exception:
-        logger.exception("[DATA_RESPONSE] Error exportando CSV fallback del cuadro")
+        logger.exception("[DATA_RESPONSE] Error exportando XLSX fallback del cuadro")
         return None
 
 
@@ -3648,19 +3677,19 @@ def _build_fallback_csv_marker(
     cuadro_name = str(observations.get("cuadro_name") or "")
     safe_cuadro_id = re.sub(r"[^A-Za-z0-9._-]+", "_", cuadro_id).strip("_") or "cuadro"
     if is_contribution:
-        filename = f"cuadro_{safe_cuadro_id}_contribuciones.csv"
+        filename = f"cuadro_{safe_cuadro_id}_contribuciones.xlsx"
     elif is_participation:
-        filename = f"cuadro_{safe_cuadro_id}_participaciones.csv"
+        filename = f"cuadro_{safe_cuadro_id}_participaciones.xlsx"
     else:
-        filename = f"cuadro_{safe_cuadro_id}.csv"
-    label = "Descargar CSV"
+        filename = f"cuadro_{safe_cuadro_id}.xlsx"
+    label = "Descargar Excel"
     return (
         "##CSV_DOWNLOAD_START\n"
         f"path={path}\n"
         f"filename={filename}\n"
         f"title={cuadro_name}\n"
         f"label={label}\n"
-        "mimetype=text/csv\n"
+        f"mimetype={_XLSX_MIMETYPE}\n"
         "##CSV_DOWNLOAD_END"
     )
 
