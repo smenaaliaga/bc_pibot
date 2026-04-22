@@ -92,7 +92,7 @@ def format_period_labels(period_str: str, freq: str) -> Tuple[str, ...]:
             return (f"el año {parts[0]}",)
         return ("--",)
 
-    if len(parts) < 3:
+    if len(parts) < 2:
         return ("--",)
 
     try:
@@ -1720,6 +1720,9 @@ def _build_contribution_ranking_polarity_instruction(
             if isinstance(row, dict):
                 aggregate_value = _safe_float(row.get("value"))
                 if aggregate_value is not None:
+                    fallback_period = _canonicalize_period_token(freq_code, row.get("period"))
+                    if fallback_period:
+                        target_period = fallback_period
                     break
     if aggregate_value is None:
         return None
@@ -3287,12 +3290,13 @@ def _export_series_csv(
         if not fieldnames:
             return None
         buf = io.StringIO()
-        buf.write(f"# Nombre: {cuadro_name}\n")
-        buf.write(f"# Serie: {short_title}\n")
-        buf.write(f"# Serie ID: {series_id}\n")
-        buf.write("# YTYPCT: alias BDE de variación porcentual interanual\n")
-        buf.write("# pct: variación porcentual respecto al periodo anterior\n")
-        buf.write("#\n")
+        meta_writer = csv.writer(buf)
+        meta_writer.writerow([f"# Nombre: {cuadro_name}"])
+        meta_writer.writerow([f"# Serie: {short_title}"])
+        meta_writer.writerow([f"# Serie ID: {series_id}"])
+        meta_writer.writerow(["# YTYPCT: alias BDE de variación porcentual interanual"])
+        meta_writer.writerow(["# pct: variación porcentual respecto al periodo anterior"])
+        meta_writer.writerow(["#"])
         writer = csv.DictWriter(buf, fieldnames=fieldnames, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(normalized_records)
@@ -3605,10 +3609,11 @@ def _export_cuadro_csv(observations: Dict[str, Any]) -> Optional[str]:
         cuadro_id = str(observations.get("cuadro_id") or "")
         fieldnames = ["series_id", "short_title", "frequency", *dynamic_fields]
         buf = io.StringIO()
-        buf.write(f"# Nombre: {cuadro_name}\n")
-        buf.write(f"# Cuadro ID: {cuadro_id}\n")
-        buf.write("# Export: cuadro completo\n")
-        buf.write("#\n")
+        meta_writer = csv.writer(buf)
+        meta_writer.writerow([f"# Nombre: {cuadro_name}"])
+        meta_writer.writerow([f"# Cuadro ID: {cuadro_id}"])
+        meta_writer.writerow(["# Export: cuadro completo"])
+        meta_writer.writerow(["#"])
         writer = csv.DictWriter(buf, fieldnames=fieldnames, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(rows)
