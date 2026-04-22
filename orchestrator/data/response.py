@@ -1577,8 +1577,18 @@ def _build_contribution_activity_focus_instruction(
     if not any(token in text for token in ("actividad", "impuls", "aporte", "contribu")):
         return None
 
-    latest_t = str((observations.get("latest_available") or {}).get("T") or "").strip()
-    latest_label = _natural_period_label(latest_t, "T") if latest_t else "el último trimestre disponible"
+    indicator = str(entities_ctx.get("indicator_ent") or "").strip().lower()
+    indicator_label = "IMACEC" if indicator == "imacec" else "PIB"
+
+    latest_avail = observations.get("latest_available") or {}
+    if indicator == "imacec":
+        latest_period_raw = str(latest_avail.get("M") or "").strip()
+        latest_label = _natural_period_label(latest_period_raw, "M") if latest_period_raw else "el último mes disponible"
+        period_word = "mes"
+    else:
+        latest_period_raw = str(latest_avail.get("T") or "").strip()
+        latest_label = _natural_period_label(latest_period_raw, "T") if latest_period_raw else "el último trimestre disponible"
+        period_word = "trimestre"
 
     try:
         top_n = max(1, int(os.getenv("RULE_CONTRIBUTION_TOP_N", "3")))
@@ -1587,10 +1597,11 @@ def _build_contribution_activity_focus_instruction(
 
     return (
         "REGLA ESTRICTA PARA PREGUNTAS DE ACTIVIDAD-CONTRIBUCIÓN: "
-        "esta pregunta exige DESGLOSE POR ACTIVIDADES, no variación agregada del PIB. "
-        f"Si el período mensual pedido no existe para PIB, usa directamente {latest_label}. "
-        "NO escribas 'enero no publicado' para este tipo de pregunta; ancla la respuesta al trimestre disponible. "
-        "OBLIGATORIO: llama rank_series (metric='value') para ese trimestre y construye el bloque DATOS "
+        f"esta pregunta exige DESGLOSE POR ACTIVIDADES del {indicator_label}, además de la apertura "
+        f"literal con la variación agregada del {indicator_label} (definida en la REGLA DE APERTURA LITERAL). "
+        f"Si el período pedido no existe para {indicator_label}, usa directamente {latest_label}. "
+        f"NO escribas 'período no publicado' para este tipo de pregunta; ancla la respuesta al {period_word} disponible. "
+        f"OBLIGATORIO: llama rank_series (metric='value') para ese {period_word} y construye el bloque DATOS "
         f"con EXACTAMENTE {top_n} actividades por grupo (si existen) en formato de lista, cada una con su contribución en %. "
         f"PROHIBIDO listar más de {top_n} actividades en un mismo grupo; no uses 'entre otras' ni 'además'. "
         "Para valores negativos, usa verbo negativo ('disminuyó') y valor absoluto sin signo. "
@@ -1604,7 +1615,8 @@ def _build_contribution_activity_focus_instruction(
         "Esta validación aplica a todas las actividades reportadas, sin excepciones. "
         "Si aparece '-X,X%', debes convertirlo a 'disminuyó **X,X%** respecto al mismo período del año anterior'. "
         "La respuesta es inválida si no incluye lista de actividades con %. "
-        "Está PROHIBIDO responder solo con 'el PIB registró X%'."
+        f"Está PROHIBIDO responder solo con 'el {indicator_label} registró X%' (omitir el desglose); "
+        f"también está PROHIBIDO omitir la apertura con la variación agregada del {indicator_label}."
     )
 
 
