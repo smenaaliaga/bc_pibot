@@ -3674,6 +3674,7 @@ def _build_fallback_csv_marker(
     observations: Dict[str, Any],
     is_contribution: bool = False,
     is_participation: bool = False,
+    is_nominal: bool = False,
 ) -> str:
     """Build a fallback marker so the UI can always render one download button.
 
@@ -3692,6 +3693,8 @@ def _build_fallback_csv_marker(
         filename = f"cuadro_{safe_cuadro_id}_contribuciones.xlsx"
     elif is_participation:
         filename = f"cuadro_{safe_cuadro_id}_participaciones.xlsx"
+    elif is_nominal:
+        filename = f"cuadro_{safe_cuadro_id}_nominales.xlsx"
     else:
         filename = f"cuadro_{safe_cuadro_id}.xlsx"
     label = "Descargar Excel"
@@ -4029,6 +4032,11 @@ def stream_data_response(
                         or _is_participation_level_query(question, observations)
                     )
                 )
+                is_nominal_query = (
+                    not is_contribution_query
+                    and not is_participation_query
+                    and str(entities_ctx.get("price_ent") or "").strip().lower() == "co"
+                )
                 if is_contribution_query:
                     csv_block = _build_fallback_csv_marker(
                         observations, is_contribution=True
@@ -4036,6 +4044,10 @@ def stream_data_response(
                 elif is_participation_query:
                     csv_block = _build_fallback_csv_marker(
                         observations, is_participation=True
+                    )
+                elif is_nominal_query:
+                    csv_block = _build_fallback_csv_marker(
+                        observations, is_nominal=True
                     )
                 if not csv_block and final_series_ctx:
                     csv_block = _build_full_history_csv_marker(
