@@ -3632,12 +3632,13 @@ def _export_cuadro_csv(observations: Dict[str, Any]) -> Optional[str]:
 def _build_fallback_csv_marker(
     observations: Dict[str, Any],
     is_contribution: bool = False,
+    is_participation: bool = False,
 ) -> str:
     """Build a fallback marker so the UI can always render one download button.
 
-    Si *is_contribution* es True, el archivo se renombra y etiqueta como
-    'contribuciones' para dejar claro que trae todas las series del cuadro
-    (no solo la actividad individual sobre la que se preguntó).
+    Si *is_contribution* o *is_participation* es True, el archivo se renombra
+    para dejar claro que trae todas las series del cuadro (no solo la
+    actividad/componente individual sobre el que se preguntó).
     """
     path = _export_cuadro_csv(observations)
     if not path:
@@ -3648,6 +3649,8 @@ def _build_fallback_csv_marker(
     safe_cuadro_id = re.sub(r"[^A-Za-z0-9._-]+", "_", cuadro_id).strip("_") or "cuadro"
     if is_contribution:
         filename = f"cuadro_{safe_cuadro_id}_contribuciones.csv"
+    elif is_participation:
+        filename = f"cuadro_{safe_cuadro_id}_participaciones.csv"
     else:
         filename = f"cuadro_{safe_cuadro_id}.csv"
     label = "Descargar CSV"
@@ -3974,9 +3977,24 @@ def stream_data_response(
                         (observations.get("classification") or {}).get("calc_mode") or ""
                     ).strip().lower() == "contribution"
                 )
+                is_participation_query = (
+                    not is_contribution_query
+                    and (
+                        calc_mode_ctx == "share"
+                        or str(
+                            (observations.get("classification") or {}).get("calc_mode") or ""
+                        ).strip().lower() == "share"
+                        or _is_participation_cuadro(observations)
+                        or _is_participation_level_query(question, observations)
+                    )
+                )
                 if is_contribution_query:
                     csv_block = _build_fallback_csv_marker(
                         observations, is_contribution=True
+                    )
+                elif is_participation_query:
+                    csv_block = _build_fallback_csv_marker(
+                        observations, is_participation=True
                     )
                 if not csv_block and final_series_ctx:
                     csv_block = _build_full_history_csv_marker(
