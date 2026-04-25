@@ -24,6 +24,7 @@ from .nodes import (
     make_memory_node,
     make_rag_node,
     make_router_node,
+    make_scope_block_node,
 )
 from .state import (
     AgentState,
@@ -93,6 +94,11 @@ def fallback_node(state: AgentState, *, writer: Optional[StreamWriter] = None):
     return node_fn(state, writer=writer)
 
 
+def scope_block_node(state: AgentState, *, writer: Optional[StreamWriter] = None):
+    node_fn = make_scope_block_node(_FALLBACK_LLM)
+    return node_fn(state, writer=writer)
+
+
 def memory_node(state: AgentState) -> AgentState:
     node_fn = make_memory_node(_MEMORY, _INTENT_STORE)
     return node_fn(state)
@@ -100,7 +106,7 @@ def memory_node(state: AgentState) -> AgentState:
 
 def _route_from_router(state: AgentState) -> str:
     decision = str(state.get("route_decision") or "fallback").strip().lower()
-    if decision not in {"data", "rag", "fallback"}:
+    if decision not in {"data", "rag", "fallback", "out_of_scope"}:
         return "fallback"
     return decision
 
@@ -120,6 +126,7 @@ def build_graph():
     data = make_data_node(_MEMORY)
     rag = make_rag_node(_RAG_LLM)
     fallback = make_fallback_node(_FALLBACK_LLM)
+    scope_block = make_scope_block_node(_FALLBACK_LLM)
     memory = make_memory_node(_MEMORY, _INTENT_STORE)
 
     builder.add_node("ingest", ingest)
@@ -129,6 +136,7 @@ def build_graph():
     builder.add_node("data", data)
     builder.add_node("rag", rag)
     builder.add_node("fallback", fallback)
+    builder.add_node("scope_block", scope_block)
     builder.add_node("memory", memory)
 
     builder.add_edge(START, "ingest")
@@ -138,11 +146,12 @@ def build_graph():
     builder.add_conditional_edges(
         "router",
         _route_from_router,
-        {"data": "data", "rag": "rag", "fallback": "fallback"},
+        {"data": "data", "rag": "rag", "fallback": "fallback", "out_of_scope": "scope_block"},
     )
     builder.add_edge("data", "memory")
     builder.add_edge("rag", "memory")
     builder.add_edge("fallback", "memory")
+    builder.add_edge("scope_block", "memory")
     builder.add_edge("memory", END)
 
     checkpointer = getattr(_MEMORY, "saver", None)

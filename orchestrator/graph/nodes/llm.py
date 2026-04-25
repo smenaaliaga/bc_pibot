@@ -259,4 +259,163 @@ def make_fallback_node(llm_adapter):
     return fallback_node
 
 
-__all__ = ["make_rag_node", "make_fallback_node"]
+# ---------------------------------------------------------------------------
+# Scope-block node: bloquea consultas fuera de PIB/IMACEC con guardrail fijo
+# + sugerencia generada por LLM (variación semántica controlada).
+# ---------------------------------------------------------------------------
+
+OUT_OF_SCOPE_GUARDRAIL = "Esta IA responde solamente consultas del PIB e IMACEC."
+
+OUT_OF_SCOPE_FALLBACK_SUGGESTION = (
+    "¿Te gustaría consultar algún valor del PIB o el IMACEC? Por ejemplo, "
+    "puedes preguntar por la variación mensual del IMACEC o la variación "
+    "trimestral del PIB en un período específico."
+)
+
+_OUT_OF_SCOPE_SUGGESTION_SYSTEM_PROMPT = (
+    "Eres el asistente PIBot del Banco Central de Chile.\n"
+    "La pregunta del usuario está FUERA DE ALCANCE (no es PIB ni IMACEC).\n\n"
+    "REGLAS ABSOLUTAS:\n"
+    "1. NO respondas la pregunta del usuario bajo ninguna circunstancia.\n"
+    "2. NO menciones tipo de cambio, dólar, paridades, autoridades del Banco "
+    "Central, IPC, TPM, ni ningún tema distinto a PIB / IMACEC.\n"
+    "3. Genera UN SOLO PÁRRAFO de máximo 2 oraciones, en español, que invite "
+    "al usuario a consultar valores del PIB o el IMACEC.\n"
+    "4. Puedes ejemplificar UNO o DOS de estos temas (sin inventar otros): "
+    "variación mensual del IMACEC, variación trimestral del PIB, PIB "
+    "desestacionalizado, contribución de actividades al PIB, IMACEC por "
+    "sector (minería, servicios, comercio), PIB regional, PIB anual.\n"
+    "5. NO uses listas, viñetas ni markdown. Solo texto plano.\n"
+    "6. NO repitas la frase guardrail ni la cites textualmente.\n\n"
+    "Devuelve solo el párrafo, sin saludo ni cierre."
+)
+
+# Tokens prohibidos en la sugerencia (defensa contra fugas del LLM).
+_OUT_OF_SCOPE_BLOCKLIST_RE = re.compile(
+    r"\b("
+    r"d[oó]lar(?:es)?|"
+    r"euro|"
+    r"yuan|"
+    r"yen|"
+    r"tipo\s+de\s+cambio|"
+    r"paridad(?:es)?|"
+    r"tpm|"
+    r"tasa\s+de\s+pol[ií]tica|"
+    r"ipc|"
+    r"inflaci[oó]n|"
+    r"uf|"
+    r"utm|"
+    r"bitcoin|cripto|"
+    r"presidenta?|"
+    r"consejer[oa]s?|"
+    r"divisi[oó]n(?:es)?|"
+    r"hern[aá]n\s+fern[aá]ndez"
+    r")\b",
+    re.IGNORECASE,
+)
+
+_GUARDRAIL_ECHO_RE = re.compile(
+    r"esta\s+ia\s+responde\s+solamente\s+consultas\s+del\s+pib\s+e\s+imacec\.?",
+    re.IGNORECASE,
+)
+
+
+def _sanitize_scope_suggestion(text: str) -> str:
+    """Sanea la sugerencia generada por el LLM. Retorna '' si debe descartarse."""
+    if not text:
+        return ""
+    cleaned = _ensure_text(text).strip()
+    if not cleaned:
+        return ""
+    # Elimina eco del guardrail.
+    cleaned = _GUARDRAIL_ECHO_RE.sub("", cleaned).strip()
+    # Colapsa saltos de línea.
+    cleaned = re.sub(r"\s*\n\s*", " ", cleaned)
+    cleaned = re.sub(r"\s{2,}", " ", cleaned).strip()
+    if not cleaned:
+        return ""
+    # Rechaza si menciona temas prohibidos.
+    if _OUT_OF_SCOPE_BLOCKLIST_RE.search(cleaned):
+        return ""
+    # Debe mencionar PIB o IMACEC.
+    if not re.search(r"\b(pib|imacec)\b", cleaned, re.IGNORECASE):
+        return ""
+    # Sin markdown / viñetas.
+    if cleaned.startswith(("-", "*", "•", "#", "[")):
+        return ""
+    # Truncado defensivo.
+    if len(cleaned) > 320:
+        cut = cleaned[:320]
+        idx = cut.rfind(".")
+        cleaned = (cut[: idx + 1] if idx > 0 else cut).strip()
+    return cleaned
+
+
+# Importes diferidos para evitar ciclo y para entornos sin langchain.
+try:
+    from langchain.messages import SystemMessage as _ScopeSystemMessage, HumanMessage as _ScopeHumanMessage  # type: ignore
+except Exception:  # pragma: no cover
+    _ScopeSystemMessage = None  # type: ignore
+    _ScopeHumanMessage = None  # type: ignore
+
+
+def _generate_scope_suggestion(llm_adapter) -> str:
+    """Genera la variante semántica usando el LLM. '' si falla o no disponible."""
+    if llm_adapter is None:
+        return ""
+    chat = getattr(llm_adapter, "_chat", None)
+    if chat is None or _ScopeSystemMessage is None or _ScopeHumanMessage is None:
+        return ""
+    try:
+        msgs = [
+            _ScopeSystemMessage(content=_OUT_OF_SCOPE_SUGGESTION_SYSTEM_PROMPT),
+            _ScopeHumanMessage(content="Genera la sugerencia ahora."),
+        ]
+        # Una sola invocación (sin streaming) para latencia y simplicidad.
+        out = chat.invoke(msgs)
+        text = getattr(out, "content", None) or str(out)
+        return _ensure_text(text)
+    except Exception:
+        logger.exception("[SCOPE_BLOCK] Variant generation failed; using fallback")
+        return ""
+
+
+def make_scope_block_node(llm_adapter=None):
+    """Nodo determinístico para preguntas fuera de alcance (no PIB/IMACEC).
+
+    Estructura de salida:
+      <GUARDRAIL fijo>\\n\\n<sugerencia variable>
+    Si el LLM no produce una sugerencia válida → texto fallback determinístico.
+    """
+
+    def scope_block_node(state: AgentState, *, writer: Optional[StreamWriter] = None):
+        # 1. Emitir guardrail fijo.
+        first_chunk = OUT_OF_SCOPE_GUARDRAIL + "\n\n"
+        _emit_stream_chunk(first_chunk, writer)
+
+        # 2. Generar variante o fallback.
+        raw_suggestion = _generate_scope_suggestion(llm_adapter)
+        suggestion = _sanitize_scope_suggestion(raw_suggestion)
+        if not suggestion:
+            suggestion = OUT_OF_SCOPE_FALLBACK_SUGGESTION
+
+        _emit_stream_chunk(suggestion, writer)
+
+        output = f"{OUT_OF_SCOPE_GUARDRAIL}\n\n{suggestion}"
+        logger.info(
+            "[SCOPE_BLOCK] Out-of-scope question handled | output_len=%d | variant_used=%s",
+            len(output),
+            bool(raw_suggestion and suggestion != OUT_OF_SCOPE_FALLBACK_SUGGESTION),
+        )
+        return {"output": output, "route_decision": "out_of_scope"}
+
+    return scope_block_node
+
+
+__all__ = [
+    "make_rag_node",
+    "make_fallback_node",
+    "make_scope_block_node",
+    "OUT_OF_SCOPE_GUARDRAIL",
+    "OUT_OF_SCOPE_FALLBACK_SUGGESTION",
+]

@@ -58,6 +58,62 @@ def _is_value_desestacionalizado(question: str) -> bool:
     return bool(question) and bool(_VALUE_DESEST_RE.search(question))
 
 
+# ---------------------------------------------------------------------------
+# Out-of-scope gate: bloquea preguntas que no son sobre PIB / IMACEC.
+# ---------------------------------------------------------------------------
+# Allowlist mínima de tokens que indican alcance macro-PIB/IMACEC. Si NER ya
+# normalizó indicator/activity/region/investment, el gate también deja pasar
+# (delegamos en el clasificador para no duplicar lógica de aliasing).
+_OUT_OF_SCOPE_ALLOWLIST_RE = re.compile(
+    r"\b("
+    r"pib|"
+    r"imacec|"
+    r"producto\s+interno\s+bruto|"
+    r"cuentas?\s+nacional(?:es)?|"
+    r"actividad\s+econ[oó]mica"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def _is_out_of_scope(
+    question: str,
+    current_norm: Dict[str, Any],
+    prev_indicator: Any,
+    context_label: str,
+) -> bool:
+    """True si la pregunta NO es sobre PIB ni IMACEC.
+
+    Reglas (en orden):
+    1. Calendario de publicaciones de PIB/IMACEC → en alcance (RAG calendar).
+    2. NER normalizó alguna entidad macro → en alcance.
+    3. Followup con indicador previo PIB/IMACEC → en alcance.
+    4. Texto contiene keyword del allowlist → en alcance.
+    5. Caso contrario → fuera de alcance.
+    """
+    q = _ensure_text(question)
+    if not q.strip():
+        return False  # No bloqueamos preguntas vacías; otras rutas las manejan.
+
+    if _is_calendar_intent(q):
+        return False
+
+    norm = current_norm if isinstance(current_norm, dict) else {}
+    for key in ("indicator", "activity", "region", "investment"):
+        if not _is_empty_value(norm.get(key)):
+            return False
+
+    if str(context_label or "").strip().lower() == "followup":
+        prev_lower = str(prev_indicator or "").strip().lower()
+        if prev_lower in ("pib", "imacec"):
+            return False
+
+    if _OUT_OF_SCOPE_ALLOWLIST_RE.search(q):
+        return False
+
+    return True
+
+
 _PIB_ACTIVITY_HINTS = {
     "agropecuario",
     "pesca",
@@ -433,6 +489,26 @@ def make_intent_node(memory_adapter: Any, intent_store: Any = None, predict_with
                 decision = "rag"
             else:
                 decision = "fallback"
+
+        # Out-of-scope gate (capa A). Override final: si la pregunta no es
+        # sobre PIB ni IMACEC, redirigimos al nodo scope_block. No tocamos
+        # el resto de las rutas (data/rag/fallback) cuando hay alcance válido.
+        try:
+            prev_indicator_for_scope = _first_non_empty(prev_norm.get("indicator")) if "prev_norm" in locals() else None
+        except Exception:
+            prev_indicator_for_scope = None
+        if _is_out_of_scope(
+            question=question,
+            current_norm=current_norm,
+            prev_indicator=prev_indicator_for_scope,
+            context_label=context_label,
+        ):
+            logger.info(
+                "[INTENT_NODE] Out-of-scope detected; overriding decision=%s -> 'out_of_scope' for question=%r",
+                decision,
+                question[:120],
+            )
+            decision = "out_of_scope"
 
         if isinstance(payload_root, dict):
             payload_root["entities_normalized"] = current_norm
