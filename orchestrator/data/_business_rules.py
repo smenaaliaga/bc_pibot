@@ -60,6 +60,10 @@ def apply_business_rules(ent: ResolvedEntities) -> ResolvedEntities:
     Reglas implementadas:
 
     0. **Detección de intención *share***: redirige a participación si el texto lo indica.
+    0.b **Desestacionalizado por defecto → prev_period**: si seasonality='sa' y el texto
+        no pide explícitamente yoy, el calc_mode pasa a 'prev_period' (variación t-1).
+    0.c **Variación en frecuencia natural → prev_period**: "variación mensual" para IMACEC
+        y "variación trimestral" para PIB se interpretan como t-1 (no yoy).
     1. **Contribución + inversión específica sin región**: forzar actividad "general".
     2. **IMACEC → frecuencia mensual**: IMACEC solo se publica mensual.
     3. **IMACEC sin actividad**: se asigna "imacec" como actividad por defecto.
@@ -69,6 +73,8 @@ def apply_business_rules(ent: ResolvedEntities) -> ResolvedEntities:
     7. **PIB mensual no existe**: se redirige a trimestral con nota informativa.
     """
     _rule_detect_share_intent(ent)
+    _rule_natural_freq_variation_is_prev_period(ent)
+    _rule_seasonality_sa_implies_prev_period(ent)
     _rule_contribution_investment_force_general(ent)
     _rule_imacec_force_monthly(ent)
     _rule_imacec_default_activity(ent)
@@ -87,6 +93,26 @@ _SHARE_INTENT_RE = re.compile(
     r"(?:cu[aá]nto\s+pesa|qu[eé]\s+porcentaje|participaci[oó]n|peso\s+(?:del?|en))",
     re.IGNORECASE,
 )
+
+# Palabras/frases que indican variación interanual explícita (yoy).
+# Si aparecen, NO debemos forzar prev_period aunque la serie sea desestacionalizada.
+_YOY_KEYWORDS_RE = re.compile(
+    r"\b("
+    r"interanual(?:es)?|"
+    r"a[nñ]o\s+anterior|"
+    r"mismo\s+per[ií]odo\s+del\s+a[nñ]o|"
+    r"mismo\s+mes\s+del\s+a[nñ]o|"
+    r"mismo\s+trimestre\s+del\s+a[nñ]o|"
+    r"12\s*meses|"
+    r"doce\s+meses|"
+    r"respecto\s+al\s+a[nñ]o\s+anterior|"
+    r"variaci[oó]n\s+anual"
+    r")\b",
+    re.IGNORECASE,
+)
+
+_VAR_MENSUAL_RE = re.compile(r"variaci[oó]n\s+mensual", re.IGNORECASE)
+_VAR_TRIMESTRAL_RE = re.compile(r"variaci[oó]n\s+trimestral", re.IGNORECASE)
 
 
 def _rule_detect_share_intent(ent: ResolvedEntities) -> None:
@@ -130,6 +156,78 @@ def _rule_contribution_investment_force_general(ent: ResolvedEntities) -> None:
         and ent.region_cls in (None, "none")
     ):
         ent.activity_cls_resolved = "general"
+
+
+def _rule_seasonality_sa_implies_prev_period(ent: ResolvedEntities) -> None:
+    """Cuando seasonality='sa' (desestacionalizado), la lectura natural es la
+    variación respecto al período anterior (t-1), no la interanual.
+
+    Aplica solo si el calc_mode actual es ambiguo ('original' / vacío) y la
+    pregunta no contiene palabras que pidan explícitamente la variación
+    interanual (yoy). Mantiene contribution / share / yoy / prev_period
+    intactos.
+    """
+    seasonality = str(ent.seasonality_ent or "").strip().lower()
+    if seasonality != "sa":
+        return
+
+    calc = str(ent.calc_mode_cls or "").strip().lower()
+    if calc not in ("", "original"):
+        return
+
+    question = ent.question or ""
+    if _YOY_KEYWORDS_RE.search(question):
+        return
+
+    logger.info(
+        "[DATA_NODE] seasonality='sa' + calc_mode ambiguo → forzando calc_mode='prev_period'"
+    )
+    ent.calc_mode_cls = "prev_period"
+
+
+def _rule_natural_freq_variation_is_prev_period(ent: ResolvedEntities) -> None:
+    """'variación mensual' (IMACEC) o 'variación trimestral' (PIB) refieren a la
+    variación respecto al período anterior, salvo que el texto pida yoy explícito.
+
+    También fija seasonality='sa' por defecto, ya que la variación t-1 se reporta
+    con la serie desestacionalizada.
+    """
+    question = ent.question or ""
+    if not question or _YOY_KEYWORDS_RE.search(question):
+        return
+
+    indicator = str(ent.indicator_ent or "").strip().lower()
+    calc = str(ent.calc_mode_cls or "").strip().lower()
+    # No tocar contribution / share / prev_period explícitos.
+    if calc in ("contribution", "share", "prev_period"):
+        return
+
+    matched = False
+    if indicator == "imacec" and _VAR_MENSUAL_RE.search(question):
+        matched = True
+    elif indicator == "pib" and _VAR_TRIMESTRAL_RE.search(question):
+        matched = True
+    # Indicador no resuelto aún: deducirlo del verbo de frecuencia.
+    elif not indicator:
+        if _VAR_MENSUAL_RE.search(question):
+            ent.indicator_ent = "imacec"
+            matched = True
+        elif _VAR_TRIMESTRAL_RE.search(question):
+            ent.indicator_ent = "pib"
+            matched = True
+
+    if not matched:
+        return
+
+    logger.info(
+        "[DATA_NODE] 'variación %s' del %s → forzando calc_mode='prev_period' / seasonality='sa'",
+        "mensual" if _VAR_MENSUAL_RE.search(question) else "trimestral",
+        ent.indicator_ent,
+    )
+    ent.calc_mode_cls = "prev_period"
+    # La variación 'mensual' (IMACEC) o 'trimestral' (PIB) se reporta sobre la
+    # serie desestacionalizada por convención del Banco Central.
+    ent.seasonality_ent = "sa"
 
 
 def _rule_imacec_force_monthly(ent: ResolvedEntities) -> None:

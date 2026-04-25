@@ -1218,10 +1218,33 @@ def _build_metric_priority_instruction(calc_mode: str) -> Optional[str]:
         )
     if mode == "prev_period":
         return (
-            "REGLA ESTRICTA DE REDACCION: en el PRIMER PARRAFO (primera oracion) "
-            "comienza mencionando el PERIODO analizado (ej: 'En el 3er trimestre de 2025, ...') "
-            "y reporta PRIMERO el valor de 'pct'. "
-            "No comiences con 'value' ni con 'yoy_pct'."
+            "REGLA ESTRICTA DE REDACCION (variación período anterior):\n"
+            "1. En el PRIMER PARRAFO comienza mencionando el PERIODO analizado "
+            "(ej: 'En el 3er trimestre de 2025, ...') y reporta PRIMERO el valor "
+            "de 'pct' (variación respecto al período anterior). "
+            "No comiences con 'value' ni con 'yoy_pct'.\n"
+            "2. PROHIBIDO mencionar la variación interanual o anual en cualquier "
+            "parte de la respuesta. NO uses las frases: 'respecto al mismo período "
+            "del año anterior', 'variación interanual', 'variación anual', "
+            "'respecto al año anterior', 'mismo mes/trimestre del año anterior', "
+            "ni el valor 'yoy_pct'. Reporta SOLO la variación respecto al período "
+            "anterior (pct).\n"
+            "3. PROHIBIDO frases redundantes sobre la frecuencia de publicación "
+            "como 'se reporta/publica con frecuencia mensual/trimestral' o "
+            "'la serie se reporta con frecuencia X'. La frecuencia se infiere del "
+            "período (ej: '4to trimestre de 2025' ya implica trimestral). "
+            "Solo menciona la frecuencia si el usuario la pide explícitamente.\n"
+            "4. PROHIBIDO mencionar el nivel del índice / valor absoluto / "
+            "monto de la serie ('value'). Cuando el usuario pregunta por una "
+            "VARIACIÓN, la respuesta debe contener únicamente la variación. "
+            "NO escribas frases como 'el nivel fue de ...', 'su nivel fue ...', "
+            "'el índice se ubicó en ...', '... miles de millones de pesos', "
+            "'puntos del índice', ni cifras de nivel del IMACEC/PIB.\n"
+            "5. Estructura recomendada en máximo 2 oraciones cortas:\n"
+            "   - Oración 1: 'En <período>, el <indicador> desestacionalizado "
+            "varió **X,X%** respecto al período anterior.'\n"
+            "   - Oración 2 (opcional): una línea sugiriendo profundizar en la "
+            "trayectoria reciente de la misma variación. NO menciones niveles."
         )
     if mode == "share":
         return (
@@ -2179,7 +2202,20 @@ def _pick_level_target_series(
     entities_ctx: Dict[str, Any],
     observations: Dict[str, Any],
 ) -> Optional[Dict[str, Any]]:
-    """Selecciona la serie objetivo para una consulta de nivel."""
+    """Selecciona la serie objetivo para una consulta de nivel.
+
+    Estrategia en capas (data-driven para no depender de hard-codes por serie):
+      1. PIB per cápita (cuadro dedicado).
+      2. Match específico por short_title: todos los tokens significativos del
+         short_title aparecen como substring de la pregunta. Cubre series del
+         cuadro con ``classification`` vacía (cobre, bienes durables, variación
+         de existencias, etc.).
+      3. Match por ``classification.investment`` igual a ``investment_ent``.
+         Cubre consumo, consumo_gobierno, demanda_interna, inversion,
+         inversion_fijo, exportacion (total) e importacion (total).
+      4. Totales hard-coded (exportaciones/importaciones) como red de seguridad.
+      5. Fallback a PIB solo cuando la pregunta lo menciona explícitamente.
+    """
     series_list = observations.get("series") or []
     if not series_list:
         return None
@@ -2203,21 +2239,104 @@ def _pick_level_target_series(
             if "per capita" in _norm(s.get("short_title")):
                 return s
 
-    # 2. Exportaciones de bienes y servicios (total)
-    if "exportac" in text_norm or investment_ent in ("exportacion", "exportaciones"):
+    # 2. Match específico por tokens del short_title. Permite resolver
+    #    sub-componentes del cuadro que no tienen classification.investment
+    #    (ej. "cobre" -> F033.XCO, "bienes durables" -> F033.CDU,
+    #    "consumo total" -> F033.CTO, "variación de existencias" -> F033.VAX).
+    _LEVEL_TITLE_STOPWORDS = {
+        "de", "del", "la", "el", "y", "en", "los", "las",
+        "un", "una", "a", "al", "e", "o", "u",
+    }
+    best_title_match: Optional[Dict[str, Any]] = None
+    best_title_score = 0
+    for s in series_list:
+        if not isinstance(s, dict):
+            continue
+        short_title_norm = _norm(s.get("short_title"))
+        if not short_title_norm:
+            continue
+        # Evitar que la propia fila "PIB" (indicador) capture preguntas
+        # genéricas; ese caso se maneja en la capa 5.
+        cls = s.get("classification") if isinstance(s.get("classification"), dict) else {}
+        if _norm(cls.get("indicator")) == "pib":
+            continue
+        tokens = [
+            t for t in re.findall(r"[a-z0-9]+", short_title_norm)
+            if t not in _LEVEL_TITLE_STOPWORDS and len(t) > 2
+        ]
+        if not tokens:
+            continue
+        if not all(t in text_norm for t in tokens):
+            continue
+        score = len(tokens) * 100 + sum(len(t) for t in tokens)
+        if score > best_title_score:
+            best_title_match = s
+            best_title_score = score
+    if best_title_match is not None:
+        return best_title_match
+
+    # 3. Overrides semánticos para términos genéricos del cuadro de gasto:
+    #    - "consumo" genérico (sin "hogares"/"gobierno") -> Consumo total.
+    #    - "inversión" genérico (sin "fijo" explícito) -> Formación bruta de
+    #      capital fijo (medida estándar de inversión en cuentas nacionales).
+    #    Se dispara si el clasificador normalizó investment_ent O si la
+    #    pregunta menciona el término (el slot investment suele quedar vacío
+    #    en preguntas cortas como "cuanto fue la inversion nominal en 2022").
+    #    Sólo aplican cuando la pregunta NO desambigua hacia el otro componente.
+    _GENERIC_INVESTMENT_OVERRIDES = {
+        "consumo": {
+            "target_title": "consumo total",
+            "trigger_tokens": ("consumo",),
+            "exclude_tokens": ("hogares", "ipsfl", "gobierno"),
+        },
+        "inversion": {
+            "target_title": "formacion bruta de capital fijo",
+            "trigger_tokens": ("inversion", "inversiones"),
+            "exclude_tokens": ("variacion", "existencias"),
+        },
+    }
+    override_keys: List[str] = []
+    if investment_ent in _GENERIC_INVESTMENT_OVERRIDES:
+        override_keys.append(investment_ent)
+    for key, cfg in _GENERIC_INVESTMENT_OVERRIDES.items():
+        if key in override_keys:
+            continue
+        if any(tok in text_norm for tok in cfg["trigger_tokens"]):
+            override_keys.append(key)
+    for key in override_keys:
+        cfg = _GENERIC_INVESTMENT_OVERRIDES[key]
+        if any(tok in text_norm for tok in cfg["exclude_tokens"]):
+            continue
+        target_title = cfg["target_title"]
+        for s in series_list:
+            if not isinstance(s, dict):
+                continue
+            if _norm(s.get("short_title")) == target_title:
+                return s
+
+    # 4. Match data-driven por classification.investment.
+    if investment_ent:
+        for s in series_list:
+            if not isinstance(s, dict):
+                continue
+            cls = s.get("classification") if isinstance(s.get("classification"), dict) else {}
+            if _norm(cls.get("investment")) == investment_ent:
+                return s
+
+    # 5. Totales hard-coded (red de seguridad si la pregunta menciona
+    #    exportaciones/importaciones sin entidad normalizada).
+    if "exportac" in text_norm:
         for s in series_list:
             st = _norm(s.get("short_title"))
             if st.startswith("exportaciones de bienes y servicios"):
                 return s
-
-    # 3. Importaciones de bienes y servicios (total)
-    if "importac" in text_norm or investment_ent in ("importacion", "importaciones"):
+    if "importac" in text_norm:
         for s in series_list:
             st = _norm(s.get("short_title"))
             if st.startswith("importaciones de bienes y servicios"):
                 return s
 
-    # 4. PIB total (nominal / a cuánto asciende)
+    # 6. PIB total (nominal / a cuánto asciende).
     if "pib" in text_norm or indicator_ent == "pib":
         for s in series_list:
             st = _norm(s.get("short_title"))

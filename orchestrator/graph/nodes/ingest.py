@@ -40,6 +40,24 @@ _CALENDAR_INTENT_RE = re.compile(
 def _is_calendar_intent(question: str) -> bool:
     return bool(question) and bool(_CALENDAR_INTENT_RE.search(question))
 
+
+# Override: "valor desestacionalizado" / "cuánto fue desestacionalizado" suelen
+# clasificarse como methodology con baja confianza, pero el usuario quiere el
+# valor de la serie desestacionalizada (ruta data, calc_mode='prev_period').
+_VALUE_DESEST_RE = re.compile(
+    r"\b(valor|cu[aá]nto|cu[aá]nta|nivel|cifra|dato|cu[aá]l\s+es)\b.{0,40}"
+    r"\b(desestacionaliz\w*|sin\s+estacionalidad|ajustad[oa]\s+por\s+estacionalidad)\b"
+    r"|"
+    r"\b(desestacionaliz\w*|sin\s+estacionalidad)\b.{0,40}"
+    r"\b(valor|cu[aá]nto|cu[aá]nta|nivel|cifra|dato)\b",
+    re.IGNORECASE,
+)
+
+
+def _is_value_desestacionalizado(question: str) -> bool:
+    return bool(question) and bool(_VALUE_DESEST_RE.search(question))
+
+
 _PIB_ACTIVITY_HINTS = {
     "agropecuario",
     "pesca",
@@ -304,6 +322,22 @@ def make_intent_node(memory_adapter: Any, intent_store: Any = None, predict_with
             # follow-up branch swallow them.
             if context_label != "standalone":
                 context_label = "standalone"
+
+        # Override determinístico para "valor desestacionalizado": el
+        # clasificador oscila entre method/value con baja confianza, pero el
+        # usuario pide el valor de la serie. Forzamos intent='value' para
+        # enrutar a data y dejar que las reglas de negocio resuelvan
+        # calc_mode='prev_period' (variación t-1).
+        if (
+            normalized_intent == "method"
+            and _is_value_desestacionalizado(question)
+            and not _is_calendar_intent(question)
+        ):
+            logger.info(
+                "[INTENT_NODE] Value-desestacionalizado override: intent 'method'->'value' for question=%r",
+                question[:120],
+            )
+            normalized_intent = "value"
 
         payload_root = _predict_payload_root(predict_raw)
         current_intents = _as_dict(payload_root.get("intents"))
