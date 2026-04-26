@@ -326,3 +326,6 @@ orchestrator/data/example_payload.js
 
 # Ignora archivos de datos preprocesados del payload
 orchestrator/memory/data_store/
+
+# QA Automator: artefactos generados por corridas
+qa/output/
