@@ -41,15 +41,15 @@ def test_build_metric_priority_instruction_for_share():
 def test_build_metric_priority_instruction_for_contribution_enforces_neutral_negative_wording():
     text = response_module._build_metric_priority_instruction("contribution")
     assert text is not None
-    assert "MATRIZ DE SINÓNIMOS ESTILO INFORME IMACEC" in text
-    assert "NUNCA 'pp'" in text
-    assert "valor absoluto" in text
+    assert "PUNTOS PORCENTUALES" in text
+    assert "**±X,Xpp**" in text
+    assert "signo explícito" in text
+    assert "PROHIBIDO usar '%' al lado del valor de una actividad" in text
+    assert "sin verbo intermedio" in text
     assert "CHEQUEO FINAL OBLIGATORIO" in text
-    assert "'-X,X%'" in text
-    assert "contribuciones negativas de" in text
-    assert "a la baja" in text
     assert "PLANTILLA OBLIGATORIA POR ACTIVIDAD" in text
-    assert "REGLA OBLIGATORIA POR CADA PORCENTAJE" in text
+    assert "Servicios personales **-1,1pp**" in text
+    assert "Construcción **+0,5pp**" in text
 
 
 def test_contribution_activity_focus_instruction_forbids_generic_negative_summary():
