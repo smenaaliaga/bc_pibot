@@ -70,7 +70,8 @@ _OUT_OF_SCOPE_ALLOWLIST_RE = re.compile(
     r"imacec|"
     r"producto\s+interno\s+bruto|"
     r"cuentas?\s+nacional(?:es)?|"
-    r"actividad\s+econ[oó]mica"
+    r"actividad\s+econ[oó]mica|"
+    r"econom[ií]a"
     r")\b",
     re.IGNORECASE,
 )
@@ -86,7 +87,11 @@ def _is_out_of_scope(
 
     Reglas (en orden):
     1. Calendario de publicaciones de PIB/IMACEC → en alcance (RAG calendar).
-    2. NER normalizó alguna entidad macro → en alcance.
+    2. NER normalizó activity/region/investment → en alcance.
+       NOTA: deliberadamente NO consultamos `indicator` aquí porque el
+       clasificador asigna `indicator=pib|imacec` por DEFAULT a cualquier
+       pregunta (incluso OOS como "cuál es el valor del dólar"). Las otras
+       entidades sí requieren tokens explícitos en el texto.
     3. Followup con indicador previo PIB/IMACEC → en alcance.
     4. Texto contiene keyword del allowlist → en alcance.
     5. Caso contrario → fuera de alcance.
@@ -99,7 +104,7 @@ def _is_out_of_scope(
         return False
 
     norm = current_norm if isinstance(current_norm, dict) else {}
-    for key in ("indicator", "activity", "region", "investment"):
+    for key in ("activity", "region", "investment"):
         if not _is_empty_value(norm.get(key)):
             return False
 
@@ -399,6 +404,19 @@ def make_intent_node(memory_adapter: Any, intent_store: Any = None, predict_with
         current_intents = _as_dict(payload_root.get("intents"))
         current_norm = _as_dict(payload_root.get("entities_normalized"))
 
+        # Snapshot de entidades NER ANTES de cualquier mutación followup.
+        # El gate out-of-scope debe juzgar la pregunta original (lo que el
+        # clasificador extrajo del texto), no las entidades enriquecidas
+        # con el indicador del turno previo. Sin este snapshot, una pregunta
+        # fuera de alcance dentro de una sesión multi-turno hereda
+        # indicator=pib/imacec del backfill y nunca dispararía el gate.
+        _scope_snapshot_norm: Dict[str, Any] = {
+            "indicator": current_norm.get("indicator"),
+            "activity": current_norm.get("activity"),
+            "region": current_norm.get("region"),
+            "investment": current_norm.get("investment"),
+        }
+
         if context_label == "followup":
             prev_intent_raw, prev_predict_raw = _extract_previous_turn_payload(intent_store, session_id, current_turn_id)
             prev_root = _predict_payload_root(prev_predict_raw)
@@ -491,15 +509,16 @@ def make_intent_node(memory_adapter: Any, intent_store: Any = None, predict_with
                 decision = "fallback"
 
         # Out-of-scope gate (capa A). Override final: si la pregunta no es
-        # sobre PIB ni IMACEC, redirigimos al nodo scope_block. No tocamos
-        # el resto de las rutas (data/rag/fallback) cuando hay alcance válido.
+        # sobre PIB ni IMACEC, redirigimos al nodo scope_block. Usamos el
+        # snapshot pre-followup para no contaminar el juicio con el
+        # indicador heredado del turno previo.
         try:
             prev_indicator_for_scope = _first_non_empty(prev_norm.get("indicator")) if "prev_norm" in locals() else None
         except Exception:
             prev_indicator_for_scope = None
         if _is_out_of_scope(
             question=question,
-            current_norm=current_norm,
+            current_norm=_scope_snapshot_norm,
             prev_indicator=prev_indicator_for_scope,
             context_label=context_label,
         ):

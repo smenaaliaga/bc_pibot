@@ -213,8 +213,10 @@ def test_in_scope_predicate_does_not_block(question: str):
 @pytest.mark.parametrize(
     "norm_key,value",
     [
-        ("indicator", "pib"),
-        ("indicator", "imacec"),
+        # NOTA: `indicator` se excluye intencionalmente: el clasificador real
+        # asigna indicator=pib|imacec por DEFAULT incluso a preguntas OOS,
+        # por lo que no es señal confiable. Las otras entidades sí requieren
+        # tokens explícitos en el texto.
         ("activity", "mineria"),
         ("activity", "servicios"),
         ("region", "antofagasta"),
@@ -222,14 +224,26 @@ def test_in_scope_predicate_does_not_block(question: str):
     ],
 )
 def test_in_scope_when_ner_normalizes_entity(norm_key: str, value: str):
-    """Si el normalizador detectó una entidad macro, no se bloquea aunque la
-    pregunta sin keyword salga del allowlist directo."""
+    """Si el normalizador detectó una entidad macro (activity/region/investment),
+    no se bloquea aunque la pregunta sin keyword salga del allowlist directo."""
     assert _is_out_of_scope(
         question="cuánto fue en el último período",
         current_norm={norm_key: value},
         prev_indicator=None,
         context_label="standalone",
     ) is False
+
+
+def test_indicator_alone_does_not_pass_gate():
+    """Regresión: el clasificador asigna indicator=imacec por default a
+    preguntas OOS. El gate debe ignorar `indicator` y bloquear de todos modos
+    si no hay otras señales."""
+    assert _is_out_of_scope(
+        question="cuál es el valor del dólar observado",
+        current_norm={"indicator": "imacec"},  # default del clasificador
+        prev_indicator=None,
+        context_label="standalone",
+    ) is True
 
 
 # ---------------------------------------------------------------------------
