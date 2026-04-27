@@ -412,10 +412,35 @@ def make_scope_block_node(llm_adapter=None):
     return scope_block_node
 
 
+# ---------------------------------------------------------------------------
+# Greeting node: responde a saludos puros con un mensaje amigable + invitación
+# a consultar PIB/IMACEC. Determinístico (sin LLM).
+# ---------------------------------------------------------------------------
+
+GREETING_RESPONSE = (
+    "¡Hola! Soy PIBot, el asistente del Banco Central de Chile para consultas "
+    "sobre PIB e IMACEC. ¿En qué te puedo ayudar? Por ejemplo, puedes "
+    "preguntarme por el valor del último IMACEC o la variación trimestral del PIB."
+)
+
+
+def make_greeting_node():
+    """Nodo determinístico para saludos (\"hola\", \"buenos días\", etc.)."""
+
+    def greeting_node(state: AgentState, *, writer: Optional[StreamWriter] = None):
+        _emit_stream_chunk(GREETING_RESPONSE, writer)
+        logger.info("[GREETING] Greeting response emitted | output_len=%d", len(GREETING_RESPONSE))
+        return {"output": GREETING_RESPONSE, "route_decision": "greeting"}
+
+    return greeting_node
+
+
 __all__ = [
     "make_rag_node",
     "make_fallback_node",
     "make_scope_block_node",
+    "make_greeting_node",
     "OUT_OF_SCOPE_GUARDRAIL",
     "OUT_OF_SCOPE_FALLBACK_SUGGESTION",
+    "GREETING_RESPONSE",
 ]

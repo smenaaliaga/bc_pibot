@@ -7,7 +7,7 @@ from .ingest import (
     make_router_node,
 )
 from .data import make_data_node
-from .llm import make_fallback_node, make_rag_node, make_scope_block_node
+from .llm import make_fallback_node, make_rag_node, make_scope_block_node, make_greeting_node
 from .memory import make_memory_node
 
 __all__ = [
@@ -19,5 +19,6 @@ __all__ = [
     "make_rag_node",
     "make_fallback_node",
     "make_scope_block_node",
+    "make_greeting_node",
     "make_memory_node",
 ]

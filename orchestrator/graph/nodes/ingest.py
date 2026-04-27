@@ -59,6 +59,29 @@ def _is_value_desestacionalizado(question: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Greeting gate: detecta saludos puros ("hola", "buenos días", etc.).
+# ---------------------------------------------------------------------------
+_GREETING_RE = re.compile(
+    r"^\s*(?:"
+    r"hola+|holi+|holaa+|"
+    r"buen[oa]s?\s*(?:d[ií]as?|tardes?|noches?)?|"
+    r"buen\s*d[ií]a|"
+    r"qu[eé]\s*tal|"
+    r"saludos?|"
+    r"hey|hi|hello"
+    r")\b[\s\.,!¡¿\?]*$",
+    re.IGNORECASE,
+)
+
+
+def _is_greeting(question: str) -> bool:
+    """True si la pregunta es solo un saludo (sin contenido adicional)."""
+    if not question:
+        return False
+    return bool(_GREETING_RE.match(question.strip()))
+
+
+# ---------------------------------------------------------------------------
 # Out-of-scope gate: bloquea preguntas que no son sobre PIB / IMACEC.
 # ---------------------------------------------------------------------------
 # Allowlist mínima de tokens que indican alcance macro-PIB/IMACEC. Si NER ya
@@ -508,6 +531,16 @@ def make_intent_node(memory_adapter: Any, intent_store: Any = None, predict_with
             else:
                 decision = "fallback"
 
+        # Greeting gate: si la pregunta es solo un saludo, redirigimos al
+        # nodo greeting (responde con saludo + invitación a consultar PIB/IMACEC).
+        if _is_greeting(question):
+            logger.info(
+                "[INTENT_NODE] Greeting detected; overriding decision=%s -> 'greeting' for question=%r",
+                decision,
+                question[:120],
+            )
+            decision = "greeting"
+
         # Out-of-scope gate (capa A). Override final: si la pregunta no es
         # sobre PIB ni IMACEC, redirigimos al nodo scope_block. Usamos el
         # snapshot pre-followup para no contaminar el juicio con el
@@ -516,7 +549,7 @@ def make_intent_node(memory_adapter: Any, intent_store: Any = None, predict_with
             prev_indicator_for_scope = _first_non_empty(prev_norm.get("indicator")) if "prev_norm" in locals() else None
         except Exception:
             prev_indicator_for_scope = None
-        if _is_out_of_scope(
+        if decision != "greeting" and _is_out_of_scope(
             question=question,
             current_norm=_scope_snapshot_norm,
             prev_indicator=prev_indicator_for_scope,

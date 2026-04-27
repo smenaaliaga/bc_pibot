@@ -97,6 +97,18 @@ def _as_yes_no(value: bool) -> str:
     return "SI" if value else "NO"
 
 
+def _abbrev(text: Any, max_len: int = 120) -> str:
+    """Resumen seguro de un valor para el log (1 línea, recortado)."""
+    try:
+        s = repr(text)
+    except Exception:
+        s = f"<unrepr {type(text).__name__}>"
+    s = s.replace("\n", " ").replace("\r", " ")
+    if len(s) > max_len:
+        s = s[: max_len - 3] + "..."
+    return s
+
+
 def _format_final_response(output: Any) -> str:
     if output is None:
         return ""
@@ -410,6 +422,11 @@ class DetailTracer:
             "general_orchestration_s": general_orchestration_s,
             "total_s": total_s,
         }
+
+
+# ---------------------------------------------------------------------------
+# (FileTracer eliminado: degradaba performance vía sys.setprofile + monkey-patch)
+# ---------------------------------------------------------------------------
 
 
 class DataStoreCapture:

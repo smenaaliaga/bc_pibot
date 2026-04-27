@@ -124,6 +124,32 @@ from orchestrator.normalizer._vocab import PERIOD_LATEST_REGEX, PERIOD_PREVIOUS_
 _ENTITY_KEYS = ("indicator", "seasonality", "frequency", "activity", "region", "investment", "price", "period")
 
 
+# Palabras de "ruido de precio" que el NER a veces deja pegadas al slot 'investment'
+# (ej: "exportaciones nominales", "consumo a precios corrientes"). Las quitamos
+# antes de hacer fuzzy-match contra INVESTMENT_TERMS para no romper la similitud.
+_PRICE_NOISE_RE = re.compile(
+    r"\b(?:nominal(?:es|mente)?|reales?|encadenad[oa]s?|"
+    r"a\s+precios\s+(?:corrientes|constantes)|"
+    r"precios?\s+(?:corrientes?|constantes?)|"
+    r"volumen)\b",
+    re.IGNORECASE,
+)
+
+
+def _strip_price_noise(value: Optional[str]) -> Optional[str]:
+    """Quita palabras de precio (nominal/real/etc.) de un slot crudo.
+
+    Preserva el resto del texto para que el matcher pueda alinearlo al
+    vocabulario. La señal de precio se recupera más abajo via fallback en
+    ``normalize_ner_entities`` (que mira el texto completo de la pregunta).
+    """
+    if not value:
+        return value
+    cleaned = _PRICE_NOISE_RE.sub(" ", value)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned or value
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Helpers de contexto
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -379,7 +405,8 @@ def normalize_ner_entities(
     norm_ind = normalize_indicator(indicator_raw, norm_freq)
     norm_seas = normalize_seasonality(seasonality_raw, calc_mode)
     norm_region, fail_region = normalize_region(region_raw)
-    norm_inv, fail_inv = normalize_investment(investment_raw)
+    investment_clean = _strip_price_noise(investment_raw)
+    norm_inv, fail_inv = normalize_investment(investment_clean)
     norm_price = normalize_price(price_raw)
 
     # Fallback: el NER a veces absorbe "nominal(es)" o "precios corrientes" dentro
