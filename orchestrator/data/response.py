@@ -2239,7 +2239,13 @@ def _is_level_only_query(question: str, entities_ctx: Dict[str, Any]) -> bool:
     # 4. Señal semántica del clasificador (cubre paráfrasis: valor, monto,
     #    cifra, cuánto fue, dame el ..., etc.).
     if intent_cls == "value" and calc_mode in {"", "original", "yoy"}:
-        return True
+        # IMACEC es un índice base 2018=100 sin variante nominal: por
+        # convención macroeconómica chilena, "valor del IMACEC" = variación
+        # interanual (yoy_pct), no el nivel del índice. No cortamos en
+        # False aquí: dejamos caer a la capa 5 (regex léxico) para que
+        # "nivel del imacec" siga retornando True.
+        if indicator_ent != "imacec":
+            return True
 
     # 5. Fallback léxico estricto.
     if re.search(r"\bnivel(?:es)?\s+de[l]?\s+(?!variaci|crecimient|ca[ií]da|aceleraci|alza|subid|bajad)\w+", text_norm):
