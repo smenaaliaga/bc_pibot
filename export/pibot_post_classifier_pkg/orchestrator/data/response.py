@@ -2393,16 +2393,6 @@ def _pick_level_target_series(
             if st == "pib" or st.startswith("producto interno bruto"):
                 return s
 
-    # 7. IMACEC (índice real, base 2018=100). El IMACEC es por construcción
-    #    un índice encadenado (real); no existe variante a precios corrientes,
-    #    por lo que esta capa cubre el default natural "valor del IMACEC" →
-    #    reportar el nivel del índice (ej. 119,5).
-    if "imacec" in text_norm or indicator_ent == "imacec":
-        for s in series_list:
-            st = _norm(s.get("short_title"))
-            if st == "imacec" or st.startswith("imacec "):
-                return s
-
     return None
 
 
