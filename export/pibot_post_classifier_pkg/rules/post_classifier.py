@@ -91,6 +91,31 @@ class ResolvedEntities:
     investment_cls: Any = None
     req_form_cls: Any = None
 
+    # ------------------------------------------------------------------
+    # intent_cls
+    # ------------------------------------------------------------------
+    # Etiqueta del head ``intent`` del clasificador (uvicorn /predict →
+    # ``ClassificationResult.intent``). Valores típicos:
+    #   - "value"      → consulta por el NIVEL/MONTO de la serie
+    #                    (ej. "cuál es el valor del IMACEC", "monto del PIB")
+    #   - "variation"  → consulta por una variación (yoy/pct/aceleración)
+    #   - "share"      → consulta por participación (% sobre el PIB)
+    #   - "contribution" / "rank" / "extrema" / "metadata" → otros tipos
+    #
+    # Se propaga desde ``data_node`` (orchestrator/graph/nodes/data.py)
+    # leyendo ``classification.intent`` y se consume en
+    # ``orchestrator/data/response.py::_is_level_only_query`` para decidir
+    # de forma SEMÁNTICA (no léxica) si la pregunta es de nivel.
+    # Antes de este campo la decisión dependía de regex sobre el texto crudo,
+    # lo que generaba falsos negativos con paráfrasis ("cifra", "monto",
+    # "cuánto fue", "dame el ..."). El head ``intent`` cubre esas paráfrasis
+    # con confianza > 0.99 según los reportes del clasificador.
+    #
+    # Default ``None`` para compatibilidad: si el campo no se setea (p. ej.
+    # tests que construyen ResolvedEntities a mano), el comportamiento
+    # vuelve al fallback léxico previo.
+    intent_cls: Any = None
+
     price: Optional[str] = None
     hist: Optional[int] = None
     historical_floor_instruction: Optional[str] = None
