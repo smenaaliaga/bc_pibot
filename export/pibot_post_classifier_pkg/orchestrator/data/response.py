@@ -2272,13 +2272,24 @@ def _pick_level_target_series(
       4. Totales hard-coded (exportaciones/importaciones) como red de seguridad.
       5. Fallback a PIB solo cuando la pregunta lo menciona explícitamente.
     """
-    series_list = observations.get("series") or []
-    if not series_list:
-        return None
 
     def _norm(value: Any) -> str:
         txt = unicodedata.normalize("NFKD", str(value or "").lower())
         return "".join(ch for ch in txt if not unicodedata.combining(ch)).strip()
+
+    # Normalización IMACEC: si la consulta es genérica sobre IMACEC y no se especifica price/calc_mode, forzar enc/yoy
+    indicator_ent_norm = _norm(entities_ctx.get("indicator_ent"))
+    price_ent_norm = _norm(entities_ctx.get("price_ent") or entities_ctx.get("price"))
+    calc_mode_norm = _norm(entities_ctx.get("calc_mode_cls") or entities_ctx.get("calc_mode"))
+    if indicator_ent_norm == "imacec":
+        if not price_ent_norm:
+            entities_ctx["price"] = "enc"
+        if not calc_mode_norm:
+            entities_ctx["calc_mode"] = "yoy"
+
+    series_list = observations.get("series") or []
+    if not series_list:
+        return None
 
     text_norm = _norm(question)
     indicator_ent = _norm(entities_ctx.get("indicator_ent"))
@@ -2392,7 +2403,18 @@ def _pick_level_target_series(
             if st.startswith("importaciones de bienes y servicios"):
                 return s
 
-    # 6. PIB total (nominal / a cuánto asciende).
+
+    # 6. IMACEC total (nivel, price enc, genérico)
+    if "imacec" in text_norm or indicator_ent == "imacec":
+        for s in series_list:
+            st = _norm(s.get("short_title"))
+            cls = s.get("classification") if isinstance(s.get("classification"), dict) else {}
+            price_cls = _norm(cls.get("price"))
+            # Solo selecciona IMACEC nivel encadenado
+            if (st == "imacec" or st.startswith("imacec")) and price_cls == "enc":
+                return s
+
+    # 7. PIB total (nominal / a cuánto asciende).
     if "pib" in text_norm or indicator_ent == "pib":
         for s in series_list:
             st = _norm(s.get("short_title"))
@@ -3026,6 +3048,35 @@ def _build_original_series_force_instruction(
         "OBLIGATORIO: llama get_series_data y usa value del período solicitado (o del último disponible). "
         "OBLIGATORIO: entrega una sola cifra principal en el bloque DATOS. "
         "Si respondes con yoy_pct/pct en estos casos, la respuesta es inválida y debes rehacerla con value."
+    )
+
+
+def _build_pib_real_no_variation_instruction(
+    question: str,
+    entities_ctx: Optional[Dict[str, Any]] = None,
+) -> Optional[str]:
+    """Fuerza salida en nivel/original para consultas explícitas de PIB real."""
+    text = str(question or "").lower()
+    text_norm = unicodedata.normalize("NFKD", text)
+    text_norm = "".join(ch for ch in text_norm if not unicodedata.combining(ch))
+    ctx = entities_ctx or {}
+    indicator_ent = str(ctx.get("indicator_ent") or "").strip().lower()
+
+    is_pib_real_query = bool(
+        re.search(r"\bpib\b.*\breal(?:es)?\b|\breal(?:es)?\b.*\bpib\b", text_norm)
+    )
+    if not is_pib_real_query and indicator_ent != "pib":
+        return None
+
+    if not is_pib_real_query:
+        return None
+
+    return (
+        "REGLA DE MAXIMA PRIORIDAD — PIB REAL SIN VARIACIONES: para esta consulta, "
+        "la respuesta debe usar el campo value (serie original) como cifra principal. "
+        "PROHIBIDO reportar pct o yoy_pct como cifra principal o secundaria. "
+        "PROHIBIDO redactar la respuesta en términos de variación porcentual. "
+        "OBLIGATORIO: entregar los niveles solicitados por período con su unidad."
     )
 
 
@@ -3928,7 +3979,8 @@ def stream_data_response(
     max_tool_loops = int(os.getenv("MAX_TOOL_LOOPS", "16"))
 
     try:
-        client = _OpenAI()
+        from config import get_httpx_client as _get_httpx_client  # type: ignore
+        client = _OpenAI(http_client=_get_httpx_client())
     except Exception:
         logger.exception("[DATA_RESPONSE] Error inicializando OpenAI client")
         yield "Error al conectar con el modelo de lenguaje."
@@ -4038,6 +4090,12 @@ def stream_data_response(
     )
     if value_no_rescale_instruction:
         messages.append({"role": "system", "content": value_no_rescale_instruction})
+    pib_real_no_variation_instruction = _build_pib_real_no_variation_instruction(
+        question=question,
+        entities_ctx=entities_ctx,
+    )
+    if pib_real_no_variation_instruction:
+        messages.append({"role": "system", "content": pib_real_no_variation_instruction})
     original_series_force_instruction = _build_original_series_force_instruction(
         question=question,
         entities_ctx=entities_ctx,
