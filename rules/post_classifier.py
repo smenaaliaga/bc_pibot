@@ -437,6 +437,26 @@ class Rule05_FueraDeAlcance:
         re.IGNORECASE,
     )
 
+    # Blocklist textual: cualquier mención clara a tópicos fuera de
+    # PIB/IMACEC fuerza out-of-scope incluso si el clasificador
+    # devolvió indicator=imacec por defecto. Tiene PRECEDENCIA sobre
+    # la allowlist y sobre el follow-up macro: si el usuario pregunta
+    # explícitamente por dólar/paridades/tasa/persona, la respuesta
+    # debe ser scope_block.
+    BLOCKLIST_RE = re.compile(
+        r"\b("
+        r"paridad(?:es)?|"
+        r"d[oó]lar(?:es)?|euro|yen|yuan|libra\s+esterlina|"
+        r"peso\s+(?:chileno|argentino|colombiano|mexicano|uruguayo|peruano)|"
+        r"tipos?\s+de\s+cambio|tcn|tcr|tcm|"
+        r"tasa(?:s)?\s+(?:de\s+)?(?:inter[eé]s|pol[ií]tica|tpm)|tpm|"
+        r"inflaci[oó]n|ipc|ipom|ipsa|"
+        r"presidenta?|presidente|vicepresidente|gerente|ministr[oa]|director(?:a)?|consejer[oa]|"
+        r"qui[eé]n(?:es)?\s+(?:es|son|fue|fueron)|c[oó]mo\s+se\s+llama"
+        r")\b",
+        re.IGNORECASE,
+    )
+
     # ---- LOGICA GENERAL ----------------------------------------------
     @classmethod
     def is_out_of_scope(
@@ -453,6 +473,12 @@ class Rule05_FueraDeAlcance:
             return False
 
         norm = current_norm if isinstance(current_norm, dict) else {}
+
+        # Hard blocklist: precede a cualquier allowlist/follow-up para
+        # neutralizar el sesgo del clasificador (que tiende a etiquetar
+        # como IMACEC textos desconocidos como paridades, dólar, etc.).
+        if cls.BLOCKLIST_RE.search(q):
+            return True
 
         if cls._has_macro_entity(norm):
             return False
@@ -868,12 +894,19 @@ class RuleGreeting:
     CAT = "GREET"
 
     # ---- Regex --------------------------------------------------------
+    # Lista de "tokens" de saludo. Una pregunta es saludo si toda ella
+    # se compone de uno o más de estos tokens, separados por puntuación
+    # o espacios (p.ej. "hola", "como estas", "hola, como estas",
+    # "buenos dias que tal", "hola como va?").
+    _GREETING_TOKEN_RE = (
+        r"hola+|holi+|holaa+|hey|hi|hello|saludos?|"
+        r"buen[oa]s?\s*(?:d[ií]as?|tardes?|noches?)?|buen\s*d[ií]a|"
+        r"qu[eé]\s*tal|qu[eé]\s+haces|qu[eé]\s+onda|"
+        r"c[oó]mo\s+(?:est[aá]s|est[aá]n|est[aá]is|va|vas|andas|te\s+va|estamos)|"
+        r"todo\s+bien|y\s+t[uú]|y\s+vos|gracias"
+    )
     GREETING_RE = re.compile(
-        r"^\s*(?:"
-        r"hola+|holi+|holaa+|"
-        r"buen[oa]s?\s*(?:d[ií]as?|tardes?|noches?)?|"
-        r"buen\s*d[ií]a|qu[eé]\s*tal|saludos?|hey|hi|hello"
-        r")\b[\s\.,!¡¿\?]*$",
+        rf"^\s*(?:(?:{_GREETING_TOKEN_RE})\s*[,\.!\?¡¿]*\s*)+$",
         re.IGNORECASE,
     )
 
