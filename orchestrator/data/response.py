@@ -2575,6 +2575,83 @@ def _precompute_level_answer(
     return text, ctx
 
 
+def _is_historical_pib_range(question: str, entities_ctx: Dict[str, Any]) -> bool:
+    """True para PIB anual con rango histórico amplio.
+
+    Casos cubiertos:
+      - ``ent.hist == 1`` (Rule13 detectó año < 1996) o
+        ``historical_floor_instruction`` está seteado.
+      - ``req_form_cls == 'range'`` con span anual >= 2 años, o
+      - El texto menciona "desde", "en adelante", "histórico", "evolución".
+
+    En estos casos el LLM debe reportar la variación yoy_pct año por año en
+    lugar de un nivel puntual; el cuadro renderiza correctamente la serie
+    completa con cbCalculo=YTYPCT.
+    """
+    indicator = str(entities_ctx.get("indicator_ent") or "").strip().lower()
+    if indicator != "pib":
+        return False
+    frequency = str(entities_ctx.get("frequency_ent") or "").strip().lower()
+    if frequency != "a":
+        return False
+    if entities_ctx.get("hist") in (1, "1", True):
+        return True
+    if entities_ctx.get("historical_floor_instruction"):
+        return True
+    req_form = str(entities_ctx.get("req_form_cls") or "").strip().lower()
+    text_norm = unicodedata.normalize("NFKD", str(question or "").lower())
+    text_norm = "".join(c for c in text_norm if not unicodedata.combining(c))
+    if req_form == "range":
+        if re.search(
+            r"\b(desde|en\s+adelante|hist[o\u00f3]ric|evoluci[o\u00f3]n)\b",
+            text_norm,
+        ):
+            return True
+        period = entities_ctx.get("period_ent") or []
+        years: List[int] = []
+        for value in period:
+            match = re.search(r"(\d{4})", str(value or ""))
+            if match:
+                years.append(int(match.group(1)))
+        if len(years) >= 2 and (max(years) - min(years)) >= 2:
+            return True
+    return False
+
+
+def _build_historical_pib_yoy_instruction(
+    question: str,
+    entities_ctx: Dict[str, Any],
+) -> Optional[str]:
+    """Instrucción específica para PIB anual histórico/rango amplio.
+
+    Obliga al LLM a llamar get_series_data y reportar yoy_pct año por año.
+    Prohíbe afirmar que los datos no están disponibles (la serie histórica
+    sí está cargada y el cuadro la renderiza correctamente).
+    """
+    if not _is_historical_pib_range(question, entities_ctx):
+        return None
+    return (
+        "REGLA HISTÓRICA PIB ANUAL (RANGO): esta consulta cubre un rango "
+        "amplio de años del PIB anual. OBLIGATORIO:\n"
+        "1. Llama get_series_data con frequency='A' para obtener TODOS los "
+        "registros del rango solicitado.\n"
+        "2. Reporta la VARIACIÓN INTERANUAL (yoy_pct) de cada año del rango. "
+        "Si el rango supera ~10 años, resume con promedio, máximo y mínimo "
+        "de yoy_pct más los años con valores extremos; NUNCA omitas la "
+        "variación.\n"
+        "3. NO reportes niveles absolutos en miles de millones de pesos "
+        "encadenados como cifra principal: el usuario no pidió un monto, "
+        "pidió la trayectoria del PIB.\n"
+        "4. ESTÁ PROHIBIDO afirmar 'no dispongo de los valores', 'no tengo "
+        "cargados los datos' o frases similares: la serie histórica está "
+        "completa en get_series_data para todo el rango.\n"
+        "5. Si la serie empalmada parte después del año solicitado (p. ej. "
+        "PIB desde 1960 cuando se pidió desde 1900), aclara la cobertura "
+        "real una sola vez y luego reporta yoy_pct desde el primer año "
+        "disponible."
+    )
+
+
 def _build_level_prefetch_messages(
     question: str,
     entities_ctx: Dict[str, Any],
@@ -2591,6 +2668,14 @@ def _build_level_prefetch_messages(
     Retorna None si no corresponde inyectar prefetch.
     """
     if not _is_level_only_query(question, entities_ctx):
+        return None
+    # Skip en consultas de PIB anual histórico/rango amplio: aquí debemos
+    # reportar la variación interanual año por año (matching el cuadro), no
+    # un nivel puntual. Dejamos que el LLM use la tool real.
+    if _is_historical_pib_range(question, entities_ctx):
+        logger.info(
+            "[DATA_RESPONSE] level_prefetch skipped (historical pib annual range)"
+        )
         return None
     # Skip en cuadros de participación/share: sus series son porcentajes sobre
     # el PIB (la serie "PIB" siempre vale 100) y requieren selección de
@@ -4063,6 +4148,12 @@ def stream_data_response(
     )
     if annual_pib_instruction:
         messages.append({"role": "system", "content": annual_pib_instruction})
+    historical_pib_yoy_instruction = _build_historical_pib_yoy_instruction(
+        question=question,
+        entities_ctx=entities_ctx,
+    )
+    if historical_pib_yoy_instruction:
+        messages.append({"role": "system", "content": historical_pib_yoy_instruction})
     hist_floor = entities_ctx.get("historical_floor_instruction")
     if hist_floor:
         messages.append({"role": "system", "content": hist_floor})
