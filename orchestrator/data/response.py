@@ -2194,15 +2194,16 @@ def _is_level_only_query(question: str, entities_ctx: Dict[str, Any]) -> bool:
          ``indicator_ent='pib_per_capita'``, ``activity_ent='per_capita'``,
          o el texto menciona explícitamente "nominal", "precios corrientes",
          "per cápita", "a cuánto asciende" → True.
-      4. Señal semántica del clasificador: ``intent_cls='value'`` con
-         ``calc_mode`` neutro ({'', 'original'}) → True. Esto cubre
-         paráfrasis como "monto del IMACEC", "cuánto fue el PIB", "dame el
-         valor del IMACEC", "cifra del IMACEC", que el regex léxico previo
-         dejaba escapar. ``calc_mode='yoy'`` se excluye porque indica
-         intención variacional explícita del clasificador (e.g. "qué
-         actividad creció más", "cuánto creció el PIB"); en esos casos
-         debemos permitir tool calls (rank_series / get_series_data con
-         yoy_pct) en lugar de inyectar prefetch de nivel.
+      4. Señal semántica del clasificador CON hint léxico de nivel: si
+         ``intent_cls='value'`` con ``calc_mode`` neutro ({'', 'original'})
+         Y el texto contiene un hint léxico fuerte de nivel monetario
+         ("monto", "valor en pesos/dólares", "cifra en pesos", "miles de
+         millones", "billones", "cuántos pesos", "en pesos") → True. Para
+         paráfrasis genéricas SIN hint ("valor del PIB", "cifra del PIB",
+         "cuánto fue el PIB", "PIB del último trimestre") devolvemos False
+         para que la respuesta sea sólo de variación (yoy_pct), conforme a
+         la convención macroeconómica chilena. IMACEC se excluye en esta
+         capa siempre (siempre es índice → variación interanual).
       5. Fallback léxico (compat): "nivel de/del X" sin tokens variacionales.
     """
     text = str(question or "")
@@ -2240,16 +2241,28 @@ def _is_level_only_query(question: str, entities_ctx: Dict[str, Any]) -> bool:
     )):
         return True
 
-    # 4. Señal semántica del clasificador (cubre paráfrasis: valor, monto,
-    #    cifra, cuánto fue, dame el ..., etc.).
+    # 4. Señal semántica del clasificador con HINT léxico explícito de nivel.
+    #    Política: paráfrasis genéricas como "valor del PIB", "cifra del
+    #    PIB", "cuánto fue el PIB" / IMACEC NO deben gatillar prefetch de
+    #    nivel — por convención macroeconómica chilena se reportan como
+    #    variación interanual (yoy_pct). Solo activamos level-only cuando
+    #    el texto contiene un hint léxico fuerte de nivel monetario:
+    #    "monto", "valor en pesos/dólares", "cifra en pesos", "miles de
+    #    millones", "en pesos", "cuántos pesos".
     if intent_cls == "value" and calc_mode in {"", "original"}:
-        # IMACEC es un índice base 2018=100 sin variante nominal: por
-        # convención macroeconómica chilena, "valor del IMACEC" = variación
-        # interanual (yoy_pct), no el nivel del índice. No cortamos en
-        # False aquí: dejamos caer a la capa 5 (regex léxico) para que
-        # "nivel del imacec" siga retornando True.
         if indicator_ent != "imacec":
-            return True
+            level_hint_re = re.compile(
+                r"\b(?:monto|montos)\b"
+                r"|\bvalor\s+en\s+(?:peso|pesos|d[oó]lares|dolares|usd|clp)\b"
+                r"|\bcifra\s+en\s+(?:peso|pesos|d[oó]lares|dolares|usd|clp)\b"
+                r"|\bmiles\s+de\s+millones\b"
+                r"|\bbillones\b"
+                r"|\b(?:cu[aá]ntos?)\s+(?:peso|pesos|d[oó]lares|dolares)\b"
+                r"|\ben\s+(?:peso|pesos)\b",
+                re.IGNORECASE,
+            )
+            if level_hint_re.search(text_norm):
+                return True
 
     # 5. Fallback léxico estricto.
     if re.search(r"\bnivel(?:es)?\s+de[l]?\s+(?!variaci|crecimient|ca[ií]da|aceleraci|alza|subid|bajad)\w+", text_norm):

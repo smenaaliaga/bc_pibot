@@ -1,13 +1,13 @@
-"""Validación del fix: queries con calc_mode=yoy NO entran a level prefetch.
+"""Validación de la política de level vs variación en `_is_level_only_query`.
 
-Bug: "¿Qué actividad creció más al último trimestre?" (classifier:
-intent=value, calc_mode=yoy, indicator=pib, activity=general) era
-clasificado como level-only por capa 4 de `_is_level_only_query`, lo que
-inyectaba prefetch sintético con tool_choice='none' y dejaba al LLM sin
-posibilidad de invocar `rank_series` → alucinación.
-
-Fix: remover 'yoy' del set de calc_mode neutros en capa 4. El clasificador
-ya distingue intención variacional vía calc_mode.
+Política:
+- PIB / IMACEC con paráfrasis genéricas ("valor", "cifra", "cuánto fue")
+  SIN hint léxico de nivel monetario → variación (yoy_pct).
+- Sólo activamos level-only cuando hay hint estructural fuerte (price=co,
+  pib_per_capita, "nominal", "precios corrientes", "per cápita", "a cuánto
+  asciende") o hint léxico monetario ("monto", "valor en pesos", "miles
+  de millones", "en pesos") o "nivel del/de el X" explícito.
+- calc_mode ∈ {yoy, prev_period, contribution, share} → variación, nunca level.
 """
 from __future__ import annotations
 
@@ -22,8 +22,10 @@ from orchestrator.data.response import (
 @pytest.mark.parametrize(
     "calc_mode,expected_level_only",
     [
-        ("", True),
-        ("original", True),
+        # Política actualizada: paráfrasis genéricas ("cuanto fue el pib")
+        # SIN hint léxico de nivel monetario → variación, no level.
+        ("", False),
+        ("original", False),
         ("yoy", False),
         ("prev_period", False),
         ("contribution", False),
@@ -75,8 +77,10 @@ def test_activity_ranking_no_prefetch_injected():
     assert result is None
 
 
-def test_pib_level_query_still_level_only():
-    """Sanidad: 'cuanto fue el pib del último trimestre' (calc_mode='') sigue siendo level."""
+def test_pib_value_query_default_variation():
+    """Política nueva: 'cuanto fue el pib del último trimestre' SIN hint
+    léxico de nivel monetario (monto/pesos/miles de millones) → variación,
+    no level."""
     ctx = {
         "indicator_ent": "pib",
         "intent_cls": "value",
@@ -84,7 +88,24 @@ def test_pib_level_query_still_level_only():
     }
     assert _is_level_only_query(
         "cuanto fue el pib del último trimestre", ctx
-    ) is True
+    ) is False
+
+
+def test_pib_explicit_monetary_level_still_level_only():
+    """Hint léxico explícito de nivel monetario sigue gatillando level-only."""
+    ctx = {
+        "indicator_ent": "pib",
+        "intent_cls": "value",
+        "calc_mode_cls": "",
+    }
+    for q in (
+        "a cuanto asciende el monto del pib del último trimestre",
+        "cual fue el pib en pesos del último trimestre",
+        "cuantos pesos fue el pib en 2023",
+        "valor en pesos del pib en 2023",
+        "cuantos miles de millones fue el pib en 2023",
+    ):
+        assert _is_level_only_query(q, ctx) is True, q
 
 
 def test_pib_yoy_growth_query_not_level_only():
