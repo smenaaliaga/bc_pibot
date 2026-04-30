@@ -326,3 +326,44 @@ def test_point_generic_activity_mayo_del_ano_pasado_infers_monthly(monkeypatch):
     assert normalized["indicator"] == ["imacec"]
     assert normalized["frequency"] == ["m"]
     assert normalized["period"] == ["2025-05-01", "2025-05-31"]
+
+
+def test_range_generic_growth_two_last_years_infers_pib_annual(monkeypatch):
+    monkeypatch.setattr(normalizer_mod, "_reference_now", lambda: datetime(2026, 4, 30))
+    entities = {
+        "indicator": ["economia"],
+        "period": ["dos ultimos anos"],
+    }
+
+    normalized = normalize_entities(entities, calc_mode="yoy", req_form="range")
+
+    assert normalized["indicator"] == ["pib"]
+    assert normalized["frequency"] == ["a"]
+    assert normalized["period"] == ["2024-01-01", "2024-12-31"]
+
+
+def test_range_generic_growth_n_last_years_infers_pib_annual(monkeypatch):
+    monkeypatch.setattr(normalizer_mod, "_reference_now", lambda: datetime(2026, 4, 30))
+    entities = {
+        "indicator": ["economia"],
+        "period": ["ultimos 3 anos"],
+    }
+
+    normalized = normalize_entities(entities, calc_mode="yoy", req_form="range")
+
+    assert normalized["indicator"] == ["pib"]
+    assert normalized["frequency"] == ["a"]
+    assert normalized["period"] == ["2023-01-01", "2023-12-31"]
+
+
+def test_range_generic_growth_between_years_keeps_explicit_range():
+    entities = {
+        "indicator": ["economia"],
+        "period": ["entre 2020 y 2022"],
+    }
+
+    normalized = normalize_entities(entities, calc_mode="yoy", req_form="range")
+
+    assert normalized["indicator"] == ["pib"]
+    assert normalized["frequency"] == ["a"]
+    assert normalized["period"] == ["2020-01-01", "2022-12-31"]

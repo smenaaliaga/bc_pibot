@@ -441,6 +441,22 @@ def _extract_relative_year_offset(text: str) -> Optional[int]:
     n = normalize_text(text)
     if not n:
         return None
+    m = re.search(
+        r"\b(?:ultim[oa]s?|pasad[oa]s?|anteriores?)\s+([0-9]+|un|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|trece|catorce|quince|dieciseis|diecisiete|dieciocho|diecinueve|veinte)\s+(?:ano|anio)s?\b",
+        n,
+    )
+    if m:
+        amount = _parse_number_token(m.group(1))
+        if amount is not None and amount > 0:
+            return amount
+    m = re.search(
+        r"\b([0-9]+|un|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|trece|catorce|quince|dieciseis|diecisiete|dieciocho|diecinueve|veinte)\s+(?:ultim[oa]s?|pasad[oa]s?|anteriores?)\s+(?:ano|anio)s?\b",
+        n,
+    )
+    if m:
+        amount = _parse_number_token(m.group(1))
+        if amount is not None and amount > 0:
+            return amount
     if re.search(r"\b(?:ano|anio)\s+antepasad[oa]s?\b", n):
         return 2
     if re.search(r"\b(?:ano|anio)\s+antes\s+pasad[oa]s?\b", n):
