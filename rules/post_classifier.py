@@ -577,12 +577,17 @@ class Rule07_ContribucionIndividual:
 # ============================================================================
 #
 # EXPLICACIÓN DEL PROCESO
-#   Determina el parámetro de precio para la búsqueda de series. Si el
-#   normalizador detectó precio explícito ('enc' encadenado o 'co' corriente)
-#   se usa directamente; en caso contrario el default es 'enc'.
+#   Determina el parámetro de precio para la búsqueda de series con
+#   precedencia explícita:
+#   1) Si el clasificador detectó precio explícito ('enc' o 'co'), se respeta.
+#   2) Si la consulta es nominal/precios corrientes, forzar 'co'.
+#   3) Si la consulta pide PIB real, tratarla bajo política de precios
+#      corrientes y priorizar nivel original.
+#   4) Si la consulta pide nivel explícito, por defecto responder en 'co'.
+#   5) Fallback general: 'enc'.
 #
-# Input   : ent.price_ent
-# Output  : ent.price
+# Input   : ent.price_ent, ent.question
+# Output  : ent.price, ent.calc_mode_cls (en consultas PIB real)
 # ============================================================================
 
 
@@ -591,10 +596,70 @@ class Rule09_NivelesNominales:
 
     CAT = "CAT09"
 
+    LEVEL_RE = re.compile(
+        r"\bnivel(?:es)?\s+de(?:l|la)?\s+(?!variaci|crecimient|ca[ií]da|aceleraci|alza|subid|bajad)\w+",
+        re.IGNORECASE,
+    )
+    NOMINAL_RE = re.compile(
+        r"\bnominal(?:es)?\b|\bprecios?\s+corrientes?\b",
+        re.IGNORECASE,
+    )
+    PIB_REAL_RE = re.compile(
+        r"\bpib\b.*\breal(?:es)?\b|\breal(?:es)?\b.*\bpib\b",
+        re.IGNORECASE,
+    )
+    YEAR_WORD_RE = re.compile(r"\ba[nñ]os?\b", re.IGNORECASE)
+
     @classmethod
     def assign_price(cls, ent: ResolvedEntities) -> None:
-        ent.price = ent.price_ent if ent.price_ent else "enc"
-        _trace(ent, cls.CAT, "assign_price", f"price={ent.price}")
+        q = _ensure_text(ent.question).strip().lower()
+
+        # Desambiguación: si "pib real" quedó como IMACEC, corregir a PIB.
+        if cls.PIB_REAL_RE.search(q) and str(ent.indicator_ent or "").strip().lower() == "imacec":
+            ent.indicator_ent = "pib"
+            if str(ent.frequency_ent or "").strip().lower() == "m":
+                ent.frequency_ent = "a" if cls.YEAR_WORD_RE.search(q) else "q"
+            _trace(
+                ent,
+                cls.CAT,
+                "pib_real_disambiguation",
+                f"indicator={ent.indicator_ent}, frequency={ent.frequency_ent}",
+            )
+
+        # 1) Respetar precio explícito detectado por normalizador/clasificador.
+        if ent.price_ent in ("co", "enc"):
+            ent.price = ent.price_ent
+            _trace(ent, cls.CAT, "assign_price", f"price={ent.price} (from price_ent)")
+            return
+
+        # 2) Nominal / precios corrientes y consultas "PIB real".
+        if cls.NOMINAL_RE.search(q) or cls.PIB_REAL_RE.search(q):
+            ent.price = "co"
+            ent.price_ent = "co"
+            if cls.PIB_REAL_RE.search(q):
+                ent.calc_mode_cls = "original"
+                if "nivel" not in q:
+                    ent.question = f"{_ensure_text(ent.question)} (nivel en pesos corrientes)"
+                ent.historical_floor_instruction = (
+                    "REGLA DE SALIDA (PIB REAL): para esta consulta debes reportar "
+                    "el nivel original (campo value) del PIB a precios corrientes. "
+                    "NO uses pct ni yoy_pct como cifra principal y NO redactes la "
+                    "respuesta como variación porcentual."
+                )
+                _trace(ent, cls.CAT, "assign_price", "price=co + calc_mode=original (pib real query)")
+            else:
+                _trace(ent, cls.CAT, "assign_price", "price=co (nominal query)")
+            return
+
+        # 3) Consulta de nivel explícita.
+        if cls.LEVEL_RE.search(q):
+            ent.price = "co"
+            _trace(ent, cls.CAT, "assign_price", "price=co (default level query)")
+            return
+
+        # 4) Fallback general.
+        ent.price = "enc"
+        _trace(ent, cls.CAT, "assign_price", f"price={ent.price} (default)")
 
     # Methods / Functions / Exceptions / Regex: (none)
 
