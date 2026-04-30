@@ -876,6 +876,77 @@ class Rule13_Historicos:
 
 
 # ============================================================================
+# TIPO DE CONSULTA: 14 — PIB REGIONAL · default YoY
+# ============================================================================
+#
+# EXPLICACIÓN DEL PROCESO
+#   Para PIB regional la convención canónica del BCCh es reportar la
+#   variación interanual (YoY), que es la vista por defecto del cuadro
+#   Cuentas Nacionales > PIB Regional. Si el clasificador no detectó
+#   intención variacional explícita (queda ``calc_mode=original``) y la
+#   pregunta es puntual (``req_form=point``), forzamos
+#   ``calc_mode_cls='yoy'`` para que:
+#     1. ``response.py::_is_level_only_query`` NO tome la ruta de NIVEL.
+#     2. El URL builder use ``cbCalculo=YTYPCT`` (consistente con la imagen
+#        del cuadro BDE).
+#     3. El LLM reporte ``yoy_pct`` y no el monto en miles de millones.
+#
+#   Guardas (todas en AND para evitar afectar otras consultas):
+#     - indicator_ent == 'pib'
+#     - region_cls == 'specific' AND region_ent normalizada
+#     - calc_mode_cls == 'original' (sin señal variacional del clasificador)
+#     - req_form_cls == 'point'
+#     - sin señal léxica de "nivel/monto/valor en pesos" en la pregunta
+#
+#   Si el usuario pide explícitamente el nivel ("monto", "valor en pesos",
+#   "miles de millones", "cuántos pesos"), la regla NO se activa y se
+#   conserva ``calc_mode=original``.
+#
+# Input   : ent.indicator_ent, ent.region_cls, ent.region_ent,
+#           ent.calc_mode_cls, ent.req_form_cls, ent.question
+# Output  : ent.calc_mode_cls = 'yoy'  (cuando aplica)
+# ============================================================================
+
+
+class Rule14_PibRegionalDefaultYoY:
+    """REGLA_14_PIB_REGIONAL_DEFAULT_YOY."""
+
+    CAT = "CAT14"
+
+    LEVEL_HINTS_RE = re.compile(
+        r"\b(monto|nivel(?:es)?|valor(?:es)?\s+en\s+pesos?|"
+        r"miles\s+de\s+millones|cu[aá]nt[oa]s?\s+pesos?|en\s+pesos?\b|"
+        r"a\s+cu[aá]nto\s+ascien)",
+        re.IGNORECASE,
+    )
+
+    @classmethod
+    def force_yoy(cls, ent: ResolvedEntities) -> None:
+        if (str(ent.indicator_ent or "").strip().lower()) != "pib":
+            return
+        if (str(ent.region_cls or "").strip().lower()) != "specific":
+            return
+        if not (str(ent.region_ent or "").strip()):
+            return
+        if (str(ent.calc_mode_cls or "").strip().lower()) != "original":
+            return
+        if (str(ent.req_form_cls or "").strip().lower()) != "point":
+            return
+        q = _ensure_text(ent.question)
+        if cls.LEVEL_HINTS_RE.search(q):
+            return
+        ent.calc_mode_cls = "yoy"
+        _trace(
+            ent,
+            cls.CAT,
+            "pib_regional_default_yoy",
+            f"region_ent={ent.region_ent} → calc_mode=yoy",
+        )
+
+    # Methods / Functions / Exceptions: (none)
+
+
+# ============================================================================
 # RUTEO ADICIONAL: SALUDOS
 # ============================================================================
 #
@@ -940,6 +1011,7 @@ _RULES_PIPELINE = [
     Rule13_Historicos.apply_floor,
     Rule01_ContribucionGrupal.demanda_interna,
     Rule04_CrecimientoPIB.redirect_pib_monthly_to_quarterly,
+    Rule14_PibRegionalDefaultYoY.force_yoy,
 ]
 
 

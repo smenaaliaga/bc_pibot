@@ -250,12 +250,21 @@ def _filter_series_by_entities(
     price = str(ent.price or "").strip().lower()
     seasonality = str(ent.seasonality_ent or "").strip().lower()
     calc_mode = str(ent.calc_mode_cls or "").strip().lower()
+    region_cls = str(ent.region_cls or "").strip().lower()
+    region_ent = str(ent.region_ent or "").strip().lower()
     if price:
         constraints["price"] = price
     if seasonality:
         constraints["seasonality"] = seasonality
     if calc_mode:
         constraints["calc_mode"] = calc_mode
+    # Cambio 1 (PIB regional): cuando el clasificador retorna región específica
+    # con entidad normalizada, la serie objetivo DEBE declarar esa región
+    # explícitamente. Esto evita que cuadros multi-región (que incluyen el PIB
+    # nacional como primera serie con classification_series sin region) emitan
+    # la serie nacional al LLM cuando el usuario pidió una región puntual.
+    if region_cls == "specific" and region_ent:
+        constraints["region"] = region_ent
 
     if not constraints:
         return observations
@@ -266,9 +275,10 @@ def _filter_series_by_entities(
             return True
         for key, expected in constraints.items():
             current = cls.get(key)
-            # Regla estricta: si se pidió estacionalidad, la serie debe declararla
-            # explícitamente para evitar mezclar SA/NsA por omisión de metadata.
-            if key == "seasonality" and current is None:
+            # Regla estricta: si se pidió estacionalidad o región específica,
+            # la serie debe declararla explícitamente para evitar mezclar
+            # SA/NsA o nacional/regional por omisión de metadata.
+            if key in ("seasonality", "region") and current is None:
                 return False
             if current is None:
                 continue

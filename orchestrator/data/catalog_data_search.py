@@ -113,6 +113,23 @@ def search_output_payloads(
             }
         )
 
+    # Cambio 2 (PIB regional): cuando se pide una región específica, priorizar
+    # cuadros donde classification.region == wanted_region (single-region) por
+    # sobre cuadros multi-región (donde el match vino vía classification_series).
+    # Esto vuelve determinista la elección entre, por ejemplo,
+    # ``pib_anual_por_region_*`` (multi-region) y
+    # ``pib_anual_por_actividad_economica_region_de_<X>_*`` (single-region).
+    # Sin esta normalización el resultado dependía del orden alfabético del
+    # filesystem.
+    if wanted_region:
+        def _is_single_region_match(m: Dict[str, Any]) -> int:
+            cls_payload = m.get("classification") or {}
+            cls_region = cls_payload.get("region")
+            if cls_region and _match_value(cls_region, wanted_region):
+                return 0  # prioridad alta
+            return 1
+        matches.sort(key=_is_single_region_match)
+
     return matches
 
 
