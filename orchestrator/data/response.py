@@ -2195,10 +2195,14 @@ def _is_level_only_query(question: str, entities_ctx: Dict[str, Any]) -> bool:
          o el texto menciona explícitamente "nominal", "precios corrientes",
          "per cápita", "a cuánto asciende" → True.
       4. Señal semántica del clasificador: ``intent_cls='value'`` con
-         ``calc_mode`` neutro ({'', 'original', 'yoy'}) → True. Esto cubre
+         ``calc_mode`` neutro ({'', 'original'}) → True. Esto cubre
          paráfrasis como "monto del IMACEC", "cuánto fue el PIB", "dame el
          valor del IMACEC", "cifra del IMACEC", que el regex léxico previo
-         dejaba escapar.
+         dejaba escapar. ``calc_mode='yoy'`` se excluye porque indica
+         intención variacional explícita del clasificador (e.g. "qué
+         actividad creció más", "cuánto creció el PIB"); en esos casos
+         debemos permitir tool calls (rank_series / get_series_data con
+         yoy_pct) en lugar de inyectar prefetch de nivel.
       5. Fallback léxico (compat): "nivel de/del X" sin tokens variacionales.
     """
     text = str(question or "")
@@ -2238,7 +2242,7 @@ def _is_level_only_query(question: str, entities_ctx: Dict[str, Any]) -> bool:
 
     # 4. Señal semántica del clasificador (cubre paráfrasis: valor, monto,
     #    cifra, cuánto fue, dame el ..., etc.).
-    if intent_cls == "value" and calc_mode in {"", "original", "yoy"}:
+    if intent_cls == "value" and calc_mode in {"", "original"}:
         # IMACEC es un índice base 2018=100 sin variante nominal: por
         # convención macroeconómica chilena, "valor del IMACEC" = variación
         # interanual (yoy_pct), no el nivel del índice. No cortamos en
