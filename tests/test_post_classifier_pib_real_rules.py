@@ -59,6 +59,60 @@ def test_imacec_latest_query_keeps_existing_behavior_from_20260430_log():
     assert ent.price == "enc"
 
 
+def test_economy_growth_two_latest_years_forces_pib_annual_even_if_imacec_detected():
+    ent = ResolvedEntities(
+        question="cuanto crecio la economia en los dos ultimos anos",
+        indicator_ent="imacec",
+        frequency_ent="m",
+        activity_ent="imacec",
+        calc_mode_cls="yoy",
+        req_form_cls="range",
+        price_ent=None,
+        period_ent=["2024-01-01", "2025-12-31"],
+    )
+
+    apply_business_rules(ent)
+
+    assert ent.indicator_ent == "pib"
+    assert ent.frequency_ent == "a"
+    assert ent.activity_ent is None
+
+
+def test_economy_growth_with_accents_forces_pib_annual():
+    ent = ResolvedEntities(
+        question="cuanto creció la economia en los dos ultimos años",
+        indicator_ent="imacec",
+        frequency_ent="m",
+        activity_ent="imacec",
+        calc_mode_cls="yoy",
+        req_form_cls="range",
+        price_ent=None,
+        period_ent=["2026-03-01", "2026-03-31"],
+    )
+
+    apply_business_rules(ent)
+
+    assert ent.indicator_ent == "pib"
+    assert ent.frequency_ent == "a"
+    assert ent.activity_ent is None
+
+
+def test_economy_growth_recent_years_variant_forces_pib_annual():
+    ent = ResolvedEntities(
+        question="cuanto fue la variacion de la economia en anos recientes",
+        indicator_ent="imacec",
+        frequency_ent="m",
+        calc_mode_cls="yoy",
+        req_form_cls="range",
+        price_ent=None,
+    )
+
+    apply_business_rules(ent)
+
+    assert ent.indicator_ent == "pib"
+    assert ent.frequency_ent == "a"
+
+
 def test_variacion_trimestral_pib_keeps_prev_period_rule_from_20260430_log():
     ent = ResolvedEntities(
         question="cual es la variacion trimestral del pib",

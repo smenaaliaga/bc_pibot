@@ -2295,6 +2295,17 @@ def _pick_level_target_series(
             if "per capita" in _norm(s.get("short_title")):
                 return s
 
+    # 1.b Caso específico robusto: consumo de hogares (con o sin IPSFL).
+    # Evita caer en "PIB a precios corrientes" cuando el usuario pide
+    # explícitamente hogares y el título del cuadro incluye "... e IPSFL".
+    has_households_hint = any(tok in text_norm for tok in ("hogares", "hogar", "ipsfl", "ipfsl"))
+    has_consumption_hint = any(tok in text_norm for tok in ("consumo", "cosnumo"))
+    if has_households_hint and has_consumption_hint:
+        for s in series_list:
+            st_norm = _norm(s.get("short_title"))
+            if "consumo de hogares" in st_norm:
+                return s
+
     # 2. Match específico por tokens del short_title. Permite resolver
     #    sub-componentes del cuadro que no tienen classification.investment
     #    (ej. "cobre" -> F033.XCO, "bienes durables" -> F033.CDU,

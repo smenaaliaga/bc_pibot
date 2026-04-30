@@ -273,8 +273,10 @@ INVESTMENT_TERMS: Dict[str, List[str]] = {
     "demanda_interna": ["demanda interna", "consumo interno", "gasto interno"],
     "consumo": [
         "consumo", "consumo final", "gasto de consumo", "consumo de los hogares",
-        "consumo de las familias", "consumo de hogares", "IPSFL",
-        "consumo de hogares e IPSFL",
+        "consumo de las familias", "consumo de hogares", "consumo hogares",
+        "gasto de hogares", "gasto de los hogares", "IPSFL", "IPFSL",
+        "hogares e ipsfl", "ipsfl y hogares", "consumo de hogares e IPSFL",
+        "cosnumo de hogares", "cosnumo hogares",
     ],
     "consumo_gobierno": [
         "consumo del gobierno", "gasto del gobierno", "consumo público",

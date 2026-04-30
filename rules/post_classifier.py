@@ -608,11 +608,32 @@ class Rule09_NivelesNominales:
         r"\bpib\b.*\breal(?:es)?\b|\breal(?:es)?\b.*\bpib\b",
         re.IGNORECASE,
     )
+    ECONOMY_GROWTH_RE = re.compile(
+        r"\b(crec\w*|variaci[oó]n|cay[oó]|ca[ií]da|aument[oó]|expand[ií]\w*|expansi[oó]n)\b"
+        r".*\b(econom[ií]a|actividad\s+econ[oó]mica)\b"
+        r"|\b(econom[ií]a|actividad\s+econ[oó]mica)\b"
+        r".*\b(crec\w*|variaci[oó]n|cay[oó]|ca[ií]da|aument[oó]|expand[ií]\w*|expansi[oó]n)\b",
+        re.IGNORECASE,
+    )
     YEAR_WORD_RE = re.compile(r"\ba[nñ]os?\b", re.IGNORECASE)
 
     @classmethod
     def assign_price(cls, ent: ResolvedEntities) -> None:
         q = _ensure_text(ent.question).strip().lower()
+
+        # Desambiguación anual: "crecimiento de la economía" con mención de
+        # años (explícita o relativa) siempre debe resolver a PIB, no IMACEC.
+        if cls.ECONOMY_GROWTH_RE.search(q) and cls.YEAR_WORD_RE.search(q):
+            ent.indicator_ent = "pib"
+            ent.frequency_ent = "a"
+            if str(ent.activity_ent or "").strip().lower() == "imacec":
+                ent.activity_ent = None
+            _trace(
+                ent,
+                cls.CAT,
+                "economy_growth_years_disambiguation",
+                "indicator=pib, frequency=a",
+            )
 
         # Desambiguación: si "pib real" quedó como IMACEC, corregir a PIB.
         if cls.PIB_REAL_RE.search(q) and str(ent.indicator_ent or "").strip().lower() == "imacec":
