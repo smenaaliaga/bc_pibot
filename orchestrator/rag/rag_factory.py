@@ -36,7 +36,8 @@ def _embeddings() -> Optional[Any]:
     if not model:
         return None
     try:
-        return OpenAIEmbeddings(model=model)
+        from config import get_httpx_client  # type: ignore
+        return OpenAIEmbeddings(model=model, http_client=get_httpx_client())
     except Exception:
         logger.exception("Failed to init OpenAIEmbeddings for RAG")
     return None

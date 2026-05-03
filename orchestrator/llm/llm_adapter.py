@@ -237,7 +237,14 @@ class LLMAdapter:
         self._rag_docs_count: int = 0
         if ChatOpenAI is not None:
             try:
-                self._chat = ChatOpenAI(model=self.model, temperature=self.temperature, streaming=self.streaming)
+                from config import get_httpx_client, get_async_httpx_client  # type: ignore
+                self._chat = ChatOpenAI(
+                    model=self.model,
+                    temperature=self.temperature,
+                    streaming=self.streaming,
+                    http_client=get_httpx_client(),
+                    http_async_client=get_async_httpx_client(),
+                )
             except Exception:
                 self._chat = None
 
