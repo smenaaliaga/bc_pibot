@@ -1,0 +1,828 @@
+Pregunta 1: cual fue ultimo producto interno bruto o PIB
+Respuesta 1:
+La variación trimestral de la PIB volumen a precios del año anterior encadenado con respecto al año anterior, según los datos de la BDE, es de 1.6%.
+
+**Código de serie:** F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T
+
+**Descripción de la serie:** PIB volumen a precios del año anterior encadenado
+
+Periodo | Valor | Variación
+--------|-------|----------
+el 3er trimestre del 2025 | 51.880 | 1.6%
+
+Sugerencias:
+- ¿Cuál fue el valor del PIB en el último período disponible?
+- ¿Se ha observado alguna tendencia en el PIB en los últimos trimestres?
+- ¿Cómo se compara el PIB actual con el de períodos anteriores?
+* _Miles de millones de pesos_
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2/CCNN2018_P0_V(2)) del Banco Central de Chile.
+
+Key 1: none::q::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018
+Estado 1: llave encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 2: cual es el valor del PIB
+Respuesta 2:
+La variación trimestral de la PIB volumen a precios del año anterior encadenado con respecto al año anterior, según los datos de la BDE, es 1.6%.
+
+**Código de serie:** F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T
+
+**Descripción de la serie:** PIB volumen a precios del año anterior encadenado
+
+Periodo | Valor | Variación
+--------|-------|----------
+el 3er trimestre del 2025 | 51.880 | 1.6%
+
+Sugerencias:
+- ¿Cuál fue el valor del PIB en el último período disponible?
+- ¿Se ha observado alguna tendencia en el PIB en los últimos trimestres?
+- ¿Qué factores podrían estar influyendo en el comportamiento del PIB actualmente?
+* _Miles de millones de pesos_
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2/CCNN2018_P0_V(2)) del Banco Central de Chile.
+
+Key 2: none::q::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018
+Estado 2: llave encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 3: Cual es el valor del producto interno bruto
+Respuesta 3:
+La variación trimestral de la PIB volumen a precios del año anterior encadenado con respecto al año anterior, según los datos de la BDE, es de 1.6%.
+
+**Código de serie:** F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T
+
+**Descripción de la serie:** PIB volumen a precios del año anterior encadenado
+
+Periodo | Valor | Variación
+--------|-------|----------
+el 3er trimestre del 2025 | 51.880 | 1.6%
+
+Sugerencias:
+- ¿Cuál fue el valor del PIB en el último período disponible?
+- ¿Existen proyecciones sobre el comportamiento del PIB para los próximos trimestres?
+- ¿Cómo se compara el PIB actual con el de períodos anteriores?
+* _Miles de millones de pesos_
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2/CCNN2018_P0_V(2)) del Banco Central de Chile.
+
+Key 3: none::q::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018
+Estado 3: llave encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 4: como ha cambiado el producto interno burto  en el tiempo
+Respuesta 4:
+La variación trimestral de la PIB volumen a precios del año anterior encadenado con respecto al año anterior, según los datos de la BDE, es de 1.6%.
+
+**Código de serie:** F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T
+
+**Descripción de la serie:** PIB volumen a precios del año anterior encadenado
+
+Periodo | Valor | Variación
+--------|-------|----------
+el 3er trimestre del 2025 | 51.880 | 1.6%
+
+Sugerencias:
+- ¿Cuál fue el valor del PIB en el último período disponible?
+- ¿Existen proyecciones sobre la evolución del PIB para el próximo trimestre?
+- ¿Cómo se compara el PIB actual con el del mismo período del año anterior?
+* _Miles de millones de pesos_
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2/CCNN2018_P0_V(2)) del Banco Central de Chile.
+
+Key 4: none::q::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018
+Estado 4: llave encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 5: Cual es el pib a precios corrientes
+Respuesta 5:
+La variación trimestral de la PIB volumen a precios del año anterior encadenado con respecto al año anterior, según los datos de la BDE, es de 1.6%. Este dato corresponde al último período disponible.
+
+**Código de serie:** F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T
+
+**Descripción de la serie:** PIB volumen a precios del año anterior encadenado
+
+Periodo | Valor | Variación
+--------|-------|----------
+el 3er trimestre del 2025 | 51.880 | 1.6%
+
+Sugerencias:
+- ¿Cuál fue el valor del PIB en el último período disponible?
+- ¿Se ha observado alguna tendencia en el PIB en los últimos trimestres?
+- ¿Qué factores podrían estar influyendo en el comportamiento del PIB actualmente?
+* _Miles de millones de pesos_
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2/CCNN2018_P0_V(2)) del Banco Central de Chile.
+
+Key 5: none::q::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018
+Estado 5: llave encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 6: Cual es el pib de la region de arica
+Respuesta 6:
+La variación trimestral del PIB Región de Arica y Parinacota con respecto al año anterior, según los datos de la BDE, es 3.0%.
+
+**Código de serie:** F035.PIB.FLU.R.CLP.2018.Z.Z.Z.15.0.T
+
+**Descripción de la serie:** PIB Región de Arica y Parinacota
+
+Periodo | Valor | Variación
+--------|-------|----------
+el 3er trimestre del 2025 | 417 | 3.0%
+
+Sugerencias:
+- ¿Cuál fue el valor del PIB en el último período disponible?
+- ¿Se ha observado alguna tendencia en el PIB en los últimos trimestres?
+- ¿Qué factores podrían estar influyendo en el comportamiento del PIB actualmente?
+* _Miles de millones de pesos_
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/) del Banco Central de Chile.
+
+Key 6: none::q::yoy::specific::none::latest::none::none::arica_parinacota::none::pib::nsa::none::co::2018
+Estado 6: llave encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 7: cual es el pib de la región de tarapacá
+Respuesta 7:
+La variación trimestral del PIB de la Región de Tarapacá con respecto al año anterior, según los datos de la BDE, es -8.0%.
+
+**Código de serie:** F035.PIB.FLU.R.CLP.2018.Z.Z.Z.01.0.T
+
+**Descripción de la serie:** PIB Región de Tarapacá
+
+Periodo | Valor | Variación
+--------|-------|----------
+el 3er trimestre del 2025 | 1.219 | -8.0%
+
+Sugerencias:
+- ¿Cuál fue el valor del PIB en el último período disponible?
+- ¿Existen proyecciones sobre el comportamiento del PIB en los próximos trimestres?
+- ¿Cómo se compara el PIB actual con el de períodos anteriores?
+* _Miles de millones de pesos_
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/) del Banco Central de Chile.
+
+Key 7: none::q::yoy::specific::none::latest::none::none::tarapaca::none::pib::nsa::none::co::2018
+Estado 7: llave encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 8: cual es el pib de la región de antofagasta
+Respuesta 8:
+La variación trimestral del PIB Región de Antofagasta con respecto al año anterior, según los datos de la BDE, es -1.4%. Esta cifra refleja el desempeño económico de la región en el último período disponible.
+
+**Código de serie:** F035.PIB.FLU.R.CLP.2018.Z.Z.Z.02.0.T
+
+**Descripción de la serie:** PIB Región de Antofagasta
+
+Periodo | Valor | Variación
+--------|-------|----------
+el 3er trimestre del 2025 | 4.395 | -1.4%
+
+Sugerencias:
+- ¿Cuál fue el valor del PIB en el último período disponible?
+- ¿Cómo se compara el PIB actual con el de períodos anteriores?
+- ¿Existen proyecciones sobre el comportamiento del PIB en el próximo trimestre?
+* _Miles de millones de pesos_
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/) del Banco Central de Chile.
+
+Key 8: none::q::yoy::specific::none::latest::none::none::antofagasta::none::pib::nsa::none::co::2018
+Estado 8: llave encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 9: cual es el pib de la región de atacama
+Respuesta 9:
+La variación trimestral del PIB Región de Atacama con respecto al año anterior, según los datos de la BDE, es de 11.5%.
+
+**Código de serie:** F035.PIB.FLU.R.CLP.2018.Z.Z.Z.03.0.T
+
+**Descripción de la serie:** PIB Región de Atacama
+
+Periodo | Valor | Variación
+--------|-------|----------
+el 3er trimestre del 2025 | 1.159 | 11.5%
+
+Sugerencias:
+- ¿Cuál fue el valor del PIB en el último período disponible?
+- ¿Se han observado cambios significativos en el PIB en comparación con períodos anteriores?
+- ¿Qué factores podrían estar influyendo en la variación del PIB en este último período?
+* _Miles de millones de pesos_
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/) del Banco Central de Chile.
+
+Key 9: none::q::yoy::specific::none::latest::none::none::atacama::none::pib::nsa::none::co::2018
+Estado 9: llave encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 10: cual es el pib de la región de coquimbo
+Respuesta 10:
+La variación trimestral del PIB Región de Coquimbo con respecto al año anterior, según los datos de la BDE, es de 0.4%.
+
+**Código de serie:** F035.PIB.FLU.R.CLP.2018.Z.Z.Z.04.0.T
+
+**Descripción de la serie:** PIB Región de Coquimbo
+
+Periodo | Valor | Variación
+--------|-------|----------
+el 3er trimestre del 2025 | 1.588 | 0.4%
+
+Sugerencias:
+- ¿Cuál fue el valor del PIB en el último período disponible?
+- ¿Existen proyecciones sobre el comportamiento del PIB para el próximo trimestre?
+- ¿Cómo se compara el PIB actual con el de períodos anteriores?
+* _Miles de millones de pesos_
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/) del Banco Central de Chile.
+
+Key 10: none::q::yoy::specific::none::latest::none::none::coquimbo::none::pib::nsa::none::co::2018
+Estado 10: llave encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 11: cual es el pib de la región de valparaiso
+Respuesta 11:
+La variación trimestral del PIB Región de Valparaíso con respecto al año anterior, según los datos de la BDE, es de 2.9%.
+
+**Código de serie:** F035.PIB.FLU.R.CLP.2018.Z.Z.Z.05.0.T
+
+**Descripción de la serie:** PIB Región de Valparaíso
+
+Periodo | Valor | Variación
+--------|-------|----------
+el 3er trimestre del 2025 | 3.945 | 2.9%
+
+Sugerencias:
+- ¿Cuál fue el valor del PIB en el último período disponible?
+- ¿Existen proyecciones sobre el comportamiento del PIB en los próximos trimestres?
+- ¿Cómo se compara el PIB actual con el de períodos anteriores?
+* _Miles de millones de pesos_
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/) del Banco Central de Chile.
+
+Key 11: none::q::yoy::specific::none::latest::none::none::valparaiso::none::pib::nsa::none::co::2018
+Estado 11: llave encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 12: cual es el pib de la región metropolitana
+Respuesta 12:
+La variación trimestral del PIB de la Región Metropolitana de Santiago con respecto al año anterior, según los datos de la BDE, es 3.5%.
+
+**Código de serie:** F035.PIB.FLU.R.CLP.2018.Z.Z.Z.13.0.T
+
+**Descripción de la serie:** PIB Región Metropolitana de Santiago
+
+Periodo | Valor | Variación
+--------|-------|----------
+el 3er trimestre del 2025 | 21.630 | 3.5%
+
+Sugerencias:
+- ¿Cuál fue el valor del PIB en el último período disponible?
+- ¿Existen proyecciones sobre la evolución del PIB para el próximo trimestre?
+- ¿Cómo se compara el PIB del último período con el de períodos anteriores?
+* _Miles de millones de pesos_
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/) del Banco Central de Chile.
+
+Key 12: none::q::yoy::specific::none::latest::none::none::metropolitana::none::pib::nsa::none::co::2018
+Estado 12: llave encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 13: cual es el pib de la región de ohhiggins
+Respuesta 13:
+La variación trimestral del PIB de la Región del Libertador General Bernardo O'Higgins con respecto al año anterior, según los datos de la BDE, es -3.3%.
+
+**Código de serie:** F035.PIB.FLU.R.CLP.2018.Z.Z.Z.06.0.T
+
+**Descripción de la serie:** PIB Región del Libertador General Bernardo OHiggins
+
+Periodo | Valor | Variación
+--------|-------|----------
+el 3er trimestre del 2025 | 1.771 | -3.3%
+
+Sugerencias:
+- ¿Cuál fue el valor del PIB en el último período disponible?
+- ¿Se han observado cambios significativos en el PIB en comparación con períodos anteriores?
+- ¿Qué factores podrían estar influyendo en el comportamiento del PIB en este último período?
+* _Miles de millones de pesos_
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/) del Banco Central de Chile.
+
+Key 13: none::q::yoy::specific::none::latest::none::none::ohiggins::none::pib::nsa::none::co::2018
+Estado 13: llave encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 14: cual es el pib de la región del maule
+Respuesta 14:
+La variación trimestral del PIB Región del Maule con respecto al año anterior, según los datos de la BDE, es -3.3%.
+
+**Código de serie:** F035.PIB.FLU.R.CLP.2018.Z.Z.Z.07.0.T
+
+**Descripción de la serie:** PIB Región del Maule
+
+Periodo | Valor | Variación
+--------|-------|----------
+el 3er trimestre del 2025 | 1.730 | -3.3%
+
+Sugerencias:
+- ¿Cuál fue el valor del PIB en el último período disponible?
+- ¿Se ha observado alguna tendencia en el PIB en los últimos trimestres?
+- ¿Cómo se compara el PIB actual con el de períodos anteriores?
+* _Miles de millones de pesos_
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/) del Banco Central de Chile.
+
+Key 14: none::q::yoy::specific::none::latest::none::none::maule::none::pib::nsa::none::co::2018
+Estado 14: llave encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 15: cual es el pib de la región del ñuble
+Respuesta 15:
+La variación trimestral del PIB Región de Ñuble con respecto al año anterior, según los datos de la BDE, es de 1.8%.
+
+**Código de serie:** F035.PIB.FLU.R.CLP.2018.Z.Z.Z.16.0.T
+
+**Descripción de la serie:** PIB Región de Ñuble
+
+Periodo | Valor | Variación
+--------|-------|----------
+el 3er trimestre del 2025 | 740 | 1.8%
+
+Sugerencias:
+- ¿Cuál fue el valor del PIB en el último período disponible?
+- ¿Se ha observado alguna variación significativa en el PIB en comparación con períodos anteriores?
+- ¿Qué factores podrían estar influyendo en el comportamiento del PIB en este último período?
+* _Miles de millones de pesos_
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/) del Banco Central de Chile.
+
+Key 15: none::q::yoy::specific::none::latest::none::none::nuble::none::pib::nsa::none::co::2018
+Estado 15: llave encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 16: cual es el pib de la región del bio bio
+Respuesta 16:
+La variación trimestral del PIB Región del Biobío con respecto al año anterior, según los datos de la BDE, es -4.2%.
+
+**Código de serie:** F035.PIB.FLU.R.CLP.2018.Z.Z.Z.08.0.T
+
+**Descripción de la serie:** PIB Región del Biobío
+
+Periodo | Valor | Variación
+--------|-------|----------
+el 3er trimestre del 2025 | 3.173 | -4.2%
+
+Sugerencias:
+- ¿Cuál fue el valor del PIB en el último período disponible?
+- ¿Se observó alguna variación significativa en el PIB en comparación con períodos anteriores?
+- ¿Qué factores podrían haber influido en el comportamiento del PIB en el último período?
+* _Miles de millones de pesos_
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/) del Banco Central de Chile.
+
+Key 16: none::q::yoy::specific::none::latest::none::none::biobio::none::pib::nsa::none::co::2018
+Estado 16: llave encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 17: cual es el pib de la región de la araucanía
+Respuesta 17:
+La variación trimestral del PIB de la Región de La Araucanía con respecto al año anterior, según los datos de la BDE, es de 0.8%.
+
+**Código de serie:** F035.PIB.FLU.R.CLP.2018.Z.Z.Z.09.0.T
+
+**Descripción de la serie:** PIB Región de La Araucanía
+
+Periodo | Valor | Variación
+--------|-------|----------
+el 3er trimestre del 2025 | 1.500 | 0.8%
+
+Sugerencias:
+- ¿Cuál fue el valor del PIB en el último período disponible?
+- ¿Existen proyecciones sobre el comportamiento del PIB para los próximos trimestres?
+- ¿Cómo se compara el PIB del último período con el de períodos anteriores?
+* _Miles de millones de pesos_
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/) del Banco Central de Chile.
+
+Key 17: none::q::yoy::specific::none::latest::none::none::araucania::none::pib::nsa::none::co::2018
+Estado 17: llave encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 18: cual es el pib de la región de los ríos
+Respuesta 18:
+La variación trimestral del PIB Región de los Ríos con respecto al año anterior, según los datos de la BDE, es de 2.0%.
+
+**Código de serie:** F035.PIB.FLU.R.CLP.2018.Z.Z.Z.14.0.T
+
+**Descripción de la serie:** PIB Región de los Ríos
+
+Periodo | Valor | Variación
+--------|-------|----------
+el 3er trimestre del 2025 | 681 | 2.0%
+
+Sugerencias:
+- ¿Cuál fue el valor del PIB en el último período disponible?
+- ¿Existen proyecciones sobre el comportamiento del PIB en los próximos trimestres?
+- ¿Cómo se compara el PIB actual con el de períodos anteriores en términos de crecimiento?
+* _Miles de millones de pesos_
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/) del Banco Central de Chile.
+
+Key 18: none::q::yoy::specific::none::latest::none::none::los_rios::none::pib::nsa::none::co::2018
+Estado 18: llave encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 19: cual es el pib de la región de los lagos
+Respuesta 19:
+La variación trimestral del PIB Región de Los Lagos con respecto al año anterior, según los datos de la BDE, es 5.3%.
+
+**Código de serie:** F035.PIB.FLU.R.CLP.2018.Z.Z.Z.10.0.T
+
+**Descripción de la serie:** PIB Región de Los Lagos
+
+Periodo | Valor | Variación
+--------|-------|----------
+el 3er trimestre del 2025 | 1.793 | 5.3%
+
+Sugerencias:
+- ¿Cuál fue el valor del PIB en el último período disponible?
+- ¿Existen proyecciones sobre el comportamiento del PIB para el próximo trimestre?
+- ¿Cómo se compara el PIB actual con el del mismo período del año anterior?
+* _Miles de millones de pesos_
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/) del Banco Central de Chile.
+
+Key 19: none::q::yoy::specific::none::latest::none::none::los_lagos::none::pib::nsa::none::co::2018
+Estado 19: llave encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 20: cual es el pib de la región de aysén
+Respuesta 20:
+La variación trimestral del PIB Región de Aysén del General Carlos Ibáñez del Campo con respecto al año anterior, según los datos de la BDE, es 8.2%.
+
+**Código de serie:** F035.PIB.FLU.R.CLP.2018.Z.Z.Z.11.0.T
+
+**Descripción de la serie:** PIB Región de Aysén del General Carlos Ibáñez del Campo
+
+Periodo | Valor | Variación
+--------|-------|----------
+el 3er trimestre del 2025 | 371 | 8.2%
+
+Sugerencias:
+- ¿Cuál fue el valor del PIB en el último período disponible?
+- ¿Existen proyecciones sobre el comportamiento del PIB para el próximo trimestre?
+- ¿Cómo se compara el PIB del último período con el de períodos anteriores?
+* _Miles de millones de pesos_
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/) del Banco Central de Chile.
+
+Key 20: none::q::yoy::specific::none::latest::none::none::aysen::none::pib::nsa::none::co::2018
+Estado 20: llave encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 21: cual es el pib de la región de magallanes
+Respuesta 21:
+La variación trimestral del PIB Región de Magallanes y de la Antártica Chilena con respecto al año anterior, según los datos de la BDE, es 4.9%. Esta cifra refleja el crecimiento de la economía de la región en el último período disponible.
+
+**Código de serie:** F035.PIB.FLU.R.CLP.2018.Z.Z.Z.12.0.T
+
+**Descripción de la serie:** PIB Región de Magallanes y de la Antártica Chilena
+
+Periodo | Valor | Variación
+--------|-------|----------
+el 3er trimestre del 2025 | 516 | 4.9%
+
+Sugerencias:
+- ¿Cuál fue el valor del PIB en el último período disponible?
+- ¿Existen proyecciones sobre la evolución del PIB para los próximos trimestres?
+- ¿Cómo se compara el PIB actual con el de períodos anteriores?
+* _Miles de millones de pesos_
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL_T/) del Banco Central de Chile.
+
+Key 21: none::q::yoy::specific::none::latest::none::none::magallanes::none::pib::nsa::none::co::2018
+Estado 21: llave encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 22: Cual es el valor del pib regional
+Respuesta 22:
+Para esta consulta, los datos están disponibles en el siguiente cuadro de la BDE:
+
+- Cuadro 1: https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_REGIONAL
+
+Sugerencias:
+- ¿Qué indicador económico específico te gustaría analizar, como el IMACEC o el PIB?
+- ¿Estás interesado en datos recientes o en tendencias históricas de estos indicadores?
+- ¿Te gustaría conocer cómo estos indicadores afectan a sectores específicos de la economía chilena?
+
+Key 22: none::q::yoy::general::none::latest::none::none::none::none::pib::nsa::none::co::2018
+Estado 22: llave encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 23: Como ha cambiado el producto interno bruto
+Respuesta 23:
+La variación trimestral de la PIB volumen a precios del año anterior encadenado con respecto al año anterior, según los datos de la BDE, es 1.6%.
+
+**Código de serie:** F032.PIB.FLU.R.CLP.EP18.Z.Z.0.T
+
+**Descripción de la serie:** PIB volumen a precios del año anterior encadenado
+
+Periodo | Valor | Variación
+--------|-------|----------
+el 3er trimestre del 2025 | 51.880 | 1.6%
+
+Sugerencias:
+- ¿Cuál fue el valor del PIB en el último período disponible?
+- ¿Se observa alguna tendencia en el PIB en comparación con períodos anteriores?
+- ¿Qué factores podrían estar influyendo en el comportamiento del PIB actualmente?
+* _Miles de millones de pesos_
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2/CCNN2018_P0_V(2)) del Banco Central de Chile.
+
+Key 23: none::q::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018
+Estado 23: llave encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 24: cuales son los valores del pib por actividad economica
+Respuesta 24:
+La variación trimestral del PIB a precios corrientes con respecto al año anterior, según los datos de la BDE, es 8.7%.
+
+**Código de serie:** F032.PIB.FLU.N.CLP.EP18.Z.Z.0.T
+
+**Descripción de la serie:** PIB a precios corrientes
+
+Periodo | Valor | Variación
+--------|-------|----------
+el 3er trimestre del 2025 | 81.906 | 8.7%
+
+Sugerencias:
+- ¿Cuál fue el valor del PIB en el último período disponible?
+- ¿Existen proyecciones sobre el crecimiento del PIB para el próximo trimestre?
+- ¿Cómo se compara el último valor del PIB con el del período anterior?
+* _Miles de millones de pesos_
+
+**Fuente:** 🔗 [Base de Datos Estadísticos (BDE)](https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_P0_V2/CCNN2018_P0_V(2)) del Banco Central de Chile.
+
+Key 24: general::q::yoy::none::none::latest::none::none::none::none::pib::nsa::none::co::2018
+Estado 24: llave encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 25: cuales son los valores del pib regional por actividad economica trimestral de la region de arica
+Respuesta 25:
+[GRAPH] No se recibió clasificación para el nodo DATA.
+
+Sugerencias:
+- ¿Cuál es el pib desestacionalizado?
+- ¿Cuál es la variación del PIB por sectores?
+- ¿Qué mide el pib?
+
+Key 25: general::q::yoy::specific::none::latest::none::none::arica_parinacota::none::pib::nsa::none::co::2018
+Estado 25: llave no encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 26: cuales son los valores del pib regional por actividad economica trimestral de la region de tarapaca
+Respuesta 26:
+Para esta consulta, los datos están disponibles en el siguiente cuadro de la BDE:
+
+- Cuadro 1: https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_II_ACT_T/637801735531183626
+
+Sugerencias:
+- ¿Cuál indicador económico específico te interesa analizar, como el IMACEC o el PIB?
+- ¿Buscas información sobre un periodo de tiempo particular o una tendencia a largo plazo?
+- ¿Te gustaría conocer el impacto de estos indicadores en sectores específicos de la economía chilena?
+
+Key 26: general::q::yoy::specific::none::latest::none::none::tarapaca::none::pib::nsa::none::co::2018
+Estado 26: llave encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 27: cuales son los valores del pib regional por actividad economica trimestral de la region de antofagasta
+Respuesta 27:
+Para esta consulta, los datos están disponibles en el siguiente cuadro de la BDE:
+
+- Cuadro 1: https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_III_ACT_T/637801736193316285
+
+Sugerencias:
+- ¿Cuál es el indicador específico que te interesa analizar, como el IMACEC o el PIB?
+- ¿Buscas información sobre un período específico o una comparación entre años?
+- ¿Te gustaría conocer el impacto de estos indicadores en sectores económicos particulares?
+
+Key 27: general::q::yoy::specific::none::latest::none::none::antofagasta::none::pib::nsa::none::co::2018
+Estado 27: llave encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 28: cuales son los valores del pib regional por actividad economica trimestral de la region de atacama
+Respuesta 28:
+Para esta consulta, los datos están disponibles en el siguiente cuadro de la BDE:
+
+- Cuadro 1: https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_IV_ACT_T/637801736745283219
+
+Sugerencias:
+- ¿Qué indicador específico te interesa analizar: IMACEC o PIB?
+- ¿Buscas información sobre un período particular o una tendencia a largo plazo?
+- ¿Te gustaría conocer el impacto de estos indicadores en algún sector económico específico?
+
+Key 28: general::q::yoy::specific::none::latest::none::none::atacama::none::pib::nsa::none::co::2018
+Estado 28: llave encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 29: cuales son los valores del pib regional por actividad economica trimestral de coquimbo
+Respuesta 29:
+Para esta consulta, los datos están disponibles en el siguiente cuadro de la BDE:
+
+- Cuadro 1: https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_V_ACT_T/637801737440186066
+
+Sugerencias:
+- ¿Cuál indicador específico te interesa analizar: IMACEC, PIB u otro?
+- ¿Buscas información sobre un período específico o una tendencia a largo plazo?
+- ¿Te gustaría conocer la relación de estos indicadores con otros factores económicos, como la inflación o el desempleo?
+
+Key 29: general::q::yoy::specific::none::latest::none::none::coquimbo::none::pib::nsa::none::co::2018
+Estado 29: llave encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 30: cuales son los valores del pib regional por actividad economica trimestral de valparaiso
+Respuesta 30:
+Para esta consulta, los datos están disponibles en el siguiente cuadro de la BDE:
+
+- Cuadro 1: https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_XIII_ACT_T/637801738240186152
+
+Sugerencias:
+- ¿Cuál indicador económico específico te interesa analizar: IMACEC, PIB u otro?
+- ¿Buscas información sobre un periodo específico o comparaciones entre años?
+- ¿Te gustaría conocer las causas detrás de las variaciones en estos indicadores?
+
+Key 30: general::q::yoy::specific::none::latest::none::none::valparaiso::none::pib::nsa::none::co::2018
+Estado 30: llave encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 31: cuales son los valores del pib regional por actividad economica trimestral de la region metropolitana
+Respuesta 31:
+[GRAPH] No se recibió clasificación para el nodo DATA.
+
+Sugerencias:
+- ¿Cuál es el pib desestacionalizado?
+- ¿Cuál es la variación del PIB por sectores?
+- ¿Qué mide el pib?
+
+Key 31: general::q::yoy::general::none::latest::none::none::metropolitana::none::pib::nsa::none::co::2018
+Estado 31: llave no encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 32: cuales son los valores del pib regional por actividad economica trimestral de la region de ohhigins
+Respuesta 32:
+[GRAPH] No se recibió clasificación para el nodo DATA.
+
+Sugerencias:
+- ¿Cuál es el pib desestacionalizado?
+- ¿Cuál es la variación del PIB por sectores?
+- ¿Qué mide el pib?
+
+Key 32: general::q::yoy::general::none::latest::none::none::ohiggins::none::pib::nsa::none::co::2018
+Estado 32: llave no encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 33: cuales son los valores del pib regional por actividad economica trimestral de la region del maule
+Respuesta 33:
+[GRAPH] No se recibió clasificación para el nodo DATA.
+
+Sugerencias:
+- ¿Cuál es el pib desestacionalizado?
+- ¿Cuál es la variación del PIB por sectores?
+- ¿Qué mide el pib?
+
+Key 33: general::q::yoy::general::none::latest::none::none::maule::none::pib::nsa::none::co::2018
+Estado 33: llave no encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 34: cuales son los valores del pib regional por actividad economica trimestral de la region de ñuble
+Respuesta 34:
+[GRAPH] No se recibió clasificación para el nodo DATA.
+
+Sugerencias:
+- ¿Cuál es el pib desestacionalizado?
+- ¿Cuál es la variación del PIB por sectores?
+- ¿Qué mide el pib?
+
+Key 34: general::q::yoy::general::none::latest::none::none::nuble::none::pib::nsa::none::co::2018
+Estado 34: llave no encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 35: cuales son los valores del pib regional por actividad economica trimestral de la region del bio bio
+Respuesta 35:
+[GRAPH] No se recibió clasificación para el nodo DATA.
+
+Sugerencias:
+- ¿Cuál es el pib desestacionalizado?
+- ¿Cuál es la variación del PIB por sectores?
+- ¿Qué mide el pib?
+
+Key 35: general::q::yoy::general::none::latest::none::none::biobio::none::pib::nsa::none::co::2018
+Estado 35: llave no encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 36: cuales son los valores del pib regional por actividad economica trimestral de la region de araucania
+Respuesta 36:
+Para esta consulta, los datos están disponibles en el siguiente cuadro de la BDE:
+
+- Cuadro 1: https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_XIV_ACT_T/637801742211285376
+
+Sugerencias:
+- ¿Cuál indicador económico específico te interesa analizar, como el IMACEC o el PIB?
+- ¿Buscas información sobre un período de tiempo particular para esos indicadores?
+- ¿Te gustaría conocer la relación de estos indicadores con otros aspectos económicos, como la inflación o el desempleo?
+
+Key 36: general::q::yoy::specific::none::latest::none::none::araucania::none::pib::nsa::none::co::2018
+Estado 36: llave encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 37: cuales son los valores del pib regional por actividad economica trimestral de la region de los rios
+Respuesta 37:
+[GRAPH] No se recibió clasificación para el nodo DATA.
+
+Sugerencias:
+- ¿Cuál es el pib desestacionalizado?
+- ¿Cuál es la variación del PIB por sectores?
+- ¿Qué mide el pib?
+
+Key 37: general::q::yoy::general::none::latest::none::none::rios::none::pib::nsa::none::co::2018
+Estado 37: llave no encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 38: cuales son los valores del pib regional por actividad economica trimestral de la region de los lagos
+Respuesta 38:
+[GRAPH] No se recibió clasificación para el nodo DATA.
+
+Sugerencias:
+- ¿Cuál es el pib desestacionalizado?
+- ¿Cuál es la variación del PIB por sectores?
+- ¿Qué mide el pib?
+
+Key 38: general::q::yoy::specific::none::latest::none::none::los_lagos::none::pib::nsa::none::co::2018
+Estado 38: llave no encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 39: cuales son los valores del pib regional por actividad economica trimestral de la region de aysen
+Respuesta 39:
+Para esta consulta, los datos están disponibles en el siguiente cuadro de la BDE:
+
+- Cuadro 1: https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_CCNN/MN_CCNN76/CCNN2018_PIB_XII_ACT_T/637801745965731834
+
+Sugerencias:
+- ¿Te gustaría conocer la evolución del IMACEC en los últimos meses?
+- ¿Qué sector económico específico te interesa analizar en relación al PIB?
+- ¿Necesitas información sobre proyecciones futuras de estos indicadores?
+
+Key 39: general::q::yoy::specific::none::latest::none::none::aysen::none::pib::nsa::none::co::2018
+Estado 39: llave encontrada en metadata_q.json
+
+################################################################################################################################
+
+Pregunta 40: cuales son los valores del pib regional por actividad economica trimestral de la region de magallanes
+Respuesta 40:
+[GRAPH] No se recibió clasificación para el nodo DATA.
+
+Sugerencias:
+- ¿Cuál es el pib desestacionalizado?
+- ¿Cuál es la variación del PIB por sectores?
+- ¿Qué mide el pib?
+
+Key 40: general::q::yoy::specific::none::latest::none::none::magallanes::none::pib::nsa::none::co::2018
+Estado 40: llave no encontrada en metadata_q.json
+
+################################################################################################################################

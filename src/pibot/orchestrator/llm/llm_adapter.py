@@ -1,0 +1,490 @@
+"""Chat LLM adapter with streaming support (LangChain backend)."""
+
+from __future__ import annotations
+
+import os
+import re
+import logging
+from typing import Optional, List, Dict, Any, Iterable
+
+logger = logging.getLogger(__name__)
+
+FOLLOW_UP_SUFFIX = ""
+
+# Prefer langchain_openai for streaming
+try:
+    from langchain_openai import ChatOpenAI  # type: ignore
+except Exception:
+    ChatOpenAI = None  # type: ignore
+
+try:
+    from langchain.chat_models import init_chat_model  # type: ignore
+    from langchain.messages import SystemMessage, HumanMessage, AIMessage  # type: ignore
+    LANGCHAIN_AVAILABLE = True
+except Exception:
+    init_chat_model = None
+    SystemMessage = None
+    HumanMessage = None
+    AIMessage = None
+    LANGCHAIN_AVAILABLE = False
+
+# Tipos y prompts inline
+from typing import Literal
+GuardrailMode = Literal["rag", "fallback"]
+
+
+def _chunk_logs_enabled() -> bool:
+    return os.getenv("STREAM_CHUNK_LOGS", "0").lower() in ("1", "true", "yes", "on")
+
+
+def _rag_min_docs() -> int:
+    try:
+        return max(0, int(os.getenv("RAG_MIN_DOCS", "1")))
+    except Exception:
+        return 1
+
+
+def _rag_min_context_chars() -> int:
+    try:
+        return max(0, int(os.getenv("RAG_MIN_CONTEXT_CHARS", "250")))
+    except Exception:
+        return 250
+
+
+def _safe_no_evidence_reply() -> str:
+    return (
+        "No cuento con evidencia documental suficiente en este momento para responder con precisión. "
+        "Si quieres, puedo intentar con otra formulación de la pregunta o con más contexto específico."
+    )
+
+
+_CALENDAR_KEYWORDS = re.compile(
+    r"\bcalendario\b|"
+    r"cu[aá]ndo\s+se\s+publica|"
+    r"cu[aá]ndo\s+sale|"
+    r"cu[aá]ndo\s+publican|"
+    r"pr[oó]xim[oa]\s+publicaci[oó]n|"
+    r"fecha.*publicaci[oó]n|"
+    r"pr[oó]xim[oa]\s+(imacec|pib|cuentas\s+nacionales)",
+    re.IGNORECASE,
+)
+
+CALENDAR_URL = (
+    "https://www.bcentral.cl/calendario-estadistico?"
+    "p_p_id=bcentral_calendario_global_CalendarioGlobalPortlet_INSTANCE_gvZr3D7oZBKa"
+    "&p_p_lifecycle=0&p_p_state=normal&p_p_mode=view"
+    "&categoria=Cuentas%20Nacionales&nowYear=2026"
+)
+
+CALENDAR_LINK_LABEL = "Calendario de Publicaciones 2026"
+CALENDAR_LINK_MD = f"[{CALENDAR_LINK_LABEL}]({CALENDAR_URL})"
+
+CALENDAR_2026_TEXT = (
+    "\n\nCALENDARIO DE PUBLICACIONES ESTADÍSTICAS 2026 (Cuentas Nacionales):\n"
+    "Fuente oficial: " + CALENDAR_LINK_MD + "\n"
+    "\n"
+    "IMACEC:\n"
+    "- 04-05-2026: IMACEC - marzo 2026\n"
+    "- 01-06-2026: IMACEC - abril 2026\n"
+    "- 01-07-2026: IMACEC - mayo 2026\n"
+    "- 03-08-2026: IMACEC - junio 2026\n"
+    "- 01-09-2026: IMACEC - julio 2026\n"
+    "- 01-10-2026: IMACEC - agosto 2026\n"
+    "- 02-11-2026: IMACEC - septiembre 2026\n"
+    "- 01-12-2026: IMACEC - octubre 2026\n"
+    "\n"
+    "PIB (Cuentas Nacionales Trimestrales):\n"
+    "- 18-05-2026: Cuentas Nacionales Trimestrales - 1er trim 2026\n"
+    "- 18-08-2026: Cuentas Nacionales Trimestrales - 2do trim 2026\n"
+    "- 18-11-2026: Cuentas Nacionales Trimestrales - 3er trim 2026\n"
+    "\n"
+    "PIB REGIONAL:\n"
+    "- 23-04-2026: PIB Regional trimestral - 4° trim 2025\n"
+    "- 23-06-2026: PIB Regional trimestral - 1er trim 2026\n"
+    "- 23-09-2026: PIB Regional trimestral - 2do trim 2026\n"
+    "- 23-12-2026: PIB Regional trimestral - 3er trim 2026\n"
+    "\n"
+    "Usa EXCLUSIVAMENTE estas fechas para responder cuándo se publica el próximo indicador.\n"
+    "Escribe una respuesta natural y conversacional: comienza con una frase introductoria "
+    "(por ejemplo: \"El calendario de publicaciones del IMACEC para 2026 es:\") y a continuación lista las fechas.\n"
+    "IMPORTANTE: NO incluyas ningún enlace markdown [Calendario...](...) ni URLs en el cuerpo de la respuesta.\n"
+    "NO escribas frases como 'puedes revisar el calendario aquí', 'ver el calendario completo', "
+    "'más información en el enlace' o similares. El enlace oficial al calendario se agrega automáticamente "
+    "en la sección de referencias al final.\n"
+    "NUNCA muestres URLs en texto plano.\n"
+    "NUNCA uses la URL https://www.bcentral.cl/web/banco-central/areas/estadisticas/calendario-de-publicaciones"
+)
+
+
+def _is_calendar_question(question: str) -> bool:
+    """Detect if the user is asking about publication dates / calendar."""
+    return bool(_CALENDAR_KEYWORDS.search(question))
+
+
+def _build_system_prompt(mode: GuardrailMode = "rag") -> str:
+    """Construye el prompt del sistema basado en el modo."""
+    base = """Eres el asistente económico del Banco Central de Chile (PIBot).
+Respondes SIEMPRE en español.
+
+Ayudas con consultas sobre indicadores económicos chilenos (IMACEC, PIB).
+- Responde de forma clara y concisa
+- Usa los datos proporcionados cuando estén disponibles
+- Si no tienes información, indícalo claramente
+- No inventes datos numéricos
+- No afirmes hechos que no estén explícitamente en el contexto recuperado
+- Si no hay evidencia suficiente, declara incertidumbre en vez de completar vacíos"""
+    
+    if mode == "rag":
+        return base + "\n\nMODO RAG: Usa el contexto de documentos recuperados para responder consultas metodológicas."
+    return base + "\n\nMODO FALLBACK: Responde basándote en tu conocimiento general sobre economía chilena."
+
+
+def _first_entity_value(entity: Any) -> str:
+    if isinstance(entity, dict):
+        for key in ("standard_name", "normalized", "label", "value", "text_normalized"):
+            candidate = entity.get(key)
+            if isinstance(candidate, str) and candidate.strip():
+                return candidate
+            if isinstance(candidate, list):
+                for item in candidate:
+                    if isinstance(item, str) and item.strip():
+                        return item
+        return ""
+    if isinstance(entity, list):
+        for item in entity:
+            if isinstance(item, str) and item.strip():
+                return item
+        return ""
+    if isinstance(entity, str):
+        return entity
+    return ""
+
+
+def _first_non_empty_text(value: Any) -> str:
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    if isinstance(value, list):
+        for item in value:
+            if isinstance(item, str) and item.strip():
+                return item.strip()
+    return ""
+
+
+def _extract_doc_reference(doc: Any) -> Optional[Dict[str, str]]:
+    metadata = getattr(doc, "metadata", None)
+    if not isinstance(metadata, dict):
+        return None
+
+    link = _first_non_empty_text(
+        metadata.get("link")
+        or metadata.get("source_url")
+        or metadata.get("url")
+    )
+    docname = _first_non_empty_text(
+        metadata.get("docname")
+        or metadata.get("document_name")
+        or metadata.get("title")
+        or metadata.get("source")
+    )
+    if not link:
+        return None
+    if not docname:
+        docname = "documento"
+    return {"docname": docname, "link": link}
+
+
+def _collect_doc_references(docs: Any, max_items: int = 3) -> List[Dict[str, str]]:
+    if not isinstance(docs, list):
+        return []
+
+    references: List[Dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for doc in docs:
+        ref = _extract_doc_reference(doc)
+        if not ref:
+            continue
+        key = (ref.get("docname", "").strip().lower(), ref.get("link", "").strip().lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        references.append(ref)
+        if len(references) >= max_items:
+            break
+    return references
+
+
+class LLMAdapter:
+    """Chat generation adapter using LangChain (streaming when available)."""
+
+    def __init__(
+        self,
+        model: str = "gpt-4.1",
+        temperature: float = 0.0,
+        retriever: Optional[Any] = None,
+        streaming: bool = True,
+        mode: GuardrailMode = "rag",
+    ):
+        env_model = os.getenv("OPENAI_MODEL")
+        self.model = (env_model or model)
+        self.temperature = temperature
+        self.streaming = streaming
+        self._chat = None
+        self._retriever = retriever
+        self.mode: GuardrailMode = mode
+        self._last_rag_sources: List[Dict[str, str]] = []
+        self._rag_context_sufficient: bool = True
+        self._rag_context_chars: int = 0
+        self._rag_docs_count: int = 0
+        if ChatOpenAI is not None:
+            try:
+                from config import get_httpx_client, get_async_httpx_client  # type: ignore
+                self._chat = ChatOpenAI(
+                    model=self.model,
+                    temperature=self.temperature,
+                    streaming=self.streaming,
+                    http_client=get_httpx_client(),
+                    http_async_client=get_async_httpx_client(),
+                )
+            except Exception:
+                self._chat = None
+
+    def get_last_rag_sources(self) -> List[Dict[str, str]]:
+        return [dict(item) for item in self._last_rag_sources if isinstance(item, dict)]
+
+    def rag_context_is_sufficient(self) -> bool:
+        return bool(self._rag_context_sufficient)
+
+    def _build_messages(self, question: str, history: List[Dict[str, str]], intent_info: Optional[Dict[str, Any]]):
+        self._last_rag_sources = []
+        self._rag_context_sufficient = True
+        self._rag_context_chars = 0
+        self._rag_docs_count = 0
+        system_content = _build_system_prompt(mode=self.mode)
+        if intent_info:
+            try:
+                intent = intent_info.get("intent")
+                score = intent_info.get("score")
+                entities = intent_info.get("normalized") or {}
+                spans = intent_info.get("spans") or []
+                system_content += f" Intento detectado: {intent} (confianza {score:.2f}). Entidades: {entities}. Spans: {spans}."
+            except Exception:
+                pass
+        facts = None
+        try:
+            if intent_info and "facts" in intent_info:
+                facts = intent_info["facts"]
+        except Exception:
+            facts = None
+        if facts:
+            try:
+                facts_text = "; ".join(f"{k}: {v}" for k, v in facts.items())
+                system_content += f" Datos conocidos del usuario: {facts_text}."
+            except Exception:
+                pass
+        # Inject publication calendar when the question is about dates
+        if _is_calendar_question(question):
+            system_content += CALENDAR_2026_TEXT
+        # Knowledge base (RAG) context
+        if self._retriever:
+            try:
+                meta_filter = {}
+                qlow = question.lower()
+                if "pib" in qlow:
+                    meta_filter = {"topic": "pib"}
+                elif "imacec" in qlow:
+                    meta_filter = {"topic": "imacec"}
+                elif "estacional" in qlow or "estacionalidad" in qlow or "see100" in qlow:
+                    meta_filter = {"topic": "seasonality"}
+                # Refine filter using detected entities (joint BIO model)
+                try:
+                    ent = intent_info.get("normalized") if intent_info else {}
+                except Exception:
+                    ent = {}
+                indicator = _first_entity_value(ent.get("indicator")).lower()
+                if indicator:
+                    if "pib" in indicator:
+                        meta_filter = {"topic": "pib"}
+                    elif "imacec" in indicator:
+                        meta_filter = {"topic": "imacec"}
+                sector = _first_entity_value(ent.get("sector")).lower()
+                if sector and meta_filter.get("topic") == "imacec":
+                    meta_filter["sector"] = sector
+                season = _first_entity_value(ent.get("seasonality")).lower()
+                if season:
+                    meta_filter["seasonality"] = season
+
+                docs = []
+                if callable(getattr(self._retriever, "invoke", None)):
+                    try:
+                        payload = {"query": question}
+                        if meta_filter:
+                            payload["filter"] = meta_filter
+                        docs = self._retriever.invoke(payload)  # type: ignore
+                    except Exception:
+                        docs = self._retriever.invoke(question)  # type: ignore
+                elif hasattr(self._retriever, "get_relevant_documents"):
+                    try:
+                        docs = self._retriever.get_relevant_documents(question, filter=meta_filter)  # type: ignore
+                    except Exception:
+                        docs = self._retriever.get_relevant_documents(question)  # type: ignore
+                try:
+                    logger.debug("RAG retrieval | filter=%s | docs=%s | entities=%s", meta_filter, len(docs or []), ent)
+                except Exception:
+                    pass
+                if docs:
+                    self._last_rag_sources = _collect_doc_references(docs, max_items=3)
+                    context_chunks = []
+                    max_chars = int(os.getenv("RAG_CONTEXT_MAX_CHARS", "8000"))
+                    current = 0
+                    for d in docs:
+                        page = getattr(d, "page_content", "") or ""
+                        if not page:
+                            continue
+                        remaining = max_chars - current
+                        if remaining <= 0:
+                            break
+                        snippet = page[:remaining]
+                        context_chunks.append(snippet)
+                        current += len(snippet)
+                    context = "\n\n".join(context_chunks)
+                    self._rag_docs_count = len(docs)
+                    self._rag_context_chars = len(context)
+                    self._rag_context_sufficient = (
+                        self._rag_docs_count >= _rag_min_docs()
+                        and self._rag_context_chars >= _rag_min_context_chars()
+                    )
+                    if context.strip():
+                        system_content += (
+                            "\nContexto de base de conocimiento (RAG):\n"
+                            f"{context}\nResponde citando este contexto y evita inventar información fuera de estas referencias."
+                        )
+                else:
+                    self._rag_docs_count = 0
+                    self._rag_context_chars = 0
+                    self._rag_context_sufficient = False
+                    system_content += "\nNo se recuperó contexto RAG relevante; si la respuesta depende de fuentes, indica que no dispones de datos y evita especular."
+            except Exception as exc:
+                self._rag_context_sufficient = False
+                logger.debug("Failed to fetch RAG context: %s", exc)
+
+        if history:
+            try:
+                ctx = "\n".join(f"{h.get('role')}: {h.get('content')}" for h in history[-8:])
+                system_content += (
+                    f" Historial reciente (útil para recordar datos del usuario):\n{ctx}\n"
+                    "Si el usuario pregunta por datos ya mencionados (nombre, estudios, etc.), respóndelos coherentemente."
+                )
+            except Exception:
+                pass
+        if SystemMessage is None:
+            return []
+        system = SystemMessage(content=system_content)
+        msgs: List[Any] = [system]
+        if history:
+            try:
+                context_text = "\n".join(f"{h.get('role')}: {h.get('content')}" for h in history[-8:])
+                msgs.append(SystemMessage(content=f"Contexto reciente (usa esta información para responder preguntas personales del usuario):\n{context_text}"))
+            except Exception:
+                pass
+        for h in history:
+            role = h.get("role")
+            content = h.get("content", "")
+            if role == "user":
+                msgs.append(HumanMessage(content=content))
+            else:
+                msgs.append(AIMessage(content=content))
+        msgs.append(HumanMessage(content=question))
+        return msgs
+
+    def stream(self, question: str, history: Optional[List[Dict[str, str]]] = None, intent_info: Optional[Dict[str, Any]] = None) -> Iterable[str]:
+        """Yield assistant reply chunks (streaming when backend supports it)."""
+        history = history or []
+        if not LANGCHAIN_AVAILABLE or init_chat_model is None:
+            yield f"Respuesta de prueba a: {question}. (Backend no disponible.)"
+            return
+        try:
+            msgs = self._build_messages(question, history, intent_info)
+            if self.mode == "rag" and not self._rag_context_sufficient:
+                logger.info(
+                    "[LLM_GUARDRAIL] Respuesta segura por evidencia insuficiente | docs=%s chars=%s min_docs=%s min_chars=%s",
+                    self._rag_docs_count,
+                    self._rag_context_chars,
+                    _rag_min_docs(),
+                    _rag_min_context_chars(),
+                )
+                yield _safe_no_evidence_reply()
+                return
+            # If streaming is disabled, do a single invoke to avoid SSE parsing issues
+            if self._chat is not None and not self.streaming:
+                out = self._chat.invoke(msgs)
+                text = getattr(out, "content", None) or str(out)
+                if text:
+                    yield str(text)
+                return
+            if self._chat is not None:
+                try:
+                    for chunk in self._chat.stream(msgs):
+                        text = getattr(chunk, "content", None) or getattr(chunk, "text", None) or ""
+                        if text:
+                            try:
+                                if _chunk_logs_enabled():
+                                    logger.debug("[LLM_STREAM_CHUNK] %s", text[:200])
+                            except Exception:
+                                pass
+                            yield str(text)
+                finally:
+                    # Ensure the stream is exhausted to avoid GeneratorExit
+                    if hasattr(self._chat, "close"):
+                        try:
+                            self._chat.close()  # type: ignore
+                        except Exception:
+                            pass
+                return
+            llm = init_chat_model(model=self.model, temperature=self.temperature, streaming=self.streaming)
+            if self.streaming and hasattr(llm, "stream"):
+                try:
+                    for chunk in llm.stream(msgs):
+                        text = getattr(chunk, "content", None) or getattr(chunk, "text", None) or ""
+                        if text:
+                            # No per-chunk logs here; agent_graph handles optional logging
+                            yield str(text)
+                finally:
+                    if hasattr(llm, "close"):
+                        try:
+                            llm.close()
+                        except Exception:
+                            pass
+            else:
+                out = llm.invoke(msgs)
+                if hasattr(out, "content"):
+                    yield f"{out.content}"
+                elif isinstance(out, list) and out:
+                    yield f"{getattr(out[0], 'content', str(out[0]))}"
+                else:
+                    yield f"{str(out)}"
+        except Exception:
+            logger.exception("LLMAdapter.stream failed")
+            yield f"(Error generando) {question}"
+
+    def generate(self, question: str, history: Optional[List[Dict[str, str]]] = None, intent_info: Optional[Dict[str, Any]] = None) -> str:
+        """Return full text by joining stream."""
+        return "".join(self.stream(question, history=history or [], intent_info=intent_info))
+
+    # Alias for compatibility
+    def invoke(self, question: str, history: Optional[List[Dict[str, str]]] = None, intent_info: Optional[Dict[str, Any]] = None):
+        return self.generate(question, history=history, intent_info=intent_info)
+
+
+def build_llm(
+    streaming: bool = True,
+    temperature: float = 0.0,
+    retriever: Optional[Any] = None,
+    mode: GuardrailMode = "rag",
+) -> LLMAdapter:
+    adapter = LLMAdapter(temperature=temperature, retriever=retriever, streaming=streaming, mode=mode)
+    # streaming flag kept for signature compatibility; adapter handles streaming internally
+    return adapter
+
+
+# Backward compatibility
+LangChainLLMAdapter = LLMAdapter

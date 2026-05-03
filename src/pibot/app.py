@@ -1,0 +1,1426 @@
+"""
+app.py
+------
+Lógica de la aplicación Streamlit (frontend del chatbot).
+
+- Usa Settings (config.py) para configurar nombre del bot y parámetros.
+- Recibe funciones de orquestación (stream_fn / invoke_fn) desde main.py.
+- Maneja la historia de conversación en st.session_state.
+"""
+import logging
+import uuid
+import json
+from typing import Callable, List, Dict, Optional, Iterable
+import datetime
+import time
+import os
+import re
+import threading
+from queue import Queue, Empty
+
+import html as _html_mod
+
+import streamlit as st
+
+from config import Settings
+from orchestrator.memory.memory_adapter import MemoryAdapter
+from pathlib import Path
+
+# Nuevo: reutilizar el logger unificado del orquestador para escribir en el mismo log
+try:
+    import orchestrator as _orch
+except Exception:
+    _orch = None  # type: ignore
+
+# Resolver logger para la UI: preferir el logger del orquestador; si no tiene
+# handlers, caer al root y, en última instancia, configurar uno básico.
+def _resolve_ui_logger() -> logging.Logger:
+    candidates = []
+    if _orch and hasattr(_orch, "logger"):
+        try:
+            candidates.append(_orch.logger)  # type: ignore[attr-defined]
+        except Exception:
+            pass
+    candidates.append(logging.getLogger())  # root
+    candidates.append(logging.getLogger(__name__))
+    for lg in candidates:
+        if lg and lg.handlers:
+            return lg
+    logging.basicConfig(level=logging.INFO)
+    return logging.getLogger()
+
+_ui_logger = _resolve_ui_logger()
+
+# Tipos para las funciones de orquestación
+StreamFn = Callable[[str, Optional[List[Dict[str, str]]], Optional[str]], Iterable[str]]
+InvokeFn = Callable[[str, Optional[List[Dict[str, str]]]], str]
+
+
+def _extract_memory_series_chart(response_text: str) -> Optional[Dict[str, object]]:
+    if not response_text:
+        return None
+
+    def _parse_numeric(cell: str) -> Optional[float]:
+        raw = str(cell or "").strip()
+        if not raw:
+            return None
+        raw = raw.replace("%", "").replace(" ", "")
+        try:
+            return float(raw.replace(".", "").replace(",", "."))
+        except Exception:
+            return None
+
+    lines = [ln.rstrip("\n") for ln in str(response_text).splitlines()]
+    for idx, line in enumerate(lines):
+        if "|" not in line:
+            continue
+        headers = [h.strip().lower() for h in line.split("|") if h.strip()]
+        if not headers or "periodo" not in headers:
+            continue
+        if idx + 1 >= len(lines) or "|" not in lines[idx + 1]:
+            continue
+
+        period_idx = headers.index("periodo")
+        value_idx = headers.index("valor") if "valor" in headers else -1
+        variation_idx = headers.index("variación") if "variación" in headers else -1
+        if value_idx < 0 and variation_idx < 0:
+            continue
+
+        periods: List[str] = []
+        values: List[Optional[float]] = []
+        variations: List[Optional[float]] = []
+
+        row_idx = idx + 2
+        while row_idx < len(lines):
+            row_line = lines[row_idx].strip()
+            if not row_line or "|" not in row_line:
+                break
+            if set(row_line.replace("|", "").strip()) <= {"-", ":"}:
+                row_idx += 1
+                continue
+
+            cols = [c.strip() for c in row_line.split("|")]
+            if cols and cols[0] == "":
+                cols = cols[1:]
+            if cols and cols[-1] == "":
+                cols = cols[:-1]
+            if period_idx >= len(cols):
+                break
+
+            period_val = cols[period_idx]
+            if not period_val:
+                row_idx += 1
+                continue
+
+            periods.append(period_val)
+            if value_idx >= 0 and value_idx < len(cols):
+                values.append(_parse_numeric(cols[value_idx]))
+            if variation_idx >= 0 and variation_idx < len(cols):
+                variations.append(_parse_numeric(cols[variation_idx]))
+
+            row_idx += 1
+
+        if not periods:
+            continue
+
+        try:
+            import pandas as _pd  # type: ignore
+
+            df_plot = _pd.DataFrame({"period": periods})
+            y_cols: List[str] = []
+            if values and any(v is not None for v in values):
+                df_plot["valor"] = values
+                y_cols.append("valor")
+            if variations and any(v is not None for v in variations):
+                df_plot["variacion"] = variations
+                y_cols.append("variacion")
+
+            if not y_cols:
+                return None
+
+            return {
+                "title": "Gráfico construido desde la tabla de la respuesta",
+                "x": "period",
+                "y": y_cols,
+                "data": df_plot,
+            }
+        except Exception:
+            return None
+
+    return None
+
+
+def _user_requested_chart(text: str) -> bool:
+    query = str(text or "").strip().lower()
+    if not query:
+        return False
+    query = (
+        query.replace("á", "a")
+        .replace("é", "e")
+        .replace("í", "i")
+        .replace("ó", "o")
+        .replace("ú", "u")
+    )
+    chart_terms = (
+        "grafico",
+        "grafica",
+        "graficar",
+        "chart",
+        "plot",
+        "linea",
+    )
+    return any(term in query for term in chart_terms)
+
+
+def _detect_requested_chart_type(text: str) -> str:
+    query = str(text or "").strip().lower()
+    query = (
+        query.replace("á", "a")
+        .replace("é", "e")
+        .replace("í", "i")
+        .replace("ó", "o")
+        .replace("ú", "u")
+    )
+    if any(term in query for term in ("barra", "barras", "bar")):
+        return "bar"
+    if any(term in query for term in ("area", "área")):
+        return "area"
+    return "line"
+
+
+def _build_chart_intro_from_history(
+    user_message: str,
+    history_messages: List[Dict[str, str]],
+    chart_type: str,
+) -> str:
+    chart_label = {
+        "line": "de líneas",
+        "bar": "de barras",
+        "area": "de área",
+    }.get(str(chart_type or "line").lower(), "de líneas")
+
+    previous_user_query = ""
+    for msg in reversed(history_messages or []):
+        if msg.get("role") == "user" and str(msg.get("content") or "").strip():
+            previous_user_query = str(msg.get("content") or "").strip()
+            break
+
+    if previous_user_query:
+        if len(previous_user_query) > 120:
+            previous_user_query = previous_user_query[:117].rstrip() + "..."
+        return (
+            f"Tomando como contexto tu consulta anterior ({previous_user_query}), "
+            f"a continuación se muestra un gráfico {chart_label} de la serie consultada."
+        )
+    return f"A continuación se muestra un gráfico {chart_label} de la serie consultada."
+
+
+def _extract_intro_for_chart_mode(response_text: str) -> str:
+    text = str(response_text or "").strip()
+    if not text:
+        return ""
+
+    clean_lines: List[str] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("##CSV_DOWNLOAD_") or stripped.startswith("##CHART_") or stripped.startswith("##FOLLOWUP_"):
+            continue
+        clean_lines.append(line)
+
+    cleaned = "\n".join(clean_lines).strip()
+    if not cleaned:
+        return ""
+
+    for separator in ("\n\n", "\nPeriodo |", "\nActividad |", "\n**Código de serie:**"):
+        if separator in cleaned:
+            return cleaned.split(separator, 1)[0].strip()
+    return cleaned
+
+
+def _init_session_state(settings: Settings) -> None:
+    if "messages" not in st.session_state:
+        st.session_state.messages = []  # type: ignore[assignment]
+
+    if "prev_question_timestamp" not in st.session_state:
+        st.session_state.prev_question_timestamp = datetime.datetime.fromtimestamp(0)
+
+    if "settings" not in st.session_state:
+        st.session_state.settings = settings  # type: ignore[assignment]
+    else:
+        # Asegura que la configuración actualizada se mantenga disponible
+        st.session_state.settings = settings  # type: ignore[assignment]
+
+    if "welcome_emitted" not in st.session_state:
+        st.session_state.welcome_emitted = False
+
+    # Generar session_id solo una vez por sesión de navegador
+    if "session_id" not in st.session_state:
+        st.session_state.session_id = f"st-{uuid.uuid4().hex}"
+
+
+def _clear_conversation() -> None:
+    st.session_state.messages = []
+    st.session_state.prev_question_timestamp = datetime.datetime.fromtimestamp(0)
+    st.session_state.welcome_emitted = False
+    if "orch" in st.session_state:
+        st.session_state.pop("orch")
+    st.session_state.pop("chart_markers", None)
+    st.session_state.pop("memory_series_chart", None)
+    st.session_state.pop("last_response_chart_requested", None)
+    st.session_state.pop("last_response_chart_only", None)
+    st.session_state.pop("followup_markers", None)
+    # Limpiar feedback
+    for k in list(st.session_state.keys()):
+        if k.startswith("feedback_"):
+            del st.session_state[k]
+    # Forzar nuevo session_id para una conversación limpia
+    st.session_state.session_id = f"st-{uuid.uuid4().hex}"
+
+
+@st.cache_data(ttl=3600)
+def _load_series_titles() -> Dict[str, str]:
+    """Carga series_index.json y devuelve {cod_serie: titulo}."""
+    idx_path = Path(__file__).parent / "series" / "series_index.json"
+    if not idx_path.exists():
+        return {}
+    try:
+        data = json.loads(idx_path.read_text(encoding="utf-8"))
+        return {k: v.get("DESC_SERIE_ESP", "") for k, v in data.items()}
+    except Exception:
+        return {}
+
+_SERIES_TITLES: Dict[str, str] = _load_series_titles()
+
+
+def _sanitize_llm_html(text: str) -> str:
+    """Escapa tags HTML peligrosos del LLM pero preserva markdown."""
+    if not text:
+        return text
+    # Escapar <script>, <iframe>, <object>, <embed>, <form>, <style> tags
+    dangerous_pattern = re.compile(
+        r'<\s*/?(script|iframe|object|embed|form|style|link|meta|base)(\s[^>]*)?>',
+        re.IGNORECASE,
+    )
+    return dangerous_pattern.sub(lambda m: _html_mod.escape(m.group(0)), text)
+
+
+def run_app(
+    settings: Settings,
+    stream_fn: Optional[StreamFn] = None,
+    invoke_fn: Optional[InvokeFn] = None,  # noqa: ARG001 (por ahora no lo usamos, pero queda disponible)
+) -> None:
+    """
+    Punto de entrada de la app Streamlit.
+
+    Debe ser llamado desde main.py, pasando:
+    - settings: configuración cargada desde config.py
+    - stream_fn: función de LangChain para streaming
+    - invoke_fn: función de LangChain para invocación sin streaming
+    """
+
+    # Debe ser lo primero que se ejecuta en Streamlit
+    # Usar logo por defecto si existe
+    from pathlib import Path as _Path
+    def _resolve_page_icon() -> str:
+        candidates = [
+            _Path("assets/logo.png"),
+            _Path("assets/icon.png"),
+            _Path("logo.png"),
+        ]
+        for c in candidates:
+            if c.is_file():
+                return str(c)
+        return "✨"
+
+    st.set_page_config(page_title=settings.bot_name, page_icon=_resolve_page_icon())
+    _init_session_state(settings)
+
+    # Crear orquestador LangChain si no se pasó stream_fn externo
+    if stream_fn is None:
+        if not _orch:
+            st.error("No se pudo cargar el módulo orchestrator.")
+            return
+        try:
+            # Usar valores por defecto desde entorno para evitar depender del orden del sidebar
+            _model_default = os.getenv("OPENAI_MODEL", "gpt-4.1")
+            try:
+                _temp_default = float(os.getenv("OPENAI_TEMPERATURE", "0") or 0.0)
+            except Exception:
+                _temp_default = 0.0
+            st.session_state.orch = st.session_state.get("orch") or _orch.create_orchestrator_with_langchain(model=_model_default, temperature=_temp_default)
+            try:
+                import logging as _logging
+                if hasattr(_orch, "logger"):
+                    _orch.logger = _logging.LoggerAdapter(_orch.logger, extra={"session_id": st.session_state.get("session_id", "")})  # type: ignore
+            except Exception:
+                pass
+            stream_fn = lambda q, history=None, session_id=None: st.session_state.orch.stream(q, history=history, session_id=session_id)  # type: ignore[assignment]
+        except Exception as e:
+            st.error(f"No se pudo inicializar el orquestador: {e}")
+            return
+
+    # ──────────────────────────────────────────────────────────
+    # Detectar si estamos en modo landing (sin mensajes de usuario)
+    # ──────────────────────────────────────────────────────────
+    _has_user_messages = any(m.get("role") == "user" for m in st.session_state.messages) or bool(
+        st.session_state.get("pending_question")
+    )
+
+    # Barra lateral: ajustes de modelo/temperatura y acciones de sesión
+    with st.sidebar:
+        st.subheader("Debug")
+        st.write(f"Session ID: `{st.session_state.get('session_id', 'N/A')}`")
+        
+        st.subheader("Modelo generativo")
+        model_sel = st.text_input("Modelo", value=os.getenv("OPENAI_MODEL", "gpt-4.1"))
+        temp_sel = st.slider("Temperatura", min_value=0.0, max_value=1.0, value=float(os.getenv("OPENAI_TEMPERATURE", "0") or 0.0), step=0.1)
+        
+        st.subheader("Modelo predictor")
+        # Mostrar solo el nombre de la carpeta final del BERT base/tokenizer, sin permitir edición
+        bert_model_full = os.getenv("BERT_MODEL_NAME", "")
+        bert_model_name = os.path.basename(bert_model_full.rstrip("/\\")) if bert_model_full else ""
+        st.text_input("Modelo BERT", value=bert_model_name)
+        # Mostrar solo el nombre de la carpeta final, pero mantener el path completo
+        joint_bert_model_dir_full = os.getenv("JOINT_BERT_MODEL_DIR", "")
+        joint_bert_model_dir_name = os.path.basename(joint_bert_model_dir_full.rstrip("/\\")) if joint_bert_model_dir_full else ""
+        joint_bert_model_dir_name_new = st.text_input("Modelo Joint BERT", value=joint_bert_model_dir_name)
+        # Reconstruir el path completo si el usuario lo cambia
+        if joint_bert_model_dir_name_new != joint_bert_model_dir_name and joint_bert_model_dir_name_new:
+            # Mantener el directorio padre original si existe, si no, usar el valor nuevo tal cual
+            parent_dir = os.path.dirname(joint_bert_model_dir_full) if joint_bert_model_dir_full else "models/pibot_series_interpreter"
+            joint_bert_model_dir = os.path.join(parent_dir, joint_bert_model_dir_name_new)
+        else:
+            joint_bert_model_dir = joint_bert_model_dir_full
+        
+        # Aplicar cambios de modelo al entorno para que el predictor los tome
+        _env_changed = False
+        if model_sel and os.getenv("OPENAI_MODEL") != model_sel:
+            os.environ["OPENAI_MODEL"] = model_sel
+            _env_changed = True
+        # Persistir temperatura elegida
+        if os.getenv("OPENAI_TEMPERATURE") != str(temp_sel):
+            os.environ["OPENAI_TEMPERATURE"] = str(temp_sel)
+            _env_changed = True
+        # Tokenizer/base model para JointBERT (solo lectura desde UI)
+        # Directorio del modelo entrenado de JointBERT
+        if joint_bert_model_dir and os.getenv("JOINT_BERT_MODEL_DIR") != joint_bert_model_dir:
+            os.environ["JOINT_BERT_MODEL_DIR"] = joint_bert_model_dir
+            _env_changed = True
+
+        # --- Panel dinámico: Memoria y clasificación ---------------------
+        def _get_mem_adapter() -> MemoryAdapter:
+            _ma = st.session_state.get("_mem_adapter")
+            if not _ma:
+                _ma = MemoryAdapter(pg_dsn=os.getenv("PG_DSN", "postgresql://postgres:postgres@localhost:5432/pibot"))
+                st.session_state._mem_adapter = _ma
+            return _ma  # type: ignore
+
+        def _render_memory_debug(dst_container):
+            try:
+                _ma = _get_mem_adapter()
+                _sid = st.session_state.get("session_id", "")
+                # Header
+                dst_container.subheader("Clasificación y memoria")
+                # Backend
+                try:
+                    backend = _ma.get_backend_status() or {}
+                except Exception:
+                    backend = {}
+                using_pg = bool(backend.get("using_pg"))
+                dsn = str(backend.get("dsn") or "")
+                # dst_container.caption(f"Backend: {'Postgres' if using_pg else 'Local'}{(' · ' + dsn) if dsn else ''}")
+                # Facts
+                try:
+                    facts = _ma.get_facts(_sid) or {}
+                except Exception:
+                    facts = {}
+                
+                # Deserializar facts si vienen como strings JSON
+                facts_display = {}
+                for k, v in facts.items():
+                    if isinstance(v, str):
+                        try:
+                            # Intentar parsear como JSON
+                            facts_display[k] = json.loads(v)
+                        except Exception:
+                            # Si no es JSON válido, mostrar como string
+                            facts_display[k] = v
+                    else:
+                        facts_display[k] = v
+                
+                if facts_display:
+                    # dst_container.markdown("**Clasificación (memoria)**")
+                    dst_container.json(facts_display)
+                else:
+                    dst_container.caption("Sin facts de clasificación en memoria")
+            except Exception as _e_mem:
+                dst_container.caption(f"Memoria no disponible: {str(_e_mem)[:200]}")
+
+        # Placeholder del panel para poder refrescarlo dinámicamente
+        _mem_debug_ph = st.empty()
+        st.session_state._mem_debug_placeholder = _mem_debug_ph
+        _render_memory_debug(_mem_debug_ph.container())
+
+        if st.button("Nueva sesión", icon=":material/refresh:"):
+            _clear_conversation()
+            st.rerun()
+
+    # Helper: extraer followups embebidos en contenido de asistente
+    import re as _re
+
+    def _extract_followups_from_text(text: str) -> tuple[str, List[Dict[str, str]]]:
+        cleaned_parts: List[str] = []
+        found: List[Dict[str, str]] = []
+        pattern = _re.compile(r"##FOLLOWUP_START(.*?)##FOLLOWUP_END", _re.DOTALL)
+        last_idx = 0
+        for m in pattern.finditer(text):
+            cleaned_parts.append(text[last_idx : m.start()])
+            block = m.group(1)
+            d: Dict[str, str] = {}
+            for ln in block.splitlines():
+                ln = ln.strip()
+                if "=" in ln:
+                    k, v = ln.split("=", 1)
+                    d[k.strip()] = v.strip()
+            if d:
+                found.append(d)
+            last_idx = m.end()
+        cleaned_parts.append(text[last_idx:])
+        return ("".join(cleaned_parts), found)
+
+    # ──────────────────────────────────────────────────────────
+    # Estilos base: patrón visual tipo ChatGPT (sin logo)
+    # ──────────────────────────────────────────────────────────
+    st.markdown(
+        """
+        <style>
+        :root {
+            --bcch-navy: #0c1c32;
+            --bcch-navy-soft: #1b3152;
+            --bcch-gold: #bf9c69;
+            --bcch-gold-soft: #ccb086;
+            --bcch-surface: #f6f7fb;
+            --bcch-surface-2: #ffffff;
+            --bcch-text: #1b2b46;
+            --bcch-border: #d7ddea;
+            --bcch-gold-light: #f5edd8;
+            --bcch-success: #2e7d57;
+        }
+        .stApp {
+            background: var(--bcch-surface);
+            color: var(--bcch-text);
+        }
+        [data-testid="stMainBlockContainer"] {
+            max-width: 820px;
+            padding-top: 2.2rem;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        h1, h2, h3, h4, h5 {
+            color: var(--bcch-navy);
+            letter-spacing: -0.02em;
+        }
+        .chat-subtitle {
+            color: #6f7f9a;
+            font-size: 0.98rem;
+            margin-top: 0.1rem;
+            margin-bottom: 1.25rem;
+        }
+        /* Link de fuente BDE con estilo de boton simple */
+        .source-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            background: #ffffff;
+            color: var(--bcch-navy) !important;
+            border: 1px solid var(--bcch-border);
+            border-radius: 8px;
+            padding: 0.38rem 0.8rem;
+            font-size: 0.9rem;
+            font-weight: 500;
+            text-decoration: none !important;
+            transition: all 0.18s ease;
+            margin-top: 0.5rem;
+            margin-bottom: 0.3rem;
+        }
+        .source-badge:hover {
+            background: #f8f9fc;
+            border-color: var(--bcch-gold);
+            box-shadow: 0 1px 5px rgba(12, 28, 50, 0.08);
+        }
+        /* Followup suggestion chips */
+        .followup-label {
+            font-size: 0.8rem;
+            color: #8a9bba;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 0.4rem;
+            font-weight: 600;
+        }
+        /* Followup buttons estilo chip */
+        [data-testid="stChatMessage"]:last-of-type .stButton > button[kind="secondary"] {
+            border-radius: 20px;
+            border: 1px solid var(--bcch-border);
+            background: var(--bcch-surface-2);
+            color: var(--bcch-navy-soft);
+            font-size: 0.9rem;
+            padding: 0.4rem 1rem;
+            transition: all 0.18s ease;
+        }
+        [data-testid="stChatMessage"]:last-of-type .stButton > button[kind="secondary"]:hover {
+            border-color: var(--bcch-gold);
+            background: var(--bcch-gold-light);
+            color: var(--bcch-navy);
+            box-shadow: 0 2px 8px rgba(191, 156, 105, 0.18);
+        }
+        a {
+            color: var(--bcch-navy-soft);
+            text-decoration-color: var(--bcch-gold);
+        }
+        a:hover {
+            color: var(--bcch-navy);
+            text-decoration-color: var(--bcch-gold-soft);
+        }
+        div[data-testid="stSidebar"] {
+            background: #eef2f8;
+            border-right: 1px solid var(--bcch-border);
+        }
+        .stChatMessage {
+            background: transparent;
+            border: none;
+            box-shadow: none;
+            padding: 0.15rem 0.1rem;
+            margin-bottom: 1.1rem;
+            max-width: 760px;
+            margin-left: auto;
+            margin-right: auto;
+            padding-left: 0.35rem;
+            border-left: 3px solid rgba(200, 168, 107, 0.45);
+        }
+        [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) {
+            margin-bottom: 1.9rem;
+            border-left-color: rgba(12, 28, 50, 0.22);
+        }
+        [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarAssistant"]) {
+            margin-bottom: 2.2rem;
+            border-left-color: rgba(200, 168, 107, 0.55);
+        }
+        [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) [data-testid="stMarkdownContainer"] p {
+            color: var(--bcch-navy);
+        }
+        .stChatMessage [data-testid="stMarkdownContainer"] p {
+            line-height: 1.95;
+            margin-top: 0.2rem;
+            margin-bottom: 1.6rem;
+            color: var(--bcch-navy-soft);
+            font-size: 1.06rem;
+        }
+        .stChatMessage [data-testid="stMarkdownContainer"] p + p {
+            margin-top: 1.05rem;
+        }
+        .stChatMessage [data-testid="stMarkdownContainer"] p:last-child {
+            margin-bottom: 0;
+        }
+        .stChatMessage [data-testid="stMarkdownContainer"] ul,
+        .stChatMessage [data-testid="stMarkdownContainer"] ol {
+            margin-top: 0.9rem;
+            margin-bottom: 1.5rem;
+            padding-left: 1.4rem;
+            color: var(--bcch-navy-soft);
+        }
+        [data-testid="stChatMessageAvatarUser"] {
+            background: var(--bcch-navy) !important;
+            color: #ffffff !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            align-self: center !important;
+        }
+        [data-testid="stChatMessageAvatarAssistant"] {
+            background: var(--bcch-gold) !important;
+            color: var(--bcch-navy) !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            align-self: flex-start !important;
+        }
+        [data-testid="stChatMessageAvatarUser"] svg,
+        [data-testid="stChatMessageAvatarAssistant"] svg {
+            color: inherit !important;
+        }
+        div[data-testid="stChatInput"] {
+            background: var(--bcch-surface-2);
+            border: 1px solid rgba(200, 168, 107, 0.45);
+            border-radius: 16px;
+            box-shadow:
+                0 10px 26px rgba(3, 27, 61, 0.11),
+                0 0 0 1px rgba(200, 168, 107, 0.16);
+            max-width: 760px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        div[data-testid="stChatInput"]:focus-within {
+            border-color: var(--bcch-gold);
+            box-shadow:
+                0 12px 28px rgba(3, 27, 61, 0.14),
+                0 0 0 2px rgba(200, 168, 107, 0.22);
+        }
+        div[data-testid="stChatInput"] textarea {
+            color: var(--bcch-text);
+        }
+        div[data-testid="stChatInput"] button {
+            background: var(--bcch-navy);
+            color: #ffffff;
+            border: 1px solid var(--bcch-navy);
+        }
+        div[data-testid="stChatInput"] button:hover {
+            background: var(--bcch-navy-soft);
+            border-color: var(--bcch-navy-soft);
+        }
+        .stButton > button,
+        .stDownloadButton > button {
+            border-radius: 10px;
+            border: 1px solid var(--bcch-border);
+            color: var(--bcch-navy);
+            background: #ffffff;
+            padding-top: 0.45rem;
+            padding-bottom: 0.45rem;
+            transition: all 0.18s ease;
+        }
+        .stButton > button:hover,
+        .stDownloadButton > button:hover {
+            border-color: var(--bcch-gold);
+            color: var(--bcch-navy-soft);
+            box-shadow: none;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # ──────────────────────────────────────────────────────────
+    # Modo landing: input centrado + frase grande
+    # ──────────────────────────────────────────────────────────
+    if not _has_user_messages:
+        st.markdown(
+            """
+            <style>
+            div[data-testid="stChatInput"] {
+                position: fixed;
+                left: 50%;
+                bottom: auto;
+                transform: translateX(-50%);
+                top: 56%;
+                width: min(760px, 90vw);
+                z-index: 1000;
+            }
+            .landing-container {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                min-height: 54vh;
+                text-align: center;
+                gap: 0.35rem;
+            }
+            .landing-container .landing-greeting {
+                font-size: 2rem;
+                font-weight: 600;
+                color: #0c1c32;
+                margin-bottom: 0.25rem;
+            }
+            .landing-container .landing-subtitle {
+                font-size: 1rem;
+                color: #425b83;
+                margin-bottom: 2rem;
+            }
+            .landing-examples {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.6rem;
+                justify-content: center;
+                margin-top: 1.2rem;
+                max-width: 680px;
+            }
+            .landing-chip {
+                background: #ffffff;
+                border: 1px solid #d7ddea;
+                border-radius: 20px;
+                padding: 0.5rem 1.1rem;
+                font-size: 0.9rem;
+                color: #1b3152;
+                cursor: pointer;
+                transition: all 0.18s ease;
+                text-decoration: none;
+            }
+            .landing-chip:hover {
+                border-color: #bf9c69;
+                background: #f5edd8;
+                color: #0c1c32;
+                box-shadow: 0 2px 8px rgba(191, 156, 105, 0.18);
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        greeting = (getattr(settings, "welcome_message", "") or "").strip()
+        if not greeting:
+            greeting = "¿En qué puedo ayudarte hoy?"
+
+        st.markdown(
+            f"""
+            <div class="landing-container">
+                <div class="landing-greeting">{greeting}</div>
+                <div class="landing-subtitle">Soy PIBot, asistente del Banco Central de Chile</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        # Preguntas de ejemplo desactivadas temporalmente por solicitud.
+
+        user_message = st.chat_input("Escribe tu pregunta...")
+
+        if user_message:
+            # Pasar la primera pregunta al flujo normal para responder en el mismo ciclo.
+            st.session_state.pending_question = str(user_message).strip()
+            st.rerun()
+        return
+
+    # ──────────────────────────────────────────────────────────
+    # Modo chat: interfaz normal con historial
+    # ──────────────────────────────────────────────────────────
+
+    # Título y botón de restart
+    col_title, col_btn = st.columns([4, 1])
+    with col_title:
+        st.title(settings.bot_name, anchor=False)
+    with col_btn:
+        st.button("Restart", icon=":material/refresh:", on_click=_clear_conversation)
+
+    st.markdown(
+        '<div class="chat-subtitle">Asistente para consultas sobre el PIB y el IMACEC</div>',
+        unsafe_allow_html=True,
+    )
+
+    # Helper: construir followups en UI a partir de facts si no vienen marcadores
+    def _build_ui_followups_from_facts() -> List[Dict[str, str]]:
+        suggestions: List[str] = []
+        try:
+            _ma = st.session_state.get("_mem_adapter")
+            if _ma:
+                facts = _ma.get_facts(st.session_state.get("session_id", "")) or {}
+                indicator = facts.get("indicator")
+                component = facts.get("component")
+                seasonality = facts.get("seasonality")
+                period = facts.get("period")
+
+                if not indicator:
+                    suggestions.extend([
+                        "Cuanto aceleró la economía el último mes",
+                        "Explícame que es el PIB",
+                    ])
+                else:
+                    ind_lower = str(indicator).lower()
+                    # Estacionalidad
+                    if seasonality and "sa" in str(seasonality).lower():
+                        suggestions.append(f"Cuanto creció el {indicator.upper()}")
+                    else:
+                        suggestions.append(f"Cuanto creció el {indicator.upper()} desestacionalizado")
+                    # Específico IMACEC
+                    if "imacec" in ind_lower:
+                        comp_lower = str(component or "").lower()
+                        if not comp_lower or comp_lower == "total":
+                            suggestions.append("Cuanto creció el IMACEC minero")
+                        elif "minero" in comp_lower:
+                            suggestions.append("Cuanto varió el IMACEC no minero")
+                        else:
+                            suggestions.append("Cuanto creció el IMACEC")
+                    # Específico PIB
+                    if "pib" in ind_lower and not component:
+                        suggestions.append("¿Cuál es la variación del PIB por sectores?")
+                    # Metodología / general
+                    suggestions.append(f"¿Qué mide el {indicator.upper()}?")
+                    if period:
+                        suggestions.append(f"¿Cómo ha evolucionado el {indicator.upper()} en los últimos años?")
+            # Dedup y limitar
+            seen = set()
+            uniq = []
+            for s in suggestions:
+                key = re.sub(r"[^a-z0-9]+", "", s.lower())
+                if key in seen:
+                    continue
+                seen.add(key)
+                uniq.append(s)
+            return [{f"suggestion_{i+1}": s} for i, s in enumerate(uniq[:2])] # SOLO MUESTRA 2 PREGUNTAS
+        except Exception:
+            return []
+
+    import re as _decor_re
+
+    def _decorate_links(text: str) -> str:
+        """Mantiene la fuente BDE como hipervinculo markdown simple."""
+        text = _sanitize_llm_html(text)
+        # Reemplazar link de BDE con hipervinculo clasico
+        text = _decor_re.sub(
+            r'\[(?:🔗 )?(?:Ver serie en la )?(?:Base de Datos Estad[ií]sticos \(BDE\)|BDE)\]\((https?://[^)]+)\)',
+            r'[Base de Datos Estadisticos (BDE)](\1)',
+            text,
+        )
+        # # Fallback: texto plano sin link
+        # text = _decor_re.sub(
+        #     r"(?<!📊 )(?:🔗 )?Ver serie en la BDE",
+        #     "📊 Fuente: Base de Datos Estadísticos (BDE)",
+        #     text,
+        # )
+        return text
+
+    # Mostrar historial de mensajes (sin volver a renderizar botones de followup históricos)
+    for idx_msg, msg in enumerate(st.session_state.messages):
+        role = msg.get("role")
+        content = msg.get("content", "")
+        if role == "assistant" and "##FOLLOWUP_START" in content:
+            clean_text, parsed_followups = _extract_followups_from_text(content)
+            with st.chat_message(role):
+                if clean_text.strip():
+                    st.markdown(_decorate_links(clean_text), unsafe_allow_html=True)
+        else:
+            with st.chat_message(role):
+                st.markdown(_decorate_links(content), unsafe_allow_html=True)
+
+    def _render_post_response_blocks(scope: str = "post") -> None:
+        """Renderiza descargas, gráficos y preguntas sugeridas actuales."""
+        import hashlib
+        chart_only_mode = bool(st.session_state.get("last_response_chart_only", False))
+
+        # Descargas CSV
+        csv_markers_now = st.session_state.get("csv_markers") or []
+        if csv_markers_now and not chart_only_mode:
+            with st.chat_message("assistant"):
+                for i, b in enumerate(csv_markers_now, start=1):
+                    path = b.get("path")
+                    if not path:
+                        continue
+                    filename = b.get("filename") or f"datos_{i}.csv"
+                    label = b.get("label") or "Descargar CSV"
+                    mimetype = b.get("mimetype") or "text/csv"
+                    # Extraer series_id del nombre de archivo (serie_{ID}.csv)
+                    series_id = ""
+                    if filename.startswith("serie_") and filename.endswith(".csv"):
+                        series_id = filename[len("serie_"):-len(".csv")]
+                    title = b.get("title") or _SERIES_TITLES.get(series_id, "")
+                    try:
+                        data_bytes = Path(str(path)).read_bytes()
+                    except Exception:
+                        data_bytes = b""
+                    # if title:
+                    #     st.markdown(f"**{title}**")
+                    # if series_id:
+                    #     st.caption(f"Serie: `{series_id}`")
+                    st.download_button(
+                        label,
+                        data_bytes,
+                        file_name=filename,
+                        mime=mimetype,
+                        key=f"download-{scope}-{i}-{hashlib.md5((filename + str(path)).encode()).hexdigest()[:8]}",
+                    )
+
+        # Gráficos
+        charts_enabled = bool(st.session_state.get("last_response_chart_requested", False))
+        chart_markers_now = (st.session_state.get("chart_markers") or []) if charts_enabled else []
+        memory_series_chart = st.session_state.get("memory_series_chart") if charts_enabled else None
+        if chart_markers_now or memory_series_chart:
+            with st.chat_message("assistant"):
+                st.markdown("### Gráficos de la serie")
+                for i, b in enumerate(chart_markers_now, start=1):
+                    path = b.get("data_path")
+                    if not path:
+                        continue
+                    title = b.get("title", "Gráfico")
+                    chart_type = b.get("type", "line")
+                    domain = b.get("domain", "")
+                    try:
+                        import pandas as _pd  # type: ignore
+                        df = _pd.read_csv(path)
+                        if "date" in df.columns:
+                            try:
+                                df["_dt"] = _pd.to_datetime(df["date"], errors="coerce")
+                                months_set = set(df["_dt"].dropna().dt.month.unique().tolist())
+                                is_quarterly = months_set.issubset({3, 6, 9, 12}) and len(months_set) <= 4
+                                if is_quarterly:
+                                    q_map = {3: "T1", 6: "T2", 9: "T3", 12: "T4"}
+                                    df["period"] = df["_dt"].apply(
+                                        lambda d: f"{q_map.get(d.month, '?')}/{d.year}" if not _pd.isna(d) else None
+                                    )
+                                else:
+                                    df["period"] = df["_dt"].dt.strftime("%m/%Y")
+                            except Exception:
+                                pass
+                        if "value" in df.columns:
+                            df.rename(columns={"value": "indice"}, inplace=True)
+                        if "yoy_pct" in df.columns:
+                            try:
+                                s = _pd.to_numeric(df["yoy_pct"], errors="coerce")
+                                if s.notna().any():
+                                    max_abs = float(s.abs().max())
+                                    if max_abs < 1.0:
+                                        s = s * 100.0
+                                    df["yoy_pct_%"] = s
+                            except Exception:
+                                pass
+                    except Exception:
+                        df = None
+                    st.markdown(f"**{title}**")
+                    st.caption(
+                        "Descripción: variación anual en porcentaje del año consultado, sin índice ni año previo." +
+                        (f" Dominio: {domain}." if domain else "")
+                    )
+                    if df is not None and chart_type == "line":
+                        try:
+                            cols_pref = ["yoy_pct_%", "yoy_pct"]
+                            cols_plot_all = [c for c in cols_pref if c in df.columns]
+                            cols_plot = cols_plot_all[:1] if cols_plot_all else []
+                            if cols_plot:
+                                idx_col = "period" if "period" in df.columns else "date"
+                                st.line_chart(df.set_index(idx_col)[cols_plot])
+                            else:
+                                st.line_chart(df)
+                        except Exception as _e_plot:
+                            if _orch and hasattr(_orch, "logger"):
+                                _orch.logger.error(f"[UI_CHART_ERROR] {_e_plot}")
+                            st.caption("No se pudo renderizar el gráfico.")
+                    else:
+                        st.caption("Datos no disponibles para el gráfico.")
+
+                if memory_series_chart:
+                    try:
+                        df_mem = memory_series_chart.get("data")
+                        x_col = memory_series_chart.get("x", "period")
+                        y_cols = memory_series_chart.get("y")
+                        chart_type_mem = str(memory_series_chart.get("chart_type", "line")).lower()
+                        if chart_type_mem == "bar":
+                            st.bar_chart(
+                                data=df_mem,
+                                x=x_col,
+                                y=y_cols,
+                                width="stretch",
+                                height=320,
+                            )
+                        elif chart_type_mem == "area":
+                            st.area_chart(
+                                data=df_mem,
+                                x=x_col,
+                                y=y_cols,
+                                width="stretch",
+                                height=320,
+                            )
+                        else:
+                            st.line_chart(
+                                data=df_mem,
+                                x=x_col,
+                                y=y_cols,
+                                x_label="Período",
+                                y_label="Serie",
+                                width="stretch",
+                                height=320,
+                            )
+                    except Exception as _e_mem_chart:
+                        if _orch and hasattr(_orch, "logger"):
+                            _orch.logger.error(f"[UI_MEMORY_CHART_ERROR] {_e_mem_chart}")
+                        st.caption("No se pudo renderizar el gráfico en memoria.")
+
+        # Preguntas sugeridas desactivadas temporalmente.
+        # followup_markers_now = st.session_state.get("followup_markers") or []
+        # if not followup_markers_now:
+        #     followup_markers_now = _build_ui_followups_from_facts()
+        # if followup_markers_now and not chart_only_mode:
+        #     ...
+        pass
+
+    # Renderizar bloques con marcadores actuales (permite capturar clicks de followups)
+    _render_post_response_blocks(scope="main")
+
+    # Entrada del usuario SIEMPRE visible
+    user_input_display = st.chat_input("Escribe tu pregunta...")
+
+    # Resolver mensaje a procesar (prioriza pending_question)
+    if st.session_state.get("pending_question"):
+        user_message = st.session_state.pending_question
+        st.session_state.pending_question = None
+    else:
+        user_message = user_input_display
+
+    if not user_message:
+        return
+
+    charts_requested_for_turn = _user_requested_chart(user_message)
+    requested_chart_type = _detect_requested_chart_type(user_message) if charts_requested_for_turn else "line"
+
+    # Nota: no limpiar followups aquí; se reemplazan cuando llega la nueva respuesta
+
+    # Mostrar mensaje del usuario
+    with st.chat_message("user"):
+        st.markdown(user_message)
+
+    # Registrar turno de usuario en memoria
+    try:
+        _mem_adapter = st.session_state.get("_mem_adapter") or MemoryAdapter(pg_dsn=os.getenv("PG_DSN", "postgresql://postgres:postgres@localhost:5432/pibot"))
+        st.session_state._mem_adapter = _mem_adapter
+        _mem_adapter.on_user_turn(
+            st.session_state.get("session_id", ""),
+            user_message,
+            metadata={
+                "source": "ui",
+                "model": os.getenv("OPENAI_MODEL", "gpt-4.1"),
+                "temperature": os.getenv("OPENAI_TEMPERATURE", "0"),
+            },
+        )
+        # Refrescar panel de memoria tras turno de usuario
+        try:
+            _ph = st.session_state.get("_mem_debug_placeholder")
+            if _ph:
+                _ph.empty()
+                _render_memory_debug(_ph.container())
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+    # Rate limiting simple
+    now = datetime.datetime.now()
+    delta = now - st.session_state.prev_question_timestamp
+    min_delta = datetime.timedelta(seconds=settings.min_time_between_requests)
+    st.session_state.prev_question_timestamp = now
+
+    if delta < min_delta:
+        wait_for = (min_delta - delta).total_seconds()
+        with st.spinner(f"Esperando {wait_for:.1f}s para respetar el rate limit..."):
+            time.sleep(wait_for)
+
+    # Historial previo (antes de agregar el mensaje actual)
+    # Paridad con qa/qa.py: por defecto no enviar historial al clasificador/grafo.
+    use_history = os.getenv("STREAMLIT_PASS_HISTORY_TO_GRAPH", "0").lower() in {"1", "true", "yes", "on"}
+    history: List[Dict[str, str]] = list(st.session_state.messages) if use_history else []
+
+    assistant_box = st.chat_message("assistant")
+    status_placeholder = assistant_box.empty()
+    status_placeholder.caption("Pensando .")
+    markers_csv: List[Dict[str, str]] = []
+    markers_chart: List[Dict[str, str]] = []
+    markers_followup: List[Dict[str, str]] = []
+    collecting_csv = False
+    collecting_chart = False
+    collecting_followup = False
+    buffer_csv: List[str] = []
+    buffer_chart: List[str] = []
+    buffer_followup: List[str] = []
+    raw_text_accum = ""
+    text_accum = ""
+    placeholder = assistant_box.empty()
+    _debug_chunk_idx = 0
+    first_stream_piece_rendered = False
+    thinking_frame = 0
+
+    def _thinking_caption(frame: int) -> str:
+        dots = (frame % 3) + 1
+        return f"Pensando {'.' * dots}"
+    stream_cursor_enabled = os.getenv("STREAMLIT_STREAM_CURSOR", "1").lower() in {"1", "true", "yes", "on"}
+    try:
+        stream_delay_ms = float(os.getenv("STREAMLIT_STREAM_DELAY_MS", "50") or 50)
+    except Exception:
+        stream_delay_ms = 50.0
+
+    def _iter_ui_stream_segments(text: str):
+        if not text:
+            return
+        total_len = len(text)
+        if total_len <= 120:
+            step = 4
+        elif total_len <= 400:
+            step = 8
+        else:
+            step = 16
+        for i in range(0, total_len, step):
+            yield text[i : i + step]
+
+    def _render_streaming_text(content: str, *, final: bool = False) -> None:
+        if final or not stream_cursor_enabled:
+            placeholder.markdown(_decorate_links(content) or "\u200B", unsafe_allow_html=True)
+        else:
+            placeholder.markdown((content or "\u200B") + "▌")
+
+    def handle_chunk(chunk: str) -> None:
+        nonlocal collecting_csv, collecting_chart, collecting_followup, buffer_csv, buffer_chart, buffer_followup, raw_text_accum, text_accum, _debug_chunk_idx, first_stream_piece_rendered, thinking_frame
+        text = str(chunk)
+        _debug_chunk_idx += 1
+        if not first_stream_piece_rendered:
+            status_placeholder.caption(_thinking_caption(thinking_frame))
+            thinking_frame = (thinking_frame + 1) % 4
+        try:
+            preview = text[:200].replace("\n", "\\n")
+            if os.getenv("STREAM_CHUNK_LOGS", "0").lower() in {"1", "true", "yes", "on"}:
+                _ui_logger.debug(
+                    "[UI_STREAM_CHUNK] idx=%s len=%s preview=%s",
+                    _debug_chunk_idx,
+                    len(text),
+                    text[:120].replace("\n", " "),
+                )
+                _ui_logger.debug(
+                    "[UI_STREAM_CHUNK_RAW] idx=%s repr=%s",
+                    _debug_chunk_idx,
+                    preview,
+                )
+        except Exception:
+            pass
+        out_lines: List[str] = []
+        for line in text.splitlines(keepends=True):
+            ls = line.strip()
+            if ls == "##CSV_DOWNLOAD_START":
+                collecting_csv = True
+                buffer_csv = []
+                continue
+            if ls == "##CSV_DOWNLOAD_END":
+                collecting_csv = False
+                d: Dict[str, str] = {}
+                for ln in buffer_csv:
+                    if "=" in ln:
+                        k, v = ln.split("=", 1)
+                        d[k.strip()] = v.strip()
+                if d:
+                    markers_csv.append(d)
+                buffer_csv = []
+                continue
+            if ls == "##CHART_START":
+                collecting_chart = True
+                buffer_chart = []
+                continue
+            if ls == "##CHART_END":
+                collecting_chart = False
+                d2: Dict[str, str] = {}
+                for ln in buffer_chart:
+                    if "=" in ln:
+                        k, v = ln.split("=", 1)
+                        d2[k.strip()] = v.strip()
+                if d2:
+                    markers_chart.append(d2)
+                buffer_chart = []
+                continue
+            if ls == "##FOLLOWUP_START":
+                collecting_followup = True
+                buffer_followup = []
+                continue
+            if ls == "##FOLLOWUP_END":
+                collecting_followup = False
+                d3: Dict[str, str] = {}
+                for ln in buffer_followup:
+                    if "=" in ln:
+                        k, v = ln.split("=", 1)
+                        d3[k.strip()] = v.strip()
+                if d3:
+                    markers_followup.append(d3)
+                buffer_followup = []
+                continue
+            if collecting_csv:
+                buffer_csv.append(ls)
+                continue
+            if collecting_chart:
+                buffer_chart.append(ls)
+                continue
+            if collecting_followup:
+                buffer_followup.append(ls)
+                continue
+            out_lines.append(line)
+        filtered = "".join(out_lines)
+        if filtered:
+            raw_text_accum += filtered
+        if filtered or not text_accum:
+            if charts_requested_for_turn:
+                return
+            for piece in _iter_ui_stream_segments(filtered):
+                if first_stream_piece_rendered and stream_delay_ms > 0:
+                    time.sleep(stream_delay_ms / 1000.0)
+                text_accum += piece
+                if not first_stream_piece_rendered:
+                    status_placeholder.empty()
+                _render_streaming_text(text_accum, final=False)
+                first_stream_piece_rendered = True
+            if not filtered and not text_accum:
+                _render_streaming_text(text_accum, final=False)
+
+    chunk_queue: Queue = Queue()
+    stream_done = threading.Event()
+    stream_errors: List[Exception] = []
+
+    def _produce_chunks() -> None:
+        try:
+            for _chunk in stream_fn(user_message, history=history, session_id=st.session_state.get("session_id", "")):
+                chunk_queue.put(_chunk)
+        except Exception as _e_stream:
+            stream_errors.append(_e_stream)
+        finally:
+            stream_done.set()
+            chunk_queue.put(None)
+
+    threading.Thread(target=_produce_chunks, daemon=True).start()
+
+    while True:
+        try:
+            _chunk = chunk_queue.get(timeout=0.35)
+        except Empty:
+            if not first_stream_piece_rendered and not stream_done.is_set():
+                status_placeholder.caption(_thinking_caption(thinking_frame))
+                thinking_frame = (thinking_frame + 1) % 3
+            continue
+
+        if _chunk is None:
+            break
+
+        handle_chunk(_chunk)
+
+    if stream_errors:
+        raise stream_errors[0]
+    raw_response_text = _decorate_links(raw_text_accum)
+    response_text = raw_response_text
+    if charts_requested_for_turn:
+        response_text = _build_chart_intro_from_history(
+            user_message=user_message,
+            history_messages=st.session_state.messages,
+            chart_type=requested_chart_type,
+        )
+    _render_streaming_text(response_text, final=True)
+
+    # Construir gráfico de series desde datos tabulares de la respuesta en memoria
+    if charts_requested_for_turn:
+        memory_chart_payload = _extract_memory_series_chart(raw_response_text)
+    else:
+        memory_chart_payload = None
+
+    if charts_requested_for_turn and memory_chart_payload:
+        memory_chart_payload["chart_type"] = requested_chart_type
+        st.session_state.memory_series_chart = memory_chart_payload
+    else:
+        st.session_state.pop("memory_series_chart", None)
+
+    # Fallback: extraer y limpiar marcadores de followup por si algún chunk los mostró como texto
+    if (not charts_requested_for_turn) and "##FOLLOWUP_START" in response_text:
+        response_text, parsed_followups = _extract_followups_from_text(response_text)
+        if parsed_followups:
+            markers_followup.extend(parsed_followups)
+            # Re-render sin los marcadores para evitar que queden visibles
+            _render_streaming_text(response_text, final=True)
+
+    try:
+        if os.getenv("STREAM_CHUNK_LOGS", "0").lower() in {"1", "true", "yes", "on"}:
+            _ui_logger.debug(
+                "[UI_STREAM_END] total_len=%s preview=%s",
+                len(response_text),
+                response_text[:200].replace("\n", " "),
+            )
+    except Exception:
+        pass
+    status_placeholder.empty()
+
+    # Almacenar markers en session_state (sin limpiar)
+    st.session_state.csv_markers = markers_csv
+    st.session_state.chart_markers = markers_chart if charts_requested_for_turn else []
+    st.session_state.last_response_chart_requested = charts_requested_for_turn
+    st.session_state.last_response_chart_only = charts_requested_for_turn
+    st.session_state.followup_markers = markers_followup
+
+    # Registrar turno del asistente en memoria
+    try:
+        _mem_adapter = st.session_state.get("_mem_adapter") or MemoryAdapter(pg_dsn=os.getenv("PG_DSN", "postgresql://postgres:postgres@localhost:5432/pibot"))
+        st.session_state._mem_adapter = _mem_adapter
+        _mem_adapter.on_assistant_turn(
+            st.session_state.get("session_id", ""),
+            response_text,
+            metadata={
+                "source": "ui",
+                "model": os.getenv("OPENAI_MODEL", "gpt-4.1"),
+                "temperature": os.getenv("OPENAI_TEMPERATURE", "0"),
+            },
+        )
+        # Refrescar panel de memoria tras turno del asistente
+        try:
+            _ph = st.session_state.get("_mem_debug_placeholder")
+            if _ph:
+                _ph.empty()
+                _render_memory_debug(_ph.container())
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+    # Guardar respuesta en historial
+    st.session_state.messages.append({"role": "user", "content": user_message})
+    st.session_state.messages.append({"role": "assistant", "content": response_text})
+
+    # Forzar rerender para que los nuevos followups/descargas se muestren y sean clicables
+    st.rerun()
+
+    # (Botones de followup ahora se renderizan antes del input; se omite duplicado aquí)
+
+    # Vector search: detectar coincidencias en el texto ya filtrado
+    if "vector_matches" not in st.session_state:
+        st.session_state.vector_matches = []
+    if "vm_block_id" not in st.session_state:
+        st.session_state.vm_block_id = None
+
+    matches_now: List[Dict[str, object]] = []
+    if response_text and "##VECTOR_MATCHES_START" in response_text:
+        try:
+            block = response_text.split("##VECTOR_MATCHES_START", 1)[1].split("##VECTOR_MATCHES_END", 1)[0]
+            lines = [ln.strip() for ln in block.splitlines() if ln.strip()]
+            import re as _re
+            for ln in lines:
+                m = _re.match(r"(\d+)\.\s+(.+?)\s+\(([A-Z0-9_.]+)\)$", ln)
+                if m:
+                    matches_now.append({"rank": int(m.group(1)), "title": m.group(2), "code": m.group(3)})
+        except Exception:
+            matches_now = []
+        st.session_state.vector_matches = matches_now
+        if matches_now:
+            import time as _time
+            st.session_state.vm_block_id = str(int(_time.time()))
+    else:
+        matches_now = st.session_state.vector_matches
+
+    if matches_now:
+        with st.chat_message("assistant"):
+            st.markdown("### Series sugeridas (vector search)")
+            labels_map = {m["code"]: f"{m['rank']}. {m['title']} ({m['code']})" for m in matches_now}
+            for m in matches_now:
+                code = m["code"]
+                rank = m["rank"]
+                title = m["title"]
+                label = labels_map.get(code, code)
+                if st.button(f"Usar serie {label}", key=f"vm_btn_{code}"):
+                    try:
+                        if _orch and hasattr(_orch, "logger"):
+                            _orch.logger.info(
+                                "[UI_VECTOR_SELECT_BTN] click | " f"rank={rank} | code={code} | title={title}"
+                            )
+                    except Exception:
+                        pass
+                    st.caption(f"Serie seleccionada: {code}")
+                    cmd = f"usar serie {code}"
+                    with st.chat_message("user"):
+                        st.markdown(cmd)
+                    use_history2 = os.getenv("STREAMLIT_PASS_HISTORY_TO_GRAPH", "0").lower() in {"1", "true", "yes", "on"}
+                    hist2: List[Dict[str, str]] = list(st.session_state.messages) if use_history2 else []
+                    with st.chat_message("assistant"):
+                        with st.spinner("Procesando los datos solicitados..."):
+                            response_chunks = stream_fn(cmd, history=hist2, session_id=st.session_state.get("session_id", ""))
+                            # Render streaming en UI secundaria
+                            text_accum2 = ""
+                            ph2 = st.empty()
+                            for ch2 in response_chunks:
+                                text_accum2 += str(ch2)
+                                ph2.markdown(text_accum2)
+                            response_text2 = text_accum2
+                    st.session_state.messages.append({"role": "user", "content": cmd})
+                    st.session_state.messages.append({"role": "assistant", "content": response_text2})
+                    st.session_state.vector_matches = []
+                    st.session_state.vm_block_id = None
+                    st.rerun()

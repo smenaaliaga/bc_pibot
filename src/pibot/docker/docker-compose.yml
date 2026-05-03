@@ -1,0 +1,54 @@
+services:
+  postgres:
+    build:
+      context: ..
+      dockerfile: ./docker/postgres/Dockerfile
+    container_name: pibot-postgres2
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: pibot
+    env_file:
+      - ../.env
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
+      - ./postgres/migrations:/docker-entrypoint-initdb.d/migrations:ro
+    restart: unless-stopped
+  redis:
+    image: redis:8.0-rc1
+    container_name: redis-pibot2
+    env_file:
+      - ../.env
+    command:
+      - redis-server
+      - "--appendonly"
+      - "yes"
+      - "--save"
+      - "60"
+      - "1"
+      - "--requirepass"
+      - "${REDIS_PASS:?set REDIS_PASS in .env}"
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASS:?set REDIS_PASS in .env} ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+  intent-api:
+    build:
+      context: ./intent_api
+    container_name: pibot-intent-api
+    ports:
+      - "8100:8000"
+    restart: unless-stopped
+volumes:
+  pgdata:
+  redisdata:

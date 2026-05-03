@@ -1,0 +1,1786 @@
+# -*- coding: utf-8 -*-
+"""
+get_series.py
+-------------
+Capa de acceso a series del Banco Central de Chile (BCCh) vía API REST,
+con cálculo de variaciones y cacheo en Redis.
+
+Funciones principales
+=====================
+
+   - get_series_api_rest_bcch(...)
+   - Llama a la API REST del BCCh (SieteRestWS).
+   - Normaliza las observaciones (fecha, valor, status).
+   - Opcionalmente remuestrea a otra frecuencia (D/M/Q/A) con agregación (avg/sum/first/last).
+   - Calcula:
+       * pct     → variación % respecto del período anterior.
+       * yoy_pct → variación % respecto del mismo período del año anterior.
+   - Almacena el resultado completo en Redis (meta + observaciones enriquecidas).
+   - Devuelve un dict con:
+       {
+         "meta": {...},
+         "observations": [
+            {"date": "YYYY-MM-DD", "value": x, "pct": ..., "yoy_pct": ...},
+            ...
+         ]
+       }
+
+   La clave de Redis incluye:
+       - series_id
+       - target_frequency
+       - agg
+
+2) get_series_from_redis(...)
+   - Recupera desde Redis lo almacenado por get_series_api_rest_bcch.
+   - Si no existe en Redis:
+       * Por defecto, puede llamar a get_series_api_rest_bcch para poblar (si use_fallback=True).
+       * O devolver None si use_fallback=False.
+   - Permite filtrar por rango de fechas (fecha inicio / fecha fin).
+   - Devuelve el mismo tipo de estructura que get_series_api_rest_bcch, pero filtrada al período.
+
+
+"""
+
+import json
+import re
+import datetime
+import os
+import threading
+import time
+from typing import Optional, Dict, Any, List
+
+import pandas as pd
+import requests
+from dateutil import parser as dateparser
+from urllib.parse import urlencode
+
+# import redis -> hacerlo opcional para no fallar en import
+try:
+    import redis  # type: ignore
+except Exception:  # redis no instalado o problemático
+    redis = None  # type: ignore[assignment]
+# relativedelta para ajustar rangos según frecuencia
+try:
+    from dateutil.relativedelta import relativedelta  # type: ignore
+except Exception:
+    relativedelta = None  # type: ignore[assignment]
+
+from config import BCCH_USER, BCCH_PASS, LOG_LEVEL, get_settings
+# Flag opcional para habilitar/deshabilitar cacheo
+USE_REDIS_CACHE = os.getenv("USE_REDIS_CACHE", "1").lower() in {"1", "true", "yes", "y", "on"}
+REDIS_SERIES_TTL = os.getenv("REDIS_SERIES_TTL")
+# from logger import get_logger, Phase  -> fallback si no existe logger.py
+try:
+    from logger import get_logger, Phase  # type: ignore
+except Exception:
+    import logging, contextlib, time as _time, os as _os, datetime as _dt
+
+    def get_logger(name: str, level: str = "INFO") -> logging.Logger:
+        logger = logging.getLogger(name)
+        if logger.handlers:
+            return logger
+        numeric_level = getattr(logging, level.upper(), logging.INFO)
+        logger.setLevel(numeric_level)
+        root = _os.path.abspath(_os.path.dirname(__file__))
+        log_dir = _os.path.join(root, "logs")
+        _os.makedirs(log_dir, exist_ok=True)
+        fname = _os.path.join(log_dir, f"pibot_{_dt.datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
+        fmt = logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s")
+        fh = logging.FileHandler(fname, encoding="utf-8")
+        fh.setFormatter(fmt)
+        logger.addHandler(fh)
+        ch = logging.StreamHandler()
+        ch.setFormatter(fmt)
+        logger.addHandler(ch)
+        return logger
+
+    class Phase(contextlib.ContextDecorator):
+        def __init__(self, logger: logging.Logger, name: str, extra: Optional[dict] = None):
+            self.logger = logger
+            self.name = name
+            self.extra = extra or {}
+            self._t0: Optional[float] = None
+
+        def __enter__(self):
+            self._t0 = _time.perf_counter()
+            self.logger.info(f"[FASE] start: {self.name} | {self.extra}")
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            t1 = _time.perf_counter()
+            if exc:
+                self.logger.error(f"[FASE] error: {self.name} ({t1 - (self._t0 or t1):.3f}s) | error={exc}")
+            else:
+                self.logger.info(f"[FASE] end: {self.name} ({t1 - (self._t0 or t1):.3f}s)")
+            return False
+
+try:
+    from logger import get_logger as _project_get_logger  # type: ignore
+except Exception:
+    _project_get_logger = None  # type: ignore
+
+_DEF_LOGGER_NAME = __name__
+if _project_get_logger:
+    logger = _project_get_logger(_DEF_LOGGER_NAME, level=LOG_LEVEL)
+else:
+    # Reusar logger del orquestador (archivo único por sesión)
+    try:
+        import orchestrator as _orch_mod
+        if hasattr(_orch_mod, 'logger'):
+            logger = _orch_mod.logger  # type: ignore[assignment]
+        else:
+            logger = get_logger(_DEF_LOGGER_NAME, level=LOG_LEVEL)
+    except Exception:
+        logger = get_logger(_DEF_LOGGER_NAME, level=LOG_LEVEL)
+
+# Eliminar lógica de duplicación de master: no agregar nuevos handlers
+# (log reuse check eliminado — no aporta información útil)
+
+BCCH_BASE = "https://si3.bcentral.cl/SieteRestWS/SieteRestWS.ashx"
+
+# ---------------------------------------------------------------------------
+# Configuración Redis
+# ---------------------------------------------------------------------------
+
+
+def _get_redis_client() -> Optional[Any]:
+    """
+    Devuelve un cliente Redis configurado a partir de config.py.
+
+    Se asume que en config.py existe, por ejemplo:
+        REDIS_URL = "redis://localhost:6379/0"
+
+    Si no está configurado, devuelve None y el código funciona sin cacheo.
+    """
+
+    if not USE_REDIS_CACHE:
+        logger.info("Cache Redis deshabilitado por USE_REDIS_CACHE=0/false.")
+        return None
+
+    if redis is None:
+        logger.warning("Paquete 'redis' no instalado; cacheo deshabilitado.")
+        return None
+
+    redis_url = os.getenv("REDIS_URL")
+    if not redis_url:
+        try:
+            from config import REDIS_URL as _cfg_url  # lazy import para compatibilidad
+            redis_url = _cfg_url
+        except Exception:
+            redis_url = None
+
+    if not redis_url:
+        logger.warning("REDIS_URL no configurado en config.py; cacheo deshabilitado.")
+        return None
+
+    try:
+        client = redis.Redis.from_url(
+            redis_url,
+            decode_responses=True,
+            socket_connect_timeout=1,
+            socket_timeout=2,
+        )
+        # Pequeña prueba de conexión
+        client.ping()
+        return client
+    except Exception as e:
+        logger.error(f"No se pudo conectar a Redis con REDIS_URL={redis_url!r}: {e}")
+        return None
+
+
+_redis_client: Optional[Any] = _get_redis_client()
+_redis_status_logged: bool = False
+
+
+def _ensure_redis_client() -> Optional[Any]:
+    """Inicializa el cliente Redis bajo demanda si no existe o falló antes."""
+    global _redis_client
+    global _redis_status_logged
+    if _redis_client is None:
+        _redis_client = _get_redis_client()
+        if _redis_client is not None:
+            logger.debug("[redis] Cliente inicializado para cacheo de series.")
+            _redis_status_logged = True
+    elif not _redis_status_logged:
+        try:
+            _redis_client.ping()
+        except Exception as _e:
+            logger.warning(f"[redis] Cliente presente pero ping falló: {_e}")
+        _redis_status_logged = True
+    return _redis_client
+
+
+def _make_cache_key(
+    series_id: str,
+    firstdate: Optional[str],
+    lastdate: Optional[str],
+    target_frequency: Optional[str],
+    agg: str,
+) -> str:
+    """
+    Construye la clave de Redis para una combinación (serie + fechas + frecuencia + agg).
+    """
+    fdate = firstdate or "auto"
+    ldate = lastdate or "auto"
+    freq = (target_frequency or "orig").upper()
+    agg = (agg or "avg").lower()
+    return f"bcch:series:{series_id}:{fdate}:{ldate}:{freq}:{agg}"
+
+
+# ---------------------------------------------------------------------------
+# Metadatos de actualización de series (SearchSeries)
+# ---------------------------------------------------------------------------
+
+SERIES_UPDATES_ENABLED = os.getenv("SERIES_UPDATES_ENABLED", "1").lower() in {"1", "true", "yes", "y", "on"}
+SERIES_UPDATES_TIMEOUT_SECONDS = float(os.getenv("SERIES_UPDATES_TIMEOUT_SECONDS", "15"))
+SERIES_UPDATES_TIMEOUT_SECONDS_QUARTERLY = float(
+    os.getenv("SERIES_UPDATES_TIMEOUT_SECONDS_QUARTERLY", str(SERIES_UPDATES_TIMEOUT_SECONDS))
+)
+SERIES_UPDATES_RETRY_ATTEMPTS = max(1, int(os.getenv("SERIES_UPDATES_RETRY_ATTEMPTS", "3")))
+SERIES_UPDATES_RETRY_BACKOFF_SECONDS = max(0.0, float(os.getenv("SERIES_UPDATES_RETRY_BACKOFF_SECONDS", "1.5")))
+SERIES_UPDATES_REFRESH_SECONDS = int(os.getenv("SERIES_UPDATES_REFRESH_SECONDS", "3600"))
+SERIES_UPDATES_DAILY_ENABLED = os.getenv("SERIES_UPDATES_DAILY_ENABLED", "1").lower() in {"1", "true", "yes", "y", "on"}
+SERIES_UPDATES_DAILY_AT = os.getenv("SERIES_UPDATES_DAILY_AT", "09:10").strip()
+SERIES_UPDATES_SCHEDULER_CHECK_INTERVAL_SECONDS = max(
+    5,
+    int(os.getenv("SERIES_UPDATES_SCHEDULER_CHECK_INTERVAL_SECONDS", "30")),
+)
+SERIES_UPDATES_FREQUENCIES = tuple(
+    part.strip().upper()
+    for part in os.getenv("SERIES_UPDATES_FREQUENCIES", "MONTHLY,QUARTERLY,ANNUAL").split(",")
+    if part.strip()
+)
+
+_series_updates_lock = threading.Lock()
+_series_updates_index: Dict[str, datetime.date] = {}
+_series_updates_loaded_at: Optional[datetime.datetime] = None
+_series_updates_scheduler_lock = threading.Lock()
+_series_updates_scheduler_thread: Optional[threading.Thread] = None
+
+
+def _parse_source_date(value: Any) -> Optional[datetime.date]:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    for fmt in ("%d-%m-%Y", "%Y-%m-%d"):
+        try:
+            return datetime.datetime.strptime(text, fmt).date()
+        except Exception:
+            continue
+    try:
+        parsed = dateparser.parse(text)
+    except Exception:
+        parsed = None
+    if parsed is None:
+        return None
+    if isinstance(parsed, datetime.datetime):
+        return parsed.date()
+    return parsed
+
+
+def _parse_cache_created_at(value: Any) -> Optional[datetime.datetime]:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    normalized = text.replace("Z", "+00:00")
+    try:
+        parsed = datetime.datetime.fromisoformat(normalized)
+    except Exception:
+        try:
+            parsed = dateparser.parse(text)
+        except Exception:
+            parsed = None
+    if not isinstance(parsed, datetime.datetime):
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=datetime.timezone.utc)
+    return parsed.astimezone(datetime.timezone.utc)
+
+
+def _fetch_search_series_updates(frequency_code: str) -> Dict[str, datetime.date]:
+    if not BCCH_USER or not BCCH_PASS:
+        logger.warning("[series_updates] BCCH_USER/BCCH_PASS no configurados; no se puede consultar SearchSeries.")
+        return {}
+
+    freq_normalized = str(frequency_code or "").strip().upper()
+    timeout_seconds = (
+        SERIES_UPDATES_TIMEOUT_SECONDS_QUARTERLY
+        if freq_normalized == "QUARTERLY"
+        else SERIES_UPDATES_TIMEOUT_SECONDS
+    )
+
+    params = {
+        "user": BCCH_USER,
+        "pass": BCCH_PASS,
+        "frequency": freq_normalized,
+        "function": "SearchSeries",
+    }
+    response = requests.get(
+        BCCH_BASE,
+        params=params,
+        headers={"Accept": "application/json"},
+        timeout=timeout_seconds,
+    )
+    response.raise_for_status()
+    payload = response.json() if response is not None else {}
+    if not isinstance(payload, dict):
+        return {}
+
+    infos = payload.get("SeriesInfos")
+    if not isinstance(infos, list):
+        return {}
+
+    updates: Dict[str, datetime.date] = {}
+    for item in infos:
+        if not isinstance(item, dict):
+            continue
+        series_id = str(item.get("seriesId") or "").strip()
+        if not series_id:
+            continue
+        updated_date = _parse_source_date(item.get("updatedAt"))
+        if updated_date is None:
+            continue
+        previous = updates.get(series_id)
+        if previous is None or updated_date > previous:
+            updates[series_id] = updated_date
+
+    logger.info(
+        "[series_updates] SearchSeries frequency=%s | entries=%s",
+        freq_normalized,
+        len(updates),
+    )
+    return updates
+
+
+def _fetch_search_series_updates_with_retry(frequency_code: str) -> Dict[str, datetime.date]:
+    last_timeout_exc: Optional[Exception] = None
+    freq_normalized = str(frequency_code or "").strip().upper()
+
+    for attempt in range(1, SERIES_UPDATES_RETRY_ATTEMPTS + 1):
+        try:
+            return _fetch_search_series_updates(freq_normalized)
+        except requests.exceptions.Timeout as exc:
+            last_timeout_exc = exc
+            if attempt >= SERIES_UPDATES_RETRY_ATTEMPTS:
+                break
+            backoff_seconds = SERIES_UPDATES_RETRY_BACKOFF_SECONDS * (2 ** (attempt - 1))
+            logger.warning(
+                "[series_updates] Timeout SearchSeries (%s) intento=%s/%s; reintentando en %.1fs",
+                freq_normalized,
+                attempt,
+                SERIES_UPDATES_RETRY_ATTEMPTS,
+                backoff_seconds,
+            )
+            if backoff_seconds > 0:
+                time.sleep(backoff_seconds)
+
+    if last_timeout_exc is not None:
+        raise last_timeout_exc
+    return {}
+
+
+def preload_series_updates_index(force: bool = False) -> Dict[str, str]:
+    global _series_updates_index
+    global _series_updates_loaded_at
+
+    if not SERIES_UPDATES_ENABLED:
+        return {}
+
+    now_utc = datetime.datetime.now(datetime.timezone.utc)
+    with _series_updates_lock:
+        if (
+            not force
+            and _series_updates_loaded_at is not None
+            and (now_utc - _series_updates_loaded_at).total_seconds() < SERIES_UPDATES_REFRESH_SECONDS
+            and _series_updates_index
+        ):
+            return {series_id: value.isoformat() for series_id, value in _series_updates_index.items()}
+
+        merged: Dict[str, datetime.date] = {}
+        successful_freqs: List[str] = []
+        failed_freqs: List[str] = []
+        for freq in SERIES_UPDATES_FREQUENCIES:
+            try:
+                freq_updates = _fetch_search_series_updates_with_retry(freq)
+                successful_freqs.append(freq)
+            except Exception as exc:
+                logger.warning("[series_updates] Error consultando SearchSeries (%s): %s", freq, exc)
+                failed_freqs.append(freq)
+                continue
+            for series_id, updated_date in freq_updates.items():
+                previous = merged.get(series_id)
+                if previous is None or updated_date > previous:
+                    merged[series_id] = updated_date
+
+        if merged:
+            _series_updates_index = merged
+            _series_updates_loaded_at = now_utc
+            logger.info(
+                "[series_updates] Índice actualizado | series=%s | ok=%s | failed=%s",
+                len(_series_updates_index),
+                ",".join(successful_freqs) if successful_freqs else "-",
+                ",".join(failed_freqs) if failed_freqs else "-",
+            )
+        elif failed_freqs:
+            logger.warning(
+                "[series_updates] Índice no actualizado; todas las frecuencias fallaron | failed=%s",
+                ",".join(failed_freqs),
+            )
+        elif _series_updates_loaded_at is None:
+            _series_updates_loaded_at = now_utc
+
+        return {series_id: value.isoformat() for series_id, value in _series_updates_index.items()}
+
+
+def _parse_daily_hhmm(value: str) -> Optional[datetime.time]:
+    text = str(value or "").strip()
+    if not text or ":" not in text:
+        return None
+    hh_text, mm_text = text.split(":", 1)
+    try:
+        hour = int(hh_text)
+        minute = int(mm_text)
+    except Exception:
+        return None
+    if hour < 0 or hour > 23 or minute < 0 or minute > 59:
+        return None
+    return datetime.time(hour=hour, minute=minute)
+
+
+def _series_updates_scheduler_loop(target_time: datetime.time) -> None:
+    while True:
+        try:
+            now_local = datetime.datetime.now().astimezone()
+            next_run = now_local.replace(
+                hour=target_time.hour,
+                minute=target_time.minute,
+                second=0,
+                microsecond=0,
+            )
+            if next_run <= now_local:
+                next_run += datetime.timedelta(days=1)
+
+            sleep_seconds = max(0.0, (next_run - now_local).total_seconds())
+            logger.info("[series_updates] Scheduler diario activo | próxima_ejecución=%s", next_run.isoformat())
+
+            while sleep_seconds > 0:
+                chunk = min(float(SERIES_UPDATES_SCHEDULER_CHECK_INTERVAL_SECONDS), sleep_seconds)
+                time.sleep(chunk)
+                sleep_seconds -= chunk
+
+            try:
+                series_updates = preload_series_updates_index(force=True)
+                logger.info(
+                    "[series_updates] Scheduler diario ejecutado | hora=%s | series_con_updatedAt=%s",
+                    target_time.strftime("%H:%M"),
+                    len(series_updates),
+                )
+            except Exception as exc:
+                logger.warning("[series_updates] Scheduler diario falló: %s", exc)
+        except Exception as exc:
+            logger.warning("[series_updates] Scheduler diario en error de ciclo: %s", exc)
+            time.sleep(60)
+
+
+def start_series_updates_scheduler() -> bool:
+    global _series_updates_scheduler_thread
+
+    if not SERIES_UPDATES_ENABLED or not SERIES_UPDATES_DAILY_ENABLED:
+        return False
+
+    target_time = _parse_daily_hhmm(SERIES_UPDATES_DAILY_AT)
+    if target_time is None:
+        logger.warning(
+            "[series_updates] SERIES_UPDATES_DAILY_AT inválido (%r). Formato esperado HH:MM",
+            SERIES_UPDATES_DAILY_AT,
+        )
+        return False
+
+    with _series_updates_scheduler_lock:
+        if _series_updates_scheduler_thread is not None and _series_updates_scheduler_thread.is_alive():
+            return True
+        _series_updates_scheduler_thread = threading.Thread(
+            target=_series_updates_scheduler_loop,
+            args=(target_time,),
+            name="series-updates-daily-scheduler",
+            daemon=True,
+        )
+        _series_updates_scheduler_thread.start()
+
+    logger.info("[series_updates] Scheduler diario iniciado | hora=%s", target_time.strftime("%H:%M"))
+    return True
+
+
+def _get_series_source_updated_date(series_id: str) -> Optional[datetime.date]:
+    if not SERIES_UPDATES_ENABLED:
+        return None
+    sid = str(series_id or "").strip()
+    if not sid:
+        return None
+    preload_series_updates_index(force=False)
+    return _series_updates_index.get(sid)
+
+
+def _is_cached_series_stale(series_id: str, cached_payload: Dict[str, Any]) -> bool:
+    if not SERIES_UPDATES_ENABLED:
+        return False
+    if not isinstance(cached_payload, dict):
+        return False
+
+    source_updated = _get_series_source_updated_date(series_id)
+    if source_updated is None:
+        return False
+
+    meta = cached_payload.get("meta")
+    meta = meta if isinstance(meta, dict) else {}
+    cache_created_at = _parse_cache_created_at(meta.get("cache_created_at"))
+    if cache_created_at is None:
+        # Cache legacy sin timestamp: forzar refresh para registrar metadata de caché.
+        return True
+
+    return source_updated > cache_created_at.date()
+
+
+# ---------------------------------------------------------------------------
+# Trazabilidad de cálculos (decorador)
+# ---------------------------------------------------------------------------
+
+from functools import wraps
+from typing import Any as _Any
+
+def _summarize_arg(name: str, val: _Any):
+    try:
+        if isinstance(val, pd.DataFrame):
+            return {"type": "DataFrame", "shape": list(val.shape)}
+        if isinstance(val, dict):
+            out = {"type": "dict"}
+            if "observations" in val and isinstance(val["observations"], list):
+                out["observations_len"] = len(val["observations"])  # type: ignore[index]
+            if "meta" in val and isinstance(val["meta"], dict):
+                out["meta_freq"] = (val.get("meta", {}) or {}).get("original_frequency")
+            return out
+        if isinstance(val, list):
+            return {"type": "list", "len": len(val)}
+        return val
+    except Exception:
+        return str(val)[:200]
+
+
+def calc_trace(fn):
+    @wraps(fn)
+    def _wrap(*args, **kwargs):
+        try:
+            args_summary = {f"arg{idx}": _summarize_arg(f"arg{idx}", a) for idx, a in enumerate(args)}
+            args_summary.update({k: _summarize_arg(k, v) for k, v in kwargs.items()})
+            logger.debug(f"[CALC_TRACE_ENTER] func={fn.__name__} args={args_summary}")
+        except Exception:
+            pass
+        result = fn(*args, **kwargs)
+        try:
+            if isinstance(result, str):
+                res_sum = {"type": "str", "lines": result.count("\n") + 1 if result else 0}
+            elif isinstance(result, dict):
+                res_sum = {"type": "dict", "keys": list(result.keys())[:8]}
+                try:
+                    res_sum["observations_len"] = len(result.get("observations", []) or [])
+                except Exception:
+                    pass
+            elif isinstance(result, pd.DataFrame):
+                res_sum = {"type": "DataFrame", "shape": list(result.shape)}
+            else:
+                res_sum = type(result).__name__
+            logger.debug(f"[CALC_TRACE_EXIT] func={fn.__name__} result={res_sum}")
+        except Exception:
+            pass
+        return result
+    return _wrap
+
+
+
+# Utilidades para fechas y frecuencias
+# ---------------------------------------------------------------------------
+
+import calendar as _calendar
+
+
+def _to_period_end(d: datetime.date, freq: str) -> datetime.date:
+    """Convierte una fecha de inicio-de-periodo al último día del periodo."""
+    freq = (freq or "").upper()
+    if freq == "M":
+        _, last_day = _calendar.monthrange(d.year, d.month)
+        return d.replace(day=last_day)
+    if freq in ("Q", "T"):
+        quarter_end_month = ((d.month - 1) // 3 + 1) * 3
+        _, last_day = _calendar.monthrange(d.year, quarter_end_month)
+        return datetime.date(d.year, quarter_end_month, last_day)
+    if freq == "A":
+        return datetime.date(d.year, 12, 31)
+    return d
+
+
+def _to_period_end_str(date_str: Optional[str], freq: Optional[str]) -> Optional[str]:
+    """Wrapper que acepta y retorna strings ISO."""
+    if not date_str or not freq:
+        return date_str
+    try:
+        d = datetime.date.fromisoformat(str(date_str).strip())
+        return _to_period_end(d, freq).isoformat()
+    except Exception:
+        return date_str
+
+
+def _infer_freq_from_code(series_id: str) -> str:
+    if not series_id:
+        return "U"
+    last = series_id.strip().split(".")[-1].upper()
+    if last == "T":
+        return "Q"  # T = Trimestral = Quarterly
+    return last if last in {"D", "M", "Q", "A"} else "U"
+
+
+def _parse_index_date(s: str) -> datetime.date:
+    if not s:
+        raise ValueError("indexDateString vacío")
+    if re.match(r"^\d{4}-\d{2}-\d{2}$", s):
+        return datetime.date.fromisoformat(s)
+    return dateparser.parse(s, dayfirst=True).date()
+
+
+@calc_trace
+def _resample(
+    df: pd.DataFrame,
+    target_freq: Optional[str],
+    agg: str,
+    original_freq: str,
+) -> pd.DataFrame:
+    if df is None or df.empty:
+        return df
+
+    if not target_freq or target_freq.upper() in {"", original_freq.upper()}:
+        return df
+
+    target = target_freq.upper()
+    if target not in {"D", "M", "Q", "A"}:
+        return df
+
+    # Use 'ME' for month-end to avoid pandas deprecation warning
+    rule_map = {"D": "D", "M": "ME", "Q": "Q-DEC", "A": "A-DEC"}
+    rule = rule_map[target]
+
+    if not isinstance(df.index, pd.DatetimeIndex):
+        df = df.set_index("date")
+
+    if agg == "sum":
+        grouped = df.resample(rule).sum(numeric_only=True)
+    elif agg == "last":
+        grouped = df.resample(rule).last()
+    elif agg == "first":
+        grouped = df.resample(rule).first()
+    else:
+        grouped = df.resample(rule).mean(numeric_only=True)
+
+    grouped = grouped.dropna(how="all").reset_index()
+
+    # Para frecuencia trimestral Q: asegurar que periodo anterior (mismo trimestre año previo) exista
+    # Esto se maneja luego en cálculo yoy, pero verificamos aquí que las fechas sean fin de período
+    return grouped
+
+
+def _normalize_observations(obs: List[Dict[str, Any]]) -> pd.DataFrame:
+    import pandas as pd
+    rows = []
+    for o in obs:
+        # Normalizar fecha: usar indexDateString si existe, sino date
+        date_raw = o.get("indexDateString") or o.get("date")
+        d = None
+        if date_raw:
+            try:
+                d = _parse_index_date(date_raw)
+            except Exception:
+                d = None
+        v_raw = o.get("value", None)
+        try:
+            v = float(str(v_raw).replace(",", ".")) if v_raw is not None else None
+        except Exception:
+            v = None
+        rows.append(
+            {
+                "date": d,
+                "value": v,
+            }
+        )
+
+    if not rows:
+        return pd.DataFrame(columns=["date", "value"])
+
+    df = pd.DataFrame(rows)
+    for col in ("date", "value"):
+        if col not in df.columns:
+            df[col] = None
+
+    df = df.dropna(subset=["value", "date"]).sort_values("date")
+
+    if df.empty:
+        return pd.DataFrame(columns=["date", "value"])
+
+    # Asegurar que la columna 'date' sea datetime para permitir resampleo
+    df["date"] = pd.to_datetime(df["date"])
+    return df
+
+
+# ---------------------------------------------------------------------------
+# Cálculo de variaciones (PCT y YOY_PCT)
+# ---------------------------------------------------------------------------
+
+
+@calc_trace
+def _compute_variations(df: pd.DataFrame, freq: str) -> pd.DataFrame:
+    """
+    Agrega columnas:
+      - pct      → variación % respecto al período anterior.
+      - yoy_pct  → variación % respecto al mismo período del año anterior.
+    """
+    if df.empty:
+        df["pct"] = []
+        df["yoy_pct"] = []
+        return df
+
+    df = df.sort_values("date").copy()
+
+    # Variación respecto del período anterior
+    df["pct"] = df["value"].pct_change() * 100.0
+
+    # Definir lag para YoY según frecuencia
+    freq = (freq or "").upper()
+    if freq == "M":
+        lag = 12
+    elif freq in {"Q", "T"}:
+        lag = 4
+    elif freq == "A":
+        lag = 1
+    elif freq == "D":
+        lag = 365  # aproximación
+    else:
+        lag = None
+
+    # Cálculo robusto de variación anual: emparejar por trimestre y año
+    import numpy as np
+    if freq in {"Q", "T"}:
+        # Extraer año y trimestre
+        df["_year"] = df["date"].apply(lambda x: int(str(x)[:4]))
+        df["_month"] = df["date"].apply(lambda x: int(str(x)[5:7]))
+        df["_quarter"] = df["_month"].apply(lambda m: ((m - 1) // 3) + 1)
+        yoy_list = []
+        for idx, row in df.iterrows():
+            y, q = row["_year"], row["_quarter"]
+            prev = df[(df["_year"] == y - 1) & (df["_quarter"] == q)]
+            if not prev.empty and prev.iloc[0]["value"] != 0:
+                yoy = (row["value"] / prev.iloc[0]["value"] - 1.0) * 100.0
+            else:
+                yoy = np.nan
+            yoy_list.append(yoy)
+        df["yoy_pct"] = yoy_list
+        df.drop(["_year", "_month", "_quarter"], axis=1, inplace=True)
+    elif lag is not None and lag > 0:
+        prev = df["value"].shift(lag)
+        df["yoy_pct"] = (df["value"] / prev - 1.0) * 100.0
+    else:
+        df["yoy_pct"] = None
+
+    return df
+
+
+# ---------------------------------------------------------------------------
+# Llamada a BCCh + almacenamiento en Redis
+# ---------------------------------------------------------------------------
+
+
+def get_series_api_rest_bcch(
+    series_id: str,
+    target_frequency: Optional[str] = None,
+    agg: str = "avg",
+) -> Dict[str, Any]:
+    """
+    Llama a la API REST del BCCh, calcula variaciones y almacena el resultado en Redis.
+
+    Parámetros
+    ----------
+    series_id : str
+        Identificador de la serie BCCh (ej: "F032.IMC.IND.Z.Z.EP18.Z.Z.0.M").
+        Para IMACEC, PIB y PIB regional, normalmente se obtienen desde los JSON
+        de configuración por defecto (config_default.json).
+    target_frequency : str, opcional
+        Frecuencia objetivo: "D", "M", "Q" o "A". Si None, se mantiene la original.
+    agg : str
+        Tipo de agregación en caso de remuestreo: "avg", "sum", "first", "last".
+
+    Devuelve
+    --------
+    dict con claves:
+        - "meta": {...}
+        - "observations": lista de dicts con date, value, pct, yoy_pct
+    """
+    global _redis_client
+    if not BCCH_USER or not BCCH_PASS:
+        raise RuntimeError("BCCH_USER/BCCH_PASS no configurados (.env)")
+
+    params = {
+        "user": BCCH_USER,
+        "pass": BCCH_PASS,
+        "function": "GetSeries",
+        "timeseries": series_id,
+    }
+    params_public = {
+        "function": "GetSeries",
+        "timeseries": series_id,
+    }
+    # No se envían firstdate/lastdate: se trae la serie completa.
+
+    headers = {"Accept": "application/json"}
+
+    # Log conciso de la llamada API
+    source_url = f"{BCCH_BASE}?{urlencode(params_public)}"
+    sid_up = (series_id or "").upper()
+    tag = "PIB" if "PIB" in sid_up else ("IMACEC" if ("IMC" in sid_up or "IMACEC" in sid_up) else "SERIE")
+    logger.info(f"[API_CALL:{tag}] {series_id} | freq={target_frequency or 'orig'} | url={source_url}")
+
+    # Cache sin depender de fechas: siempre se guarda la serie completa para la combinación serie+freq+agg
+    cache_key = _make_cache_key(series_id, None, None, target_frequency, agg)
+
+    # --- Llamada a API BCCh ---
+    with Phase(
+        logger,
+        "Fase 3: Llamada a BCCh",
+        {
+            "series_id": series_id,
+            "firstdate": None,
+            "lastdate": None,
+            "target_frequency": target_frequency,
+            "agg": agg,
+        },
+    ):
+        r = requests.get(BCCH_BASE, params=params, headers=headers, timeout=30)
+        r.raise_for_status()
+        data = r.json()
+
+        if data.get("Codigo") != 0:
+            desc = data.get("Descripcion", "Error desconocido")
+            raise RuntimeError(f"BCCh API error: {desc}")
+
+        series = data.get("Series", {})
+        obs = series.get("Obs", [])
+
+        df = _normalize_observations(obs)
+        original_freq = _infer_freq_from_code(series_id)
+        df_out = _resample(df, target_frequency, agg, original_freq)
+
+        # Determinar frecuencia efectiva al final del proceso
+        effective_freq = (target_frequency or original_freq or "U").upper()
+        df_enriched = _compute_variations(df_out, effective_freq)
+
+        cache_created_at = datetime.datetime.now(datetime.timezone.utc)
+        source_updated = _get_series_source_updated_date(series_id)
+
+        meta = {
+            "series_id": series.get("seriesId", series_id),
+            "descripEsp": series.get("descripEsp", ""),
+            "descripIng": series.get("descripIng", ""),
+            "source_provider": "BCCh SieteRestWS",
+            "source_url": f"{BCCH_BASE}?{urlencode(params_public)}",
+            "agg": agg,
+            "original_frequency": original_freq,
+            "cache_created_at": cache_created_at.isoformat(),
+        }
+        if source_updated is not None:
+            meta["source_updated_at"] = source_updated.isoformat()
+
+        observations = []
+        for _, row in df_enriched.iterrows():
+            d = row["date"]
+            d_date = d.date() if hasattr(d, "date") else d
+            d_end = _to_period_end(d_date, effective_freq)
+            v = row["value"]
+            pct = row.get("pct", None)
+            yoy = row.get("yoy_pct", None)
+            observations.append(
+                {
+                    "date": d_end.strftime("%Y-%m-%d"),
+                    "value": None if pd.isna(v) else float(v),
+                    "pct": None if pd.isna(pct) else float(pct),
+                    "yoy_pct": None if pd.isna(yoy) else float(yoy),
+                }
+            )
+
+        result = {
+            "meta": meta,
+            "observations": observations,
+        }
+
+    # --- Rango de fechas disponibles ---
+    try:
+        first_available_str = None
+        last_available_str = None
+        if observations:
+            dates_iter = [o.get("date") for o in observations if isinstance(o.get("date"), str) and o.get("date")]
+            if dates_iter:
+                first_available_str = min(dates_iter)
+                last_available_str = max(dates_iter)
+
+        meta_ref = result.setdefault("meta", {})
+        meta_ref["first_available_date"] = first_available_str or ""
+        meta_ref["last_available_date"] = last_available_str or ""
+
+    except Exception as _e_lastchk:
+        logger.debug(f"[get_series_api_rest_bcch] No se pudo calcular rango disponible: {_e_lastchk}")
+
+    # --- Almacenar en Redis ---
+    client = _ensure_redis_client()
+    if client is not None:
+        try:
+            payload = json.dumps(result, ensure_ascii=False)
+            client.set(cache_key, payload)
+            if REDIS_SERIES_TTL and REDIS_SERIES_TTL.isdigit():
+                try:
+                    client.expire(cache_key, int(REDIS_SERIES_TTL))
+                except Exception:
+                    logger.warning(f"[get_series_api_rest_bcch] No se pudo aplicar TTL a key='{cache_key}'")
+            logger.debug(
+                f"[get_series_api_rest_bcch] Serie almacenada en Redis | key='{cache_key}'"
+            )
+        except Exception as e:
+            logger.error(
+                f"[get_series_api_rest_bcch] Error almacenando en Redis key='{cache_key}': {e}"
+            )
+            _redis_client = None  # permitir reintentos en llamadas futuras
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Lectura desde Redis con filtro por fechas
+# ---------------------------------------------------------------------------
+
+
+def get_series_from_redis(
+    series_id: str,
+    firstdate: Optional[str] = None,
+    lastdate: Optional[str] = None,
+    target_frequency: Optional[str] = None,
+    agg: str = "avg",
+    use_fallback: bool = True,
+) -> Optional[Dict[str, Any]]:
+    """
+    Recupera la serie desde Redis (ya enriquecida con pct y yoy_pct) y filtra
+    por rango de fechas.
+
+    Parámetros
+    ----------
+    series_id : str
+        Id de la serie BCCh.
+    firstdate : str, opcional
+        Fecha inicial (YYYY-MM-DD). Si None, no se aplica filtro inferior.
+    lastdate : str, opcional
+        Fecha final (YYYY-MM-DD). Si None, no se aplica filtro superior.
+    target_frequency : str, opcional
+        Frecuencia objetivo usada cuando se cacheó.
+    agg : str
+        Tipo de agregación usado cuando se cacheó.
+    use_fallback : bool
+        Si True y la clave no existe en Redis, se llama a get_series_api_rest_bcch
+        para poblarla y se devuelve el resultado (ya filtrado).
+        Si False y la clave no existe, devuelve None.
+
+    Devuelve
+    --------
+    dict o None
+        Mismo formato que get_series_api_rest_bcch, pero con "observations"
+        filtradas al período solicitado.
+    """
+    global _redis_client
+    fd = None if firstdate in (None, "", "auto") else firstdate
+    ld = None if lastdate in (None, "", "auto") else lastdate
+
+    # Ajustar fd/ld al último día del periodo para que coincida con las fechas
+    # de observación (que ahora usan fin de periodo).
+    _eff_freq = (target_frequency or _infer_freq_from_code(series_id) or "").upper()
+    fd = _to_period_end_str(fd, _eff_freq) if fd else fd
+    ld = _to_period_end_str(ld, _eff_freq) if ld else ld
+
+    def _parse_date_str_local(value: Optional[str]) -> Optional[datetime.date]:
+        if not isinstance(value, str):
+            return None
+        cleaned = value.strip()
+        if not cleaned:
+            return None
+        try:
+            return datetime.date.fromisoformat(cleaned)
+        except Exception:
+            return None
+
+    def _to_compare_date(value: Optional[str]) -> Optional[datetime.date]:
+        """Normaliza fecha observada al fin de período para comparaciones de rango.
+
+        Esto evita excluir datos legacy guardados como inicio de período
+        (p.ej. 2025-01-01 para mensual) cuando el filtro usa fin de período
+        (p.ej. 2025-01-31).
+        """
+        parsed = _parse_date_str_local(value)
+        if parsed is None:
+            return None
+        if _eff_freq:
+            return _to_period_end(parsed, _eff_freq)
+        return parsed
+
+    def _fetch_fallback_and_filter(reason: str) -> Optional[Dict[str, Any]]:
+        fallback_data = get_series_api_rest_bcch(
+            series_id=series_id,
+            target_frequency=target_frequency,
+            agg=agg,
+        )
+        if not isinstance(fallback_data, dict):
+            return fallback_data
+        fallback_meta = fallback_data.get("meta", {}) or {}
+        fallback_meta["cache_resolution"] = reason
+        fallback_data["meta"] = fallback_meta
+        if not fd and not ld:
+            return fallback_data
+
+        observations = fallback_data.get("observations", []) or []
+
+        fd_date = _parse_date_str_local(fd) if fd else None
+        ld_date = _parse_date_str_local(ld) if ld else None
+
+        filtered_observations = []
+        for row in observations:
+            row_date_raw = row.get("date") if isinstance(row, dict) else None
+            if not row_date_raw:
+                continue
+            try:
+                row_date = _to_compare_date(str(row_date_raw))
+            except Exception:
+                continue
+            if fd_date and row_date < fd_date:
+                continue
+            if ld_date and row_date > ld_date:
+                continue
+            filtered_observations.append(row)
+
+        fallback_data["observations"] = filtered_observations
+        meta = fallback_data.get("meta", {}) or {}
+        if fd:
+            meta["period_start"] = fd
+        if ld:
+            meta["period_end"] = ld
+        meta["cache_resolution"] = reason
+        fallback_data["meta"] = meta
+        return fallback_data
+
+    def _range_covered_by_cache(observations: List[Dict[str, Any]]) -> bool:
+        if not fd and not ld:
+            return True
+
+        parsed_dates: List[datetime.date] = []
+        for row in observations:
+            if not isinstance(row, dict):
+                continue
+            parsed = _to_compare_date(str(row.get("date", "")))
+            if parsed is not None:
+                parsed_dates.append(parsed)
+
+        if not parsed_dates:
+            return False
+
+        first_available = min(parsed_dates)
+        last_available = max(parsed_dates)
+        fd_date = _parse_date_str_local(fd) if fd else None
+        ld_date = _parse_date_str_local(ld) if ld else None
+
+        if fd_date and fd_date < first_available:
+            return False
+        if ld_date and ld_date > last_available:
+            return False
+        return True
+
+    # Cache siempre con fechas auto (serie completa); fd/ld solo para filtro posterior
+    cache_key = _make_cache_key(series_id, None, None, target_frequency, agg)
+
+    client = _ensure_redis_client()
+    if client is None:
+        logger.warning(
+            "[get_series_from_redis] Redis no disponible; "
+            "usando fallback a get_series_api_rest_bcch."
+        )
+        return _fetch_fallback_and_filter("redis_unavailable") if use_fallback else None
+
+    try:
+        raw = client.get(cache_key)
+    except Exception as e:
+        logger.error(
+            f"[get_series_from_redis] Error obteniendo clave '{cache_key}' desde Redis: {e}"
+        )
+        _redis_client = None  # forzar reintento en próximas peticiones
+        if not use_fallback:
+            return None
+        
+        return _fetch_fallback_and_filter("redis_read_error")
+    if raw is None:
+        logger.debug(f"[get_series_from_redis] Cache miss | key='{cache_key}'")
+        if not use_fallback:
+            return None
+        # Poblar Redis llamando a la API
+        return _fetch_fallback_and_filter("cache_miss")
+
+    try:
+        data = json.loads(raw)
+        logger.debug(f"[get_series_from_redis] Cache hit | key='{cache_key}'")
+        meta_ref = data.setdefault("meta", {})
+        if "source_url" not in meta_ref:
+            meta_ref["source_provider"] = "BCCh SieteRestWS"
+            meta_ref["source_url"] = f"{BCCH_BASE}?{urlencode({'function': 'GetSeries', 'timeseries': series_id})}"
+        if "source_updated_at" not in meta_ref:
+            source_updated = _get_series_source_updated_date(series_id)
+            if source_updated is not None:
+                meta_ref["source_updated_at"] = source_updated.isoformat()
+    except Exception as e:
+        logger.error(
+            f"[get_series_from_redis] Error parseando JSON desde Redis | key='{cache_key}' | error={e}"
+        )
+        if not use_fallback:
+            return None
+        return _fetch_fallback_and_filter("cache_parse_error")
+
+    if _is_cached_series_stale(series_id, data):
+        logger.info(
+            "[get_series_from_redis] Cache stale detectado | series_id='%s' | key='%s' | refrescando desde API",
+            series_id,
+            cache_key,
+        )
+        try:
+            client.delete(cache_key)
+        except Exception:
+            logger.debug("[get_series_from_redis] No se pudo borrar key stale en Redis", exc_info=True)
+        if not use_fallback:
+            return None
+        return _fetch_fallback_and_filter("cache_stale")
+
+    obs = data.get("observations", [])
+
+    # Normalizar fechas legacy (inicio de período) al fin de período para
+    # mantener consistencia con el filtrado por fd/ld y con metadatos period_*.
+    if isinstance(obs, list):
+        for row in obs:
+            if not isinstance(row, dict):
+                continue
+            d_cmp = _to_compare_date(str(row.get("date", "")))
+            if d_cmp is not None:
+                row["date"] = d_cmp.isoformat()
+
+    cache_has_requested_coverage = _range_covered_by_cache(obs)
+
+    # Recalcular rango disponible y posición del periodo solicitado
+    try:
+        first_available_str = None
+        last_available_str = None
+        if obs:
+            dates_iter = [o.get("date") for o in obs if isinstance(o.get("date"), str) and o.get("date")]
+            if dates_iter:
+                first_available_str = min(dates_iter)
+                last_available_str = max(dates_iter)
+
+        lastdate_position = "unknown"
+        if not ld:
+            lastdate_position = "auto"
+        elif first_available_str and last_available_str:
+            try:
+                d_first = dateparser.parse(first_available_str).date()
+                d_latest = dateparser.parse(last_available_str).date()
+                d_req = dateparser.parse(ld).date()
+                if d_latest and d_req > d_latest:
+                    lastdate_position = "gt_latest"
+                elif d_latest and d_req == d_latest:
+                    lastdate_position = "eq_latest"
+                elif d_first and d_latest and d_req >= d_first and d_req < d_latest:
+                    lastdate_position = "within_range"
+                elif d_first and d_req < d_first:
+                    lastdate_position = "lt_first"
+            except Exception:
+                pass
+
+        meta_ref = data.setdefault("meta", {})
+        meta_ref["first_available_date"] = first_available_str or meta_ref.get("first_available_date", "")
+        meta_ref["last_available_date"] = last_available_str or meta_ref.get("last_available_date", "")
+        meta_ref["lastdate_position"] = lastdate_position
+    except Exception:
+        pass
+    if not fd and not ld:
+        meta_full = data.setdefault("meta", {})
+        meta_full["cache_resolution"] = "cache_covered"
+        return data
+
+    # Filtrado por rango de fechas
+    def _parse_date_str(s: str) -> Optional[datetime.date]:
+        if not isinstance(s, str):
+            return None
+        s_clean = s.strip()
+        if not s_clean:
+            return None
+        try:
+            return datetime.date.fromisoformat(s_clean)
+        except Exception:
+            return None
+
+    fd_date = _parse_date_str(fd) if fd else None
+    ld_date = _parse_date_str(ld) if ld else None
+
+    filtered_obs = []
+    for o in obs:
+        if not isinstance(o, dict):
+            continue
+        d = _to_compare_date(str(o.get("date", "")))
+        if d is None:
+            continue
+        if fd_date and d < fd_date:
+            continue
+        if ld_date and d > ld_date:
+            continue
+        filtered_obs.append(o)
+
+    data["observations"] = filtered_obs
+
+    if use_fallback and (not filtered_obs or not cache_has_requested_coverage):
+        # Si el periodo solicitado es posterior al último disponible y la caché
+        # está fresca (no stale), y además está significativamente en el futuro
+        # (más de 180 días), la API tampoco tendrá esos datos.  Evitar
+        # la llamada de red y devolver directamente la caché con obs vacías
+        # para que el caller (load_observations) use el fallback local.
+        meta_ref = data.setdefault("meta", {})
+        _lastdate_pos = meta_ref.get("lastdate_position", "")
+        if _lastdate_pos == "gt_latest" and not _is_cached_series_stale(series_id, data):
+            # Verificar si está significativamente en el futuro (>180 días = ~6 meses)
+            # para evitar la optimización en casos donde podría haber datos actualizados pronto
+            try:
+                if ld:
+                    ld_dt = datetime.date.fromisoformat(ld)
+                    today = datetime.date.today()
+                    days_ahead = (ld_dt - today).days
+                    if days_ahead > 180:  # Solo optimizar si el futuro es lejano
+                        logger.debug(
+                            "[get_series_from_redis] Rango muy futuro (%d días adelante) y cache fresca; "
+                            "omitiendo llamada API | series_id='%s'", days_ahead, series_id
+                        )
+                        meta_ref["cache_resolution"] = "cache_beyond_available"
+                        if fd:
+                            meta_ref["period_start"] = fd
+                        if ld:
+                            meta_ref["period_end"] = ld
+                        return data
+            except Exception:
+                pass
+
+        logger.info(
+            "[get_series_from_redis] Rango solicitado no cubierto por cache | "
+            "series_id='%s' | key='%s' | fd='%s' | ld='%s' | filtered_rows=%s | refrescando desde API",
+            series_id,
+            cache_key,
+            fd,
+            ld,
+            len(filtered_obs),
+        )
+        return _fetch_fallback_and_filter("cache_missing_period")
+
+    # Actualizar meta para reflejar el nuevo rango
+    meta = data.get("meta", {})
+    if fd:
+        meta["period_start"] = fd
+    if ld:
+        meta["period_end"] = ld
+    meta["cache_resolution"] = "cache_covered"
+    data["meta"] = meta
+
+    return data
+
+
+# ---------------------------------------------------------------------------
+# Wrapper de conveniencia: salida por frecuencia y tipo de cálculo
+# y logging a test/log.txt con timestamp
+# ---------------------------------------------------------------------------
+def get_current_test_log_file() -> str:
+    """Compat: antes escribía a un archivo separado; ahora reusa el logger principal."""
+    return ""
+
+def _append_test_log(message: str) -> None:
+    """En lugar de crear archivos adicionales, registramos en el logger principal."""
+    ts = datetime.datetime.now().isoformat(timespec="seconds")
+    logger.info(f"[TEST_LOG] {ts} {message}")
+
+
+@calc_trace
+def fetch_series_with_calc(
+    series_id: str,
+    firstdate: Optional[str] = None,
+    lastdate: Optional[str] = None,
+    frequency: Optional[str] = None,
+    calc_type: str = "original",
+    agg: str = "avg",
+) -> Dict[str, Any]:
+    """
+    Obtiene una serie del BCCh y devuelve la salida según el tipo de cálculo solicitado.
+
+    Parámetros:
+      - series_id: código BCCh de la serie.
+      - firstdate / lastdate: rango YYYY-MM-DD (o None/"auto").
+      - frequency: "M" (mensual), "Q" (trimestral), "A" (anual) o "D".
+      - calc_type: "original" (valor), "yoy"/"YPCT" (variación interanual), "mom"/"PCT" (variación periodo a periodo).
+      - agg: agregación para remuestreo (default "avg").
+
+    Devuelve un dict con meta y observations. Mantiene los campos originales
+    (value, pct, yoy_pct) y agrega "selected" con el valor elegido según calc_type.
+    Además, escribe un registro en test/log_<timestamp>.text con timestamp y un resumen.
+    """
+    # Normalizar frecuencia y aceptar alias en español
+    freq_map = {
+        "D": "D", "DIARIA": "D", "DIARIO": "D",
+        "M": "M", "MENSUAL": "M",
+        "Q": "Q", "TRIMESTRAL": "Q", "TRIMESTRE": "Q",
+        "A": "A", "ANUAL": "A", "ANIO": "A", "AÑO": "A",
+    }
+    freq_key = (frequency or "").strip().upper()
+    freq = freq_map.get(freq_key, None)
+    if frequency and not freq:
+        logger.warning(f"frequency inválida '{frequency}', usando la original de la serie")
+
+    # Determinar calc_type normalizado y métrica
+    metric_key = "value"
+    raw_calc = (calc_type or "original").strip().lower()
+    calc_type_norm = "original"
+    if any(k in raw_calc for k in ["ypct", "yoy", "interanual", "año", "anio", "anual anterior", "año anterior", "anio anterior"]):
+        metric_key = "yoy_pct"
+        calc_type_norm = "ypct"
+    elif any(k in raw_calc for k in ["pct", "mom", "mensual", "mes", "mes a mes", "periodo a periodo", "m/m"]):
+        metric_key = "pct"
+        calc_type_norm = "pct"
+
+    # Título descriptivo del cálculo en el log
+    _append_test_log(
+        f"Calculo de serie {series_id} con frecuencia {freq or 'original'} en formato {calc_type_norm.upper()}"
+    )
+
+    # Ajustar rango de fetch para garantizar cálculo (prefetch de períodos previos)
+    # PERO: si el periodo solicitado es futuro, la expansión no ayuda (API tampoco tiene datos futuros)
+    fd_fetch, ld_fetch = firstdate, lastdate
+    is_future_dated = False
+    try:
+        if lastdate:
+            ld_dt = datetime.date.fromisoformat(lastdate)
+            today = datetime.date.today()
+            if ld_dt > today:
+                is_future_dated = True
+    except Exception:
+        pass
+    
+    try:
+        if firstdate and not is_future_dated:
+            fd_dt = datetime.date.fromisoformat(firstdate)
+            if calc_type_norm == "ypct":
+                # Necesita mismo período del año anterior
+                if relativedelta is not None:
+                    if (freq or "M") == "M":
+                        fd_fetch = (fd_dt - relativedelta(years=1)).isoformat()
+                    elif (freq or "M") == "Q":
+                        fd_fetch = (fd_dt - relativedelta(years=1)).isoformat()
+                    elif (freq or "M") == "A":
+                        fd_fetch = (fd_dt - relativedelta(years=1)).isoformat()
+                    elif (freq or "M") == "D":
+                        fd_fetch = (fd_dt - datetime.timedelta(days=365)).isoformat()
+                else:
+                    # Fallback básico
+                    fd_fetch = (fd_dt - datetime.timedelta(days=365)).isoformat()
+            elif calc_type_norm == "pct":
+                # Necesita período inmediatamente anterior
+                if relativedelta is not None:
+                    if (freq or "M") == "M":
+                        fd_fetch = (fd_dt - relativedelta(months=1)).isoformat()
+                    elif (freq or "M") == "Q":
+                        fd_fetch = (fd_dt - relativedelta(months=3)).isoformat()
+                    elif (freq or "M") == "A":
+                        fd_fetch = (fd_dt - relativedelta(years=1)).isoformat()
+                    elif (freq or "M") == "D":
+                        fd_fetch = (fd_dt - datetime.timedelta(days=1)).isoformat()
+                else:
+                    fd_fetch = (fd_dt - datetime.timedelta(days=31)).isoformat()
+    except Exception as _adj_e:
+        logger.warning(f"No fue posible ajustar el rango para calc={calc_type_norm}: {_adj_e}")
+
+    data = get_series_from_redis(
+        series_id=series_id,
+        firstdate=fd_fetch,
+        lastdate=ld_fetch,
+        target_frequency=freq,
+        agg=agg,
+        use_fallback=True,
+    )
+
+    obs_in = data.get("observations", [])
+    obs_out: List[Dict[str, Any]] = []
+    for o in obs_in:
+        selected_val = o.get(metric_key, None)
+        obs_out.append({**o, "selected": selected_val})
+
+    # Filtrar al rango solicitado (primario), si corresponde
+    def _in_range(date_str: str) -> bool:
+        try:
+            d = datetime.date.fromisoformat(date_str)
+            if firstdate and d < datetime.date.fromisoformat(firstdate):
+                return False
+            if lastdate and d > datetime.date.fromisoformat(lastdate):
+                return False
+            return True
+        except Exception:
+            return True
+
+    if firstdate or lastdate:
+        obs_out = [o for o in obs_out if _in_range(o.get("date", ""))]
+
+    result = {
+        "meta": {
+            **data.get("meta", {}),
+            "calc_type": calc_type_norm,
+            "metric_selected": metric_key,
+            # Reflejar el rango solicitado en meta
+            "period_start": firstdate or (data.get("meta", {}).get("period_start")),
+            "period_end": lastdate or (data.get("meta", {}).get("period_end")),
+        },
+        "observations": obs_out,
+    }
+
+    # Logging a test/log con resumen
+    sample = ", ".join(
+        f"{r['date']}={r['selected']}" for r in obs_out[:5]
+    )
+    _append_test_log(
+        (
+            f"serie={series_id} | rango={firstdate or 'auto'}→{lastdate or 'auto'} | "
+            f"freq={freq or data.get('meta', {}).get('original_frequency', '')} | "
+            f"calc={calc_type_norm} | rows={len(obs_out)} | sample=[{sample}]"
+        )
+    )
+
+    return result
+
+
+# Alias público solicitado: función get_series con parámetro calc_type
+
+def get_series(
+    series_id: str,
+    firstdate: Optional[str] = None,
+    lastdate: Optional[str] = None,
+    target_frequency: Optional[str] = None,
+    agg: str = "avg",
+    calc_type: str = "ORIGINAL",
+) -> Dict[str, Any]:
+    """
+    API de alto nivel para obtener series con el tipo de cálculo deseado.
+
+    calc_type admite: "ORIGINAL", "YPCT" (interanual), "PCT" (mes a mes).
+    target_frequency admite: D/M/Q/A.
+    """
+    # Reusar la implementación existente aceptando alias en español/inglés
+    # Detect if PIB and force quarterly frequency for correct YoY/periods
+    force_quarterly = False
+    sid_up = (series_id or "").upper()
+    if "PIB" in sid_up and (target_frequency or "M").upper() == "M":
+        force_quarterly = True
+    freq_to_use = "Q" if force_quarterly else (target_frequency or None)
+    return fetch_series_with_calc(
+        series_id=series_id,
+        firstdate=firstdate,
+        lastdate=lastdate,
+        frequency=freq_to_use,
+        calc_type=(calc_type or "ORIGINAL"),
+        agg=agg,
+    )
+
+
+def format_series_openai(data: Dict[str, Any], calc_type: str = "ORIGINAL") -> Dict[str, Any]:
+    """
+    Devuelve una estructura tabular compacta para UI/API según calc_type.
+
+    - ORIGINAL: columns [date, value]
+    - YPCT:     columns [date, yoy_pct]
+    - PCT:      columns [<año-1>, <año>, variacion_pct]
+      Empareja meses entre los dos últimos años disponibles (si es posible). Si no
+      puede emparejar, retorna fallback [date, pct].
+    """
+    obs = data.get("observations", []) or []
+    calc = (calc_type or "ORIGINAL").strip().upper()
+
+    # Utilidades de redondeo a 1 decimal conservando None
+    def _r1(x: Any) -> Any:
+        try:
+            return None if x is None else round(float(x), 1)
+        except Exception:
+            return x
+
+    if calc == "YPCT":
+        # Construir tabla emparejando meses entre último año y su anterior
+        # Columnas: <año-1>, <año>, variacion_pct
+        if not obs:
+            return {"columns": ["date", "yoy_pct"], "rows": []}
+
+        # Determinar año objetivo desde meta.period_end o último dato
+        meta = data.get("meta", {})
+        lastdate = meta.get("period_end")
+        try:
+            curr_year = int(str(lastdate).split("-")[0]) if lastdate else max(int(o.get("date","0000-01-01").split("-")[0]) for o in obs)
+        except Exception:
+            curr_year = max(int(o.get("date","0000-01-01").split("-")[0]) for o in obs)
+        prev_year = curr_year - 1
+
+        # Mapa año->mes->valor
+        by_year_month: Dict[int, Dict[int, float]] = {prev_year: {}, curr_year: {}}
+        for o in obs:
+            try:
+                y = int(str(o.get("date", "0000-01-01")).split("-")[0])
+                m = int(str(o.get("date", "0000-01-01")).split("-")[1])
+            except Exception:
+                continue
+            if y not in (prev_year, curr_year):
+                continue
+            v = o.get("value")
+            if v is None:
+                continue
+            by_year_month.setdefault(y, {})[m] = float(v)
+
+        months = sorted(set(by_year_month.get(prev_year, {}).keys()) & set(by_year_month.get(curr_year, {}).keys()))
+        rows = []
+        for m in months:
+            pv = by_year_month[prev_year].get(m)
+            cv = by_year_month[curr_year].get(m)
+            if pv is None or cv is None:
+                continue
+            variacion = (cv / pv - 1.0) * 100.0 if pv else None
+            rows.append({str(prev_year): _r1(pv), str(curr_year): _r1(cv), "variacion_pct": _r1(variacion)})
+
+        if rows:
+            return {"columns": [str(prev_year), str(curr_year), "variacion_pct"], "rows": rows}
+        # Fallback si no hay meses emparejados
+        rows = [{"date": o.get("date"), "yoy_pct": _r1(o.get("yoy_pct"))} for o in obs]
+        return {"columns": ["date", "yoy_pct"], "rows": rows}
+
+    if calc == "PCT":
+        if not obs:
+            return {"columns": ["date", "pct"], "rows": []}
+
+        # Detectar últimos dos años presentes
+        def _year(d: str) -> int:
+            return int(str(d).split("-")[0])
+        def _month(d: str) -> int:
+            try:
+                return int(str(d).split("-")[1])
+            except Exception:
+                return 0
+
+        years = sorted({ _year(o.get("date", "0000-01-01")) for o in obs })
+        if len(years) >= 2:
+            curr_year = years[-1]
+            prev_year = years[-2]
+            by_year_month: Dict[int, Dict[int, float]] = {prev_year: {}, curr_year: {}}
+            for o in obs:
+                try:
+                    y = _year(o.get("date", "0000-01-01"))
+                    m = _month(o.get("date", "0000-01-01"))
+                except Exception:
+                    continue
+                if y not in (prev_year, curr_year):
+                    continue
+                v = o.get("value")
+                if v is None:
+                    continue
+                by_year_month.setdefault(y, {})[m] = float(v)
+
+            months = sorted(set(by_year_month.get(prev_year, {}).keys()) & set(by_year_month.get(curr_year, {}).keys()))
+            rows = []
+            for m in months:
+                pv = by_year_month[prev_year].get(m)
+                cv = by_year_month[curr_year].get(m)
+                if pv is None or cv is None:
+                    continue
+                variacion = (cv / pv - 1.0) * 100.0 if pv else None
+                rows.append({str(prev_year): _r1(pv), str(curr_year): _r1(cv), "variacion_pct": _r1(variacion)})
+
+            # Si hubo emparejamientos, usar el formato de años
+            if rows:
+                return {"columns": [str(prev_year), str(curr_year), "variacion_pct"], "rows": rows}
+
+        # Fallback: devolver date + pct
+        rows = [{"date": o.get("date"), "pct": _r1(o.get("pct"))} for o in obs]
+        return {"columns": ["date", "pct"], "rows": rows}
+
+    # ORIGINAL por defecto
+    rows = [{"date": o.get("date"), "value": _r1(o.get("value"))} for o in obs]
+    return {"columns": ["date", "value"], "rows": rows}
+
+
+def get_series_for_api(
+    series_id: str,
+    firstdate: Optional[str] = None,
+    lastdate: Optional[str] = None,
+    target_frequency: Optional[str] = None,
+    agg: str = "avg",
+    calc_type: str = "ORIGINAL",
+) -> Dict[str, Any]:
+    """
+    Conveniencia: obtiene la serie con el cálculo solicitado y devuelve además
+    el formato compacto para consumo de APIs/UI.
+
+    Retorna un dict con:
+      - data: salida completa de get_series (incluye meta/observations)
+      - formatted: estructura tabular compacta para el calc_type indicado
+    """
+    data = get_series(
+        series_id=series_id,
+        firstdate=firstdate,
+        lastdate=lastdate,
+        target_frequency=target_frequency,
+        agg=agg,
+        calc_type=calc_type,
+    )
+    formatted = format_series_openai(data, calc_type=calc_type)
+    return {"data": data, "formatted": formatted}
+
+
+@calc_trace
+def build_year_comparison_table(data: Dict[str, Any], year: int) -> Dict[str, Any]:
+    """Construye tabla de comparación Año anterior vs Año actual (solo periodos con dato del año actual).
+
+    - Incluye únicamente los periodos (meses o trimestres) para los que existe dato en el año actual.
+    - Para cada periodo agrega valor del año anterior si existe.
+    - Calcula variación interanual (yoy_pct) si no viene en los datos.
+    - Redondea la variación a 1 decimal (pero preserva valores originales para value_prev/value_curr).
+    """
+    obs = data.get('observations', []) or []
+    prev_year = year - 1
+    freq = (data.get('meta', {}) or {}).get('original_frequency', 'M').upper()
+
+    from typing import Tuple
+    def _quarter_and_label(dt: datetime.date) -> Tuple[str, str]:
+        # Robustly assign quarter and label for quarterly data
+        if freq in {"Q", "T"}:
+            # If date is first of quarter, assign quarter accordingly
+            month = dt.month
+            if month in (1, 2, 3):
+                q = 1
+            elif month in (4, 5, 6):
+                q = 2
+            elif month in (7, 8, 9):
+                q = 3
+            else:
+                q = 4
+            label = f"{q}T {dt.year}"
+            key = f"{dt.year}-Q{q}"
+            return key, label
+        meses = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"]
+        label = meses[dt.month - 1]
+        key = f"{dt.year}-{dt.month:02d}"
+        return key, label
+
+    prev_map: Dict[str, Dict[str, Any]] = {}
+    curr_map: Dict[str, Dict[str, Any]] = {}
+    for r in obs:
+        try:
+            d = datetime.date.fromisoformat(r.get('date', '0000-01-01'))
+        except Exception:
+            continue
+        key, label = _quarter_and_label(d)
+        r['_period_label'] = label
+        if d.year == prev_year:
+            prev_map[key] = r
+        elif d.year == year:
+            curr_map[key] = r
+
+    # Solo periodos presentes en el año actual
+    def quarter_sort_key(k):
+        # k is like '2025-Q3'
+        if freq in {"Q", "T"} and '-Q' in k:
+            y, q = k.split('-Q')
+            return (int(y), int(q))
+        # fallback for months
+        if '-' in k:
+            y, m = k.split('-')
+            return (int(y), int(m))
+        return (9999, 99)
+    periods_curr = sorted(curr_map.keys(), key=quarter_sort_key)
+
+    rows: List[Dict[str, Any]] = []
+    for p in periods_curr:
+        py = prev_map.get(p, {})
+        cy = curr_map.get(p, {})
+        pv = py.get('value')
+        cv = cy.get('value')
+        # Use label from current year if available, else from previous
+        period_label = cy.get('_period_label') or py.get('_period_label') or p
+        # Calculate YoY only if both values exist and are not None
+        yoy = cy.get('yoy_pct')
+        if yoy is None and (pv is not None and cv is not None and pv != 0):
+            try:
+                yoy = (float(cv) - float(pv)) / float(pv) * 100.0
+            except Exception:
+                yoy = None
+        # Redondear variación a 1 decimal si existe
+        if yoy is not None:
+            try:
+                yoy = round(float(yoy), 1)
+            except Exception:
+                pass
+        rows.append({
+            'period': period_label,
+            'value_prev': pv,
+            'value_curr': cv,
+            'yoy_pct': yoy,
+        })
+
+    return {"year_prev": prev_year, "year_curr": year, "frequency": freq, "rows": rows}
+
+
+@calc_trace
+def build_year_comparison_table_text(data: Dict[str, Any], year: int) -> str:
+    """Markdown de la comparación interanual truncada al último periodo disponible del año actual.
+
+    Columnas:
+    Mes | Año anterior | Año actual | Variación anual
+    La variación se redondea a 1 decimal.
+    """
+    prev_year = year - 1
+    table = build_year_comparison_table(data, year)
+    freq = str(table.get("frequency") or (data.get("meta", {}) or {}).get("original_frequency") or "M").upper()
+    if freq in {"Q", "T"}:
+        period_label = "Trimestre"
+    elif freq == "M":
+        period_label = "Mes"
+    else:
+        period_label = "Periodo"
+    header_lines = [
+        f"Comparación {prev_year} vs {year}",
+        f"{period_label} | Año anterior | Año actual | Variación anual",
+        "---|---|---|---",
+    ]
+    body_lines: List[str] = []
+
+    def _r1(x: Any) -> Any:
+        try:
+            return "" if x is None else round(float(x), 1)
+        except Exception:
+            return x
+
+    for row in table.get('rows', []):
+        period_lbl = row.get('period', '')
+        pv = row.get('value_prev')
+        cv = row.get('value_curr')
+        yoy = row.get('yoy_pct')
+        # Redondear a 1 decimal en la representación textual
+        pv_txt = _r1(pv)
+        cv_txt = _r1(cv)
+        yoy_txt = _r1(yoy)
+        body_lines.append(
+            f"{period_lbl} | {pv_txt} | {cv_txt} | {yoy_txt}"
+        )
+    return "\n".join(header_lines + body_lines)

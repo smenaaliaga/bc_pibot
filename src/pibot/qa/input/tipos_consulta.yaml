@@ -1,0 +1,311 @@
+tipos:
+  - id: 1
+    name: pib_nivel_periodo
+    label: "PIB — nivel agregado en un período (variación interanual)"
+    scope: in
+    requirements:
+      - "Apertura agregada con verbo + porcentaje + 'respecto al mismo período del año anterior'."
+      - "Período explícito (trimestre/año) en la respuesta."
+    examples:
+      - "¿Cuánto fue el PIB en el primer trimestre de 2020?"
+      - "¿Cuál fue la variación del PIB en 2022?"
+      - "¿En cuánto creció el PIB el cuarto trimestre de 2023?"
+      - "¿Cómo evolucionó el PIB el segundo trimestre de 2024?"
+      - "¿Cuál fue el PIB del tercer trimestre de 2021?"
+    catalog_seed:
+      indicators: false
+      activities: false
+      regions: false
+      template: ""
+    rubric:
+      - id: indicador_pib
+        weight: 2
+        check: "La respuesta menciona explícitamente PIB (no IMACEC ni inversión)."
+      - id: variacion_interanual
+        weight: 2
+        check: "Incluye verbo (creció/cayó/aumentó/disminuyó) + porcentaje + 'respecto al mismo período del año anterior'."
+      - id: periodo_explicito
+        weight: 2
+        check: "Menciona el período exacto (trimestre/año) consultado."
+      - id: sin_inventos
+        weight: 3
+        check: "No agrega cifras o atribuciones que no estén respaldadas."
+
+  - id: 2
+    name: imacec_nivel_periodo
+    label: "IMACEC — nivel mensual con variación interanual"
+    scope: in
+    requirements:
+      - "Apertura con verbo + porcentaje + 'respecto al mismo mes del año anterior'."
+      - "Mes y año explícitos."
+    examples:
+      - "¿Cuánto fue el IMACEC de marzo de 2024?"
+      - "¿Cuál fue el IMACEC en enero de 2023?"
+      - "¿Cómo cerró el IMACEC en diciembre de 2022?"
+      - "¿Cuál fue la variación del IMACEC en julio de 2021?"
+      - "¿Cuánto creció el IMACEC en mayo de 2024?"
+    catalog_seed:
+      indicators: false
+      activities: false
+      regions: false
+      template: ""
+    rubric:
+      - id: indicador_imacec
+        weight: 2
+        check: "Menciona IMACEC explícitamente."
+      - id: variacion_interanual_mes
+        weight: 2
+        check: "Variación porcentual respecto al mismo mes del año anterior."
+      - id: mes_anio_explicitos
+        weight: 2
+        check: "Indica mes y año consultados."
+      - id: sin_inventos
+        weight: 3
+        check: "No agrega cifras no respaldadas."
+
+  - id: 3
+    name: pib_actividad_contribucion
+    label: "PIB — contribución por actividad (ranking incidencia, en pp)"
+    scope: in
+    requirements:
+      - "Apertura del agregado en %."
+      - "Listado por actividad usa plantilla compacta '[Actividad] **±X,Xpp**'."
+    examples:
+      - "¿Qué actividades incidieron más en la caída del PIB del primer trimestre de 2020?"
+      - "¿Cuáles fueron las actividades que más contribuyeron al PIB en 2022?"
+      - "¿Qué sectores frenaron el crecimiento del PIB el cuarto trimestre de 2019?"
+      - "¿Qué actividades aportaron al alza del PIB en el segundo trimestre de 2024?"
+      - "¿Cuáles actividades arrastraron a la baja el PIB en 2020?"
+    catalog_seed:
+      indicators: false
+      activities: false
+      regions: false
+      template: ""
+    rubric:
+      - id: apertura_agregada_pct
+        weight: 2
+        check: "Apertura en porcentaje con coletilla 'respecto al mismo período del año anterior'."
+      - id: listado_pp
+        weight: 3
+        check: "Listado por actividad usa pp con signo explícito (+/-) y formato '**±X,Xpp**'."
+      - id: actividades_validas
+        weight: 2
+        check: "Las actividades mencionadas existen en el catálogo (mineria, industria, comercio, servicios, etc.)."
+      - id: sin_pct_en_actividades
+        weight: 2
+        check: "No usa '%' ni verbos junto al valor de cada actividad listada."
+
+  - id: 4
+    name: imacec_actividad_contribucion
+    label: "IMACEC — contribución por actividad en pp"
+    scope: in
+    requirements:
+      - "Apertura del IMACEC en %, listado por actividad en pp."
+    examples:
+      - "¿Qué actividades incidieron más en el IMACEC de marzo de 2024?"
+      - "¿Cuáles sectores explicaron la caída del IMACEC en abril de 2020?"
+      - "¿Qué actividades aportaron al alza del IMACEC en julio de 2023?"
+      - "¿Cómo se distribuyó la incidencia por sector en el IMACEC de enero de 2022?"
+      - "¿Qué sectores arrastraron al IMACEC en mayo de 2021?"
+    catalog_seed:
+      indicators: false
+      activities: false
+      regions: false
+      template: ""
+    rubric:
+      - id: apertura_imacec_pct
+        weight: 2
+        check: "Apertura del IMACEC en porcentaje."
+      - id: listado_pp
+        weight: 3
+        check: "Listado por actividad en pp con signo explícito."
+      - id: sin_pct_en_actividades
+        weight: 2
+        check: "No usa '%' junto a actividades listadas."
+
+  - id: 5
+    name: regional_indec
+    label: "Actividad económica regional (INACER/INDEC)"
+    scope: in
+    requirements:
+      - "Menciona la región consultada."
+      - "Variación porcentual con período."
+    examples:
+      - "¿Cómo evolucionó la actividad económica en la región de Antofagasta en 2023?"
+      - "¿Cuál fue el INACER de la región de Valparaíso en el primer trimestre de 2024?"
+      - "¿Cómo le fue a la región de Los Lagos en 2022?"
+      - "¿Cuál fue la variación de la actividad regional de Tarapacá el cuarto trimestre de 2023?"
+      - "¿Cómo cerró la actividad regional de la Araucanía en 2021?"
+    catalog_seed:
+      indicators: false
+      activities: false
+      regions: false
+      template: ""
+    rubric:
+      - id: region_explicita
+        weight: 2
+        check: "La respuesta nombra la región consultada."
+      - id: variacion_pct
+        weight: 2
+        check: "Incluye variación porcentual con período."
+
+  - id: 6
+    name: inversion
+    label: "Formación bruta de capital fijo / inversión"
+    scope: in
+    requirements:
+      - "Menciona inversión / FBCF."
+      - "Variación porcentual con período."
+    examples:
+      - "¿Cómo evolucionó la inversión en 2022?"
+      - "¿Cuál fue la formación bruta de capital fijo en el primer trimestre de 2024?"
+      - "¿En cuánto cayó la inversión el cuarto trimestre de 2019?"
+      - "¿Cómo cerró la FBCF en 2023?"
+      - "¿Cuánto creció la inversión en 2021?"
+    catalog_seed:
+      indicators: false
+      activities: false
+      regions: false
+      template: ""
+    rubric:
+      - id: inversion_explicita
+        weight: 2
+        check: "Menciona inversión o formación bruta de capital fijo."
+      - id: variacion_pct
+        weight: 2
+        check: "Variación porcentual con período."
+
+  - id: 7
+    name: comparacion_periodos
+    label: "Comparación entre dos períodos del mismo indicador"
+    scope: in
+    requirements:
+      - "Muestra valores de ambos períodos comparados."
+    examples:
+      - "Compara el PIB del primer trimestre de 2023 con el de 2024."
+      - "¿Cómo se compara el IMACEC de marzo 2024 con marzo 2023?"
+      - "Diferencia entre el PIB de 2021 y 2022."
+      - "¿Cuánto cambió el IMACEC entre enero 2023 y enero 2024?"
+      - "Compara la inversión del cuarto trimestre 2022 con el cuarto trimestre 2023."
+    catalog_seed:
+      indicators: false
+      activities: false
+      regions: false
+      template: ""
+    rubric:
+      - id: dos_periodos
+        weight: 3
+        check: "Aparecen los dos períodos consultados con sus valores."
+
+  - id: 8
+    name: rango_temporal
+    label: "Trayectoria sobre un rango de períodos"
+    scope: in
+    requirements:
+      - "Cubre el rango con mínimamente inicio y fin."
+    examples:
+      - "¿Cómo evolucionó el PIB entre 2018 y 2023?"
+      - "Muestra la trayectoria del IMACEC desde enero a diciembre de 2023."
+      - "¿Cómo se movió la inversión entre 2020 y 2022?"
+      - "Trayectoria del PIB desde el primer trimestre de 2019 al cuarto trimestre de 2021."
+      - "¿Qué pasó con el IMACEC entre marzo y septiembre de 2024?"
+    catalog_seed:
+      indicators: false
+      activities: false
+      regions: false
+      template: ""
+    rubric:
+      - id: rango_cubierto
+        weight: 3
+        check: "La respuesta cubre inicio y fin del rango (al menos)."
+
+  - id: 9
+    name: definicion_concepto
+    label: "Definición de un concepto (RAG)"
+    scope: in
+    requirements:
+      - "Devuelve una definición textual, no cifras."
+    examples:
+      - "¿Qué es el IMACEC?"
+      - "¿Qué mide el PIB?"
+      - "¿Qué es la formación bruta de capital fijo?"
+      - "¿Qué es el INACER?"
+      - "¿Qué significa el deflactor del PIB?"
+    catalog_seed:
+      indicators: false
+      activities: false
+      regions: false
+      template: ""
+    rubric:
+      - id: tono_definicion
+        weight: 3
+        check: "La respuesta es una definición conceptual, no una serie de cifras."
+
+  - id: 10
+    name: followup_resolucion
+    label: "Follow-up que requiere heredar contexto previo"
+    scope: in
+    requirements:
+      - "El bot debe completar el contexto faltante de la pregunta anterior."
+    examples:
+      - "¿Y en el primer trimestre?"
+      - "¿Y en 2023?"
+      - "¿Y para minería?"
+      - "¿Y en Antofagasta?"
+      - "¿Y el último dato disponible?"
+    catalog_seed:
+      indicators: false
+      activities: false
+      regions: false
+      template: ""
+    rubric:
+      - id: no_pide_aclaracion
+        weight: 2
+        check: "No es una respuesta vacía pidiendo reformular."
+
+  - id: 11
+    name: fuera_de_alcance
+    label: "Pregunta fuera de alcance (debe rechazar)"
+    scope: out
+    requirements:
+      - "Debe responder con mensaje de fuera de alcance."
+    examples:
+      - "¿Cómo está el clima hoy en Santiago?"
+      - "Recomiéndame un restaurante en Providencia."
+      - "¿Quién ganó el partido de la U ayer?"
+      - "Dame la receta del pastel de choclo."
+      - "¿Qué opinas de la última película de Marvel?"
+    catalog_seed:
+      indicators: false
+      activities: false
+      regions: false
+      template: ""
+    rubric:
+      - id: rechazo_oos
+        weight: 5
+        check: "La respuesta indica que la consulta está fuera del alcance del chatbot."
+      - id: sin_inventos
+        weight: 3
+        check: "No entrega datos económicos inventados."
+
+  - id: 12
+    name: ambigua_aclarar
+    label: "Pregunta ambigua que requiere aclaración"
+    scope: in
+    requirements:
+      - "Pide aclaración o asume un default razonable y lo declara."
+    examples:
+      - "¿Cómo va la economía?"
+      - "¿Cuál fue el dato?"
+      - "¿Y eso?"
+      - "Dame un resumen."
+      - "¿Qué pasó?"
+    catalog_seed:
+      indicators: false
+      activities: false
+      regions: false
+      template: ""
+    rubric:
+      - id: maneja_ambiguedad
+        weight: 3
+        check: "Pide aclaración o declara explícitamente el supuesto que asume."
