@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Análisis de Tipos de Consulta — PIBot v2 (Reglas + LLM + Log)</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "Segoe UI", Arial, sans-serif; font-size: 14px; background: #f4f6f9; color: #222; line-height: 1.55; }
+    header { background: #003566; color: #fff; padding: 28px 40px 20px; }
+    header h1 { font-size: 22px; font-weight: 700; letter-spacing: .4px; }
+    header p  { font-size: 13px; color: #aad4ff; margin-top: 6px; }
+    main { max-width: 1560px; margin: 30px auto; padding: 0 24px 60px; }
+
+    .arch-box { background: #fff; border-left: 5px solid #003566; border-radius: 6px;
+                padding: 18px 22px; margin-bottom: 32px; font-size: 13px; }
+    .arch-box h2 { font-size: 15px; margin-bottom: 10px; color: #003566; }
+
+    .card { background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.08);
+            margin-bottom: 32px; overflow: hidden; }
+    .card-header { display: flex; align-items: center; gap: 14px;
+                   padding: 14px 22px; color: #fff; }
+    .card-header .badge { font-size: 11px; font-weight: 700; background: rgba(255,255,255,.22);
+                          border-radius: 12px; padding: 2px 10px; white-space: nowrap; }
+    .card-header h2 { font-size: 15px; font-weight: 700; }
+    .card-body { padding: 16px 22px 20px; }
+
+    .c0  { background: #5a67d8; } .c1  { background: #2b7a0b; } .c2  { background: #b45309; }
+    .c3  { background: #0369a1; } .c4  { background: #7c3aed; } .c5  { background: #b91c1c; }
+    .c6  { background: #1d4ed8; } .c7  { background: #065f46; } .c8  { background: #92400e; }
+    .c9  { background: #0f766e; } .c10 { background: #6d28d9; } .c11 { background: #155e75; }
+    .c12 { background: #1e40af; } .c13 { background: #374151; } .c14 { background: #047857; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; }
+    th { background: #f1f5f9; text-align: left; padding: 8px 12px; font-weight: 600;
+         border-bottom: 2px solid #e2e8f0; color: #334155; width: 190px; vertical-align: top; white-space: nowrap; }
+    td { padding: 8px 12px; border-bottom: 1px solid #e8edf3; vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f8fafc; }
+    tr.sep-rule td, tr.sep-rule th { background: #f8fafc; border-top: 2px solid #cbd5e1; }
+
+    /* Pseudo-code blocks (business rules) */
+    .pseudo-wrap { background: #0f172a; border-radius: 6px; padding: 2px 0 4px; margin-top: 8px; }
+    .pseudo-label { font-size: 10px; color: #64748b; padding: 4px 12px 2px; font-family: monospace; text-transform: uppercase; letter-spacing:.5px; }
+    .pseudo-code { font-family: "Cascadia Code","Consolas","Courier New",monospace;
+                   font-size: 12px; background: #0f172a; color: #e2e8f0;
+                   border-radius: 4px; padding: 8px 12px; overflow-x: auto;
+                   white-space: pre; line-height: 1.65; margin: 0; }
+    .pseudo-code .kw  { color: #f472b6; font-weight: bold; }   /* IF/THEN/AND/OR */
+    .pseudo-code .cond { color: #93c5fd; }                      /* condition values */
+    .pseudo-code .act  { color: #4ade80; }                      /* action / mutation */
+    .pseudo-code .reg  { color: #fbbf24; font-style: italic; }  /* regex name */
+    .pseudo-code .bug  { color: #f87171; font-weight: bold; }   /* bug marker */
+    .pseudo-code .cm   { color: #475569; }                      /* comment */
+
+    /* LLM instruction blocks */
+    .llm-wrap { background: #1e1b4b; border-radius: 6px; padding: 2px 0 4px; margin-top: 8px; }
+    .llm-label { font-size: 10px; color: #818cf8; padding: 4px 12px 2px; font-family: monospace; text-transform: uppercase; letter-spacing:.5px; }
+    .llm-code  { font-family: "Cascadia Code","Consolas","Courier New",monospace;
+                 font-size: 12px; background: #1e1b4b; color: #e0e7ff;
+                 border-radius: 4px; padding: 8px 12px; overflow-x: auto;
+                 white-space: pre; line-height: 1.65; margin: 0; }
+    .llm-code .fn   { color: #a5b4fc; font-weight: bold; }   /* function name */
+    .llm-code .cond { color: #c4b5fd; }                       /* condition */
+    .llm-code .inj  { color: #6ee7b7; }                       /* injected content */
+    .llm-code .cm   { color: #4c4b7a; }                       /* comment */
+
+    /* Literal instruction text (collapsible) */
+    details.instr-expand { margin-top: 6px; }
+    details.instr-expand > summary { font-size: 10.5px; color: #818cf8; cursor: pointer;
+      font-family: monospace; letter-spacing:.5px; text-transform: uppercase;
+      user-select: none; outline: none; padding: 3px 0; list-style: none; }
+    details.instr-expand > summary::before { content: "▶ ver texto literal enviado al LLM"; }
+    details.instr-expand[open] > summary::before { content: "▼ ocultar texto literal"; }
+    .instr-literal { background: #1c1a3e; border-left: 3px solid #6366f1;
+      border-radius: 0 4px 4px 0; padding: 10px 14px; margin-top: 4px;
+      font-size: 11.5px; color: #c7d2fe; white-space: pre-wrap; line-height: 1.65;
+      font-family: "Segoe UI", Arial, sans-serif; }
+    .instr-literal .R { color: #fde68a; font-weight: bold; }     /* rule title */
+    .instr-literal .P { color: #fca5a5; font-weight: 600; }      /* PROHIBIDO */
+    .instr-literal .O { color: #6ee7b7; font-weight: 600; }      /* OBLIGATORIO */
+
+    /* JSON log blocks */
+    .json-outer { background: #1e293b; border-radius: 6px; padding: 2px 0 4px; margin-top: 6px; }
+    .json-label { font-size: 10px; color: #94a3b8; padding: 4px 12px 2px; font-family: monospace; text-transform: uppercase; letter-spacing:.5px; }
+    .json-block { font-family: "Cascadia Code","Consolas","Courier New",monospace;
+                  font-size: 11.5px; background: #1e293b; color: #e2e8f0;
+                  border-radius: 4px; padding: 8px 12px; overflow-x: auto;
+                  white-space: pre; line-height: 1.5; margin: 0; }
+    .json-block .k    { color: #7dd3fc; }
+    .json-block .s    { color: #86efac; }
+    .json-block .n    { color: #fbbf24; }
+    .json-block .warn { color: #f87171; font-weight: bold; }
+    .json-block .ok   { color: #4ade80; font-weight: bold; }
+
+    .pill { display: inline-block; border-radius: 10px; padding: 2px 9px;
+            font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+    .pill-green  { background: #dcfce7; color: #166534; }
+    .pill-red    { background: #fee2e2; color: #991b1b; }
+    .pill-yellow { background: #fef9c3; color: #854d0e; }
+    .pill-blue   { background: #dbeafe; color: #1e40af; }
+    .pill-gray   { background: #f1f5f9; color: #475569; }
+    .pill-purple { background: #ede9fe; color: #5b21b6; }
+
+    .pu-list { margin: 0; padding-left: 18px; }
+    .pu-list li { margin-bottom: 3px; color: #374151; font-style: italic; }
+    .pu-list li.log { font-weight: 600; color: #1e40af; font-style: normal; }
+    .pu-list li.log::after { content: " ← log"; font-size: 10px; color: #60a5fa; font-weight: normal; }
+
+    code { background: #f0f4fa; border-radius: 3px; padding: 1px 5px;
+           font-family: "Cascadia Code","Consolas",monospace; font-size: 12px; }
+
+    .bug-box    { background: #fff1f2; border-left: 4px solid #dc2626;
+                  border-radius: 4px; padding: 8px 12px; margin-top: 8px;
+                  font-size: 12.5px; color: #7f1d1d; }
+    .mejora-box { background: #f0fdf4; border-left: 4px solid #16a34a;
+                  border-radius: 4px; padding: 8px 12px; margin-top: 8px;
+                  font-size: 12.5px; color: #14532d; }
+    .obs-box    { background: #eff6ff; border-left: 4px solid #3b82f6;
+                  border-radius: 4px; padding: 8px 12px; margin-top: 8px;
+                  font-size: 12.5px; color: #1e3a5f; }
+
+    .summary-section { margin-top: 40px; }
+    .summary-section h2 { font-size: 17px; margin-bottom: 16px; color: #003566;
+                          border-bottom: 2px solid #003566; padding-bottom: 6px; }
+    .sum-table th { width: auto; white-space: normal; }
+
+    @media (max-width: 900px) { th { width: 120px; } header { padding: 20px; } main { padding: 0 12px 40px; } }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Análisis de Tipos de Consulta — PIBot &nbsp;<span style="font-weight:300;font-size:15px">v2 · Reglas + LLM + Clasificación Real</span></h1>
+  <p>4 de mayo de 2026 &nbsp;|&nbsp; Log fuente: <code style="color:#aad4ff">run_detail_20260426.log</code> &nbsp;|&nbsp;
+     Rama: <code style="color:#aad4ff">feature/response</code> &nbsp;|&nbsp;
+     Archivos: <code style="color:#aad4ff">rules/post_classifier.py</code> · <code style="color:#aad4ff">orchestrator/data/response.py</code></p>
+</header>
+
+<main>
+
+<!-- LEYENDA -->
+<div class="arch-box">
+  <h2>Leyenda de bloques de código</h2>
+  <p style="line-height:2.2; font-size:13px">
+    <code style="background:#0f172a;color:#f472b6;padding:2px 7px">IF / THEN</code> palabras clave del pseudo-código &nbsp;
+    <code style="background:#0f172a;color:#93c5fd;padding:2px 7px">condición</code> valor del clasificador o entidad &nbsp;
+    <code style="background:#0f172a;color:#4ade80;padding:2px 7px">→ acción</code> mutación de ResolvedEntities &nbsp;
+    <code style="background:#0f172a;color:#fbbf24;padding:2px 7px">REGEX_NAME</code> patrón compilado &nbsp;
+    <code style="background:#0f172a;color:#f87171;font-weight:bold;padding:2px 7px">⚠ BUG</code> &nbsp;
+    <code style="background:#1e1b4b;color:#a5b4fc;padding:2px 7px">fn()</code> función response.py &nbsp;
+    <code style="background:#1e1b4b;color:#6ee7b7;padding:2px 7px">→ inyecta</code> mensaje de sistema añadido &nbsp;
+    <code style="background:#1e293b;color:#4ade80;font-weight:bold;padding:2px 7px">✓ correcto</code>
+    <code style="background:#1e293b;color:#f87171;font-weight:bold;padding:2px 7px">⚠ sesgo</code>
+  </p>
+</div>
+
+<!-- ═══════════════════════════════════════════ TIPO 0 ═══ -->
+<div class="card">
+  <div class="card-header c0"><span class="badge">TIPO 0</span><h2>Consultas Metodológicas</h2></div>
+  <div class="card-body">
+    <table>
+      <tr><th>PU — Ejemplos</th><td><ul class="pu-list">
+        <li>cómo se calcula el pib</li><li>qué es el ajuste estacional</li>
+        <li>cuáles son los componentes del pib del gasto</li></ul></td></tr>
+      <tr><th>PREDICT_URL outputs</th><td><code>intent = "methodology"</code> → normalizado a <code>"method"</code></td></tr>
+      <tr class="sep-rule"><th>Regla post_classifier</th><td>
+        <span class="pill pill-red">NO</span> — el ruteo ocurre antes de <code>apply_business_rules()</code>, en el nodo <code>ingest.py</code> por <code>intent=="method"</code>
+      </td></tr>
+      <tr><th>Instrucción LLM<br/>(response.py)</th><td>
+        <span class="pill pill-gray">N/A</span> — va directo al nodo RAG; <code>response.py</code> no se invoca
+      </td></tr>
+      <tr><th>Solución propuesta</th><td>
+        <div class="mejora-box">💡 Entrenar head <code>intent="calendar"</code> en el clasificador para separar metodología de calendario. Actualmente ambos caen en <code>"method"</code> — el TIPO 6 depende de Rule06 regex para distinguirlos.</div>
+      </td></tr>
+      <tr><th>calc_mode / Freq.</th><td><span class="pill pill-gray">N/A</span></td></tr>
+      <tr><th>Clasificación real (log)</th><td>
+        <div class="obs-box">ℹ️ "Cual es el imacec de Junio" → <code>intent=method, conf=0.98</code> → rutea a RAG en lugar de DATA. Dato existe pero no se entrega. Caso borde de confusión metodología/datos.</div>
+      </td></tr>
+      <tr><th>Eliminable</th><td><span class="pill pill-gray">N/A</span></td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ TIPO 1 ═══ -->
+<div class="card">
+  <div class="card-header c1"><span class="badge">TIPO 1</span><h2>Contribución Grupal</h2></div>
+  <div class="card-body">
+    <table>
+      <tr><th>PU — Ejemplos</th><td><ul class="pu-list">
+        <li class="log">que actividad afecto al aumento del pib el primer trimestre del 2020</li>
+        <li class="log">que actividad afecto al aumento del imacec</li>
+        <li>cuánto contribuyó la demanda interna al pib</li></ul></td></tr>
+      <tr><th>PREDICT_URL outputs</th><td><code>calc_mode="contribution"</code>, <code>activity_cls="general"</code></td></tr>
+      <tr class="sep-rule"><th>Regla post_classifier</th><td>
+        <span class="pill pill-blue">SÍ</span> &nbsp; <code>Rule01_ContribucionGrupal</code>
+        <div class="pseudo-wrap"><div class="pseudo-label">PSEUDO-CÓDIGO — Rule01_ContribucionGrupal.force_general</div>
+        <pre class="pseudo-code"><span class="kw">IF</span> <span class="cond">calc_mode_cls == "contribution"</span>
+<span class="kw">AND</span> <span class="cond">investment_cls == "specific"</span>
+<span class="kw">AND</span> <span class="cond">investment_cls in (None, "none")</span>  <span class="cm">← condición IMPOSIBLE (¡siempre False!)</span>
+<span class="kw">AND</span> <span class="cond">region_cls in (None, "none")</span>
+<span class="kw">THEN</span> <span class="act">ent.activity_cls_resolved = "general"</span>    <span class="bug">⚠ BUG: nunca se ejecuta</span>
+
+<span class="cm">────────────────────────────────────────</span>
+<span class="kw">IF</span> <span class="cond">calc_mode_cls == "contribution"</span>
+<span class="kw">AND</span> <span class="cond">investment_cls == "specific"</span>
+<span class="kw">AND</span> <span class="cond">investment_ent == "demanda_interna"</span>
+<span class="kw">THEN</span> <span class="act">ent.investment_cls = "general"</span></pre></div>
+      </td></tr>
+      <tr><th>Instrucción LLM<br/>(response.py)</th><td>
+        <div class="llm-wrap"><div class="llm-label">DISPARADOR EN response.py — build_messages()</div>
+        <pre class="llm-code"><span class="cm">// effective_calc_mode = "contribution" (puesto por clasificador o Rule01)</span>
+<span class="kw">if</span> <span class="cond">effective_calc_mode == "contribution"</span>
+    <span class="kw">and not</span> <span class="cond">is_specific_contribution_query</span>:
+  messages.append(<span class="fn">_build_metric_priority_instruction</span>(<span class="inj">"contribution"</span>))
+<span class="cm">// SIEMPRE inyectado (todos los tipos DATA):</span>
+<span class="kw">messages.append</span>(<span class="fn">_build_recommendation_length_instruction</span>())</pre>
+<details class="instr-expand"><summary></summary><div class="instr-literal"><span class="R">REGLA ESTRICTA DE REDACCION PARA CONTRIBUCIONES (MODO RANKING):</span>
+0. Estas reglas aplican SOLO cuando la respuesta requiera ranking/comparación entre actividades.
+1. En el PRIMER PARRAFO (apertura del agregado) comienza mencionando el PERIODO analizado (ej: 'En el 3er trimestre de 2025, ...') y reporta el agregado del indicador (PIB/IMACEC) como variación porcentual con la frase completa 'creció/disminuyó <b>X,X%</b> respecto al mismo período del año anterior'. La apertura SÍ usa '%' y SÍ usa verbos.
+2. En el LISTADO POR ACTIVIDAD (ranking) los datos son CONTRIBUCIONES expresadas en PUNTOS PORCENTUALES con signo explícito. La unidad obligatoria es 'pp' pegada al número, NO '%'. Cada actividad se reporta como pareja compacta '[Actividad] <b>±X,Xpp</b>'.
+3. Redondea SIEMPRE a 1 decimal: 0,54 → '+0,5pp'; -0,67 → '-0,7pp'; 0 → '0,0pp'.
+4. Ordena por VALOR ABSOLUTO de la contribución (mayor primero).
+5. Separa claramente contribuciones positivas de negativas en grupos distintos.
+6. <span class="O">REGLA DE SIGNO Y UNIDAD POR ACTIVIDAD (OBLIGATORIA):</span> cada actividad listada debe escribirse con signo explícito y sufijo 'pp', sin verbo intermedio:
+   - si contribución &lt; 0: escribe '<b>-X,Xpp</b>' (con signo menos pegado).
+   - si contribución &gt; 0: escribe '<b>+X,Xpp</b>' (con signo más pegado).
+   - si contribución = 0: escribe '<b>0,0pp</b>'.
+7. SINÓNIMOS PERMITIDOS SOLO EN LA APERTURA DEL AGREGADO (no por actividad): para el agregado del indicador puedes usar 'creció/aumentó' (signo +) o 'disminuyó/cayó' (signo -). El agregado se reporta en '%' (variación), NO en 'pp'. El listado por actividad NO usa estos verbos.
+8. <span class="P">PROHIBIDO usar '%'</span> al lado del valor de una actividad listada en el ranking; debe ir 'pp' siempre.
+8.b. <span class="P">PROHIBIDO usar verbos</span> ('disminuyó', 'creció', 'aumentó', 'cayó', 'subió', 'bajó') junto al valor de una actividad listada.
+8.c. <span class="P">PROHIBIDO añadir</span> 'respecto al mismo período del año anterior' al lado del valor por actividad.
+8.d. CHEQUEO FINAL OBLIGATORIO ANTES DE RESPONDER: si en el listado por actividad aparece un porcentaje terminado en '%' o un verbo de variación junto a una actividad, debes reescribir esa línea con el formato '[Actividad] <b>±X,Xpp</b>'.
+8.e. RESPUESTA INVÁLIDA si en el listado por actividad aparece el patrón 'X,X%' o frases como 'disminuyó X,X%' / 'creció X,X%' al describir una actividad.
+8.g. PLANTILLA OBLIGATORIA POR ACTIVIDAD EN CONTRIBUCIÓN: '[Actividad] <b>±X,Xpp</b>'. Ejemplos válidos: 'Servicios personales <b>-1,1pp</b>'; 'Construcción <b>+0,5pp</b>'; 'Comercio <b>0,0pp</b>'.
+9. Respuesta objetiva: describe cifras y relaciones de compensación, sin juicios de valor.
+10. <span class="O">FLUJO OBLIGATORIO EN RANKING:</span> primero llama list_series y luego llama rank_series con metric='value' y order='desc' para obtener el ranking de contribuciones.
+11. CHEQUEO FINAL OBLIGATORIO: si no hay salida de rank_series en el contexto de herramientas, no redactes la respuesta final y vuelve a llamar rank_series.
+
+<span class="R">REGLA DE RECOMENDACIÓN</span> (siempre inyectada): el bloque final de recomendación debe tener una sola oración, pero más desarrollada (mínimo 16 palabras), conectada con la consulta del usuario, sin opiniones ni proyecciones.</div></details></div>
+      </td></tr>
+      <tr><th>Solución propuesta</th><td>
+        <div class="bug-box">🐛 Corregir condición imposible en <code>_matches_force_general</code>: cambiar<br/>
+        <code>investment_cls == "specific" AND investment_cls in (None,"none")</code><br/>por<br/>
+        <code>investment_cls in (None,"none","general")</code> (sin el primer AND redundante)</div>
+        <div class="mejora-box" style="margin-top:6px">💡 Si el clasificador aprende <code>activity_cls="general"</code> de forma consistente y NER extrae <code>activity=[]</code> para el agregado, la regla completa puede eliminarse.</div>
+      </td></tr>
+      <tr><th>calc_mode / Freq.</th><td><span class="pill pill-blue">contribution</span> &nbsp; Q (PIB) | M (IMACEC)</td></tr>
+      <tr><th>Clasificación real (log)</th><td>
+        <div class="json-outer"><div class="json-label">PU: "que actividad afecto al aumento del pib el primer trimestre del 2020"</div>
+        <pre class="json-block">{
+  <span class="k">"intents"</span>:    { <span class="k">"calc_mode"</span>: <span class="ok">"contribution"</span>, <span class="k">"activity"</span>: <span class="ok">"general"</span> },
+  <span class="k">"entities_normalized"</span>: {
+    <span class="k">"indicator"</span>: <span class="ok">["pib"]</span>,  <span class="k">"frequency"</span>: <span class="ok">["q"]</span>,
+    <span class="k">"activity"</span>:  <span class="warn">[]</span>,    <span class="cm">// activity_cls=general → NER no extrae actividad específica</span>
+    <span class="k">"period"</span>:    <span class="ok">["2020-01-01","2020-03-31"]</span>
+  }
+}</pre></div>
+      </td></tr>
+      <tr><th>Eliminable</th><td><span class="pill pill-yellow">Parcialmente</span> — con modelo que distinga aggregado/específico</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ TIPO 2 ═══ -->
+<div class="card">
+  <div class="card-header c2"><span class="badge">TIPO 2</span><h2>Variaciones de Frecuencia / Desestacionalizado</h2></div>
+  <div class="card-body">
+    <table>
+      <tr><th>PU — Ejemplos</th><td><ul class="pu-list">
+        <li class="log">cual es la variación trimestral del PIB</li>
+        <li class="log">cual es la variación mensual del imacec</li>
+        <li class="log">cual es la variación del pib con respecto al periodo anterior</li>
+        <li class="log">Cual es el valor desestacionalizado del IMACEC</li></ul></td></tr>
+      <tr><th>PREDICT_URL outputs</th><td><code>seasonality="sa"</code> cuando aplica; <code>calc_mode="yoy"|"original"|"prev_period"</code></td></tr>
+      <tr class="sep-rule"><th>Regla post_classifier</th><td>
+        <span class="pill pill-blue">SÍ</span> &nbsp; <code>Rule02_VariacionesDesest</code>
+        <div class="pseudo-wrap"><div class="pseudo-label">PSEUDO-CÓDIGO — Rule02.natural_freq_is_prev_period</div>
+        <pre class="pseudo-code"><span class="kw">IF</span> <span class="cond">NOT YOY_KEYWORDS_RE</span>.search(question)          <span class="cm">// sin "interanual","año anterior"…</span>
+<span class="kw">AND</span> <span class="cond">calc_mode_cls NOT IN</span> ("contribution","share","prev_period")
+<span class="kw">AND</span> (  (<span class="cond">indicator_ent == "imacec"</span> <span class="kw">AND</span> <span class="reg">VAR_MENSUAL_RE</span>.search(question))
+    <span class="kw">OR</span> (<span class="cond">indicator_ent == "pib"</span>   <span class="kw">AND</span> <span class="reg">VAR_TRIMESTRAL_RE</span>.search(question))  )
+<span class="kw">THEN</span>
+  <span class="act">ent.calc_mode_cls  = "prev_period"</span>
+  <span class="act">ent.seasonality_ent = "sa"</span>
+  <span class="act">ent.indicator_ent   = indicador inferido</span>
+
+<span class="cm">────────────────────────────────────────</span>
+<span class="kw">REGLA 2b</span> — Rule02.sa_implies_prev_period
+<span class="kw">IF</span> <span class="cond">seasonality_ent == "sa"</span>
+<span class="kw">AND</span> <span class="cond">calc_mode_cls IN ("", "original")</span>
+<span class="kw">AND</span> <span class="cond">NOT YOY_KEYWORDS_RE</span>.search(question)
+<span class="kw">THEN</span> <span class="act">ent.calc_mode_cls = "prev_period"</span></pre></div>
+      </td></tr>
+      <tr><th>Instrucción LLM<br/>(response.py)</th><td>
+        <div class="llm-wrap"><div class="llm-label">DISPARADOR EN response.py — build_messages()</div>
+        <pre class="llm-code"><span class="kw">if</span> <span class="cond">effective_calc_mode == "prev_period"</span>:
+  messages.append(<span class="fn">_build_metric_priority_instruction</span>(<span class="inj">"prev_period"</span>))
+<span class="kw">messages.append</span>(<span class="fn">_build_recommendation_length_instruction</span>())</pre>
+<details class="instr-expand"><summary></summary><div class="instr-literal"><span class="R">REGLA ESTRICTA DE REDACCION (variación período anterior):</span>
+1. En el PRIMER PARRAFO comienza mencionando el PERIODO analizado (ej: 'En el 3er trimestre de 2025, ...') y reporta PRIMERO el valor de 'pct' (variación respecto al período anterior). No comiences con 'value' ni con 'yoy_pct'.
+2. <span class="P">PROHIBIDO mencionar la variación interanual o anual</span> en cualquier parte de la respuesta. NO uses las frases: 'respecto al mismo período del año anterior', 'variación interanual', 'variación anual', 'respecto al año anterior', 'mismo mes/trimestre del año anterior', ni el valor 'yoy_pct'. Reporta SOLO la variación respecto al período anterior (pct).
+3. <span class="P">PROHIBIDO frases redundantes</span> sobre la frecuencia de publicación como 'se reporta/publica con frecuencia mensual/trimestral'. La frecuencia se infiere del período (ej: '4to trimestre de 2025' ya implica trimestral). Solo menciona la frecuencia si el usuario la pide explícitamente.
+4. <span class="P">PROHIBIDO mencionar el nivel del índice / valor absoluto / monto de la serie ('value')</span>. Cuando el usuario pregunta por una VARIACIÓN, la respuesta debe contener únicamente la variación. NO escribas frases como 'el nivel fue de ...', 'su nivel fue ...', 'el índice se ubicó en ...', '... miles de millones de pesos', 'puntos del índice', ni cifras de nivel del IMACEC/PIB.
+5. Estructura recomendada en máximo 2 oraciones cortas:
+   - Oración 1: 'En &lt;período&gt;, el &lt;indicador&gt; desestacionalizado varió <b>X,X%</b> respecto al período anterior.'
+   - Oración 2 (opcional): una línea sugiriendo profundizar en la trayectoria reciente. NO menciones niveles.
+
+<span class="R">REGLA DE RECOMENDACIÓN</span> (siempre inyectada): el bloque final de recomendación debe tener una sola oración, pero más desarrollada (mínimo 16 palabras), conectada con la consulta del usuario, sin opiniones ni proyecciones.</div></details></div>
+      </td></tr>
+      <tr><th>Solución propuesta</th><td>
+        <div class="mejora-box">💡 Entrenar el clasificador con pares: "variación mensual IMACEC" → <code>calc_mode="prev_period"</code> y "variación trimestral PIB" → <code>calc_mode="prev_period"</code>. Si el modelo aprende esto directamente, Rule02 puede eliminarse.</div>
+        <div class="obs-box" style="margin-top:6px">ℹ️ "con respecto al periodo anterior" es la única frase que produce <code>prev_period</code> directamente del clasificador (conf=0.99). "variación mensual" produce <code>yoy</code> con conf=0.77 (baja).</div>
+      </td></tr>
+      <tr><th>calc_mode / Freq.</th><td><span class="pill pill-blue">prev_period</span> &nbsp; M (IMACEC) | Q (PIB)</td></tr>
+      <tr><th>Clasificación real (log)</th><td>
+        <div class="json-outer"><div class="json-label">PU: "cual es la variación trimestral del PIB"</div>
+        <pre class="json-block">{
+  <span class="k">"routing"</span>: { <span class="k">"intent"</span>: <span class="s">"value"</span>, <span class="k">"confidence"</span>: <span class="n">0.9987</span> },
+  <span class="k">"intents"</span>: { <span class="k">"calc_mode"</span>: <span class="warn">"yoy"</span> },    <span class="cm">// ⚠ Rule02 lo corrige a prev_period</span>
+  <span class="k">"entities_normalized"</span>: { <span class="k">"indicator"</span>: <span class="ok">["pib"]</span>, <span class="k">"frequency"</span>: <span class="ok">["q"]</span>, <span class="k">"seasonality"</span>: <span class="warn">["nsa"]</span> }
+}</pre></div>
+        <div class="json-outer" style="margin-top:6px"><div class="json-label">PU: "Cual es el valor desestacionalizado del IMACEC" (conf baja)</div>
+        <pre class="json-block">{
+  <span class="k">"routing"</span>: { <span class="k">"intent"</span>: <span class="s">"value"</span>, <span class="k">"confidence"</span>: <span class="warn">0.7183</span> },
+  <span class="k">"intents"</span>: { <span class="k">"calc_mode"</span>: <span class="warn">"original"</span> },  <span class="cm">// Rule02b: sa → prev_period</span>
+  <span class="k">"entities_normalized"</span>: { <span class="k">"indicator"</span>: <span class="ok">["imacec"]</span>, <span class="k">"seasonality"</span>: <span class="ok">["sa"]</span> }
+}</pre></div>
+      </td></tr>
+      <tr><th>Eliminable</th><td><span class="pill pill-green">Sí</span> — si clasificador aprende <code>prev_period</code> para "variación mensual/trimestral"</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ TIPO 3 ═══ -->
+<div class="card">
+  <div class="card-header c3"><span class="badge">TIPO 3</span><h2>Validación Período Correcto del Indicador</h2></div>
+  <div class="card-body">
+    <table>
+      <tr><th>PU — Ejemplos</th><td><ul class="pu-list">
+        <li class="log">Cuál fué el imacec de Marzo</li>
+        <li class="log">Cual es el pib 2026</li>
+        <li>cual es el pib del primer trimestre del 2023</li></ul></td></tr>
+      <tr><th>PREDICT_URL outputs</th><td><code>indicator="imacec"/"pib"</code>, <code>frequency="m"/"q"/"a"</code></td></tr>
+      <tr class="sep-rule"><th>Regla post_classifier</th><td>
+        <span class="pill pill-blue">SÍ</span> &nbsp; <code>Rule03</code> + <code>Rule04</code>
+        <div class="pseudo-wrap"><div class="pseudo-label">PSEUDO-CÓDIGO — Rule03.force_monthly</div>
+        <pre class="pseudo-code"><span class="kw">IF</span> <span class="cond">indicator_ent == "imacec"</span>
+<span class="kw">AND</span> <span class="cond">frequency_ent != "m"</span>   <span class="cm">// IMACEC solo tiene frecuencia mensual</span>
+<span class="kw">THEN</span> <span class="act">ent.frequency_ent = "m"</span>
+
+<span class="cm">────────────────────────────────────────</span>
+<span class="kw">REGLA 4</span> — Rule04.redirect_pib_monthly_to_quarterly
+<span class="kw">IF</span> <span class="cond">indicator_ent == "pib"</span>
+<span class="kw">AND</span> <span class="cond">frequency_ent == "m"</span>   <span class="cm">// PIB no tiene datos mensuales</span>
+<span class="kw">THEN</span>
+  <span class="act">ent.frequency_ent  = "q"</span>
+  <span class="act">ent.period_ent     = []</span>
+  <span class="act">ent.req_form_cls   = "latest"</span></pre></div>
+      </td></tr>
+      <tr><th>Instrucción LLM<br/>(response.py)</th><td>
+        <div class="llm-wrap"><div class="llm-label">DISPARADOR — build_messages()</div>
+        <pre class="llm-code"><span class="cm">// default: effective_calc_mode = "original" → yoy_pct</span>
+<span class="fn">_build_metric_priority_instruction</span>(<span class="cond">"original"</span>)
+<span class="kw">+</span> <span class="fn">_build_annual_pib_completeness_instruction</span>(<span class="cond">question, entities_ctx, observations</span>)
+  <span class="cm">if indicator="pib" AND freq="a" AND año pedido no está completo</span>
+<span class="kw">+</span> <span class="fn">_build_no_explicit_period_latest_instruction</span>(...)  <span class="cm">if sin período explícito</span>
+<span class="kw">+</span> <span class="fn">_build_recommendation_length_instruction</span>()</pre>
+<details class="instr-expand"><summary></summary><div class="instr-literal"><span class="R">REGLA ESTRICTA DE REDACCION (modo yoy — por defecto):</span>
+1. En el PRIMER PARRAFO comienza mencionando el PERIODO analizado (ej: 'En el 3er trimestre de 2025, ...').
+2. Reporta SOLO la variación respecto al mismo período del año anterior (yoy_pct) como dato principal.
+3. <span class="P">PROHIBIDO incluir niveles (value) o cifras de índice</span> en la respuesta. NO uses get_series_data con metric='value' ni menciones niveles de índice.
+4. La única excepción para reportar 'value' es si el usuario pide explícitamente 'PIB en pesos', 'PIB en dólares', 'PIB per cápita' o 'a precios corrientes'.
+5. Expresiones como 'el valor', 'la cifra', 'cuánto fue', 'el dato' NO son solicitud de nivel; en esos casos reporta yoy_pct.
+6. No comiences con 'value' ni con 'pct' salvo que la pregunta lo requiera explícitamente.
+
+<span class="R">REGLA ESTRICTA DE PIB ANUAL</span> (si año incompleto):
+«El año {AÑO} NO está completo. Solo se dispone de {N}/4 trimestres publicados. Aún no se han publicado todos los datos del PIB {AÑO} según los datos de la Base de Datos Estadísticos. El último dato disponible corresponde a {ULTIMO_PERIODO}.» Luego usa get_series_data para el último año completo y reporta solo yoy_pct.
+
+<span class="R">REGLA ESTRICTA DE PERIODO POR DEFECTO</span> (si sin período explícito):
+Si req_form_cls='latest' o la pregunta no especifica fecha, usa el último periodo disponible ({PERIODO}). USA get_series_data para obtener la cifra de {PERIODO} antes de responder. En la INTRODUCCION incluye literalmente: 'La serie se reporta con frecuencia {FREQ}.' Cuando reportes yoy_pct, exprésalo como 'variación respecto al mismo período del año anterior' o directamente con el verbo ('creció/disminuyó <b>X,X%</b> respecto al mismo período del año anterior'). <span class="P">EVITA 'variación anual' e 'interanual'</span> cuando la frase ya incluya 'respecto al mismo período del año anterior' (redundancia prohibida).
+
+<span class="R">REGLA DE RECOMENDACIÓN</span> (siempre inyectada): el bloque final de recomendación debe tener una sola oración, pero más desarrollada (mínimo 16 palabras), conectada con la consulta del usuario, sin opiniones ni proyecciones.</div></details></div>
+      </td></tr>
+      <tr><th>Solución propuesta</th><td>
+        <div class="mejora-box">💡 Modelar frecuencia como metadato del catálogo: <code>IMACEC → only_freq="m"</code>, <code>PIB → only_freq="q"</code>. Si <code>ingest.py</code> consulta este metadato, Rule03 y Rule04 son redundantes.</div>
+        <div class="bug-box" style="margin-top:6px">🐛 "Cual es el imacec de Junio" → <code>intent=method, conf=0.98</code> → va a RAG. Agregar guardia en <code>ingest.py</code>: si <code>intent="method"</code> y NER tiene <code>indicator+period</code>, forzar ruta DATA.</div>
+      </td></tr>
+      <tr><th>calc_mode / Freq.</th><td><span class="pill pill-blue">yoy (default)</span> &nbsp; M (IMACEC) | Q/A (PIB)</td></tr>
+      <tr><th>Clasificación real (log)</th><td>
+        <div class="json-outer"><div class="json-label">PU: "Cuál fué el imacec de Marzo"</div>
+        <pre class="json-block">{
+  <span class="k">"routing"</span>: { <span class="k">"confidence"</span>: <span class="n">0.9999</span> },
+  <span class="k">"entities_normalized"</span>: {
+    <span class="k">"indicator"</span>: <span class="ok">["imacec"]</span>,  <span class="k">"frequency"</span>: <span class="ok">["m"]</span>,
+    <span class="k">"period"</span>:    <span class="ok">["2026-03-01","2026-03-31"]</span>  <span class="cm">// ✓ "Marzo" normalizado al año actual</span>
+  }
+}</pre></div>
+        <div class="json-outer" style="margin-top:6px"><div class="json-label">PU: "Cual es el imacec de Junio" ← CASO BORDE</div>
+        <pre class="json-block">{
+  <span class="k">"routing"</span>: { <span class="k">"intent"</span>: <span class="warn">"method"</span>, <span class="k">"confidence"</span>: <span class="warn">0.9848</span> },
+  <span class="k">"ruta_resultado"</span>: <span class="warn">"rag"</span>   <span class="cm">// ⚠ dato existe pero no se entrega</span>
+}</pre></div>
+      </td></tr>
+      <tr><th>Eliminable</th><td><span class="pill pill-green">Sí</span> — con metadato de frecuencia en catálogo</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ TIPO 4 ═══ -->
+<div class="card">
+  <div class="card-header c4"><span class="badge">TIPO 4</span><h2>Crecimiento / PIB Real</h2></div>
+  <div class="card-body">
+    <table>
+      <tr><th>PU — Ejemplos</th><td><ul class="pu-list">
+        <li class="log">cuanto creció la economía el último mes</li>
+        <li class="log">cuanto crecio la economia el ultimo año</li>
+        <li class="log">cuanto creció la economia en los dos ultimos años</li>
+        <li class="log">Cual es el pib real de los dos últimos años</li></ul></td></tr>
+      <tr><th>PREDICT_URL outputs</th><td><code>calc_mode="yoy"</code>; "PIB real" → <code>indicator=imacec</code> (sesgo severo)</td></tr>
+      <tr class="sep-rule"><th>Regla post_classifier</th><td>
+        <span class="pill pill-blue">SÍ</span> &nbsp; <code>Rule09_NivelesNominales.assign_price</code>
+        <div class="pseudo-wrap"><div class="pseudo-label">PSEUDO-CÓDIGO — Rule09 Desambiguación "economía + años"</div>
+        <pre class="pseudo-code"><span class="cm">// Paso 1 — Economía con mención explícita de años → PIB anual</span>
+<span class="kw">IF</span> <span class="reg">ECONOMY_GROWTH_RE</span>.search(question)   <span class="cm">// "creció", "economía"…</span>
+<span class="kw">AND</span> <span class="reg">YEAR_WORD_RE</span>.search(question)       <span class="cm">// "año","años"</span>
+<span class="kw">THEN</span>
+  <span class="act">ent.indicator_ent  = "pib"</span>
+  <span class="act">ent.frequency_ent  = "a"</span>
+  <span class="kw">IF</span> <span class="cond">activity_ent == "imacec"</span> <span class="kw">THEN</span> <span class="act">ent.activity_ent = None</span>
+
+<span class="cm">────────────────────────────────────────</span>
+<span class="cm">// Paso 2 — "PIB real" → clasificador devuelve IMACEC (sesgo)</span>
+<span class="kw">IF</span> <span class="reg">PIB_REAL_RE</span>.search(question)         <span class="cm">// "pib … real" o "real … pib"</span>
+<span class="kw">AND</span> <span class="cond">indicator_ent == "imacec"</span>
+<span class="kw">THEN</span>
+  <span class="act">ent.indicator_ent  = "pib"</span>
+  <span class="act">ent.frequency_ent  = "a"  (si YEAR_WORD_RE) else "q"</span>
+  <span class="act">ent.calc_mode_cls  = "original"</span>
+  <span class="act">ent.price          = "co"</span>
+  <span class="act">ent.historical_floor_instruction = "REGLA PIB REAL: reportar value (nivel)"</span></pre></div>
+      </td></tr>
+      <tr><th>Instrucción LLM<br/>(response.py)</th><td>
+        <div class="llm-wrap"><div class="llm-label">DISPARADOR — build_messages()</div>
+        <pre class="llm-code"><span class="kw">if</span> <span class="cond">entities_ctx.get("historical_floor_instruction")</span>:
+  messages.append(<span class="fn">hist_floor</span>)  <span class="cm">// PIB real → reportar value</span>
+<span class="kw">+</span> <span class="fn">_build_metric_priority_instruction</span>(<span class="inj">"yoy"</span>)  <span class="cm">// para "cuánto creció la economía"</span>
+<span class="kw">+</span> <span class="fn">_build_economy_wording_instruction</span>(question, entities_ctx)
+  <span class="cm">if "econom" in question</span>
+<span class="kw">+</span> <span class="fn">_build_no_explicit_period_latest_instruction</span>(...)  <span class="cm">if sin período</span>
+<span class="kw">+</span> <span class="fn">_build_recommendation_length_instruction</span>()</pre>
+<details class="instr-expand"><summary></summary><div class="instr-literal"><span class="R">REGLA DE CONTINUIDAD PARA CONSULTAS DE ECONOMÍA (PIB)</span> — inyectada si 'econom' en la pregunta:
+«En la INTRODUCCIÓN incluye literalmente la frase 'El último dato disponible para el crecimiento de la economía, medida por el PIB,'.»
+(Para IMACEC: «... medida por el IMACEC, ...»)
+
+<span class="R">hist_floor instruction</span> — inyectada si Rule09 seteó historical_floor_instruction (PIB real):
+«REGLA DE SALIDA (PIB REAL): reportar value (nivel) a precios corrientes. <span class="P">PROHIBIDO</span> usar pct o yoy_pct como cifra principal.»
+
+<span class="R">REGLA ESTRICTA DE REDACCION (yoy por defecto)</span> — para 'cuánto creció la economía':
+1. En el PRIMER PARRAFO comienza mencionando el PERIODO analizado.
+2. Reporta SOLO la variación respecto al mismo período del año anterior (yoy_pct) como dato principal.
+3. <span class="P">PROHIBIDO incluir niveles (value)</span> o cifras de índice en la respuesta.
+5. Expresiones como 'el valor', 'la cifra', 'cuánto fue', 'el dato' NO son solicitud de nivel; en esos casos reporta yoy_pct.
+
+<span class="R">REGLA DE RECOMENDACIÓN</span> (siempre inyectada): el bloque final de recomendación debe tener una sola oración, pero más desarrollada (mínimo 16 palabras), conectada con la consulta del usuario, sin opiniones ni proyecciones.</div></details></div>
+      </td></tr>
+      <tr><th>Solución propuesta</th><td>
+        <div class="bug-box">🐛 Sesgo SEVERO confirmado: "PIB real" → <code>indicator=imacec, frequency=m</code>. Agregar ejemplos de entrenamiento: "PIB real" → <code>indicator=pib</code>. El rango "dos últimos años" tampoco se extrae correctamente.</div>
+        <div class="mejora-box" style="margin-top:6px">💡 Mientras se re-entrena: ampliar <code>PIB_REAL_RE</code> con variantes como "pib encadenado", "pib a precios de 2018", "producto real". Evaluar si Rule09 puede consolidarse con Rule04.</div>
+      </td></tr>
+      <tr><th>calc_mode / Freq.</th><td><span class="pill pill-blue">yoy</span> (crecimiento) | <span class="pill pill-blue">original</span> (PIB real nivel)</td></tr>
+      <tr><th>Clasificación real (log)</th><td>
+        <div class="json-outer"><div class="json-label">PU: "Cual es el pib real de los dos últimos años" ← SESGO SEVERO</div>
+        <pre class="json-block">{
+  <span class="k">"entities_normalized"</span>: {
+    <span class="k">"indicator"</span>: <span class="warn">["imacec"]</span>,   <span class="cm">// ⚠ "pib real" → imacec (sesgo)</span>
+    <span class="k">"frequency"</span>: <span class="warn">["m"]</span>,        <span class="cm">// ⚠ debería ser "a"</span>
+    <span class="k">"period"</span>:    <span class="warn">["2026-03-01","2026-03-31"]</span>  <span class="cm">// ⚠ no extrae "dos últimos años"</span>
+  }
+}</pre></div>
+      </td></tr>
+      <tr><th>Eliminable</th><td><span class="pill pill-green">Sí</span> — con ejemplos de entrenamiento adicionales para "PIB real"</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ TIPO 5 ═══ -->
+<div class="card">
+  <div class="card-header c5"><span class="badge">TIPO 5</span><h2>Preguntas Fuera del Alcance</h2></div>
+  <div class="card-body">
+    <table>
+      <tr><th>PU — Ejemplos</th><td><ul class="pu-list">
+        <li class="log">quien es la presidenta del banco central</li>
+        <li class="log">cual es el valor del dolar observado</li>
+        <li class="log">Quienes son los consejeros del banco central</li></ul></td></tr>
+      <tr><th>PREDICT_URL outputs</th><td>Todas producen <code>indicator=imacec</code> (sesgo sistemático del clasificador)</td></tr>
+      <tr class="sep-rule"><th>Regla post_classifier</th><td>
+        <span class="pill pill-blue">SÍ</span> &nbsp; <code>Rule05_FueraDeAlcance</code> (regla de RUTEO — en <code>ingest.py</code>)
+        <div class="pseudo-wrap"><div class="pseudo-label">PSEUDO-CÓDIGO — Rule05.is_out_of_scope (cadena de decisiones)</div>
+        <pre class="pseudo-code"><span class="kw">IF</span> <span class="cond">question == ""</span> <span class="kw">THEN</span> <span class="act">return False</span>  <span class="cm">// vacío: no bloquear</span>
+<span class="kw">IF</span> <span class="fn">Rule06_Calendario</span>.is_calendar_intent(question) <span class="kw">THEN</span> <span class="act">return False</span>  <span class="cm">// calendario → en alcance</span>
+<span class="kw">IF</span> <span class="reg">BLOCKLIST_RE</span>.search(question) <span class="kw">THEN</span> <span class="act">return True</span>  <span class="cm">// dólar/presidenta/TPM → BLOQUEAR</span>
+<span class="kw">IF</span> <span class="cond">norm["activity"|"region"|"investment"]</span> not empty <span class="kw">THEN</span> <span class="act">return False</span>
+<span class="kw">IF</span> <span class="cond">norm["person"|"org"|"location"]</span> not empty <span class="kw">THEN</span> <span class="act">return True</span>
+<span class="kw">IF</span> <span class="cond">context_label == "followup"</span> <span class="kw">AND</span> <span class="cond">prev_indicator in {"pib","imacec"}</span> <span class="kw">THEN</span> <span class="act">return False</span>
+<span class="kw">IF</span> <span class="reg">ALLOWLIST_RE</span>.search(question) <span class="kw">THEN</span> <span class="act">return False</span>   <span class="cm">// "pib","imacec","economía"…</span>
+<span class="kw">ELSE</span> <span class="act">return True</span>  <span class="cm">// si indicator no es pib/imacec → bloquear</span></pre></div>
+      </td></tr>
+      <tr><th>Instrucción LLM<br/>(response.py)</th><td>
+        <span class="pill pill-gray">N/A</span> — rutea a <code>scope_block</code> node. No llama a <code>response.py</code>.
+      </td></tr>
+      <tr><th>Solución propuesta</th><td>
+        <div class="obs-box">ℹ️ Esta regla es una <b>capa de seguridad crítica</b> — mantener siempre. El sesgo sistémico (todas las OOS → <code>indicator=imacec</code>) hace que la BLOCKLIST sea la única defensa real contra falsos positivos en el clasificador.</div>
+        <div class="mejora-box" style="margin-top:6px">💡 Ampliar <code>BLOCKLIST_RE</code> con términos observados en queries: "tipo de cambio", "IPC", "inflación", "IPOM", "IPSA". Revisar si "tipos de cambio nominal" está cubierto (actualmente sí con <code>tcn|tcr</code>).</div>
+      </td></tr>
+      <tr><th>calc_mode / Freq.</th><td><span class="pill pill-gray">N/A</span></td></tr>
+      <tr><th>Clasificación real (log)</th><td>
+        <div class="json-outer"><div class="json-label">PU: "cual es el valor del dolar observado"</div>
+        <pre class="json-block">{
+  <span class="k">"entities_normalized"</span>: { <span class="k">"indicator"</span>: <span class="warn">["imacec"]</span> },  <span class="cm">// sesgo default</span>
+  <span class="k">"ruta_resultado"</span>: <span class="ok">"out_of_scope"</span>   <span class="cm">// ✓ BLOCKLIST intercepta "dólar"</span>
+}</pre></div>
+        <div class="json-outer" style="margin-top:6px"><div class="json-label">PU: "quien es la presidenta del banco central" (conf baja)</div>
+        <pre class="json-block">{
+  <span class="k">"routing"</span>: { <span class="k">"confidence"</span>: <span class="warn">0.5076</span> },   <span class="cm">// modelo confundido</span>
+  <span class="k">"entities_normalized"</span>: { <span class="k">"indicator"</span>: <span class="warn">["imacec"]</span> },
+  <span class="k">"ruta_resultado"</span>: <span class="ok">"out_of_scope"</span>   <span class="cm">// ✓ BLOCKLIST intercepta "presidenta"</span>
+}</pre></div>
+      </td></tr>
+      <tr><th>Eliminable</th><td><span class="pill pill-red">NO — mantener como capa de seguridad</span></td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ TIPO 6 ═══ -->
+<div class="card">
+  <div class="card-header c6"><span class="badge">TIPO 6</span><h2>Calendario de Publicación</h2></div>
+  <div class="card-body">
+    <table>
+      <tr><th>PU — Ejemplos</th><td><ul class="pu-list">
+        <li class="log">cual es la próxima fecha de publicación del IMACEC</li>
+        <li>cuándo se publica el próximo PIB regional</li></ul></td></tr>
+      <tr><th>PREDICT_URL outputs</th><td><code>intent="method"</code> conf≈0.79 (clasifica como metodología, no calendario)</td></tr>
+      <tr class="sep-rule"><th>Regla post_classifier</th><td>
+        <span class="pill pill-blue">SÍ</span> &nbsp; <code>Rule06_Calendario</code> (regla de RUTEO — en <code>ingest.py</code>)
+        <div class="pseudo-wrap"><div class="pseudo-label">PSEUDO-CÓDIGO — Rule06.is_calendar_intent</div>
+        <pre class="pseudo-code"><span class="kw">IF</span> <span class="reg">INTENT_RE</span>.search(question)
+  <span class="cm">// Patrón: "calendario" | "cuándo se publica" | "cuándo sale"</span>
+  <span class="cm">//         "próxima publicación" | "fecha … publicación"</span>
+  <span class="cm">//         "próximo IMACEC|PIB|cuentas_nacionales"</span>
+<span class="kw">THEN</span> <span class="act">return True</span>  <span class="cm">// → ingest.py fuerza intent="method" → ruta RAG</span></pre></div>
+      </td></tr>
+      <tr><th>Instrucción LLM<br/>(response.py)</th><td>
+        <span class="pill pill-gray">N/A</span> — va al nodo RAG de calendario. <code>response.py</code> no se invoca.
+      </td></tr>
+      <tr><th>Solución propuesta</th><td>
+        <div class="mejora-box">💡 Agregar head <code>intent="calendar"</code> al clasificador JointBERT. Permite distinguir entre "qué es el IMACEC" (metodología) y "cuándo se publica el IMACEC" (calendario). Actualmente ambos quedan en <code>intent="method"</code> con Rule06 resolviendo por regex.</div>
+      </td></tr>
+      <tr><th>calc_mode / Freq.</th><td><span class="pill pill-gray">N/A</span></td></tr>
+      <tr><th>Clasificación real (log)</th><td>
+        <div class="json-outer"><div class="json-label">PU: "cual es la próxima fecha de publicación del IMACEC"</div>
+        <pre class="json-block">{
+  <span class="k">"routing"</span>: { <span class="k">"intent"</span>: <span class="warn">"method"</span>, <span class="k">"confidence"</span>: <span class="warn">0.7868</span> },
+  <span class="k">"ruta_resultado"</span>: <span class="ok">"rag"</span>   <span class="cm">// ✓ Rule06 regex corrige el ruteo</span>
+}</pre></div>
+      </td></tr>
+      <tr><th>Eliminable</th><td><span class="pill pill-green">Sí</span> — si el clasificador tiene head <code>intent="calendar"</code></td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ TIPO 7 ═══ -->
+<div class="card">
+  <div class="card-header c7"><span class="badge">TIPO 7</span><h2>Contribución Individual IMACEC</h2></div>
+  <div class="card-body">
+    <table>
+      <tr><th>PU — Ejemplos</th><td><ul class="pu-list">
+        <li class="log">cuanto contribuyo la producción de bienes al imacec</li>
+        <li>cuánto contribuyó los servicios al imacec</li></ul></td></tr>
+      <tr><th>PREDICT_URL outputs</th><td><code>calc_mode="contribution"</code>, <code>activity_cls="specific"</code>, <code>activity_ent="bienes"</code> (NER OK para IMACEC)</td></tr>
+      <tr class="sep-rule"><th>Regla post_classifier</th><td>
+        <span class="pill pill-blue">SÍ</span> &nbsp; <code>Rule07_ContribucionIndividual</code>
+        <div class="pseudo-wrap"><div class="pseudo-label">PSEUDO-CÓDIGO — Rule07.default_activity</div>
+        <pre class="pseudo-code"><span class="kw">IF</span> <span class="cond">indicator_ent == "imacec"</span>
+<span class="kw">AND</span> <span class="cond">activity_ent is None</span>   <span class="cm">// sin actividad específica detectada por NER</span>
+<span class="kw">THEN</span> <span class="act">ent.activity_ent = "imacec"</span>   <span class="cm">// fallback: serie agregada IMACEC</span></pre></div>
+      </td></tr>
+      <tr><th>Instrucción LLM<br/>(response.py)</th><td>
+        <div class="llm-wrap"><div class="llm-label">DISPARADOR — build_messages()</div>
+        <pre class="llm-code"><span class="kw">if</span> <span class="cond">effective_calc_mode == "contribution"</span>
+    <span class="kw">and not</span> <span class="cond">is_specific_contribution_query</span>:
+  messages.append(<span class="fn">_build_metric_priority_instruction</span>(<span class="inj">"contribution"</span>))
+<span class="kw">if</span> <span class="cond">is_specific_contribution_query</span>:
+  messages.append(<span class="fn">_build_specific_contribution_directness_instruction</span>(question))
+<span class="kw">+</span> <span class="fn">_build_recommendation_length_instruction</span>()</pre>
+<details class="instr-expand"><summary></summary><div class="instr-literal"><span class="R">REGLA DE CONTRIBUCIÓN DIRECTA</span> — si la pregunta tiene 'contribuyó [actividad] ... imacec|pib':
+«Si la pregunta es 'cuánto contribuyó [actividad] ...', responde de forma directa con ESA actividad y su valor para el período objetivo. No agregues ranking de otras actividades salvo que el usuario lo pida explícitamente. <span class="O">FORMATO OBLIGATORIO PARA CONTRIBUCIÓN INDIVIDUAL:</span> reporta en puntos porcentuales (pp) y conserva el signo del dato.»
+
+(Si activity_cls='general' → se usa la instrucción contribution del TIPO 1 en su lugar.)
+
+<span class="R">REGLA DE RECOMENDACIÓN</span> (siempre inyectada): el bloque final de recomendación debe tener una sola oración, pero más desarrollada (mínimo 16 palabras), conectada con la consulta del usuario, sin opiniones ni proyecciones.</div></details></div>
+      </td></tr>
+      <tr><th>Solución propuesta</th><td>
+        <div class="mejora-box">💡 Si el NER cubre todas las actividades del IMACEC (bienes, minería, industria, resto_bienes, servicios, no_minería), Rule07 solo actúa como fallback para consultas agregadas. Es aceptable mantenerla pero simplificable si el NER mejora cobertura.</div>
+      </td></tr>
+      <tr><th>calc_mode / Freq.</th><td><span class="pill pill-blue">contribution</span> &nbsp; M — mensual</td></tr>
+      <tr><th>Clasificación real (log)</th><td>
+        <div class="json-outer"><div class="json-label">PU: "cuanto contribuyo la producción de bienes al imacec"</div>
+        <pre class="json-block">{
+  <span class="k">"intents"</span>: { <span class="k">"calc_mode"</span>: <span class="ok">"contribution"</span>, <span class="k">"activity"</span>: <span class="ok">"specific"</span> },
+  <span class="k">"entities_normalized"</span>: {
+    <span class="k">"indicator"</span>: <span class="ok">["imacec"]</span>,  <span class="k">"frequency"</span>: <span class="ok">["m"]</span>,
+    <span class="k">"activity"</span>:  <span class="ok">["bienes"]</span>   <span class="cm">// ✓ NER extrae para IMACEC</span>
+  }
+}</pre></div>
+      </td></tr>
+      <tr><th>Eliminable</th><td><span class="pill pill-green">Sí</span> — si NER cubre todas las actividades IMACEC con alta cobertura</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ TIPO 8 ═══ -->
+<div class="card">
+  <div class="card-header c8"><span class="badge">TIPO 8</span><h2>Actividades No Existentes en el Cuadro PIB</h2></div>
+  <div class="card-body">
+    <table>
+      <tr><th>PU — Ejemplos</th><td><ul class="pu-list">
+        <li class="log">cuanto contribuyo la producción de bienes al pib</li>
+        <li>cuánto contribuyó la pesca al pib</li></ul></td></tr>
+      <tr><th>PREDICT_URL outputs</th><td><code>calc_mode="contribution"</code>, <code>activity_cls="specific"</code>, <code>activity_ent=[]</code> (NER falla para PIB)</td></tr>
+      <tr class="sep-rule"><th>Regla post_classifier</th><td>
+        <span class="pill pill-red">NO</span> — la detección ocurre en el <b>catalog lookup</b> del nodo DATA.
+        Si <code>activity_ent</code> no resuelve a ninguna serie del cuadro PIB, se llama a <code>handle_no_series()</code>
+      </td></tr>
+      <tr><th>Instrucción LLM<br/>(response.py)</th><td>
+        <div class="llm-wrap"><div class="llm-label">FUNCIÓN response.py — _build_missing_activity_instruction()</div>
+        <pre class="llm-code"><span class="kw">if</span> <span class="cond">activity_cls == "specific"</span>
+  <span class="kw">AND</span> <span class="cond">requested_activity NOT IN available_set</span>:
+  messages.append(<span class="fn">_build_missing_activity_instruction</span>(entities_ctx, observations))
+<span class="cm">// Si activity_ent viene vacía (NER no extrajo nada):</span>
+<span class="fn">_build_prevalidated_missing_specific_activity_instruction</span>(entities_ctx, observations)</pre>
+<details class="instr-expand"><summary></summary><div class="instr-literal"><span class="R">REGLA ESTRICTA DE ACTIVIDAD FALTANTE</span> — inyectada si activity_cls='specific' y actividad pedida no está en el cuadro:
+«Esta actividad no se encuentra disponible en la Base de datos estadísticos para el indicador {PIB|IMACEC}.
+<span class="O">PRIMER PÁRRAFO OBLIGATORIO:</span> inicia con la estructura exacta 'En [PERIODO], esta actividad no se encuentra disponible en la Base de datos estadísticos para el indicador {IND}'.
+<span class="P">PROHIBIDO</span> agregar en ese primer párrafo frases como 'no corresponde a la actividad solicitada' o mencionar una actividad proxy/cercana por nombre.
+<span class="P">NO escribas</span> una introducción que afirme contribución de la actividad solicitada en el período, porque contradice la no disponibilidad.
+<span class="O">SEGUNDO PÁRRAFO OBLIGATORIO:</span> debe iniciar EXACTAMENTE con la frase 'Las actividades disponibles en este cuadro son: ' seguida de la lista, y luego un cierre breve.
+<span class="P">PROHIBIDO</span> repetir en este segundo párrafo la oración del primer párrafo ni volver a mencionar el indicador.
+<span class="P">PROHIBIDO</span> usar expresiones como 'actividad similar', 'más cercana', 'proxy' o 'como referencia usar ...'.
+Usa nombres naturales de actividades (sin guiones bajos, sin códigos técnicos).
+<span class="P">NO reemplaces</span> por la serie agregada (PIB total) ni por otra actividad, y <span class="P">NO inventes valores</span>.»
+
+<span class="R">VALIDACIÓN PREVIA</span> — si activity_cls='specific' pero activity normalizada vacía (NER no extrajo):
+«No debes inferir ni decidir una actividad alternativa. Debes responder literalmente: 'Esta actividad no se encuentra disponible en la Base de datos estadísticos para el indicador {IND}'.» (Mismas reglas de párrafos obligatorios.)</div></details></div>
+      </td></tr>
+      <tr><th>Solución propuesta</th><td>
+        <div class="mejora-box">💡 Cuando la actividad existe en IMACEC pero no en PIB (ej. "bienes"), agregar sugerencia automática: "Para la actividad 'bienes' puedes consultar el cuadro IMACEC por actividades." Requiere un mapa de equivalencias entre actividades IMACEC y PIB.</div>
+      </td></tr>
+      <tr><th>calc_mode / Freq.</th><td><span class="pill pill-gray">N/A — sin serie</span></td></tr>
+      <tr><th>Clasificación real (log)</th><td>
+        <div class="json-outer"><div class="json-label">PU: "cuanto contribuyo la producción de bienes al pib"</div>
+        <pre class="json-block">{
+  <span class="k">"intents"</span>: { <span class="k">"calc_mode"</span>: <span class="ok">"contribution"</span>, <span class="k">"activity"</span>: <span class="s">"specific"</span> },
+  <span class="k">"entities_normalized"</span>: {
+    <span class="k">"indicator"</span>: <span class="ok">["pib"]</span>,  <span class="k">"frequency"</span>: <span class="ok">["q"]</span>,
+    <span class="k">"activity"</span>:  <span class="warn">[]</span>    <span class="cm">// NER no mapea "bienes" al cuadro PIB</span>
+  }
+}</pre></div>
+      </td></tr>
+      <tr><th>Eliminable</th><td><span class="pill pill-yellow">Mejora de catálogo</span> — mapa de equivalencias IMACEC↔PIB</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ TIPO 9 ═══ -->
+<div class="card">
+  <div class="card-header c9"><span class="badge">TIPO 9</span><h2>Precios Corrientes / Niveles Nominales</h2></div>
+  <div class="card-body">
+    <table>
+      <tr><th>PU — Ejemplos</th><td><ul class="pu-list">
+        <li class="log">Cuanto fue el consumo nominal en el último trimestre</li>
+        <li class="log">cuanto fueron las exportaciones nominales en el último trimestre</li>
+        <li class="log">Cual es el nivel del PIB</li>
+        <li class="log">cuanto fueron las exportaciones nominales el 2022</li></ul></td></tr>
+      <tr><th>PREDICT_URL outputs</th><td><code>calc_mode="original"</code>; <code>price_ent=[]</code> para "nivel" (NER no detecta)</td></tr>
+      <tr class="sep-rule"><th>Regla post_classifier</th><td>
+        <span class="pill pill-blue">SÍ</span> &nbsp; <code>Rule09_NivelesNominales.assign_price</code> (4 capas con precedencia)
+        <div class="pseudo-wrap"><div class="pseudo-label">PSEUDO-CÓDIGO — Rule09.assign_price (4 capas)</div>
+        <pre class="pseudo-code"><span class="cm">// CAPA 1 — Precio explícito del clasificador</span>
+<span class="kw">IF</span> <span class="cond">price_ent in ("co", "enc")</span>
+<span class="kw">THEN</span> <span class="act">ent.price = price_ent</span>  <span class="cm">→ respetar NER</span>
+
+<span class="cm">// CAPA 2 — Nominal / precios corrientes</span>
+<span class="kw">IF</span> <span class="reg">NOMINAL_RE</span>.search(question)   <span class="cm">// "nominal", "precios corrientes"</span>
+<span class="kw">THEN</span> <span class="act">ent.price = "co"</span>
+
+<span class="cm">// CAPA 2b — "PIB real" (sesgo ya corregido arriba)</span>
+<span class="kw">IF</span> <span class="reg">PIB_REAL_RE</span>.search(question)
+<span class="kw">THEN</span> <span class="act">ent.price = "co", ent.calc_mode_cls = "original"</span>
+     <span class="act">ent.historical_floor_instruction = "REGLA PIB REAL: reportar value"</span>
+
+<span class="cm">// CAPA 3 — Nivel explícito</span>
+<span class="kw">IF</span> <span class="reg">LEVEL_RE</span>.search(question)   <span class="cm">// "nivel de la/del" + indicador</span>
+<span class="kw">THEN</span> <span class="act">ent.price = "co"</span>
+
+<span class="cm">// CAPA 4 — Fallback general</span>
+<span class="kw">ELSE</span> <span class="act">ent.price = "enc"</span>   <span class="cm">// volumen encadenado por defecto</span></pre></div>
+      </td></tr>
+      <tr><th>Instrucción LLM<br/>(response.py)</th><td>
+        <div class="llm-wrap"><div class="llm-label">DISPARADOR — build_messages()</div>
+        <pre class="llm-code"><span class="fn">_build_value_no_rescale_instruction</span>(question, entities_ctx)
+  <span class="cm">if price=="co" AND ("nominal"|"precios corrientes"|"pib en pesos"|"per capita" in question)</span>
+<span class="kw">+</span> <span class="fn">_build_original_series_force_instruction</span>(question, entities_ctx)
+  <span class="cm">if per_capita OR precios_corrientes OR nivel_request</span>
+<span class="kw">+</span> <span class="fn">_build_no_explicit_period_latest_instruction</span>(...)  <span class="cm">if sin período</span>
+<span class="kw">+</span> <span class="fn">_build_recommendation_length_instruction</span>()</pre>
+<details class="instr-expand"><summary></summary><div class="instr-literal"><span class="R">REGLA DE ESCALA PARA VALORES ORIGINALES</span> — inyectada si price='co' y pregunta contiene nominal/precios corrientes/pib en pesos/per cápita:
+«Cuando entregues value, conserva exactamente la escala entregada por get_series_data (no multiplicar, no dividir, no convertir unidades). Solo redondea y formatea separadores de miles. Ejemplo: si get_series_data entrega 57246,76 (miles de millones), reporta 57.247 y nunca 57.247.000. <span class="O">OBLIGATORIO:</span> para PIB a precios corrientes o PIB per cápita, el bloque DATOS debe usar solo value (serie original) como cifra principal; no uses yoy_pct ni pct salvo solicitud explícita de variación. <span class="O">OBLIGATORIO:</span> entrega una sola cifra principal para el período solicitado (o último disponible si no se especifica período).»
+
+<span class="R">REGLA DE MAXIMA PRIORIDAD — SERIE ORIGINAL OBLIGATORIA</span> — inyectada si per_capita OR precios_corrientes OR nivel_request:
+«Para PIB per cápita o PIB a precios corrientes, la cifra principal debe salir SIEMPRE del campo value (serie original). <span class="P">PROHIBIDO usar yoy_pct o pct</span> como dato principal, salvo que el usuario pida explícitamente variación. <span class="O">OBLIGATORIO:</span> llama get_series_data y usa value del período solicitado (o del último disponible). <span class="O">OBLIGATORIO:</span> entrega una sola cifra principal en el bloque DATOS. Si respondes con yoy_pct/pct en estos casos, la respuesta es inválida y debes rehacerla con value.»
+
+<span class="R">REGLA DE RECOMENDACIÓN</span> (siempre inyectada): el bloque final de recomendación debe tener una sola oración, pero más desarrollada (mínimo 16 palabras), conectada con la consulta del usuario, sin opiniones ni proyecciones.</div></details></div>
+      </td></tr>
+      <tr><th>Solución propuesta</th><td>
+        <div class="mejora-box">💡 Mejorar NER: entrenar el modelo para que "nominal" → <code>price_ent="co"</code> directamente (capa 1). Esto eliminaría CAPA 2. Actualmente NER extrae <code>price_ent=[]</code> para "nominal".</div>
+        <div class="obs-box" style="margin-top:6px">ℹ️ <b>Inconsistencia NER:</b> "exportaciones nominales" produce <code>investment=[]</code> en una ejecución y <code>investment=["exportacion"]</code> en otra. Variabilidad no determinista.</div>
+      </td></tr>
+      <tr><th>calc_mode / Freq.</th><td><span class="pill pill-blue">original</span> &nbsp; Q (trimestral) | A (anual)</td></tr>
+      <tr><th>Clasificación real (log)</th><td>
+        <div class="json-outer"><div class="json-label">PU: "Cuanto fue el consumo nominal en el último trimestre"</div>
+        <pre class="json-block">{
+  <span class="k">"entities_normalized"</span>: {
+    <span class="k">"indicator"</span>:  <span class="ok">["pib"]</span>,  <span class="k">"frequency"</span>: <span class="ok">["q"]</span>,
+    <span class="k">"investment"</span>: <span class="ok">["consumo"]</span>,   <span class="cm">// ✓</span>
+    <span class="k">"price"</span>:      <span class="ok">["co"]</span>         <span class="cm">// ✓ "nominal" → co</span>
+  }
+}</pre></div>
+      </td></tr>
+      <tr><th>Eliminable</th><td><span class="pill pill-yellow">Capas 2-3</span> — si NER detecta <code>price_ent</code> con alta cobertura</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ TIPO 10 ═══ -->
+<div class="card">
+  <div class="card-header c10"><span class="badge">TIPO 10</span><h2>Participaciones (% del PIB)</h2></div>
+  <div class="card-body">
+    <table>
+      <tr><th>PU — Ejemplos</th><td><ul class="pu-list">
+        <li class="log">Cuanto pesa el consumo en el pib</li>
+        <li class="log">Que porcentaje del PIB son las exportaciones</li>
+        <li class="log">Cuanto pesa la inversión en Chile</li>
+        <li class="log">Cuanto pesa el consumo en el pib el 2018</li></ul></td></tr>
+      <tr><th>PREDICT_URL outputs</th><td><code>calc_mode="original"</code> — el clasificador no produce <code>"share"</code> nunca</td></tr>
+      <tr class="sep-rule"><th>Regla post_classifier</th><td>
+        <span class="pill pill-blue">SÍ</span> &nbsp; <code>Rule10_Participaciones</code>
+        <div class="pseudo-wrap"><div class="pseudo-label">PSEUDO-CÓDIGO — Rule10.detect_share_intent</div>
+        <pre class="pseudo-code"><span class="kw">IF</span> <span class="reg">INTENT_RE</span>.search(question)
+  <span class="cm">// Patrón: "cuánto pesa" | "qué porcentaje" | "participación" | "peso del/en"</span>
+<span class="kw">AND</span> <span class="cond">indicator_ent in ("pib", "")</span>
+<span class="kw">AND</span> (  <span class="cond">investment_cls in ("specific","general")</span>
+    <span class="kw">OR</span> <span class="cond">investment_ent is not None</span>  )
+<span class="kw">THEN</span>
+  <span class="act">ent.calc_mode_cls  = "share"</span>
+  <span class="act">ent.frequency_ent  = "a"</span>      <span class="cm">// anual siempre para participaciones</span>
+  <span class="act">ent.price_ent      = "co"</span>     <span class="cm">// precios corrientes</span>
+  <span class="kw">IF</span> <span class="cond">investment_cls == "none"</span> <span class="kw">THEN</span> <span class="act">ent.investment_cls = "general"</span></pre></div>
+      </td></tr>
+      <tr><th>Instrucción LLM<br/>(response.py)</th><td>
+        <div class="llm-wrap"><div class="llm-label">DISPARADOR — build_messages()</div>
+        <pre class="llm-code"><span class="kw">if</span> <span class="cond">effective_calc_mode == "share"</span>:
+  messages.append(<span class="fn">_build_metric_priority_instruction</span>(<span class="inj">"share"</span>))
+<span class="kw">+</span> <span class="fn">_build_no_explicit_period_latest_instruction</span>(...)  <span class="cm">if sin período</span>
+<span class="kw">+</span> <span class="fn">_build_recommendation_length_instruction</span>()</pre>
+<details class="instr-expand"><summary></summary><div class="instr-literal"><span class="R">REGLA ESTRICTA DE REDACCION PARA PARTICIPACIONES (% SOBRE EL PIB):</span>
+1. En el PRIMER PARRAFO comienza mencionando el PERIODO analizado (ej: 'En 2024, ...').
+2. Los datos representan el NIVEL DE PARTICIPACIÓN del componente sobre el PIB total. La métrica principal es 'value' (puntos porcentuales del PIB, ej: 24,1 pp).
+3. Reporta SIEMPRE 'value' como dato principal usando la unidad 'pp' (puntos porcentuales) y redacción de nivel: 'representó <b>X,X pp</b> del PIB', 'pesó <b>X,X pp</b> del PIB' o 'su participación fue de <b>X,X pp</b> del PIB'. <span class="P">PROHIBIDO usar '%' o 'por ciento'</span> para la métrica principal; usa SIEMPRE 'pp'. <span class="P">PROHIBIDO hablar de 'variación'</span> o 'variación de X puntos porcentuales'.
+4. Redondea a 1 decimal y usa formato con coma decimal: ej. '<b>24,1 pp</b>'.
+5. NO uses 'yoy_pct' ni 'pct' como métrica principal salvo que el usuario pida explícitamente 'variación', 'cuanto varió', 'cuanto subió/bajó'.
+6. Si el usuario pregunta por un componente específico, destaca ese componente y compáralo con otros componentes relevantes.
+7. Respuesta objetiva: describe cifras y composición, sin juicios de valor.
+
+<span class="R">REGLA DE RECOMENDACIÓN</span> (siempre inyectada): el bloque final de recomendación debe tener una sola oración, pero más desarrollada (mínimo 16 palabras), conectada con la consulta del usuario, sin opiniones ni proyecciones.</div></details></div>
+      </td></tr>
+      <tr><th>Solución propuesta</th><td>
+        <div class="bug-box">🐛 Gap total confirmado en logs: NINGUNA variante produce <code>calc_mode="share"</code>. 100% dependiente de Rule10. Entrenar head <code>intent="share"</code> (o <code>calc_mode="share"</code>) en el clasificador para cubrir "cuánto pesa", "qué porcentaje del PIB", "participación".</div>
+      </td></tr>
+      <tr><th>calc_mode / Freq.</th><td><span class="pill pill-blue">share</span> (forzado por Rule10) &nbsp; A — anual</td></tr>
+      <tr><th>Clasificación real (log)</th><td>
+        <div class="json-outer"><div class="json-label">PU: "Cuanto pesa el consumo en el pib"</div>
+        <pre class="json-block">{
+  <span class="k">"routing"</span>: { <span class="k">"intent"</span>: <span class="warn">"value"</span>, <span class="k">"confidence"</span>: <span class="n">0.9997</span> },  <span class="cm">// no detecta share</span>
+  <span class="k">"intents"</span>: { <span class="k">"calc_mode"</span>: <span class="warn">"original"</span> },  <span class="cm">// Rule10 lo cambia a "share"</span>
+  <span class="k">"entities_normalized"</span>: {
+    <span class="k">"indicator"</span>:  <span class="ok">["pib"]</span>,   <span class="k">"frequency"</span>:  <span class="warn">["q"]</span>,   <span class="cm">// Rule10 fuerza "a"</span>
+    <span class="k">"investment"</span>: <span class="ok">["consumo"]</span>
+  }
+}</pre></div>
+      </td></tr>
+      <tr><th>Eliminable</th><td><span class="pill pill-green">Sí</span> — si clasificador aprende head <code>share</code></td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ TIPO 12 ═══ -->
+<div class="card">
+  <div class="card-header c12"><span class="badge">TIPO 12</span><h2>PIB Regional</h2></div>
+  <div class="card-body">
+    <table>
+      <tr><th>PU — Ejemplos</th><td><ul class="pu-list">
+        <li>qué región tuvo el mayor crecimiento del pib en el último año</li>
+        <li>cual es el pib de la región del biobío</li></ul></td></tr>
+      <tr><th>PREDICT_URL outputs</th><td><code>calc_mode="original"</code>, <code>region_cls="specific"</code>, <code>region_ent="biobio"</code> (cuando se menciona explícitamente)</td></tr>
+      <tr class="sep-rule"><th>Regla post_classifier</th><td>
+        <span class="pill pill-blue">SÍ</span> &nbsp; <code>Rule14_PibRegionalDefaultYoY</code>
+        <div class="pseudo-wrap"><div class="pseudo-label">PSEUDO-CÓDIGO — Rule14.force_yoy</div>
+        <pre class="pseudo-code"><span class="kw">IF</span> <span class="cond">indicator_ent == "pib"</span>
+<span class="kw">AND</span> <span class="cond">region_cls == "specific"</span>
+<span class="kw">AND</span> <span class="cond">region_ent is not None</span>
+<span class="kw">AND</span> <span class="cond">calc_mode_cls == "original"</span>   <span class="cm">// clasificador no detectó variación</span>
+<span class="kw">AND</span> <span class="cond">req_form_cls == "point"</span>
+<span class="kw">AND NOT</span> <span class="reg">LEVEL_HINTS_RE</span>.search(question)  <span class="cm">// sin "monto","nivel","pesos"…</span>
+<span class="kw">THEN</span> <span class="act">ent.calc_mode_cls = "yoy"</span>
+  <span class="cm">// Convención BCCh: PIB regional → variación interanual por defecto</span></pre></div>
+      </td></tr>
+      <tr><th>Instrucción LLM<br/>(response.py)</th><td>
+        <div class="llm-wrap"><div class="llm-label">DISPARADOR — build_messages()</div>
+        <pre class="llm-code"><span class="fn">_build_metric_priority_instruction</span>(<span class="inj">"yoy"</span>)  <span class="cm">// Rule14 fuerza yoy</span>
+<span class="kw">+</span> <span class="fn">_build_no_explicit_period_latest_instruction</span>(...)  <span class="cm">if sin período</span>
+<span class="kw">+</span> <span class="fn">_build_recommendation_length_instruction</span>()</pre>
+<details class="instr-expand"><summary></summary><div class="instr-literal"><span class="R">REGLA ESTRICTA DE REDACCION (modo yoy — por defecto):</span>
+1. En el PRIMER PARRAFO comienza mencionando el PERIODO analizado (ej: 'En el 3er trimestre de 2025, ...').
+2. Reporta SOLO la variación respecto al mismo período del año anterior (yoy_pct) como dato principal.
+3. <span class="P">PROHIBIDO incluir niveles (value) o cifras de índice</span> en la respuesta.
+4. La única excepción para reportar 'value' es si el usuario pide explícitamente 'PIB en pesos', 'PIB en dólares', 'PIB per cápita' o 'a precios corrientes'.
+5. Expresiones como 'el valor', 'la cifra', 'cuánto fue', 'el dato' NO son solicitud de nivel; en esos casos reporta yoy_pct.
+6. No comiences con 'value' ni con 'pct' salvo que la pregunta lo requiera explícitamente.
+
+<span class="R">REGLA ESTRICTA DE PERIODO POR DEFECTO</span> (si no hay período explícito):
+Si req_form_cls='latest' o la pregunta no especifica fecha, usa el último periodo disponible. USA get_series_data antes de responder. En la INTRODUCCION incluye: 'La serie se reporta con frecuencia {FREQ}.'
+
+<span class="R">REGLA DE RECOMENDACIÓN</span> (siempre inyectada): el bloque final de recomendación debe tener una sola oración, pero más desarrollada (mínimo 16 palabras), conectada con la consulta del usuario, sin opiniones ni proyecciones.</div></details></div>
+      </td></tr>
+      <tr><th>Solución propuesta</th><td>
+        <div class="mejora-box">💡 Entrenar el clasificador con la convención BCCh: preguntas de PIB regional con un año/período → <code>calc_mode="yoy"</code> por defecto. Si el modelo aprende esto, Rule14 puede eliminarse. Actualmente actúa como conocimiento de dominio compensatorio.</div>
+      </td></tr>
+      <tr><th>calc_mode / Freq.</th><td><span class="pill pill-blue">yoy</span> (forzado por Rule14) &nbsp; A — anual (convención BCCh)</td></tr>
+      <tr><th>Clasificación real (log)</th><td>
+        <div class="obs-box">ℹ️ No hay consultas directas de PIB regional en los logs del 26 de abril. Referencia del 27 de abril: "que actividad afecto al pib en la región del bío bío" → <code>region=["biobio"]</code> ✓ detectado cuando se menciona explícitamente.</div>
+      </td></tr>
+      <tr><th>Eliminable</th><td><span class="pill pill-green">Sí</span> — con convención BCCh en entrenamiento del clasificador</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ TIPO 13 ═══ -->
+<div class="card">
+  <div class="card-header c13"><span class="badge">TIPO 13</span><h2>Datos Históricos</h2></div>
+  <div class="card-body">
+    <table>
+      <tr><th>PU — Ejemplos</th><td><ul class="pu-list">
+        <li class="log">cual es el pib de chile desde 1900 en adelante</li>
+        <li class="log">cual es el valor del pib de 1961 a 1970</li></ul></td></tr>
+      <tr><th>PREDICT_URL outputs</th><td><code>req_form="range"</code>, <code>frequency="a"</code>; "desde 1900 en adelante" → <code>period=["1900-01-01","1900-12-31"]</code> (rango abierto no parseado)</td></tr>
+      <tr class="sep-rule"><th>Regla post_classifier</th><td>
+        <span class="pill pill-blue">SÍ</span> &nbsp; <code>Rule13_Historicos</code>
+        <div class="pseudo-wrap"><div class="pseudo-label">PSEUDO-CÓDIGO — Rule13.apply_floor</div>
+        <pre class="pseudo-code"><span class="kw">IF</span> <span class="cond">indicator_ent == "imacec"</span>
+<span class="kw">AND</span> <span class="cond">period_ent[0].year &lt; 1996</span>
+<span class="kw">THEN</span>
+  <span class="act">ent.period_ent = rewrite_to_floor(period_ent, floor=1996)</span>
+  <span class="act">ent.historical_floor_instruction = "IMACEC: solo hay datos desde 1996"</span>
+
+<span class="cm">────────────────────────────────────────</span>
+<span class="kw">IF</span> <span class="cond">indicator_ent == "pib"</span>
+<span class="kw">AND</span> <span class="cond">period_ent[0].year &lt; 1960</span>
+<span class="kw">THEN</span>
+  <span class="act">ent.period_ent = rewrite_to_floor(period_ent, floor=1960)</span>
+  <span class="act">ent.hist = 1  (si año &lt; 1996)</span>
+  <span class="act">ent.historical_floor_instruction = "PIB: datos empalmados desde 1960"</span></pre></div>
+      </td></tr>
+      <tr><th>Instrucción LLM<br/>(response.py)</th><td>
+        <div class="llm-wrap"><div class="llm-label">DISPARADOR — build_messages()</div>
+        <pre class="llm-code"><span class="kw">if</span> <span class="cond">entities_ctx.get("historical_floor_instruction")</span>:
+  messages.append(<span class="fn">hist_floor</span>)  <span class="cm">// floor desde Rule13</span>
+<span class="kw">+</span> <span class="fn">_build_historical_pib_yoy_instruction</span>(question, entities_ctx)
+  <span class="cm">if _is_historical_pib_range(question, entities_ctx)</span>
+<span class="kw">+</span> <span class="fn">_build_recommendation_length_instruction</span>()</pre>
+<details class="instr-expand"><summary></summary><div class="instr-literal"><span class="R">hist_floor instruction</span> — inyectada si historical_floor_instruction está seteado por Rule13 o Rule09:
+«REGLA DE DISPONIBILIDAD HISTÓRICA: el indicador {IND} tiene datos empalmados desde {AÑO}. Debes indicarlo explícitamente en la respuesta si el período solicitado es anterior a esa fecha.»
+
+<span class="R">REGLA HISTÓRICA PIB ANUAL (RANGO)</span> — inyectada si la consulta cubre un rango amplio de años del PIB:
+«Esta consulta cubre un rango amplio de años del PIB anual. <span class="O">OBLIGATORIO:</span>
+1. Llama get_series_data con frequency='A' para obtener TODOS los registros del rango solicitado.
+2. Reporta la VARIACIÓN INTERANUAL (yoy_pct) de cada año del rango. Si el rango supera ~10 años, resume con promedio, máximo y mínimo de yoy_pct más los años con valores extremos; NUNCA omitas la variación.
+3. <span class="P">NO reportes niveles absolutos</span> en miles de millones de pesos encadenados como cifra principal: el usuario no pidió un monto, pidió la trayectoria del PIB.
+4. <span class="P">ESTÁ PROHIBIDO afirmar</span> 'no dispongo de los valores', 'no tengo cargados los datos' o frases similares: la serie histórica está completa en get_series_data para todo el rango.
+5. Si la serie empalmada parte después del año solicitado (p. ej. PIB desde 1960 cuando se pidió desde 1900), aclara la cobertura real una sola vez y luego reporta yoy_pct desde el primer año disponible.»
+
+<span class="R">REGLA DE RECOMENDACIÓN</span> (siempre inyectada): el bloque final de recomendación debe tener una sola oración, pero más desarrollada (mínimo 16 palabras), conectada con la consulta del usuario, sin opiniones ni proyecciones.</div></details></div>
+      </td></tr>
+      <tr><th>Solución propuesta</th><td>
+        <div class="obs-box">ℹ️ El NER no parsea "desde X en adelante" como rango abierto. Produce <code>period=["1900-01-01","1900-12-31"]</code> sin extremo superior.</div>
+        <div class="mejora-box" style="margin-top:6px">💡 En el normalizador de períodos: detectar patrón "desde YYYY en adelante" → <code>period=[YYYY, today()]</code>. Alternativamente, si <code>req_form="range"</code> y solo hay un año en <code>period_ent</code>, inferir el extremo superior como la fecha actual.</div>
+      </td></tr>
+      <tr><th>calc_mode / Freq.</th><td><span class="pill pill-gray">Depende del clasificador</span> &nbsp; A — anual</td></tr>
+      <tr><th>Clasificación real (log)</th><td>
+        <div class="json-outer"><div class="json-label">PU: "cual es el pib de chile desde 1900 en adelante"</div>
+        <pre class="json-block">{
+  <span class="k">"intents"</span>: { <span class="k">"req_form"</span>: <span class="ok">"range"</span> },
+  <span class="k">"entities_normalized"</span>: {
+    <span class="k">"indicator"</span>: <span class="ok">["pib"]</span>,  <span class="k">"frequency"</span>: <span class="ok">["a"]</span>,
+    <span class="k">"period"</span>:    <span class="warn">["1900-01-01","1900-12-31"]</span>  <span class="cm">// ⚠ rango abierto no parseado</span>
+  }
+}</pre></div>
+        <div class="json-outer" style="margin-top:6px"><div class="json-label">PU: "cual es el valor del pib de 1961 a 1970" (CORRECTO)</div>
+        <pre class="json-block">{
+  <span class="k">"intents"</span>: { <span class="k">"req_form"</span>: <span class="ok">"range"</span> },
+  <span class="k">"entities_normalized"</span>: {
+    <span class="k">"indicator"</span>: <span class="ok">["pib"]</span>,  <span class="k">"frequency"</span>: <span class="ok">["a"]</span>,
+    <span class="k">"period"</span>:    <span class="ok">["1961-01-01","1970-12-31"]</span>  <span class="cm">// ✓ ambos extremos</span>
+  }
+}</pre></div>
+      </td></tr>
+      <tr><th>Eliminable</th><td><span class="pill pill-yellow">Parcialmente</span> — mejor como metadato de disponibilidad en catálogo</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ TIPO 14 ═══ -->
+<div class="card">
+  <div class="card-header c14"><span class="badge">TIPO 14</span><h2>Saludos</h2></div>
+  <div class="card-body">
+    <table>
+      <tr><th>PU — Ejemplos</th><td><ul class="pu-list">
+        <li class="log">hola como estas</li>
+        <li>Hola me llamo Hernan</li>
+        <li>buenos días</li></ul></td></tr>
+      <tr><th>PREDICT_URL outputs</th><td><code>intent="other"</code>, <code>macro=0</code>, <code>confidence≈0.92</code>; NER → <code>indicator=imacec</code> (sesgo)</td></tr>
+      <tr class="sep-rule"><th>Regla post_classifier</th><td>
+        <span class="pill pill-blue">SÍ</span> &nbsp; <code>RuleGreeting</code> (regla de RUTEO — en <code>ingest.py</code>)
+        <div class="pseudo-wrap"><div class="pseudo-label">PSEUDO-CÓDIGO — RuleGreeting.is_greeting</div>
+        <pre class="pseudo-code"><span class="kw">IF</span> <span class="reg">GREETING_RE</span>.match(question.strip())
+  <span class="cm">// Regex: ^(token_saludo)([,!?¡¿ ]*token_saludo)*$</span>
+  <span class="cm">// Tokens: "hola","hey","buenos días","cómo estás","gracias"…</span>
+  <span class="cm">// FALLA: "hola como estas" — "como estas" NO está en la lista de tokens</span>
+  <span class="bug">⚠ BUG: GREETING_RE requiere que TODA la frase sean tokens de saludo</span>
+<span class="kw">THEN</span> <span class="act">return True</span>  <span class="cm">→ ingest.py → greeting_node</span>
+<span class="kw">ELSE</span> <span class="act">return False</span> <span class="cm">→ continúa a Rule05 → out_of_scope si no pasa allowlist</span></pre></div>
+      </td></tr>
+      <tr><th>Instrucción LLM<br/>(response.py)</th><td>
+        <span class="pill pill-gray">N/A</span> — va al <code>greeting_node</code> que responde con mensaje fijo. <code>response.py</code> no se invoca.
+      </td></tr>
+      <tr><th>Solución propuesta</th><td>
+        <div class="bug-box">🐛 Bug confirmado en log: "hola como estas" → <code>ruta=out_of_scope</code>. Corrección inmediata:<br/>
+        Agregar a <code>_GREETING_TOKEN_RE</code>: <code>r"como\s+est[aá]s"</code> (ya existe como <code>r"c[oó]mo\s+(?:est[aá]s|...)"</code>).<br/>
+        El problema real es que el patrón completo <code>GREETING_RE</code> requiere que TODA la frase matchee. Simplificar a:<br/>
+        <code>if question starts with (hola|hey|buenos) → is_greeting = True</code></div>
+        <div class="mejora-box" style="margin-top:6px">💡 Entrenar head <code>intent="greeting"</code> en el clasificador. Elimina la dependencia de regex para saludos y cubre "hola Hernan, cómo vas", "buenas", "ey!", etc.</div>
+      </td></tr>
+      <tr><th>calc_mode / Freq.</th><td><span class="pill pill-gray">N/A</span></td></tr>
+      <tr><th>Clasificación real (log)</th><td>
+        <div class="json-outer"><div class="json-label">PU: "hola como estas" ← BUG CONFIRMADO</div>
+        <pre class="json-block">{
+  <span class="k">"routing"</span>: { <span class="k">"intent"</span>: <span class="s">"other"</span>, <span class="k">"confidence"</span>: <span class="n">0.9225</span>, <span class="k">"macro"</span>: <span class="n">0</span> },
+  <span class="k">"entities_normalized"</span>: { <span class="k">"indicator"</span>: <span class="warn">["imacec"]</span> },   <span class="cm">// sesgo default</span>
+  <span class="k">"ruta_resultado"</span>: <span class="warn">"out_of_scope"</span>  <span class="cm">// ⚠ debería ser "greeting"</span>
+}</pre></div>
+      </td></tr>
+      <tr><th>Eliminable</th><td><span class="pill pill-green">Sí</span> — con head <code>intent="greeting"</code> en clasificador</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════ TABLA RESUMEN ═══════════════════════ -->
+<div class="summary-section">
+  <h2>Tabla Resumen — Reglas · Tipo de Problema · LLM Instrucción · Solución</h2>
+  <table class="sum-table">
+    <thead>
+      <tr>
+        <th>Regla</th>
+        <th>Post<br/>Classifier</th>
+        <th>Tipo de problema</th>
+        <th>Instrucción LLM inyectada</th>
+        <th>Evidencia log</th>
+        <th>Solución propuesta</th>
+        <th>Eliminable</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>Rule01.force_general</code></td>
+        <td><span class="pill pill-blue">SÍ</span></td>
+        <td>Bug activo — condición imposible</td>
+        <td><code>_build_metric_priority_instruction("contribution")</code></td>
+        <td>—</td>
+        <td>Corregir predicado: eliminar <code>AND investment_cls=="specific"</code></td>
+        <td><span class="pill pill-red">No aún</span></td>
+      </tr>
+      <tr>
+        <td><code>Rule01.demanda_interna</code></td>
+        <td><span class="pill pill-blue">SÍ</span></td>
+        <td>NER gap — no reconoce demanda_interna</td>
+        <td><code>_build_metric_priority_instruction("contribution")</code></td>
+        <td>Log OK</td>
+        <td>Entrenar NER con entidad demanda_interna</td>
+        <td><span class="pill pill-green">Sí</span></td>
+      </tr>
+      <tr>
+        <td><code>Rule02.natural_freq</code></td>
+        <td><span class="pill pill-blue">SÍ</span></td>
+        <td>Clasificador: "var. mensual/trimestral" → yoy</td>
+        <td><code>_build_metric_priority_instruction("prev_period")</code></td>
+        <td>"var. trimestral PIB" → yoy conf=0.99</td>
+        <td>Entrenar model: "var. mensual" → prev_period</td>
+        <td><span class="pill pill-green">Sí</span></td>
+      </tr>
+      <tr>
+        <td><code>Rule02.sa_implies</code></td>
+        <td><span class="pill pill-blue">SÍ</span></td>
+        <td>Inferencia semántica: sa→prev_period</td>
+        <td><code>_build_metric_priority_instruction("prev_period")</code></td>
+        <td>"desest. IMACEC" → original+sa, conf=0.72</td>
+        <td>Entrenar head explícito para prev_period desest.</td>
+        <td><span class="pill pill-green">Sí</span></td>
+      </tr>
+      <tr>
+        <td><code>Rule03.force_monthly</code></td>
+        <td><span class="pill pill-blue">SÍ</span></td>
+        <td>Conocimiento de dominio: IMACEC=solo mensual</td>
+        <td>Default yoy_pct + completeness instruction</td>
+        <td>Rara vez falla (NER suele detectar freq=m)</td>
+        <td>Metadato catálogo: IMACEC.only_freq="m"</td>
+        <td><span class="pill pill-green">Sí</span></td>
+      </tr>
+      <tr>
+        <td><code>Rule04.pib→quarterly</code></td>
+        <td><span class="pill pill-blue">SÍ</span></td>
+        <td>Conocimiento de dominio: PIB no mensual</td>
+        <td>Default yoy_pct</td>
+        <td>—</td>
+        <td>Metadato catálogo: PIB.min_freq="q"</td>
+        <td><span class="pill pill-green">Sí</span></td>
+      </tr>
+      <tr>
+        <td><code>Rule05.is_oos</code></td>
+        <td><span class="pill pill-blue">SÍ</span></td>
+        <td>Seguridad + sesgo NER: OOS→imacec</td>
+        <td>N/A (scope_block)</td>
+        <td>"dólar"→imacec; "presidenta" conf=0.51</td>
+        <td>Mantener. Ampliar BLOCKLIST.</td>
+        <td><span class="pill pill-red">NO</span></td>
+      </tr>
+      <tr>
+        <td><code>Rule06.calendario</code></td>
+        <td><span class="pill pill-blue">SÍ</span></td>
+        <td>Intent gap: no hay head "calendar"</td>
+        <td>N/A (RAG)</td>
+        <td>"próxima fecha" → method conf=0.79</td>
+        <td>Head intent="calendar" en clasificador</td>
+        <td><span class="pill pill-green">Sí</span></td>
+      </tr>
+      <tr>
+        <td><code>Rule07.default_activity</code></td>
+        <td><span class="pill pill-blue">SÍ</span></td>
+        <td>NER gap: actividad implícita en IMACEC</td>
+        <td><code>_build_metric_priority_instruction("contribution")</code></td>
+        <td>"bienes al IMACEC" → activity=["bienes"] ✓</td>
+        <td>Ampliar cobertura NER de actividades IMACEC</td>
+        <td><span class="pill pill-green">Sí</span></td>
+      </tr>
+      <tr>
+        <td><code>Rule09.assign_price</code></td>
+        <td><span class="pill pill-blue">SÍ</span></td>
+        <td>NER gap: "nominal" no produce price_ent</td>
+        <td><code>_build_value_no_rescale_instruction</code> + <code>_build_original_series_force_instruction</code></td>
+        <td>"consumo nominal" → price=["co"] ✓</td>
+        <td>Entrenar NER: "nominal"→price_ent="co"</td>
+        <td><span class="pill pill-yellow">Capas 2-3</span></td>
+      </tr>
+      <tr>
+        <td><code>Rule09.economy_growth_years</code></td>
+        <td><span class="pill pill-blue">SÍ</span></td>
+        <td>Sesgo: "economía+años" → IMACEC mensual</td>
+        <td><code>_build_economy_wording_instruction</code></td>
+        <td>"economía dos últimos años" → imacec+m</td>
+        <td>Ejemplos entrenamiento: economía+año→pib+a</td>
+        <td><span class="pill pill-green">Sí</span></td>
+      </tr>
+      <tr>
+        <td><code>Rule09.pib_real</code></td>
+        <td><span class="pill pill-blue">SÍ</span></td>
+        <td>Sesgo severo: "PIB real" → imacec+m</td>
+        <td><code>historical_floor_instruction</code> (PIB REAL: reportar value)</td>
+        <td>"PIB real dos últimos años" → imacec+m</td>
+        <td>Ejemplos entrenamiento: "PIB real"→pib</td>
+        <td><span class="pill pill-green">Sí</span></td>
+      </tr>
+      <tr>
+        <td><code>Rule10.share</code></td>
+        <td><span class="pill pill-blue">SÍ</span></td>
+        <td>Intent gap: clasificador nunca produce "share"</td>
+        <td><code>_build_metric_priority_instruction("share")</code></td>
+        <td>Todas las variantes → original (gap total)</td>
+        <td>Head calc_mode="share" en clasificador</td>
+        <td><span class="pill pill-green">Sí</span></td>
+      </tr>
+      <tr>
+        <td><code>Rule13.historicos</code></td>
+        <td><span class="pill pill-blue">SÍ</span></td>
+        <td>NER gap: rango abierto "desde X"</td>
+        <td><code>historical_floor_instruction</code> + <code>_build_historical_pib_yoy_instruction</code></td>
+        <td>"desde 1900" → period=["1900-01-01","1900-12-31"]</td>
+        <td>Normalizador: "desde YYYY en adelante"→[YYYY, today]</td>
+        <td><span class="pill pill-yellow">Parcialmente</span></td>
+      </tr>
+      <tr>
+        <td><code>Rule14.pib_regional_yoy</code></td>
+        <td><span class="pill pill-blue">SÍ</span></td>
+        <td>Convención BDE: PIB regional→yoy default</td>
+        <td>Default yoy_pct</td>
+        <td>Sin log directo (región detectada cuando explícita)</td>
+        <td>Convención BDE en entrenamiento del clasificador</td>
+        <td><span class="pill pill-green">Sí</span></td>
+      </tr>
+      <tr>
+        <td><code>RuleGreeting</code></td>
+        <td><span class="pill pill-blue">SÍ</span></td>
+        <td>Bug: regex no cubre saludos compuestos</td>
+        <td>N/A (greeting_node)</td>
+        <td>"hola como estas" → out_of_scope</td>
+        <td>Ampliar GREETING_RE O head intent="greeting"</td>
+        <td><span class="pill pill-green">Sí</span></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- CONCLUSIÓN -->
+<div class="arch-box" style="margin-top:32px; border-left-color:#dc2626">
+  <h2 style="color:#dc2626">Conclusiones y Prioridades de Acción</h2>
+  <br/>
+  <p><b>1. Bugs que corregir ahora (sin reentrenamiento):</b><br/>
+    &nbsp;&nbsp;• <code>Rule01.force_general</code>: condición imposible — la regla nunca activa. Corregir el predicado.<br/>
+    &nbsp;&nbsp;• <code>RuleGreeting</code>: "hola como estas" → <code>out_of_scope</code> (BUG confirmado). Ampliar <code>GREETING_RE</code>.<br/>
+    &nbsp;&nbsp;• <code>ingest.py</code>: agregar guardia para <code>intent="method" + NER(indicator+period)</code> → forzar ruta DATA.
+  </p>
+  <br/>
+  <p><b>2. Gaps del clasificador confirmados con logs reales (requieren reentrenamiento):</b><br/>
+    &nbsp;&nbsp;• <code>share</code>: 100% dependiente de Rule10 (gap total).<br/>
+    &nbsp;&nbsp;• <code>prev_period</code>: "var. mensual/trimestral" → <code>yoy</code> siempre (100% dependiente de Rule02).<br/>
+    &nbsp;&nbsp;• <code>calendar</code>: "próxima fecha de publicación" → <code>method</code> conf=0.79 (dependiente de Rule06 regex).<br/>
+    &nbsp;&nbsp;• "PIB real" → <code>indicator=imacec</code> (sesgo severo, dependiente de Rule09).
+  </p>
+  <br/>
+  <p><b>3. LLM instructions en response.py (cadena de inyección por calc_mode):</b><br/>
+    &nbsp;&nbsp;• <code>contribution</code> → <code>_build_metric_priority_instruction("contribution")</code> = reglas de pp, signo y ranking.<br/>
+    &nbsp;&nbsp;• <code>prev_period</code> → <code>_build_metric_priority_instruction("prev_period")</code> = solo pct, prohibido yoy_pct.<br/>
+    &nbsp;&nbsp;• <code>share</code> → <code>_build_metric_priority_instruction("share")</code> = value en pp, prohibido "%".<br/>
+    &nbsp;&nbsp;• PIB real/históricos → <code>historical_floor_instruction</code> como mensaje de sistema adicional.<br/>
+    &nbsp;&nbsp;• Siempre: <code>_build_recommendation_length_instruction()</code> + instrucciones de período, estacionalidad y nivel.
+  </p>
+  <br/>
+  <p><b>4. Capa de seguridad (mantener siempre):</b><br/>
+    &nbsp;&nbsp;• <code>Rule05</code> BLOCKLIST: todas las OOS producen <code>indicator=imacec</code> en el clasificador. El sesgo es sistémico. Esta regla es la única defensa válida.
+  </p>
+</div>
+
+</main>
+</body>
+</html>

@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Análisis de Tipos de Consulta — PIBot</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "Segoe UI", Arial, sans-serif; font-size: 14px; background: #f4f6f9; color: #222; line-height: 1.55; }
+    header { background: #003566; color: #fff; padding: 28px 40px 20px; }
+    header h1 { font-size: 22px; font-weight: 700; letter-spacing: .4px; }
+    header p  { font-size: 13px; color: #aad4ff; margin-top: 6px; }
+    main { max-width: 1400px; margin: 30px auto; padding: 0 24px 60px; }
+
+    /* resumen arquitectura */
+    .arch-box { background: #fff; border-left: 5px solid #003566; border-radius: 6px;
+                padding: 18px 22px; margin-bottom: 32px; font-size: 13px; }
+    .arch-box h2 { font-size: 15px; margin-bottom: 10px; color: #003566; }
+    .arch-box pre { background: #f0f4fa; border-radius: 4px; padding: 12px 16px;
+                    font-size: 12.5px; overflow-x: auto; white-space: pre; }
+
+    /* fichas por tipo */
+    .card { background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.08);
+            margin-bottom: 28px; overflow: hidden; }
+    .card-header { display: flex; align-items: center; gap: 14px;
+                   padding: 14px 22px; color: #fff; }
+    .card-header .badge { font-size: 11px; font-weight: 700; background: rgba(255,255,255,.22);
+                          border-radius: 12px; padding: 2px 10px; white-space: nowrap; }
+    .card-header h2 { font-size: 15px; font-weight: 700; }
+    .card-body { padding: 16px 22px 20px; }
+
+    /* colores por tipo */
+    .c0  { background: #5a67d8; }  /* metodología */
+    .c1  { background: #2b7a0b; }  /* contribución grupal */
+    .c2  { background: #b45309; }  /* variaciones / desest */
+    .c3  { background: #0369a1; }  /* validación período */
+    .c4  { background: #7c3aed; }  /* crecimiento / pib real */
+    .c9  { background: #0f766e; }  /* precios corrientes */
+    .c5  { background: #b91c1c; }  /* fuera de alcance */
+    .c6  { background: #1d4ed8; }  /* calendario */
+    .c7  { background: #065f46; }  /* contribución individual */
+    .c8  { background: #92400e; }  /* actividades no existentes */
+    .c10 { background: #6d28d9; }  /* participaciones */
+    .c11 { background: #155e75; }  /* variación trimestral */
+    .c12 { background: #1e40af; }  /* pib regional */
+    .c13 { background: #374151; }  /* históricos */
+    .c14 { background: #047857; }  /* saludos */
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; }
+    th { background: #f1f5f9; text-align: left; padding: 8px 12px; font-weight: 600;
+         border-bottom: 2px solid #e2e8f0; color: #334155; width: 200px; }
+    td { padding: 8px 12px; border-bottom: 1px solid #e8edf3; vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f8fafc; }
+
+    .pill { display: inline-block; border-radius: 10px; padding: 2px 9px;
+            font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+    .pill-green  { background: #dcfce7; color: #166534; }
+    .pill-red    { background: #fee2e2; color: #991b1b; }
+    .pill-yellow { background: #fef9c3; color: #854d0e; }
+    .pill-blue   { background: #dbeafe; color: #1e40af; }
+    .pill-gray   { background: #f1f5f9; color: #475569; }
+
+    .pu-list { margin: 0; padding-left: 18px; }
+    .pu-list li { margin-bottom: 3px; color: #374151; font-style: italic; }
+
+    .rule-list { margin: 0; padding-left: 18px; }
+    .rule-list li { margin-bottom: 6px; }
+    code { background: #f0f4fa; border-radius: 3px; padding: 1px 5px;
+           font-family: "Cascadia Code", "Consolas", monospace; font-size: 12px; }
+
+    .bug-box { background: #fff1f2; border-left: 4px solid #dc2626;
+               border-radius: 4px; padding: 8px 12px; margin-top: 8px;
+               font-size: 12.5px; color: #7f1d1d; }
+    .mejora-box { background: #f0fdf4; border-left: 4px solid #16a34a;
+                  border-radius: 4px; padding: 8px 12px; margin-top: 8px;
+                  font-size: 12.5px; color: #14532d; }
+
+    /* tabla resumen final */
+    .summary-section { margin-top: 40px; }
+    .summary-section h2 { font-size: 17px; margin-bottom: 16px; color: #003566;
+                          border-bottom: 2px solid #003566; padding-bottom: 6px; }
+    .summary-table th { width: auto; }
+    .summary-table td:nth-child(4) { max-width: 320px; }
+
+    @media (max-width: 768px) {
+      th { width: 130px; }
+      header { padding: 20px; }
+      main  { padding: 0 12px 40px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Análisis de Proceso Actual por Tipo de Consulta — PIBot</h1>
+  <p>Generado: 4 de mayo de 2026 &nbsp;|&nbsp; Proyecto: bc_pibot &nbsp;|&nbsp; Rama: feature/response</p>
+</header>
+
+<main>
+
+  <!-- ══════════════════════════════════════════════ ARQUITECTURA ══ -->
+  <div class="arch-box">
+    <h2>Arquitectura del Flujo (resumen)</h2>
+    <pre>
+Usuario
+  │
+  ▼
+[ingest.py]  ──►  PREDICT_URL  (NER + intent JointBERT)  http://localhost:8000/predict
+             ──►  INTENT_CLASSIFIER_URL  (head de intent) http://localhost:8100/intent
+  │
+  ├── ¿saludo?           → greeting_node   (respuesta fija)
+  ├── ¿fuera de alcance? → scope_block     (respuesta fija)
+  ├── ¿calendario?       → RAG             (link de publicación)
+  ├── ¿metodología?      → RAG             (documentos técnicos)
+  └── datos              → apply_business_rules(ResolvedEntities)
+                                    │
+                               catalog lookup  →  timeseries JSON
+                                    │
+                               response.py  →  LLM (OpenAI function calling, streaming)
+    </pre>
+  </div>
+
+  <!-- ══════════════════════════════════════════════ TIPO 0 ══ -->
+  <div class="card">
+    <div class="card-header c0">
+      <span class="badge">TIPO 0</span>
+      <h2>Consultas Metodológicas</h2>
+    </div>
+    <div class="card-body">
+      <table>
+        <tr><th>PU — Ejemplos</th>
+          <td><ul class="pu-list">
+            <li>cómo se calcula el pib</li>
+            <li>qué es el ajuste estacional</li>
+            <li>cuáles son los componentes del pib del gasto</li>
+          </ul></td></tr>
+        <tr><th>PREDICT_URL outputs</th><td><code>intent = "methodology"</code> → normalizado a <code>"method"</code></td></tr>
+        <tr><th>INTENT_CLASSIFIER head</th><td><code>intent = "methodology"</code></td></tr>
+        <tr><th>Reglas post_classifier</th><td><span class="pill pill-gray">Ninguna</span> — se rutea antes de <code>apply_business_rules</code></td></tr>
+        <tr><th>Detalle reglas</th><td>Ruteo directo al nodo RAG de documentos metodológicos. La regla CAT00 no existe en el pipeline de mutación de entidades.</td></tr>
+        <tr><th>Instrucción LLM</th><td>N/A (responde el RAG con documentos)</td></tr>
+        <tr><th>calc_mode resultado</th><td><span class="pill pill-gray">N/A</span></td></tr>
+        <tr><th>Frecuencia resultado</th><td><span class="pill pill-gray">N/A</span></td></tr>
+        <tr><th>Eliminable con mejor modelo</th><td><span class="pill pill-green">N/A</span></td></tr>
+      </table>
+      <div class="mejora-box">💡 <b>Mejora posible:</b> El <code>SYSTEM_PROMPT</code> en response.py contiene una sección "PREGUNTAS METODOLÓGICAS" como fallback, lo que indica que a veces el LLM recibe preguntas metodológicas por mal enrutamiento. Si el clasificador es consistente (&gt; 0.9 confidence), ese fallback es redundante.</div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════ TIPO 1 ══ -->
+  <div class="card">
+    <div class="card-header c1">
+      <span class="badge">TIPO 1</span>
+      <h2>Contribución Grupal (aumentó o disminuyó)</h2>
+    </div>
+    <div class="card-body">
+      <table>
+        <tr><th>PU — Ejemplos</th>
+          <td><ul class="pu-list">
+            <li>qué actividad afectó al aumento del pib el primer trimestre del 2020</li>
+            <li>qué actividad afectó al aumento del imacec</li>
+            <li>cuánto contribuyó la demanda interna al pib</li>
+          </ul></td></tr>
+        <tr><th>PREDICT_URL outputs</th><td><code>calc_mode = "contribution"</code>, <code>indicator = "pib"|"imacec"</code>, <code>investment = "specific"|"general"</code></td></tr>
+        <tr><th>INTENT_CLASSIFIER head</th><td><code>intent = "contribution"</code></td></tr>
+        <tr><th>Reglas post_classifier</th><td>
+          <span class="pill pill-blue">Rule01_ContribucionGrupal.force_general</span><br/>
+          <span class="pill pill-blue">Rule01_ContribucionGrupal.demanda_interna</span>
+        </td></tr>
+        <tr><th>Detalle reglas</th><td>
+          <ul class="rule-list">
+            <li><b>force_general:</b> Si <code>calc_mode=="contribution"</code> + <code>investment_cls=="specific"</code> sin region/investment → <code>activity_cls_resolved="general"</code></li>
+            <li><b>demanda_interna:</b> Si <code>investment_ent=="demanda_interna"</code> → <code>investment_cls="general"</code> para abrir ranking completo</li>
+          </ul>
+        </td></tr>
+        <tr><th>Instrucción LLM</th><td><code>_build_metric_priority_instruction("contribution")</code> → 12 reglas estrictas: plantilla <code>[Actividad] <b>±X,Xpp</b></code>, <code>rank_series</code> obligatorio, separar positivos/negativos</td></tr>
+        <tr><th>calc_mode resultado</th><td><span class="pill pill-blue">contribution</span></td></tr>
+        <tr><th>Frecuencia resultado</th><td>T — trimestral (PIB) &nbsp;|&nbsp; M — mensual (IMACEC)</td></tr>
+        <tr><th>Eliminable con mejor modelo</th><td><span class="pill pill-yellow">Parcialmente</span> — <code>demanda_interna</code> eliminable si NER mejora; <code>force_general</code> actualmente inoperante (bug)</td></tr>
+      </table>
+      <div class="bug-box">🐛 <b>Bug identificado:</b> <code>_matches_force_general</code> tiene condición lógicamente imposible: <code>investment_cls == "specific"</code> AND <code>investment_cls in (None, "none")</code>. Estas dos condiciones son mutuamente excluyentes → la regla <b>nunca se activa</b>.</div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════ TIPO 2 ══ -->
+  <div class="card">
+    <div class="card-header c2">
+      <span class="badge">TIPO 2</span>
+      <h2>Variaciones de Frecuencia / Valores Desestacionalizados</h2>
+    </div>
+    <div class="card-body">
+      <table>
+        <tr><th>PU — Ejemplos</th>
+          <td><ul class="pu-list">
+            <li>cual es la variación trimestral del PIB</li>
+            <li>Cual es el valor desestacionalizado del IMACEC</li>
+          </ul></td></tr>
+        <tr><th>PREDICT_URL outputs</th><td><code>seasonality = "sa"</code>, <code>calc_mode = "" / "original"</code>, <code>indicator = "pib"|"imacec"</code></td></tr>
+        <tr><th>INTENT_CLASSIFIER head</th><td><code>intent = "variation"</code> o <code>"value"</code> (ambiguo según redacción)</td></tr>
+        <tr><th>Reglas post_classifier</th><td>
+          <span class="pill pill-blue">Rule02_VariacionesDesest.natural_freq_is_prev_period</span><br/>
+          <span class="pill pill-blue">Rule02_VariacionesDesest.sa_implies_prev_period</span>
+        </td></tr>
+        <tr><th>Detalle reglas</th><td>
+          <ul class="rule-list">
+            <li><b>natural_freq:</b> Regex <code>VAR_MENSUAL_RE</code> / <code>VAR_TRIMESTRAL_RE</code> sobre texto + indicador correcto + sin keywords YoY → fuerza <code>calc_mode_cls="prev_period"</code> + <code>seasonality_ent="sa"</code></li>
+            <li><b>sa_implies_prev_period:</b> Si <code>seasonality_ent=="sa"</code> y <code>calc_mode in ("","original")</code> → <code>calc_mode_cls="prev_period"</code></li>
+            <li><b>Ruteo especial:</b> <code>_is_value_desestacionalizado()</code> en ingest.py (regex <code>VALUE_DESEST_RE</code>) fuerza ruteo a DATA aunque el texto parezca de nivel</li>
+          </ul>
+        </td></tr>
+        <tr><th>Instrucción LLM</th><td><code>_build_metric_priority_instruction("prev_period")</code> → reportar <code>pct</code>, prohibido <code>yoy_pct</code> y niveles, prohibido mencionar frecuencia de publicación</td></tr>
+        <tr><th>calc_mode resultado</th><td><span class="pill pill-blue">prev_period</span></td></tr>
+        <tr><th>Frecuencia resultado</th><td>M — mensual (IMACEC) &nbsp;|&nbsp; Q — trimestral (PIB)</td></tr>
+        <tr><th>Eliminable con mejor modelo</th><td><span class="pill pill-green">Sí</span> — ambas eliminables si clasificador aprende a devolver <code>calc_mode="prev_period"</code> para "variación mensual/trimestral"</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════ TIPO 3 ══ -->
+  <div class="card">
+    <div class="card-header c3">
+      <span class="badge">TIPO 3</span>
+      <h2>Validación Período Correcto del Indicador</h2>
+    </div>
+    <div class="card-body">
+      <table>
+        <tr><th>PU — Ejemplos</th>
+          <td><ul class="pu-list">
+            <li>Cuál fue el imacec de Marzo</li>
+            <li>cual es el pib de mayo del 2026</li>
+            <li>cual es el imacec del ultimo mes</li>
+            <li>cual es el valor del pib del ultimo trimestre</li>
+            <li>cual es el pib del primer trimestre del 2023</li>
+            <li>cual es el valor del pib del 2023</li>
+          </ul></td></tr>
+        <tr><th>PREDICT_URL outputs</th><td><code>indicator</code>, <code>period</code>, <code>frequency</code> extraídos por NER</td></tr>
+        <tr><th>INTENT_CLASSIFIER head</th><td><code>intent = "value"</code></td></tr>
+        <tr><th>Reglas post_classifier</th><td>
+          <span class="pill pill-blue">Rule03_ValidacionPeriodoIMACEC.force_monthly</span><br/>
+          <span class="pill pill-blue">Rule04_CrecimientoPIB.redirect_pib_monthly_to_quarterly</span>
+        </td></tr>
+        <tr><th>Detalle reglas</th><td>
+          <ul class="rule-list">
+            <li><b>Rule03:</b> Si <code>indicator_ent=="imacec"</code> y <code>frequency_ent != "m"</code> → fuerza <code>frequency_ent="m"</code>. Compensa que el NER devuelve frecuencia trimestral para IMACEC</li>
+            <li><b>Rule04:</b> Si <code>indicator_ent=="pib"</code> y <code>frequency_ent=="m"</code> → redirige a <code>frequency_ent="q"</code>, borra periodo, <code>req_form_cls="latest"</code></li>
+          </ul>
+        </td></tr>
+        <tr><th>Instrucción LLM</th><td>Regla general YoY. <code>SYSTEM_PROMPT</code> incluye <b>REGLA ESTRICTA PIB ANUAL</b> (verificar 4 trimestres antes de reportar dato anual) + <b>DATOS NO DISPONIBLES FALLBACK</b> (informar período no publicado y entregar último dato disponible)</td></tr>
+        <tr><th>calc_mode resultado</th><td><span class="pill pill-blue">yoy (default)</span></td></tr>
+        <tr><th>Frecuencia resultado</th><td>M — mensual (IMACEC) &nbsp;|&nbsp; Q/A — trimestral/anual (PIB)</td></tr>
+        <tr><th>Eliminable con mejor modelo</th><td><span class="pill pill-green">Sí</span> — ambas eliminables si el NER conoce las frecuencias de publicación de cada indicador</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════ TIPO 4 ══ -->
+  <div class="card">
+    <div class="card-header c4">
+      <span class="badge">TIPO 4</span>
+      <h2>Crecimiento / PIB Real</h2>
+    </div>
+    <div class="card-body">
+      <table>
+        <tr><th>PU — Ejemplos</th>
+          <td><ul class="pu-list">
+            <li>cuánto creció la economía en los dos últimos meses</li>
+            <li>Cual es el pib real de los dos últimos años</li>
+            <li>cuánto creció la economía en los últimos 5 años</li>
+          </ul></td></tr>
+        <tr><th>PREDICT_URL outputs</th><td><code>indicator = "imacec"</code> (sesgo del modelo) o <code>"pib"</code>, <code>frequency = "m"|"a"|"q"</code>, <code>calc_mode = "original"</code></td></tr>
+        <tr><th>INTENT_CLASSIFIER head</th><td><code>intent = "variation"</code></td></tr>
+        <tr><th>Reglas post_classifier</th><td>
+          <span class="pill pill-blue">Rule09_NivelesNominales.assign_price</span> (rama <code>ECONOMY_GROWTH_RE + YEAR_WORD_RE</code>)<br/>
+          <span class="pill pill-blue">Rule09_NivelesNominales.assign_price</span> (rama <code>PIB_REAL_RE</code>)
+        </td></tr>
+        <tr><th>Detalle reglas</th><td>
+          <ul class="rule-list">
+            <li><b>ECONOMY_GROWTH + YEARS:</b> Regex doble "creció/variación/economía" + "años" → fuerza <code>indicator_ent="pib"</code> + <code>frequency_ent="a"</code></li>
+            <li><b>PIB_REAL_RE:</b> Texto "pib real" + <code>indicator_ent=="imacec"</code> → corrige a <code>indicator_ent="pib"</code>, activa <code>calc_mode_cls="original"</code>, añade <code>"(nivel en pesos corrientes)"</code> a la pregunta</li>
+          </ul>
+        </td></tr>
+        <tr><th>Instrucción LLM</th><td>Cuando <code>PIB_REAL_RE</code> activa: inyecta <code>historical_floor_instruction</code> → <b>"REGLA DE SALIDA (PIB REAL): reportar <code>value</code> (nivel), NO usar <code>pct</code>/<code>yoy_pct</code>"</b></td></tr>
+        <tr><th>calc_mode resultado</th><td><span class="pill pill-blue">yoy</span> (crecimiento) &nbsp;|&nbsp; <span class="pill pill-blue">original</span> (PIB real nivel)</td></tr>
+        <tr><th>Frecuencia resultado</th><td>A (años) &nbsp;|&nbsp; Q (trimestral) &nbsp;|&nbsp; M (meses) según consulta</td></tr>
+        <tr><th>Eliminable con mejor modelo</th><td><span class="pill pill-green">Sí</span> — eliminables si el clasificador entrena con ejemplos "crecimiento economía en años → PIB anual"</td></tr>
+      </table>
+      <div class="mejora-box">💡 <b>Falencia del clasificador:</b> El modelo tiende a devolver <code>indicator="imacec"</code> para "economía" porque IMACEC es el proxy mensual de la actividad. Las reglas de Rule09 compensan este sesgo para distinguir consultas anuales vs mensuales.</div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════ TIPO 9 ══ -->
+  <div class="card">
+    <div class="card-header c9">
+      <span class="badge">TIPO 9</span>
+      <h2>Precios Corrientes / Niveles</h2>
+    </div>
+    <div class="card-body">
+      <table>
+        <tr><th>PU — Ejemplos</th>
+          <td><ul class="pu-list">
+            <li>cuánto fueron las exportaciones nominales en el último trimestre</li>
+            <li>Cual es el nivel del PIB en el segundo trimestre del 2024</li>
+            <li>Cuánto fue el consumo de hogares nominal en el último trimestre</li>
+          </ul></td></tr>
+        <tr><th>PREDICT_URL outputs</th><td><code>price = "co"|"enc"</code>, <code>indicator = "pib"</code>, <code>investment = "specific"</code></td></tr>
+        <tr><th>INTENT_CLASSIFIER head</th><td><code>intent = "value"</code></td></tr>
+        <tr><th>Reglas post_classifier</th><td><span class="pill pill-blue">Rule09_NivelesNominales.assign_price</span> (capas 1 → 4)</td></tr>
+        <tr><th>Detalle reglas</th><td>
+          <ul class="rule-list">
+            <li><b>Capa 1:</b> Si <code>price_ent in ("co","enc")</code> → respetar el valor del NER</li>
+            <li><b>Capa 2:</b> Si texto contiene "nominal" / "precios corrientes" → <code>price="co"</code></li>
+            <li><b>Capa 3:</b> Si texto contiene "nivel de X" (regex) → <code>price="co"</code></li>
+            <li><b>Capa 4 (fallback):</b> → <code>price="enc"</code></li>
+          </ul>
+          <b>_is_level_only_query:</b> True cuando: <code>price_ent=="co"</code> / "nominal" en texto / <code>intent_cls=="value"</code> con <code>calc_mode</code> neutro / regex "nivel de/del X"
+        </td></tr>
+        <tr><th>Instrucción LLM</th><td><code>_build_metric_priority_instruction("original")</code> → reportar <code>value</code> con unidad</td></tr>
+        <tr><th>calc_mode resultado</th><td><span class="pill pill-blue">original</span></td></tr>
+        <tr><th>Frecuencia resultado</th><td>Q — trimestral (PIB) &nbsp;|&nbsp; M — mensual (IMACEC)</td></tr>
+        <tr><th>Eliminable con mejor modelo</th><td><span class="pill pill-yellow">Parcialmente</span> — capas 2-3 eliminables si NER detecta <code>price_ent</code> con alta confianza</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════ TIPO 5 ══ -->
+  <div class="card">
+    <div class="card-header c5">
+      <span class="badge">TIPO 5</span>
+      <h2>Preguntas Fuera del Alcance</h2>
+    </div>
+    <div class="card-body">
+      <table>
+        <tr><th>PU — Ejemplos</th>
+          <td><ul class="pu-list">
+            <li>quién es la presidenta del banco central</li>
+            <li>Cual es el valor del dólar observado</li>
+            <li>Cual es el valor de tipos de cambio nominal</li>
+          </ul></td></tr>
+        <tr><th>PREDICT_URL outputs</th><td><code>indicator = ""|"imacec"</code> (sesgo por defecto del modelo), NER puede devolver <code>person</code> / <code>organization</code></td></tr>
+        <tr><th>INTENT_CLASSIFIER head</th><td><code>intent = "metadata"|"value"</code></td></tr>
+        <tr><th>Reglas post_classifier</th><td><span class="pill pill-blue">Rule05_FueraDeAlcance.is_out_of_scope</span> <span class="pill pill-gray">(predicado de RUTEO, no muta entidades)</span></td></tr>
+        <tr><th>Detalle reglas</th><td>
+          Orden de evaluación:
+          <ol class="rule-list" style="padding-left:20px">
+            <li>¿Es calendario? → NO bloquear</li>
+            <li><b>BLOCKLIST</b> (dólar/paridades/tpm/IPC/presidenta/quién es/tipos de cambio) → BLOQUEAR (tiene precedencia)</li>
+            <li>NER detectó <code>activity</code>/<code>region</code>/<code>investment</code> → NO bloquear</li>
+            <li>NER detectó <code>person</code>/<code>org</code>/<code>loc</code> → BLOQUEAR</li>
+            <li>ALLOWLIST (<code>pib/imacec/economía</code>) → NO bloquear</li>
+            <li><code>indicator not in {pib, imacec}</code> → BLOQUEAR</li>
+          </ol>
+        </td></tr>
+        <tr><th>Instrucción LLM</th><td>N/A — rutea a <code>scope_block</code> node (respuesta fija)</td></tr>
+        <tr><th>calc_mode resultado</th><td><span class="pill pill-gray">N/A</span></td></tr>
+        <tr><th>Frecuencia resultado</th><td><span class="pill pill-gray">N/A</span></td></tr>
+        <tr><th>Eliminable con mejor modelo</th><td><span class="pill pill-red">No (capa de seguridad)</span> — la blocklist léxica neutraliza el sesgo del modelo de etiquetar OOS como IMACEC. Debe mantenerse aunque mejore el clasificador</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════ TIPO 6 ══ -->
+  <div class="card">
+    <div class="card-header c6">
+      <span class="badge">TIPO 6</span>
+      <h2>Calendario de Publicación</h2>
+    </div>
+    <div class="card-body">
+      <table>
+        <tr><th>PU — Ejemplos</th>
+          <td><ul class="pu-list">
+            <li>cual es la próxima fecha de publicación del IMACEC</li>
+            <li>cuándo se publica el próximo pib regional</li>
+          </ul></td></tr>
+        <tr><th>PREDICT_URL outputs</th><td>Cualquier resultado (el routing ocurre antes de usarlo)</td></tr>
+        <tr><th>INTENT_CLASSIFIER head</th><td>Cualquier resultado (no hay head <code>calendar</code>)</td></tr>
+        <tr><th>Reglas post_classifier</th><td><span class="pill pill-blue">Rule06_Calendario.is_calendar_intent</span> <span class="pill pill-gray">(predicado de RUTEO puro)</span></td></tr>
+        <tr><th>Detalle reglas</th><td>
+          Regex <code>INTENT_RE</code>: <code>calendario</code> / <code>cuándo se publica</code> / <code>cuándo sale</code> / <code>próxima publicación</code> / <code>fecha.*publicación</code> / <code>próximo (imacec|pib|...)</code><br/>
+          → Fuerza <code>intent="method"</code> → RAG de calendario con link oficial
+        </td></tr>
+        <tr><th>Instrucción LLM</th><td>N/A — responde el RAG con link oficial de publicación</td></tr>
+        <tr><th>calc_mode resultado</th><td><span class="pill pill-gray">N/A</span></td></tr>
+        <tr><th>Frecuencia resultado</th><td><span class="pill pill-gray">N/A</span></td></tr>
+        <tr><th>Eliminable con mejor modelo</th><td><span class="pill pill-green">Sí</span> — si el clasificador tiene head <code>intent="calendar"</code></td></tr>
+      </table>
+      <div class="mejora-box">💡 <b>Gap de cobertura regex:</b> No cubre variantes como "próxima nota de cuentas nacionales" o anglicismos ("release del pib").</div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════ TIPO 7 ══ -->
+  <div class="card">
+    <div class="card-header c7">
+      <span class="badge">TIPO 7</span>
+      <h2>Contribución Individual</h2>
+    </div>
+    <div class="card-body">
+      <table>
+        <tr><th>PU — Ejemplos</th>
+          <td><ul class="pu-list">
+            <li>cuánto contribuyó la producción de bienes al imacec</li>
+          </ul></td></tr>
+        <tr><th>PREDICT_URL outputs</th><td><code>indicator = "imacec"</code>, <code>activity = "bienes"</code>, <code>calc_mode = "contribution"</code></td></tr>
+        <tr><th>INTENT_CLASSIFIER head</th><td><code>intent = "contribution"</code></td></tr>
+        <tr><th>Reglas post_classifier</th><td><span class="pill pill-blue">Rule07_ContribucionIndividual.default_activity</span></td></tr>
+        <tr><th>Detalle reglas</th><td>Si <code>indicator_ent=="imacec"</code> y <code>activity_ent is None</code> → asigna <code>activity_ent="imacec"</code> (serie agregada). Compensa que el NER a veces no detecta la actividad cuando se pregunta por el total</td></tr>
+        <tr><th>Instrucción LLM</th><td><code>_build_metric_priority_instruction("contribution")</code> → plantilla <code>[Actividad] <b>±X,Xpp</b></code></td></tr>
+        <tr><th>calc_mode resultado</th><td><span class="pill pill-blue">contribution</span></td></tr>
+        <tr><th>Frecuencia resultado</th><td>M — mensual (IMACEC)</td></tr>
+        <tr><th>Eliminable con mejor modelo</th><td><span class="pill pill-green">Sí</span> — si NER detecta actividades de IMACEC con alta cobertura</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════ TIPO 8 ══ -->
+  <div class="card">
+    <div class="card-header c8">
+      <span class="badge">TIPO 8</span>
+      <h2>Actividades No Existentes en el Cuadro</h2>
+    </div>
+    <div class="card-body">
+      <table>
+        <tr><th>PU — Ejemplos</th>
+          <td><ul class="pu-list">
+            <li>cuánto contribuyó la producción de bienes al pib</li>
+            <li>cuánto contribuyó la pesca al pib</li>
+            <li>¿Qué actividad creció más al último trimestre?</li>
+          </ul></td></tr>
+        <tr><th>PREDICT_URL outputs</th><td><code>indicator = "pib"</code>, <code>activity = "bienes"|"pesca"</code>, <code>calc_mode = "contribution"|"original"</code></td></tr>
+        <tr><th>INTENT_CLASSIFIER head</th><td><code>intent = "contribution"|"rank"</code></td></tr>
+        <tr><th>Reglas post_classifier</th><td><span class="pill pill-gray">Ninguna específica</span> — la detección ocurre en el catalog lookup</td></tr>
+        <tr><th>Detalle reglas</th><td>El catálogo no encuentra la <code>activity</code> en el cuadro PIB → <code>handle_no_series()</code> en response.py → <code>build_no_series_message()</code></td></tr>
+        <tr><th>Instrucción LLM</th><td>N/A → mensaje fijo: <i>"No encontré datos de PIB para la actividad X en la BDE del Banco Central."</i></td></tr>
+        <tr><th>calc_mode resultado</th><td><span class="pill pill-gray">N/A (sin serie)</span></td></tr>
+        <tr><th>Frecuencia resultado</th><td><span class="pill pill-gray">N/A</span></td></tr>
+        <tr><th>Eliminable con mejor modelo</th><td><span class="pill pill-yellow">Mejora de catálogo</span> — el catálogo podría sugerir el cuadro correcto (ej. "bienes existe en IMACEC, no en PIB")</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════ TIPO 10 ══ -->
+  <div class="card">
+    <div class="card-header c10">
+      <span class="badge">TIPO 10</span>
+      <h2>Participaciones</h2>
+    </div>
+    <div class="card-body">
+      <table>
+        <tr><th>PU — Ejemplos</th>
+          <td><ul class="pu-list">
+            <li>Cuánto pesa el consumo en el pib</li>
+            <li>Cuánto pesa la inversión en Chile</li>
+          </ul></td></tr>
+        <tr><th>PREDICT_URL outputs</th><td><code>indicator = "pib"</code>, <code>investment = "specific"|"general"</code>, <code>calc_mode = ""|"original"</code></td></tr>
+        <tr><th>INTENT_CLASSIFIER head</th><td><code>intent = "share"</code> o <code>"value"</code> (ambiguo)</td></tr>
+        <tr><th>Reglas post_classifier</th><td><span class="pill pill-blue">Rule10_Participaciones.detect_share_intent</span></td></tr>
+        <tr><th>Detalle reglas</th><td>
+          Regex <code>INTENT_RE</code>: <code>cuánto pesa</code> / <code>qué porcentaje</code> / <code>participación</code> / <code>peso del|en</code><br/>
+          + <code>indicator in ("pib","")</code> + presencia de <code>investment_cls</code> o <code>investment_ent</code><br/>
+          → Fuerza <code>calc_mode="share"</code> + <code>frequency="a"</code> + <code>price="co"</code> + <code>investment_cls="general"</code> si era <code>"none"</code>
+        </td></tr>
+        <tr><th>Instrucción LLM</th><td><code>_build_metric_priority_instruction("share")</code> → reportar <code>value</code> en <code>pp</code>, plantilla <i>"representó <b>X,X pp</b> del PIB"</i>, prohibido <code>yoy_pct</code></td></tr>
+        <tr><th>calc_mode resultado</th><td><span class="pill pill-blue">share</span></td></tr>
+        <tr><th>Frecuencia resultado</th><td>A — anual (forzado por Rule10)</td></tr>
+        <tr><th>Eliminable con mejor modelo</th><td><span class="pill pill-green">Sí</span> — si head <code>intent="share"</code> del clasificador es robusto (confidence &gt; 0.9)</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════ TIPO 11 ══ -->
+  <div class="card">
+    <div class="card-header c11">
+      <span class="badge">TIPO 11</span>
+      <h2>Actividades de Variación Trimestral (combinación Tipo 1 + Tipo 2)</h2>
+    </div>
+    <div class="card-body">
+      <table>
+        <tr><th>PU — Ejemplos</th><td><i>(Sin PU propio definido — derivado de Tipo 1 + Tipo 2)</i></td></tr>
+        <tr><th>PREDICT_URL outputs</th><td><code>seasonality = "sa"</code>, <code>calc_mode = "contribution"</code></td></tr>
+        <tr><th>INTENT_CLASSIFIER head</th><td><code>intent = "contribution"</code></td></tr>
+        <tr><th>Reglas post_classifier</th><td>
+          <span class="pill pill-blue">Rule02_VariacionesDesest</span> + <span class="pill pill-blue">Rule01_ContribucionGrupal</span> en secuencia
+        </td></tr>
+        <tr><th>Detalle reglas</th><td>Rule02 NO activa si <code>calc_mode=="contribution"</code> (guard explícita en el predicado). Se aplica Rule01 para ranking de contribuciones desestacionalizadas con series SA.</td></tr>
+        <tr><th>Instrucción LLM</th><td><code>contribution</code> → plantilla <code>±X,Xpp</code> con series desestacionalizadas</td></tr>
+        <tr><th>calc_mode resultado</th><td><span class="pill pill-blue">contribution</span></td></tr>
+        <tr><th>Frecuencia resultado</th><td>Q — trimestral (PIB SA) &nbsp;|&nbsp; M — mensual (IMACEC SA)</td></tr>
+        <tr><th>Eliminable con mejor modelo</th><td><span class="pill pill-yellow">Parcialmente</span> — depende de mejoras en Rule01 y Rule02</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════ TIPO 12 ══ -->
+  <div class="card">
+    <div class="card-header c12">
+      <span class="badge">TIPO 12</span>
+      <h2>PIB Regional</h2>
+    </div>
+    <div class="card-body">
+      <table>
+        <tr><th>PU — Ejemplos</th>
+          <td><ul class="pu-list">
+            <li>qué región ha tenido el crecimiento más alto del pib en el último año</li>
+            <li>cual fue la región que menos creció el año 2025</li>
+            <li>cual es el pib de la región de Santiago</li>
+            <li>cúal es el pib de la región de la antártica</li>
+          </ul></td></tr>
+        <tr><th>PREDICT_URL outputs</th><td><code>indicator = "pib"</code>, <code>region = "specific"</code>, <code>region_ent = "santiago"|"antartica"</code>, <code>calc_mode = "original"</code></td></tr>
+        <tr><th>INTENT_CLASSIFIER head</th><td><code>intent = "value"|"rank"|"extrema"</code></td></tr>
+        <tr><th>Reglas post_classifier</th><td><span class="pill pill-blue">Rule14_PibRegionalDefaultYoY.force_yoy</span></td></tr>
+        <tr><th>Detalle reglas</th><td>
+          Condiciones (todas en AND):
+          <ul class="rule-list">
+            <li><code>indicator_ent == "pib"</code></li>
+            <li><code>region_cls == "specific"</code></li>
+            <li><code>region_ent</code> no vacío</li>
+            <li><code>calc_mode_cls == "original"</code></li>
+            <li><code>req_form_cls == "point"</code></li>
+            <li>Sin palabras de nivel ("monto/nivel/valor en pesos/miles de millones") en la pregunta</li>
+          </ul>
+          → Fuerza <code>calc_mode_cls="yoy"</code> (convención BDE: PIB regional se publica como YoY)
+        </td></tr>
+        <tr><th>Instrucción LLM</th><td><code>_build_metric_priority_instruction("yoy")</code> → reportar <code>yoy_pct</code></td></tr>
+        <tr><th>calc_mode resultado</th><td><span class="pill pill-blue">yoy</span> (forzado por convención BDE)</td></tr>
+        <tr><th>Frecuencia resultado</th><td>A — anual (publicación BDE regional)</td></tr>
+        <tr><th>Eliminable con mejor modelo</th><td><span class="pill pill-green">Sí</span> — si el clasificador aprende la convención BDE (PIB regional = YoY por defecto)</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════ TIPO 13 ══ -->
+  <div class="card">
+    <div class="card-header c13">
+      <span class="badge">TIPO 13</span>
+      <h2>Consultas de Datos Históricos</h2>
+    </div>
+    <div class="card-body">
+      <table>
+        <tr><th>PU — Ejemplos</th>
+          <td><ul class="pu-list">
+            <li>cual es el pib de chile desde 1900 en adelante</li>
+            <li>cual es el valor del pib de 1961 a 1970</li>
+            <li>entregame los valores del imacec de 1997</li>
+          </ul></td></tr>
+        <tr><th>PREDICT_URL outputs</th><td><code>indicator</code>, <code>period = ["1900","..."] | ["1961","1970"]</code></td></tr>
+        <tr><th>INTENT_CLASSIFIER head</th><td><code>intent = "value"|"variation"</code></td></tr>
+        <tr><th>Reglas post_classifier</th><td><span class="pill pill-blue">Rule13_Historicos.apply_floor</span></td></tr>
+        <tr><th>Detalle reglas</th><td>
+          <ul class="rule-list">
+            <li><b>IMACEC:</b> piso 1996 → reescribe <code>period_ent</code> al piso + inyecta <code>historical_floor_instruction</code>: <i>"Solo hay datos empalmados de IMACEC desde 1996"</i></li>
+            <li><b>PIB:</b> piso 1960 → ídem con <i>"hay datos empalmados desde 1960"</i></li>
+            <li>Si año &lt; 1996 → <code>hist=1</code> (flag de serie histórica)</li>
+          </ul>
+        </td></tr>
+        <tr><th>Instrucción LLM</th><td>Cuando activa: <code>historical_floor_instruction</code> se inyecta como mensaje de sistema adicional explicando el límite histórico y el año de inicio disponible</td></tr>
+        <tr><th>calc_mode resultado</th><td><span class="pill pill-gray">Depende del clasificador</span></td></tr>
+        <tr><th>Frecuencia resultado</th><td>A — anual (histórico)</td></tr>
+        <tr><th>Eliminable con mejor modelo</th><td><span class="pill pill-yellow">Parcialmente</span> — podría migrar a metadato <code>min_year</code> por serie en el catálogo, sin regla de negocio</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════ TIPO 14 ══ -->
+  <div class="card">
+    <div class="card-header c14">
+      <span class="badge">TIPO 14</span>
+      <h2>Saludos</h2>
+    </div>
+    <div class="card-body">
+      <table>
+        <tr><th>PU — Ejemplos</th>
+          <td><ul class="pu-list">
+            <li>Hola Me llamo Hernan</li>
+          </ul></td></tr>
+        <tr><th>PREDICT_URL outputs</th><td>Cualquier resultado (el routing ocurre antes)</td></tr>
+        <tr><th>INTENT_CLASSIFIER head</th><td>Puede devolver <code>"methodology"</code>/<code>"value"</code> — sin head de saludo</td></tr>
+        <tr><th>Reglas post_classifier</th><td><span class="pill pill-blue">RuleGreeting.is_greeting</span> <span class="pill pill-gray">(predicado de RUTEO puro)</span></td></tr>
+        <tr><th>Detalle reglas</th><td>
+          Regex <code>GREETING_RE</code>: <code>^\s*(?:(hola|buenos días|cómo estás|hey|hi|...)\s*[,.!?]*\s*)+$</code><br/>
+          Valida que <b>toda la frase</b> se componga únicamente de tokens de saludo. → <code>greeting_node</code> (respuesta fija)
+        </td></tr>
+        <tr><th>Instrucción LLM</th><td>N/A — respuesta fija del <code>greeting_node</code></td></tr>
+        <tr><th>calc_mode resultado</th><td><span class="pill pill-gray">N/A</span></td></tr>
+        <tr><th>Frecuencia resultado</th><td><span class="pill pill-gray">N/A</span></td></tr>
+        <tr><th>Eliminable con mejor modelo</th><td><span class="pill pill-green">Sí</span> — si el clasificador tiene head <code>intent="greeting"</code></td></tr>
+      </table>
+      <div class="bug-box">🐛 <b>Bug identificado:</b> El regex es <code>^(token)+$</code> — solo matchea frases <b>puramente</b> de saludo. "Hola me llamo Hernan" tiene contenido adicional ("me llamo Hernan") y <b>no matchea</b>, pudiendo caer a OOS. Se requiere ampliar el regex para detectar saludo + presentación personal.</div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════ TABLA RESUMEN ══ -->
+  <div class="summary-section">
+    <h2>Mapa de Reglas: Origen del Problema vs Tipo de Regla</h2>
+    <table class="summary-table">
+      <thead>
+        <tr>
+          <th>Regla</th>
+          <th>Tipo</th>
+          <th>Origen del problema que compensa</th>
+          <th>¿Eliminable con mejor clasificador?</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><code>Rule01 force_general</code></td><td>Bug activo</td><td>Condición imposible — nunca se activa</td><td><span class="pill pill-red">Bug: corregir primero</span></td></tr>
+        <tr><td><code>Rule01 demanda_interna</code></td><td>NER gap</td><td>NER no mapea <code>demanda_interna</code> a <code>investment_cls=general</code></td><td><span class="pill pill-green">Sí, si NER mejora</span></td></tr>
+        <tr><td><code>Rule02 natural_freq</code></td><td>NER gap</td><td>Clasificador no devuelve <code>prev_period</code> para variación mensual/trimestral</td><td><span class="pill pill-green">Sí, si clasificador aprende</span></td></tr>
+        <tr><td><code>Rule02 sa_implies_prev_period</code></td><td>Inferencia semántica</td><td><code>seasonality=sa</code> implica <code>prev_period</code> por convención BDE</td><td><span class="pill pill-green">Sí, con head explícito</span></td></tr>
+        <tr><td><code>Rule03 imacec_force_monthly</code></td><td>Conocimiento dominio</td><td>NER no sabe que IMACEC es solo mensual</td><td><span class="pill pill-green">Sí, con post-process dominio</span></td></tr>
+        <tr><td><code>Rule04 pib_monthly→quarterly</code></td><td>Conocimiento dominio</td><td>NER no sabe que PIB no tiene frecuencia mensual</td><td><span class="pill pill-green">Sí, con post-process dominio</span></td></tr>
+        <tr><td><code>Rule05 is_out_of_scope</code></td><td>Seguridad + NER bias</td><td>Clasificador asigna <code>imacec</code> por defecto a textos OOS</td><td><span class="pill pill-red">No — mantener como capa de seguridad</span></td></tr>
+        <tr><td><code>Rule06 calendario</code></td><td>Intent gap</td><td>Clasificador no tiene head <code>calendar</code></td><td><span class="pill pill-green">Sí, con nuevo head</span></td></tr>
+        <tr><td><code>Rule07 default_activity IMACEC</code></td><td>NER gap</td><td>NER no detecta actividad implícita del agregado</td><td><span class="pill pill-green">Sí, si NER mejora</span></td></tr>
+        <tr><td><code>Rule09 economy_growth+years</code></td><td>Desambiguación</td><td>Sesgo del modelo: "economía" → IMACEC aunque sea contexto anual</td><td><span class="pill pill-green">Sí, con ejemplos de entrenamiento</span></td></tr>
+        <tr><td><code>Rule09 PIB_REAL_RE</code></td><td>Desambiguación</td><td>Mal enrutamiento "pib real" → IMACEC</td><td><span class="pill pill-green">Sí, con ejemplos de entrenamiento</span></td></tr>
+        <tr><td><code>Rule10 participaciones</code></td><td>Intent gap</td><td>Clasificador no tiene head <code>share</code> confiable</td><td><span class="pill pill-green">Sí, con head <code>share</code></span></td></tr>
+        <tr><td><code>Rule13 históricos</code></td><td>Conocimiento dominio</td><td>NER no conoce rangos disponibles por serie</td><td><span class="pill pill-yellow">Parcialmente — mejor como metadato en catálogo</span></td></tr>
+        <tr><td><code>Rule14 PIB regional YoY</code></td><td>Convención BDE</td><td>Clasificador devuelve <code>original</code> para preguntas de nivel regional</td><td><span class="pill pill-green">Sí, si se entrena con convención BDE</span></td></tr>
+        <tr><td><code>RuleGreeting</code></td><td>Intent gap</td><td>Clasificador no tiene head <code>greeting</code></td><td><span class="pill pill-green">Sí, con head <code>greeting</code></span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- CONCLUSIÓN -->
+  <div class="arch-box" style="margin-top:32px; border-left-color:#dc2626">
+    <h2 style="color:#dc2626">Conclusión y Prioridades</h2>
+    <br/>
+    <p><b>1. Corregir ahora (bug):</b> <code>Rule01_ContribucionGrupal.force_general</code> tiene condición lógicamente imposible y nunca se activa. Revisar la lógica antes de cualquier otra optimización.</p>
+    <br/>
+    <p><b>2. Compensan gaps del clasificador (eliminables con modelo mejorado):</b><br/>Rule02, Rule06, Rule07, Rule10, Rule14, RuleGreeting — todas son correcciones de <code>intent</code>/<code>calc_mode</code> que debería emitir directamente el clasificador.</p>
+    <br/>
+    <p><b>3. Compensan conocimiento de dominio (eliminables con validación en catálogo):</b><br/>Rule03, Rule04, Rule13 — validan restricciones estructurales (IMACEC=mensual, PIB≠mensual, pisos históricos) que podrían vivir como metadatos del catálogo.</p>
+    <br/>
+    <p><b>4. Capa de seguridad (mantener siempre):</b><br/>Rule05 blocklist — neutraliza el sesgo sistemático del modelo de etiquetar OOS como IMACEC. No debe eliminarse aunque mejore el clasificador.</p>
+  </div>
+
+</main>
+</body>
+</html>

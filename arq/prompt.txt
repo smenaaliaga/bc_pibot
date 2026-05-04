@@ -1,0 +1,365 @@
+═══════════════════════════════════════════════════════════════════════════════
+PROMPT: Análisis de proceso actual por tipo de pregunta — PIBot
+VERSIÓN: 2 (mayo 2026)
+ARCHIVO DE REFERENCIA: arq/analisis_tipos_consulta_v2.html
+───────────────────────────────────────────────────────────────────────────────
+INSTRUCCIÓN PARA EL AGENTE
+───────────────────────────────────────────────────────────────────────────────
+Se adjunta como referencia el archivo arq/analisis_tipos_consulta_v2.html que
+contiene el resultado de un análisis previo completo. Tu tarea es producir un
+archivo HTML equivalente para el estado actual del código.
+
+NO regeneres el archivo de referencia tal cual — lee el código actualizado y
+genera una nueva versión del HTML siguiendo exactamente la misma estructura,
+convenciones CSS y secciones descritas más abajo.
+
+Si alguna regla, función o tipo de consulta de la tabla cambió respecto al
+archivo de referencia, refleja el estado actual del código. Si no cambió,
+puedes tomar como base los mismos textos del archivo de referencia.
+
+═══════════════════════════════════════════════════════════════════════════════
+TÍTULO: Análisis de proceso actual por tipo de pregunta y evaluación de mejoras
+═══════════════════════════════════════════════════════════════════════════════
+
+DESCRIPCIÓN GENERAL
+───────────────────
+Analizar cada tipo de pregunta que maneja PIBot y documentar en un archivo HTML
+de una sola página: (1) qué hace el clasificador, (2) qué reglas de negocio
+aplica post_classifier.py, (3) qué instrucciones concretas se inyectan al LLM
+en response.py, y (4) posibles mejoras para reducir o eliminar las reglas de
+negocio delegando más responsabilidad al clasificador.
+
+OBJETIVO
+────────
+La meta de largo plazo es eliminar los árboles de decisión de post_classifier.py
+de modo que las respuestas sean lo más transparentes posibles al clasificador.
+Antes de hacerlo se necesita un mapa completo del estado actual por tipo de
+consulta.
+
+───────────────────────────────────────────────────────────────────────────────
+ARQUITECTURA ACTUAL (contexto relevante para el agente)
+───────────────────────────────────────────────────────────────────────────────
+
+1. CLASIFICADOR
+   - Primer clasificador (intent): decide si la consulta es metodología o datos.
+     Endpoint: PREDICT_URL = http://localhost:8000/predict
+   - Segundo clasificador (intents + entities): entrega calc_mode, activity_cls,
+     indicator, frequency, period, seasonality, region, investment, etc.
+     Endpoint: INTENT_CLASSIFIER_URL = http://localhost:8100/intent
+   - NER normaliza entidades (indicator_ent, activity_ent, period_ent, etc.)
+
+2. POST-CLASIFICACIÓN
+   - Archivo: rules/post_classifier.py
+   - Clase principal: BusinessRuleEngine con métodos apply_business_rules()
+   - Reglas numeradas Rule01…Rule14 (aprox). Cada regla muta ResolvedEntities.
+   - Algunas reglas corrigen falencias del clasificador; otras son lógica de
+     dominio irremplazable.
+
+3. RESPONSE
+   - Archivo: orchestrator/data/response.py
+   - Función principal: build_messages(question, entities_ctx, observations, ...)
+   - Construye la lista de mensajes de sistema enviados al LLM.
+   - Funciones clave: _build_metric_priority_instruction(calc_mode),
+     _build_economy_wording_instruction(), _build_annual_pib_completeness_instruction(),
+     _build_no_explicit_period_latest_instruction(),
+     _build_historical_pib_yoy_instruction(), _build_original_series_force_instruction(),
+     _build_value_no_rescale_instruction(), _build_recommendation_length_instruction(),
+     _build_specific_contribution_directness_instruction(),
+     _build_missing_activity_instruction(), _build_share_instruction(), etc.
+
+───────────────────────────────────────────────────────────────────────────────
+TABLA DE TIPOS DE CONSULTA
+───────────────────────────────────────────────────────────────────────────────
+
+Tipo │ Nombre                              │ PU — Ejemplos de consulta
+─────┼─────────────────────────────────────┼──────────────────────────────────────────────────
+  0  │ Consultas Metodológicas             │ • cómo se calcula el pib
+     │                                     │ • qué es el ajuste estacional
+     │                                     │ • cuáles son los componentes del pib del gasto
+─────┼─────────────────────────────────────┼──────────────────────────────────────────────────
+  1  │ Contribución Grupal                 │ • que actividad afecto al aumento del pib el 1T 2020
+     │                                     │ • que actividad afecto al aumento del imacec
+     │                                     │ • cuanto contribuyo la demanda interna al pib
+─────┼─────────────────────────────────────┼──────────────────────────────────────────────────
+  2  │ Variaciones de Frecuencia /         │ • cual es la variación trimestral del PIB
+     │ Valores Desestacionalizados         │ • Cual es el valor desestacionalizado del IMACEC
+─────┼─────────────────────────────────────┼──────────────────────────────────────────────────
+  3  │ Validación Período Correcto         │ • Cuál fué el imacec de Marzo
+     │ del Indicador                       │ • cual es el pib de mayo del 2026
+     │                                     │ • cual es el imacec del ultimo mes
+     │                                     │ • cual es el valor del pib del ultimo trimestre
+     │                                     │ • cual es el pib del primer trimestre del 2023
+     │                                     │ • cual es el valor del pib del 2023
+─────┼─────────────────────────────────────┼──────────────────────────────────────────────────
+  4  │ Crecimiento / PIB Real              │ • cuanto creció la economia en los dos ultimos meses
+     │                                     │ • Cual es el pib real de los dos últimos años
+     │                                     │ • cuanto creció la economia en los ultimos 5 años
+─────┼─────────────────────────────────────┼──────────────────────────────────────────────────
+  5  │ Preguntas Fuera del Alcance         │ • quien es la presidenta del banco central
+     │                                     │ • Cual es el valor del dolar observado
+     │                                     │ • Cual es el valor de tipos de cambio nominal
+─────┼─────────────────────────────────────┼──────────────────────────────────────────────────
+  6  │ Calendario                          │ • cual es la próxima fecha de publicación del IMACEC
+     │                                     │ • cuando se publica el próximo pib regional
+─────┼─────────────────────────────────────┼──────────────────────────────────────────────────
+  7  │ Contribución Individual IMACEC      │ • cuanto contribuyo la producción de bienes al imacec
+─────┼─────────────────────────────────────┼──────────────────────────────────────────────────
+  8  │ Actividades No Existentes en        │ • cuanto contribuyo la producción de bienes al pib
+     │ el Cuadro                           │ • cuanto contribuyo la pesca al pib
+─────┼─────────────────────────────────────┼──────────────────────────────────────────────────
+  9  │ Precios Corrientes / Niveles        │ • cuanto fueron las exportaciones nominales en el
+     │ Nominales                           │   último trimestre
+     │                                     │ • Cual es el nivel del PIB en el 2T 2024
+     │                                     │ • Cuanto fue el consumo de hogares nominal en el
+     │                                     │   último trimestre
+─────┼─────────────────────────────────────┼──────────────────────────────────────────────────
+ 10  │ Participaciones                     │ • Cuanto pesa el consumo en el pib
+     │                                     │ • Cuanto pesa la inversión en Chile
+─────┼─────────────────────────────────────┼──────────────────────────────────────────────────
+ 11  │ Actividades de Variación Trimestral │ (sin PU unitaria definida aún)
+─────┼─────────────────────────────────────┼──────────────────────────────────────────────────
+ 12  │ PIB Regional                        │ • que región ha tenido el crecimiento más alto
+     │                                     │   del pib en el último año
+     │                                     │ • cual fue la región que menos creció el año 2025
+     │                                     │ • cual es el pib de la región de Santiago
+     │                                     │ • cual es el pib de la región de la antártica
+─────┼─────────────────────────────────────┼──────────────────────────────────────────────────
+ 13  │ Consultas de Datos Históricos       │ • cual es el pib de chile desde 1900 en adelante
+     │                                     │ • cual es el valor del pib de 1961 a 1970
+     │                                     │ • entregame los valores del imacec de 1997
+─────┼─────────────────────────────────────┼──────────────────────────────────────────────────
+ 14  │ Saludos                             │ • Hola Me llamo Hernan
+
+───────────────────────────────────────────────────────────────────────────────
+REQUERIMIENTOS POR TIPO (campos que debe contener cada tarjeta)
+───────────────────────────────────────────────────────────────────────────────
+
+Para cada tipo de consulta de la tabla anterior, documentar:
+
+R1. PU — EJEMPLOS DE CONSULTA
+    Lista de preguntas unitarias de prueba. Marcar con "← log" las que tengan
+    evidencia en un log real de ejecución.
+
+R2. PREDICT_URL OUTPUTS
+    Valores producidos por el clasificador para ese tipo:
+    calc_mode, activity_cls, indicator_ent, frequency_ent, period_ent,
+    seasonality_ent, region_cls, investment_cls, etc.
+
+R3. INTENT_CLASSIFIER_URL OUTPUTS
+    Valores del segundo clasificador (intents + entities normalizadas).
+
+R4. REGLA POST_CLASSIFIER
+    ¿Aplica alguna regla de post_classifier.py?
+    - Si SÍ: nombre de la regla (ej. Rule02_VariacionesDesest), pseudo-código
+      exacto de la condición IF/THEN con los nombres reales de variables.
+    - Para cada regla: ¿responde a una falencia del clasificador o es lógica
+      de dominio? ¿Es eliminable si el clasificador mejora?
+
+R5. INSTRUCCIÓN LLM (response.py)
+    - Condición que dispara cada llamada a _build_*_instruction().
+    - El texto LITERAL completo que retorna cada función (copiar verbatim
+      del código fuente de response.py).
+
+R6. ENRUTAMIENTO calc_mode
+    Valor final de calc_mode después de todas las reglas:
+    original | yoy | prev_period | contribution | share
+
+R7. ENRUTAMIENTO frecuencia
+    Valor final de freq después de todas las reglas: q | m | a
+
+R8. CLASIFICACIÓN REAL (log)
+    Si hay un log de ejecución disponible, mostrar el JSON de clasificación
+    real para al menos una PU del tipo.
+
+R9. POSIBLES MEJORAS
+    - Bugs detectados en las reglas actuales (condiciones imposibles, colisiones).
+    - Si la regla puede eliminarse con un clasificador más preciso, describirlo.
+    - Mejoras de UX o catálogo.
+
+R10. ELIMINABLE
+    Clasificar cada regla como:
+    - Eliminable con modelo mejorado
+    - Parcialmente eliminable
+    - No eliminable (lógica de dominio irremplazable)
+    - N/A
+
+───────────────────────────────────────────────────────────────────────────────
+FORMATO DE SALIDA — ARCHIVO HTML DE UNA SOLA PÁGINA
+───────────────────────────────────────────────────────────────────────────────
+
+IMPORTANTE: El archivo de referencia arq/analisis_tipos_consulta_v2.html
+contiene el diseño completo implementado. Úsalo como plantilla visual exacta.
+A continuación se describe la estructura para que el agente pueda reproducirla:
+
+ESTRUCTURA GENERAL DEL HTML
+────────────────────────────
+- DOCTYPE html, lang="es", charset UTF-8
+- <header> azul oscuro (#003566) con título h1 y línea de metadata (fecha, rama, archivos)
+- <main> max-width 1560px con:
+    1. .arch-box   → leyenda de colores de código (1 sola, al inicio)
+    2. N × .card   → una por tipo de consulta (TIPO 0 a TIPO 14)
+    3. .summary-section → tabla resumen al final (opcional, si hay tiempo)
+
+ESTRUCTURA DE CADA .card
+─────────────────────────
+<div class="card">
+  <div class="card-header cN">          ← N = número del tipo (0-14)
+    <span class="badge">TIPO N</span>
+    <h2>Nombre del Tipo</h2>
+  </div>
+  <div class="card-body">
+    <table>
+      <tr><th>PU — Ejemplos</th><td><ul class="pu-list"> ... </ul></td></tr>
+      <tr><th>PREDICT_URL outputs</th><td> ... </td></tr>
+      <tr class="sep-rule"><th>Regla post_classifier</th><td>
+        [ pill verde/rojo/azul ] + pseudo-código si aplica
+      </td></tr>
+      <tr><th>Instrucción LLM<br/>(response.py)</th><td>
+        bloque .llm-wrap con pseudo-código de disparador +
+        <details class="instr-expand"> con texto literal completo
+      </td></tr>
+      <tr><th>Solución propuesta</th><td>
+        .bug-box (fondo rojo) para bugs y/o .mejora-box (fondo verde) para mejoras
+      </td></tr>
+      <tr><th>calc_mode / Freq.</th><td> pills con valores finales </td></tr>
+      <tr><th>Clasificación real (log)</th><td>
+        .json-outer + .json-block con JSON real del clasificador (o .obs-box si sin log)
+      </td></tr>
+      <tr><th>Eliminable</th><td> pill con clasificación </td></tr>
+    </table>
+  </div>
+</div>
+
+CSS — CLASES PRINCIPALES (copiar del archivo de referencia)
+────────────────────────────────────────────────────────────
+
+Bloques de pseudo-código (reglas de negocio):
+  .pseudo-wrap / .pseudo-label / .pseudo-code
+  Syntax highlighting:
+    .kw   → pink  (#f472b6)  — IF / THEN / AND / OR
+    .cond → blue  (#93c5fd)  — condiciones / valores del clasificador
+    .act  → green (#4ade80)  — mutaciones de entidades
+    .reg  → amber (#fbbf24)  — nombres de regex
+    .bug  → red   (#f87171)  — marcador de bug
+    .cm   → gray  (#475569)  — comentarios
+
+Bloques de instrucción LLM (disparador):
+  .llm-wrap / .llm-label / .llm-code
+  Syntax highlighting:
+    .fn   → indigo (#a5b4fc) — nombre de función
+    .cond → violet (#c4b5fd) — condición
+    .inj  → teal   (#6ee7b7) — texto inyectado
+    .cm   → darkgray (#4c4b7a) — comentario
+
+Bloques de texto literal (colapsable):
+  <details class="instr-expand">
+    <summary></summary>   ← vacío; el texto lo pone ::before CSS
+    <div class="instr-literal">
+      Texto literal copiado verbatim de response.py.
+      Envolver con spans:
+        <span class="R"> nombre de la regla / sección (color amber #fde68a) </span>
+        <span class="P"> PROHIBIDO (color red #fca5a5) </span>
+        <span class="O"> OBLIGATORIO (color teal #6ee7b7) </span>
+    </div>
+  </details>
+
+  CSS clave para el acordeón:
+    details.instr-expand > summary::before { content: "▶ ver texto literal enviado al LLM"; }
+    details.instr-expand[open] > summary::before { content: "▼ ocultar texto literal"; }
+    .instr-literal { background: #1c1a3e; border-left: 3px solid #6366f1; ... }
+
+Bloques de log JSON:
+  .json-outer / .json-label / .json-block
+  Syntax highlighting: .k (key), .s (string), .n (number), .warn (rojo), .ok (verde)
+
+Pills de estado:
+  .pill-green  → SÍ aplica / correcto
+  .pill-red    → NO aplica / error
+  .pill-blue   → regla activa
+  .pill-yellow → mejora parcial
+  .pill-gray   → N/A
+  .pill-purple → caso especial
+
+Cajas de observaciones:
+  .bug-box    → fondo rojo   — bugs en reglas actuales
+  .mejora-box → fondo verde  — propuestas de mejora
+  .obs-box    → fondo azul   — observaciones / casos borde
+
+Colores de cabecera por tipo:
+  .c0  #5a67d8  .c1  #2b7a0b  .c2  #b45309  .c3  #0369a1  .c4  #7c3aed
+  .c5  #b91c1c  .c6  #1d4ed8  .c7  #065f46  .c8  #92400e  .c9  #0f766e
+  .c10 #6d28d9  .c11 #155e75  .c12 #1e40af  .c13 #374151  .c14 #047857
+
+───────────────────────────────────────────────────────────────────────────────
+FUENTES DE DATOS PARA EL AGENTE
+───────────────────────────────────────────────────────────────────────────────
+
+Archivos principales a leer:
+
+  rules/post_classifier.py
+    → Clases BusinessRuleEngine y todas las Rule* (leer completo)
+    → Identificar: condición IF, mutación THEN, nombres de variables,
+      nombres de regex compiladas, posibles condiciones imposibles
+
+  orchestrator/data/response.py
+    → Función build_messages() y todas las _build_*_instruction()
+    → Copiar el texto LITERAL (el string que retorna cada función)
+    → Identificar: en qué condición se llama cada función
+
+  orchestrator/api/  (o app.py / main.py según estructura actual)
+    → Para confirmar los endpoints PREDICT_URL e INTENT_CLASSIFIER_URL
+    → Para confirmar el flujo: ingest → classify → post_classify → response
+
+  logs/  (si hay logs de ejecución)
+    → Buscar JSONs de clasificación real para las PU de cada tipo
+    → Usar el log más reciente disponible
+
+  Para correr las PU en vivo (opcional, solo si el servidor está activo):
+    POST http://localhost:8000/predict   body: { "question": "<PU>" }
+    POST http://localhost:8100/intent    body: { "question": "<PU>" }
+
+───────────────────────────────────────────────────────────────────────────────
+CONSIDERACIONES ADICIONALES
+───────────────────────────────────────────────────────────────────────────────
+
+1. El texto literal de cada _build_*_instruction() debe copiarse verbatim del
+   código fuente, incluyendo numeración de reglas, palabras en mayúsculas
+   (PROHIBIDO, OBLIGATORIO), y ejemplos dentro del texto.
+
+2. Si una instrucción tiene parámetros dinámicos (ej. año, período, frecuencia),
+   representarlos como {VARIABLE} en el texto del bloque literal y explicar en
+   el pseudo-código cuándo se llena cada variable.
+
+3. Los bugs detectados en post_classifier.py deben documentarse en .bug-box
+   con el código original problemático y la corrección propuesta.
+
+4. Para los tipos sin PU definida en la tabla (ej. Tipo 11), documentar igual
+   la lógica de las reglas y funciones aunque no haya ejemplo concreto de log.
+
+5. Guardar el archivo de salida como: arq/analisis_tipos_consulta_v3.html
+   (incrementar la versión respecto al archivo de referencia).
+
+6. No ejecutar nada que modifique el código fuente. El análisis es de solo lectura.
+
+───────────────────────────────────────────────────────────────────────────────
+RESUMEN DE LO QUE SE HIZO EN LA VERSIÓN DE REFERENCIA (v2)
+───────────────────────────────────────────────────────────────────────────────
+
+Para que el agente entienda el punto de partida:
+
+• Se leyeron completamente rules/post_classifier.py y orchestrator/data/response.py
+• Se extrajeron e identificaron las reglas Rule01…Rule14 con sus condiciones exactas
+• Se identificaron ~15 funciones _build_*_instruction() y se copió su texto literal
+• Por cada tipo se documentó: qué devuelve el clasificador, qué regla aplica,
+  qué pseudo-código representa la condición IF/THEN, qué texto exacto se inyecta
+  al LLM, y si la regla es eliminable
+• Se añadieron logs reales de clasificación para los tipos que tenían evidencia
+  en run_detail_20260426.log
+• Los bugs detectados fueron:
+  - Rule01: condición imposible (investment_cls=="specific" AND investment_cls IN (None,"none"))
+  - (otros detectados durante la lectura del código)
+• El diseño HTML se hizo en una sola página autocontenida sin dependencias externas
+• Los bloques de texto literal de LLM se hicieron colapsables con <details> para
+  no saturar la vista inicial
+
+═══════════════════════════════════════════════════════════════════════════════
