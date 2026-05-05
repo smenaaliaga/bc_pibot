@@ -1,0 +1,379 @@
+MINUTA DE REUNIÓN — PIBot
+Fecha: 5 de mayo de 2026
+═══════════════════════════════════════════════════════════════════════════════
+
+CONSULTAS A CORREGIR
+───────────────────────────────────────────────────────────────────────────────
+
+Q: cual fué el primer imacec
+
+RESPUESTA ACTUAL (incorrecta):
+  En febrero de 2026, la serie se reporta con frecuencia mensual.
+  El IMACEC registró una variación de -0,3% respecto al mismo período del año anterior.
+  Puedes profundizar revisando el desglose sectorial del IMACEC y su trayectoria reciente.
+  Fuente: BDE — https://si3.bcentral.cl/Siete/...
+
+PROBLEMA: La pregunta pide el primer valor histórico disponible, pero el bot responde
+  con el dato más reciente (febrero 2026).
+
+───────────────────────────────────────────────────────────────────────────────
+
+Q: cuál es el valor del imacec más antiguo
+
+RESPUESTA ACTUAL (incorrecta):
+  En febrero de 2026, la serie se reporta con frecuencia mensual.
+  El IMACEC registró una variación de -0,3% respecto al mismo período del año anterior.
+  Fuente: BDE
+
+PROBLEMA: Igual al anterior — responde el más reciente en lugar del más antiguo.
+
+───────────────────────────────────────────────────────────────────────────────
+
+Q: cuál es el valor del imacec historico disponible más antiguo
+
+RESPUESTA ACTUAL (incorrecta):
+  En febrero de 2026, el IMACEC es la serie mensual disponible más reciente en el
+  cuadro consultado. La serie se reporta con frecuencia mensual.
+  El IMACEC registró una variación de -0,3% respecto al mismo período del año anterior.
+  Fuente: BDE
+
+PROBLEMA: Reconoce que pregunta por "el más antiguo" pero entrega el más reciente.
+
+───────────────────────────────────────────────────────────────────────────────
+
+Q: cual fué el primer pib publicado
+
+RESPUESTA ACTUAL (incorrecta):
+  En el 4to trimestre de 2025, la serie del PIB se reporta con frecuencia trimestral.
+  El PIB registró una variación de 1,6% respecto al mismo período del año anterior.
+  Fuente: BDE
+
+PROBLEMA: Responde con el último período disponible, no el primero/más antiguo.
+
+───────────────────────────────────────────────────────────────────────────────
+
+Q: puedo resumírlo en una versión más corta o explicarlo para el PIB trimestral
+   específicamente.
+   [En alusión a una consulta metodológica previa]
+
+RESPUESTA ACTUAL (observación — posible mejora):
+  En el 4º trimestre de 2025, el PIB trimestral mostró una contribución total de
+  1,6 pp respecto al mismo período del año anterior.
+  Las mayores contribuciones positivas fueron Comercio +0,5 pp, Servicios personales
+  +0,4 pp, Impuestos sobre los productos +0,4 pp, Otras actividades mineras +0,3 pp
+  e Industria Manufacturera +0,2 pp. La principal incidencia negativa fue Minería del
+  cobre -0,9 pp, seguida por Minería -0,6 pp y Electricidad, gas, agua y gestión de
+  desechos -0,1 pp.
+  Fuente: BDE
+
+OBSERVACIÓN: Esta respuesta en realidad es de datos, no metodológica. El bot no
+  entendió que era un follow-up de un contexto metodológico.
+
+───────────────────────────────────────────────────────────────────────────────
+
+Q: cual es la serie del pib de la araucanía desde 1990
+
+RESPUESTA ACTUAL (incorrecta):
+  No encontré la serie de PIB solicitada en la Base de Datos Estadística del
+  Banco Central. Puedes reformular tu pregunta o consultar el catálogo de series
+  disponibles.
+
+PROBLEMA: La serie existe (PIB Regional), pero no la encuentra. Falla de mapeo
+  de región o de catálogo.
+
+───────────────────────────────────────────────────────────────────────────────
+
+Q: cúal es el pib de la región de la antartica
+
+RESPUESTA ACTUAL (incorrecta):
+  En el 4to trimestre de 2025, el PIB de la región de la Antártica se ubicó en
+  57.246,8 miles de millones de pesos encadenados. La serie se reporta con frecuencia
+  trimestral.
+  Fuente: BDE
+
+PROBLEMA: La "Región de la Antártica Chilena" no existe como unidad del PIB Regional.
+  El bot retorna el agregado nacional en lugar de indicar que no existe esa región.
+
+───────────────────────────────────────────────────────────────────────────────
+
+OTROS COMENTARIOS
+───────────────────────────────────────────────────────────────────────────────
+
+1. SACAR LAS RECOMENDACIONES DE LAS CONSULTAS METODOLÓGICAS
+   Las respuestas metodológicas no deben incluir el párrafo de recomendación.
+
+2. FOLLOW-UP CON CONTEXTO DE PERÍODO ("dame este valor para el 2020")
+   Si el usuario pregunta Q1 (ej. "Cuanto pesa la inversión en Chile") y luego
+   pide Q2 ("dame este valor para el 2020"), el bot no recupera el valor del
+   período solicitado. Caso reportado como: consulta MIXTA / Follow-up fallback.
+
+───────────────────────────────────────────────────────────────────────────────
+
+TABLA ACTUALIZADA DE TIPOS DE CONSULTA
+───────────────────────────────────────────────────────────────────────────────
+
+Tipo │ Nombre                              │ Requisitos
+─────┼─────────────────────────────────────┼─────────────────────────────────────────────────
+  0  │ CONSULTAS METODOLÓGICAS             │ 1. El modelo de clasificación responde correctamente
+     │                                     │ 2. No incluir recomendación
+─────┼─────────────────────────────────────┼─────────────────────────────────────────────────
+  1  │ CONTRIBUCIÓN GRUPAL                 │ 1. Señalar en el 1er párrafo si aumentó o disminuyó
+     │ (AUMENTO O DISMINUYÓ)               │    el PIB o IMACEC
+     │                                     │ 2. Si PIB/IMACEC aumenta → partir por contribuciones
+     │                                     │    positivas. Si baja → partir por las negativas.
+     │                                     │ 3. 2do párrafo: rankear 3 de mayor y 3 de menor incidencia
+     │                                     │ 4. Formato: "Servicios personales -1,1pp" (signo + pp)
+─────┼─────────────────────────────────────┼─────────────────────────────────────────────────
+  2  │ VARIACIONES DE FRECUENCIA /         │ 1. "desestacionalizado" → calc_mode = prev_period (t-1)
+     │ VALORES DESESTACIONALIZADOS         │ 2. PIB: variación trimestral → t-1
+     │                                     │ 3. IMACEC: variación mensual → t-1
+     │                                     │ 4. Evitar redundar con "se publica mensual/trimestral"
+     │                                     │ 5. Eliminar "interanual" si luego se menciona variación
+     │                                     │ 6. Valor desestacionalizado → responder t-1
+─────┼─────────────────────────────────────┼─────────────────────────────────────────────────
+  3  │ VALIDACIÓN PERÍODO CORRECTO         │ 1. Validar períodos válidos de publicación
+     │ DEL INDICADOR                       │ 2. Agrupar por frecuencia cuando se pida otra frecuencia
+─────┼─────────────────────────────────────┼─────────────────────────────────────────────────
+  4  │ CRECIMIENTO / PIB REAL              │ 1. "crecimiento último mes" → IMACEC
+     │                                     │ 2. "crecimiento último trimestre" → PIB
+     │                                     │ 3. "actividad que creció más" → PIB
+─────┼─────────────────────────────────────┼─────────────────────────────────────────────────
+  5  │ PREGUNTAS FUERA DEL ALCANCE         │ 1. Solo contestar sobre PIB e IMACEC
+     │                                     │ 2. Responder: "Esta IA responde consultas del PIB
+     │                                     │    e IMACEC"
+─────┼─────────────────────────────────────┼─────────────────────────────────────────────────
+  6  │ CALENDARIO                          │ 1. Referenciar el link correcto de publicación
+─────┼─────────────────────────────────────┼─────────────────────────────────────────────────
+  7  │ CONTRIBUCIÓN INDIVIDUAL             │ 1. Entregar puntos porcentuales (pp)
+─────┼─────────────────────────────────────┼─────────────────────────────────────────────────
+  8  │ ACTIVIDADES NO EXISTENTES           │ 1. Indicar solo que no existe, sin inventar datos
+     │ EN EL CUADRO                        │
+─────┼─────────────────────────────────────┼─────────────────────────────────────────────────
+  9  │ PRECIOS CORRIENTES / NIVELES        │ 1. Datos nominales → cuadro precios corrientes
+     │ NOMINALES                           │ 2. "nivel del PIB" → precios corrientes (no encadenado)
+     │                                     │ 3. Datos reales → entregar original + precios corrientes
+─────┼─────────────────────────────────────┼─────────────────────────────────────────────────
+ 10  │ PARTICIPACIONES                     │ 1. peso / porcentaje / participación → ir a participación
+     │                                     │    y mostrar valor original en formato X,X pp con signo
+─────┼─────────────────────────────────────┼─────────────────────────────────────────────────
+ 11  │ ACTIVIDADES DE VARIACIÓN            │ 1. Variación trimestral PIB/IMACEC → contribuciones con
+     │ TRIMESTRAL                          │    ajuste estacional t-1
+     │                                     │ 2. "desestacionalizado" → variación período anterior
+─────┼─────────────────────────────────────┼─────────────────────────────────────────────────
+ 12  │ PIB REGIONAL                        │ 1. Responder consultas del PIB regional por región
+     │                                     │ 2. Responder por actividades individuales de la región
+─────┼─────────────────────────────────────┼─────────────────────────────────────────────────
+ 13  │ CONSULTAS DE DATOS HISTÓRICOS       │ 1. Validar el rango de data histórica para PIB e IMACEC
+─────┼─────────────────────────────────────┼─────────────────────────────────────────────────
+ 14  │ SALUDOS                             │ 1. Responder el saludo
+─────┼─────────────────────────────────────┼─────────────────────────────────────────────────
+  *  │ FOLLOW-UP                           │ fallback: recuperar contexto de consulta anterior
+     │                                     │ Ej: Q1 "Cuanto pesa la inversión en Chile"
+     │                                     │     Q2 "dame este valor para el 2020"
+─────┼─────────────────────────────────────┼─────────────────────────────────────────────────
+  *  │ CONSULTAS MIXTAS                    │ Ej: "cual es la serie del pib de la araucanía desde 1990"
+     │                                     │     "cuál es la política de revisiones del pib"
+
+───────────────────────────────────────────────────────────────────────────────
+
+PRUEBAS UNITARIAS (PU) POR TIPO
+───────────────────────────────────────────────────────────────────────────────
+
+TIPO 0 — CONSULTAS METODOLÓGICAS
+  PU:  • cómo se calcula el pib
+       • qué es el efecto calendario
+       • qué es el ajuste estacional
+       • cuál es la diferencia entre precios corrientes y precios encadenados
+       • cuáles son los componentes del pib desde el punto de vista del gasto
+       • por qué razón el pib puede ser negativo
+       • qué es pp
+       • puedes explicarme por qué un PIB trimestral puede caer en términos
+         desestacionalizados o cómo se interpreta una tasa de crecimiento negativa
+  PU mínimas:
+       • cómo se calcula el pib
+       • qué es el ajuste estacional
+       • cuáles son los componentes del pib del gasto
+
+TIPO 1 — CONTRIBUCIÓN GRUPAL
+  PU:  • que actividad afecto al aumento del pib el primer trimestre del 2020
+       • que actividad afecto al aumento del pib el segundo trimestre del 2020
+       • que actividad afecto a la disminución del pib el segundo trimestre del 2020
+       • que actividad afecto al aumento del pib
+       • que actividad afecto a la disminución del pib del cuarto trimestre del 2020
+       • que actividad afecto al aumento del imacec
+       • que actividad afecto al aumento del imacec en diciembre del 2025
+  PU mínimas:
+       • que actividad afecto al aumento del pib el primer trimestre del 2020
+       • que actividad afecto al aumento del imacec
+       • cuanto contribuyo la demanda interna al pib
+
+TIPO 2 — VARIACIONES / DESESTACIONALIZADO
+  PU:  • cual es la variación trimestral del PIB
+       • cual es la variación mensual del imacec
+       • cual es la variación del pib con respecto al periodo anterior
+       • cual es la variación del imacec con respecto al periodo anterior
+       • Cual es el valor desestacionalizado del IMACEC
+       • Cual es el valor desestacionalizado del PIB
+       • cual es la variación trimestral del PIB del primer trimestre 2022
+       • cual es la variación mensual del imacec de marzo del 2024
+       • cuales son las variaciones trimestrales del pib el 2021
+       • cual es la variación del pib con respecto al periodo anterior el 2023
+       • cual es la variación del imacec con respecto al periodo anterior el ultimo mes
+       • Cual es el valor desestacionalizado del IMACEC del mes de junio del 2024
+       • Cuales son los valores desestacionalizado del IMACEC desde enero a junio del 2024
+       • Cuales son los valores desestacionalizado del PIB del 2021
+  PU mínimas:
+       • cual es la variación trimestral del PIB
+       • Cual es el valor desestacionalizado del IMACEC
+
+TIPO 3 — VALIDACIÓN PERÍODO
+  PU:  • Cuál fué el imacec de Marzo
+       • Cual es el pib 2026
+       • Cual es el imacec de Julio de este año
+       • cual es el pib de mayo del 2026
+  PU mínimas:
+       • Cuál fué el imacec de Marzo
+       • cual es el pib de mayo del 2026
+       • cual es el imacec del ultimo mes
+       • cual es el valor del pib del ultimo trimestre
+       • cual es el pib del primer trimestre del 2023
+       • cual es el valor del pib del 2023
+
+TIPO 4 — CRECIMIENTO / PIB REAL
+  PU:  1. Cual es el pib de los dos ultimos años
+       2. Cual es el pib anual de los dos ultimos dos años
+       3. Cual es el pib real de los dos últimos años
+       4. Cual es el pib real anual de los dos ultimos dos años
+       5. cuales son los valores del pib real entre 2022 y 2024
+       6. cual es el imacec real del ultimo mes
+       7. cuanto creció la economía el último mes
+       8. cuanto creció la economia en los dos ultimos años
+       9. cuanto creció la economia en los ultimos 5 años
+       10. cuanto crecio la economia el ultimo trimestre
+       11. cuanto crecio la economia el ultimo año
+       12. cuanto creció la economia en los dos ultimos meses
+       13. cuanto creció la economia en los ultimos 6 meses
+  PU mínimas:
+       • cuanto creció la economia en los dos ultimos meses
+       • Cual es el pib real de los dos últimos años
+       • cuanto creció la economia en los ultimos 5 años
+
+TIPO 5 — FUERA DEL ALCANCE
+  PU:  1. quien es la presidenta del banco central
+       2. cual es el valor del dolar observado
+       3. Quienes son los consejeros del banco central
+       4. Cual es el valor de tipos de cambio nominal
+       5. Cual es el valor de las paridades
+       6. Cuales son las divisiones del banco central
+       7. Quien es Hernán Fernandez
+  PU mínimas:
+       • quien es la presidenta del banco central
+       • Cual es el valor del dolar observado
+       • Cual es el valor de tipos de cambio nominal
+
+TIPO 6 — CALENDARIO
+  PU:  • cual es la próxima fecha de publicación del IMACEC
+       • Cuando se publica el próximo PIB
+       • Cual es el calendario de publicaciones del PIB
+       • Cual es el calendario de publicaciones del IMACEC
+       • cuando se publica el próximo pib regional
+  PU mínimas:
+       • cual es la próxima fecha de publicación del IMACEC
+       • cuando se publica el próximo pib regional
+
+TIPO 7 — CONTRIBUCIÓN INDIVIDUAL
+  PU:  • cuanto contribuyo la producción de bienes al imacec
+  PU mínimas:
+       • cuanto contribuyo la producción de bienes al imacec
+
+TIPO 8 — ACTIVIDADES NO EXISTENTES
+  PU:  • cuanto contribuyo la producción de bienes al pib
+       • cuanto contribuyo el turismo al pib
+       • cuanto contribuyo la pesca al pib
+       • ¿Qué actividad creció más al último trimestre?
+  PU mínimas:
+       • cuanto contribuyo la producción de bienes al pib
+       • cuanto contribuyo la pesca al pib
+       • ¿Qué actividad creció más al último trimestre?
+
+TIPO 9 — PRECIOS CORRIENTES / NIVELES
+  PU:  • cuanto fueron las exportaciones nominales en el último trimestre
+       • cuanto fueron las exportaciones nominales en el último año
+       • cuanto fueron las exportaciones nominales el 2022
+       • cuanto fueron las exportaciones nominales el segundo trimestre del 2023
+       • Cuanto fue el consumo nominal en el último trimestre
+       • Cuanto fue la demanda interna nominal en el último trimestre
+       • Cuanto fue el consumo de hogares nominal en el último trimestre
+       • Cual es el nivel del PIB
+       • Cual es el nivel del PIB en el segundo trimestre del 2024
+       • Cual es el nivel del PIB el 2025
+  PU mínimas:
+       • cuanto fueron las exportaciones nominales en el último trimestre
+       • Cual es el nivel del PIB en el segundo trimestre del 2024
+       • Cuanto fue el consumo de hogares nominal en el último trimestre
+
+TIPO 10 — PARTICIPACIONES
+  PU:  • Cuanto pesa el consumo en el pib
+       • Cuanto pesa el consumo en el pib el 2018
+       • Cuanto pesa la inversión en Chile
+       • Que porcentaje del PIB son las exportaciones
+       • Que porcentaje del PIB son las exportaciones el 2019
+       • Cual es la participación de la inversión en Chile
+  PU mínimas:
+       • Cuanto pesa el consumo en el pib
+       • Cuanto pesa la inversión en Chile
+
+TIPO 11 — ACTIVIDADES VARIACIÓN TRIMESTRAL
+  PU:  • que actividades incidieron en la variación trimestral del pib/imacec,
+         contribuciones con ajuste estacional
+       • imacec desestacionalizada
+       • contribucion trimestre/trimestre desestacionalizado
+  PU mínimas: (sin PU mínima definida aún)
+
+TIPO 12 — PIB REGIONAL
+  PU:  • que actividad afecto al aumento del pib el primer trimestre del 2020 en la región del bío bío
+       • que actividad afecto al aumento del pib el segundo trimestre del 2020 en la región del bío bío
+       • cual fue la región que menos creció el año 2025
+       • que región ha tenido el crecimiento más alto del pib en el último año
+       • que región ha tenido el crecimiento más alto del pib en el último trimestre
+       • cúal es el pib de la región del bío bío del último trimestre
+       • cúal es el pib de la región del bío bío del último año
+       • cual es el pib de la región de los ríos del segundo trimestre del 2022
+       • cual es el pib de la región del los lagos 2022
+  PU mínimas:
+       • que región ha tenido el crecimiento más alto del pib en el último año
+       • cual fue la región que menos creció el año 2025
+       • cual es el pib de la región de Santiago
+       • cúal es el pib de la región de la antártica
+       • cúal es el pib de la región de la antartica
+
+TIPO 13 — DATOS HISTÓRICOS
+  PU:  • desde cuando hay datos disponibles del pib en la serie histórica
+       • cual fué el primer pib publicado                        ← A CORREGIR
+       • cuál es el valor del imacec histórico disponible más antiguo  ← A CORREGIR
+       • cuál es el valor del imacec más antiguo                 ← A CORREGIR
+       • cual fué el primer imacec                               ← A CORREGIR
+       • cual es el pib de chile desde 1900 en adelante
+       • cual es el valor del pib de 1961
+       • cual es el valor del pib de 1961 a 1970
+       • cual es el valor del pib de 1960 en adelante
+       • cual es el valor del imacec de 1986 en adelante
+       • entregame los valores del imacec de 1997
+  PU mínimas:
+       • cual es el pib de chile desde 1900 en adelante
+       • cual es el valor del pib de 1961 a 1970
+       • entregame los valores del imacec de 1997
+
+TIPO 14 — SALUDOS
+  PU:  • Hola Me llamo Hernan
+
+FOLLOW-UP (fallback)
+  PU:  Q1: Cuanto pesa la inversión en Chile
+       Q2: dame este valor para el 2020       ← A CORREGIR
+
+CONSULTAS MIXTAS
+  PU:  • cual es la serie del pib de la región de la araucanía desde 1990  ← A CORREGIR
+       • cual es la serie del pib de la araucanía desde 1990                ← A CORREGIR
+       • cuál es la política de revisiones del pib
+
+═══════════════════════════════════════════════════════════════════════════════
