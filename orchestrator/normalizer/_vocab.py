@@ -242,6 +242,7 @@ REGION_TERMS: Dict[str, List[str]] = {
         "12va región", "12a región", "12m región", "xii ",
         "antartica", "la antartica", "antartica chilena",
         "antartica chilena y magallanes",
+        "la antartica chilena", "región de la antartica", "region antartica",
     ],
 }
 

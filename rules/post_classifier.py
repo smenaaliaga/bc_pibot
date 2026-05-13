@@ -121,6 +121,12 @@ class ResolvedEntities:
     historical_floor_instruction: Optional[str] = None
     question: Optional[str] = None
 
+    # BUG-A: dirección temporal ("earliest" = primer dato histórico disponible)
+    date_direction: Optional[str] = None        # "earliest" | None
+
+    # BUG-B2: nota de alias de región ambiguo (se propaga a response.py)
+    region_alias_note: Optional[str] = None     # "antartica_standalone" | None
+
     applied_rules: List[Dict[str, Any]] = field(default_factory=list)
 
 
@@ -433,7 +439,11 @@ class Rule05_FueraDeAlcance:
         r"cuentas?\s+nacional(?:es)?|"
         r"actividad\s+econ[oó]mica|"
         r"econom[ií]a"
-        r")\b",
+        r")\b"
+        r"|"
+        # Ranking regional implícito: "región que más/menos creció/crecimiento"
+        # No menciona PIB/IMACEC explícitamente pero es una consulta de datos macro.
+        r"(?=.*\bregi[oó]n\b)(?=.*\b(m[aá]s|menos|mayor|menor)\b)(?=.*\bcreci)",
         re.IGNORECASE,
     )
 
@@ -794,9 +804,29 @@ class Rule13_Historicos:
     IMACEC_FLOOR_YEAR = 1996
     HIST_FLAG_YEAR = 1996
 
+    # ---- Regex (BUG-A: detección de intención "primer dato histórico") --------
+    EARLIEST_RE = re.compile(
+        r"\bm[aá]s\s+antiguo\b"
+        r"|\bm[aá]s\s+viejo\b"
+        r"|\bprimer\s+(?:dato|valor|registro|publicacion|imacec|pib)\b"
+        r"|\bprimero\s+(?:disponible|publicado|registrado)\b"
+        r"|\bhistor\w+\s+disponible\s+m[aá]s\s+antiguo\b",
+        re.IGNORECASE,
+    )
+    # Guard: "primer trimestre" / "primera región" NO activan earliest
+    EARLIEST_GUARD_RE = re.compile(r"\btrimestre\b|\bregio\w*\b", re.IGNORECASE)
+
     # ---- LOGICA GENERAL ----------------------------------------------
     @classmethod
     def apply_floor(cls, ent: ResolvedEntities) -> None:
+        # BUG-A: detectar intent de dato más antiguo disponible
+        q = ent.question or ""
+        if cls.EARLIEST_RE.search(q) and not cls.EARLIEST_GUARD_RE.search(q):
+            ent.date_direction = "earliest"
+            _trace(ent, cls.CAT, "earliest_intent",
+                   "date_direction=earliest (primer dato histórico)")
+            return
+
         indicator = str(ent.indicator_ent or "").strip().lower()
         period = list(ent.period_ent or [])
         ref_year = _extract_year(period[0]) if period else None
@@ -830,6 +860,14 @@ class Rule13_Historicos:
         period: List[Any],
         ref_year: Optional[int],
     ) -> None:
+        # BUG-B1: PIB Regional no tiene cuadro histórico separado con hist=1;
+        # forzar hist=0 para que el buscador use el cuadro regional estándar.
+        if str(ent.region_cls or "").strip().lower() == "specific":
+            ent.hist = 0
+            _trace(ent, cls.CAT, "pib_regional_no_hist_flag",
+                   "region_cls=specific → hist=0 (no cuadro hist PIB regional)")
+            return
+
         ent.hist = 1 if (ref_year is not None and ref_year < cls.HIST_FLAG_YEAR) else 0
         if indicator != "pib" or ref_year is None or ref_year >= cls.PIB_FLOOR_YEAR:
             return
@@ -930,7 +968,9 @@ class Rule14_PibRegionalDefaultYoY:
             return
         if (str(ent.calc_mode_cls or "").strip().lower()) != "original":
             return
-        if (str(ent.req_form_cls or "").strip().lower()) != "point":
+        # Aplica tanto a req_form='point' (período explícito) como a
+        # req_form='latest' (consulta genérica "cuál es el pib de la región X").
+        if (str(ent.req_form_cls or "").strip().lower()) not in ("point", "latest"):
             return
         q = _ensure_text(ent.question)
         if cls.LEVEL_HINTS_RE.search(q):
@@ -947,7 +987,237 @@ class Rule14_PibRegionalDefaultYoY:
 
 
 # ============================================================================
-# RUTEO ADICIONAL: SALUDOS
+# TIPO DE CONSULTA: 12 — PIB REGIONAL · clarificaciones geográficas (BUG-B2)
+# ============================================================================
+#
+# EXPLICACIÓN DEL PROCESO
+#   "La Antártica" no existe como región independiente en el PIB Regional.
+#   Es parte de la Región XII: "Magallanes y de la Antártica Chilena".
+#   El normalizer mapea "antartica" → "magallanes" (correcto), pero cuando
+#   el usuario dice "antártica" SIN mencionar "magallanes", es necesario
+#   aclarar la situación en la respuesta para no devolver datos silenciosamente.
+#   Se detecta aquí y se propaga via region_alias_note al data node (response.py).
+#
+# Input   : ent.region_ent, ent.question
+# Output  : ent.region_alias_note = "antartica_standalone"
+# ============================================================================
+
+
+class Rule12_PibRegional:
+    """REGLA_12_PIB_REGIONAL — clarificaciones geográficas."""
+
+    CAT = "CAT12"
+
+    # ---- Regex --------------------------------------------------------
+    ANTARTICA_RE  = re.compile(r"\bantar[ct]ica\b", re.IGNORECASE)
+    MAGALLANES_RE = re.compile(r"\bmagallanes\b",   re.IGNORECASE)
+
+    # ---- LOGICA GENERAL ----------------------------------------------
+    @classmethod
+    def flag_antartica_standalone(cls, ent: ResolvedEntities) -> None:
+        """Marca consultas donde el usuario dijo 'antártica' sin 'magallanes'."""
+        if str(ent.region_ent or "").strip().lower() != "magallanes":
+            return
+        q = ent.question or ""
+        if cls.ANTARTICA_RE.search(q) and not cls.MAGALLANES_RE.search(q):
+            ent.region_alias_note = "antartica_standalone"
+            _trace(ent, cls.CAT, "antartica_standalone",
+                   "region_alias_note=antartica_standalone")
+
+    # Methods / Functions / Exceptions / Regex: (none)
+
+
+# ============================================================================
+# TIPO DE CONSULTA: 15 — CRECIMIENTO + AÑOS DE CHILE → PIB (no IMACEC)
+# ============================================================================
+#
+# EXPLICACIÓN DEL PROCESO
+#   Cuando el usuario pregunta por el "crecimiento" de Chile en un horizonte
+#   de años ("últimos 10 años", "últimos años", "de los años"), el indicador
+#   correcto es el PIB (no el IMACEC). El normalizer defaultea a IMACEC
+#   cuando no se menciona un indicador explícito; esta regla corrige ese
+#   default a PIB y deja que Rule16 setee la frecuencia anual.
+#
+# Input   : ent.question, ent.indicator_ent='imacec' (default), sin actividad
+# Output  : ent.indicator_ent='pib', ent.frequency_ent='a' (si no se setea por Rule16)
+# ============================================================================
+
+
+class Rule15_CrecimientoChileToPIB:
+    """REGLA_15_CRECIMIENTO_CHILE_PIB."""
+
+    CAT = "CAT15"
+
+    # "crecimiento" o "crecio"/"crece" como rasgo del verbo principal
+    CRECIMIENTO_RE = re.compile(
+        r"\bcrecimiento\b|\bcreci[oó]\b|\bcrece\b|\bcrecen\b",
+        re.IGNORECASE,
+    )
+    # Horizonte plurianual: "años", "últimos N años", "de los últimos años"
+    ANIOS_RE = re.compile(r"\baños?\b", re.IGNORECASE)
+    # Guard: si menciona "mes", "trimestre" o un mes concreto, no aplica.
+    GUARD_RE = re.compile(
+        r"\bmes(?:es|ual)?\b|\btrimestr\w*\b|"
+        r"\b(enero|febrero|marzo|abril|mayo|junio|julio|agosto|"
+        r"septiembre|setiembre|octubre|noviembre|diciembre)\b",
+        re.IGNORECASE,
+    )
+
+    @classmethod
+    def force_pib_for_crecimiento_anual(cls, ent: ResolvedEntities) -> None:
+        q = _ensure_text(ent.question)
+        if not q:
+            return
+        if not cls.CRECIMIENTO_RE.search(q):
+            return
+        if not cls.ANIOS_RE.search(q):
+            return
+        if cls.GUARD_RE.search(q):
+            return
+        # Solo overridear cuando el indicador es imacec (default del normalizer)
+        # y no hay actividad específica (las actividades del IMACEC — ej. minería —
+        # deben mantenerse en IMACEC).
+        if str(ent.indicator_ent or "").strip().lower() != "imacec":
+            return
+        if str(ent.activity_ent or "").strip():
+            return
+        ent.indicator_ent = "pib"
+        # Rule16 seteará freq='a' si corresponde; aquí solo aseguramos que la
+        # frecuencia mensual heredada del default IMACEC no quede colgada.
+        if str(ent.frequency_ent or "").strip().lower() == "m":
+            ent.frequency_ent = "a"
+        _trace(
+            ent,
+            cls.CAT,
+            "crecimiento_anios_to_pib",
+            "indicator_ent=imacec→pib por 'crecimiento'+'años'",
+        )
+
+
+# ============================================================================
+# TIPO DE CONSULTA: 16 — PIB CON HORIZONTE DE AÑOS → FRECUENCIA ANUAL
+# ============================================================================
+#
+# EXPLICACIÓN DEL PROCESO
+#   "PIB de los últimos N años" / "PIB en los años ..." / "PIB anual".
+#   Cuando el usuario menciona un horizonte explícito en años y NO menciona
+#   trimestre/mes, la frecuencia natural es anual (no trimestral por default
+#   del normalizer). También limpia el período si el normalizer lo resolvió
+#   incorrectamente a un solo trimestre ("últimos 10" → [2026-Q1] es bug).
+#
+# Input   : ent.indicator_ent='pib', question con "\d+ años" o "últimos años"
+# Output  : ent.frequency_ent='a'; ent.period_ent=[] cuando el rango
+#           tiene >1 año y el período es de un solo trimestre.
+# ============================================================================
+
+
+class Rule16_PibLargoPlazoAnual:
+    """REGLA_16_PIB_LARGO_PLAZO_ANUAL."""
+
+    CAT = "CAT16"
+
+    # Detecta horizonte plurianual: "10 años", "últimos 10 años", "últimos años",
+    # "varios años", "última década". También captura "de los últimos años".
+    HORIZON_RE = re.compile(
+        r"\b(?:\d+|varios|\u00faltim[oa]s?|ultim[oa]s?|pasad[oa]s?|recientes?)\s+años?\b"
+        r"|\b\u00faltim[oa]\s+d[eé]cada\b"
+        r"|\bultima\s+decada\b",
+        re.IGNORECASE,
+    )
+    # Guard: si menciona "trimestre" o "mes" explícitamente, no forzar anual.
+    GUARD_RE = re.compile(
+        r"\btrimestr\w*\b|\bmes(?:es|ual)?\b",
+        re.IGNORECASE,
+    )
+    # Detecta número de años en el horizonte (para limpiar período bugueado)
+    N_ANIOS_RE = re.compile(r"\b(\d+)\s+años?\b", re.IGNORECASE)
+
+    @classmethod
+    def force_annual_frequency(cls, ent: ResolvedEntities) -> None:
+        if str(ent.indicator_ent or "").strip().lower() != "pib":
+            return
+        q = _ensure_text(ent.question)
+        if not q:
+            return
+        if not cls.HORIZON_RE.search(q):
+            return
+        if cls.GUARD_RE.search(q):
+            return
+        ent.frequency_ent = "a"
+        # Limpia período bugueado: el normalizer suele resolver "últimos 10"
+        # como el trimestre actual (un solo trimestre). Si el rango es
+        # plurianual pero period_ent cubre <2 años, lo descartamos para que
+        # el data_node elija el rango por default (toda la serie anual).
+        m = cls.N_ANIOS_RE.search(q)
+        n_years = int(m.group(1)) if m else 0
+        period = list(ent.period_ent or [])
+        if period:
+            years = {y for y in (_extract_year(p) for p in period) if y is not None}
+            span = (max(years) - min(years) + 1) if years else 0
+            if n_years >= 2 and span < n_years:
+                ent.period_ent = []
+        _trace(
+            ent,
+            cls.CAT,
+            "pib_anual_largo_plazo",
+            f"frequency_ent=a (horizonte plurianual, n_anios~{n_years})",
+        )
+
+
+# ============================================================================
+# TIPO DE CONSULTA: 17 — PIB REGIONAL RANKING (más/menos creció)
+# ============================================================================
+#
+# EXPLICACIÓN DEL PROCESO
+#   Consultas como "cuál es la región que más/menos creció el último trimestre"
+#   o "qué región creció más/menos" no nombran una región específica, pero sí
+#   implican el contexto de PIB regional. El clasificador a veces no detecta
+#   region_cls="general" para estas preguntas (especialmente con "menos creció"),
+#   lo que resulta en has_region=0 y ruteo al cuadro de PIB nacional.
+#   Esta regla fuerza region_cls="general", indicator_ent="pib" y
+#   calc_mode_cls="yoy" para que el catalog devuelva el cuadro regional.
+#
+# Input   : ent.question con patrón "regi[oó]n" + "más/menos creció"
+# Output  : ent.region_cls="general", ent.indicator_ent="pib",
+#           ent.calc_mode_cls="yoy"
+# ============================================================================
+
+
+class Rule17_PibRegionalRanking:
+    """REGLA_17_PIB_REGIONAL_RANKING — región que más/menos creció."""
+
+    CAT = "CAT17"
+
+    # Pregunta que menciona "región" + comparativo de crecimiento (cualquier orden relativo)
+    # Cubre: "región que más/menos creció", "región creció más/menos", etc.
+    REGION_RE = re.compile(r"\bregi[oó]n\b", re.IGNORECASE)
+    CRECI_RE = re.compile(r"\bcreci(miento|[oó]|[eé]|[eé]n|endo)?\b", re.IGNORECASE)
+    COMP_RE = re.compile(r"\b(m[aá]s|menos|mayor(?:es)?|menor(?:es)?)\b", re.IGNORECASE)
+
+    @classmethod
+    def force_regional_ranking(cls, ent: ResolvedEntities) -> None:
+        # Ya tiene región específica resuelta → no aplica (Rule14 lo maneja)
+        if (
+            str(ent.region_cls or "").strip().lower() == "specific"
+            and str(ent.region_ent or "").strip()
+        ):
+            return
+        q = _ensure_text(ent.question)
+        if not (cls.REGION_RE.search(q) and cls.CRECI_RE.search(q) and cls.COMP_RE.search(q)):
+            return
+        ent.indicator_ent = "pib"
+        ent.region_cls = "general"
+        if str(ent.calc_mode_cls or "").strip().lower() not in ("yoy", "prev_period"):
+            ent.calc_mode_cls = "yoy"
+        _trace(
+            ent,
+            cls.CAT,
+            "pib_regional_ranking",
+            "region_cls=general, indicator_ent=pib, calc_mode=yoy (ranking más/menos creció)",
+        )
+
+
+
 # ============================================================================
 #
 # EXPLICACIÓN DEL PROCESO
@@ -1006,12 +1276,16 @@ _RULES_PIPELINE = [
     Rule02_VariacionesDesest.sa_implies_prev_period,
     Rule01_ContribucionGrupal.force_general,
     Rule03_ValidacionPeriodoIMACEC.force_monthly,
+    Rule15_CrecimientoChileToPIB.force_pib_for_crecimiento_anual,  # antes de Rule07/09
     Rule07_ContribucionIndividual.default_activity,
     Rule09_NivelesNominales.assign_price,
     Rule13_Historicos.apply_floor,
     Rule01_ContribucionGrupal.demanda_interna,
     Rule04_CrecimientoPIB.redirect_pib_monthly_to_quarterly,
+    Rule16_PibLargoPlazoAnual.force_annual_frequency,              # después de Rule04
+    Rule17_PibRegionalRanking.force_regional_ranking,     # antes de Rule14
     Rule14_PibRegionalDefaultYoY.force_yoy,
+    Rule12_PibRegional.flag_antartica_standalone,   # BUG-B2: alias geográfico
 ]
 
 
@@ -1126,6 +1400,11 @@ __all__ = [
     "Rule09_NivelesNominales",
     "Rule10_Participaciones",
     "Rule13_Historicos",
+    "Rule12_PibRegional",
+    "Rule14_PibRegionalDefaultYoY",
+    "Rule15_CrecimientoChileToPIB",
+    "Rule16_PibLargoPlazoAnual",
+    "Rule17_PibRegionalRanking",
     "RuleGreeting",
     # Predicates de ruteo
     "_is_calendar_intent",

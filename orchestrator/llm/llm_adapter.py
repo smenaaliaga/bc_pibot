@@ -135,7 +135,14 @@ Ayudas con consultas sobre indicadores económicos chilenos (IMACEC, PIB).
 - Si no hay evidencia suficiente, declara incertidumbre en vez de completar vacíos"""
     
     if mode == "rag":
-        return base + "\n\nMODO RAG: Usa el contexto de documentos recuperados para responder consultas metodológicas."
+        return base + (
+            "\n\nMODO RAG: Usa el contexto de documentos recuperados para responder consultas metodológicas."
+            "\nPROHIBICIONES ABSOLUTAS EN RESPUESTAS METODOLÓGICAS:"
+            "\n- NO incluyas frases de ofrecimiento o invitación como: 'Si quieres te lo explico con un ejemplo',"
+            " '¿Te gustaría que profundice?', 'Puedo explicarlo de otra forma', '¿Quieres más detalles?',"
+            " 'Si deseas más información', 'También te lo puedo explicar', o variantes similares."
+            "\n- Responde directamente con la información disponible. No ofrezcas ampliar ni reformular."
+        )
     return base + "\n\nMODO FALLBACK: Responde basándote en tu conocimiento general sobre economía chilena."
 
 

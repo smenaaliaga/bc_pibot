@@ -862,6 +862,8 @@ def run_app(
     def _decorate_links(text: str) -> str:
         """Mantiene la fuente BDE como hipervinculo markdown simple."""
         text = _sanitize_llm_html(text)
+        # Eliminar negritas markdown (**texto**) para estandarizar la visualización
+        text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
         # Reemplazar link de BDE con hipervinculo clasico
         text = _decor_re.sub(
             r'\[(?:🔗 )?(?:Ver serie en la )?(?:Base de Datos Estad[ií]sticos \(BDE\)|BDE)\]\((https?://[^)]+)\)',

@@ -1319,6 +1319,171 @@ def _build_seasonality_strict_instruction(
     return None
 
 
+def _compute_first_available_from_observations(
+    observations: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Recorre observations.series y devuelve un dict {freq_code: {period, value, yoy_pct, first_yoy_period, first_yoy_value, series_id, short_title}}.
+
+    Usado por BUG-A: cuando date_direction='earliest' el LLM debe anclar la
+    respuesta al primer record disponible. observations no expone
+    'first_available' directamente; se computa aquí a partir de
+    series[].data[FREQ].records[0] (los payloads están ordenados
+    cronológicamente ascendente).
+
+    Adicionalmente identifica el PRIMER record con yoy_pct no nulo
+    (``first_yoy_period``/``first_yoy_value``) para que la respuesta complemente
+    el dato histórico inicial con la primera variación interanual disponible
+    (ej. PIB 1960 sin yoy → PIB 1961 con yoy=5.5%).
+    """
+    result: Dict[str, Any] = {}
+    series_list = observations.get("series") or []
+    if not isinstance(series_list, list):
+        return result
+    for series in series_list:
+        if not isinstance(series, dict):
+            continue
+        data = series.get("data") or {}
+        if not isinstance(data, dict):
+            continue
+        for freq_code, block in data.items():
+            if not isinstance(block, dict):
+                continue
+            records = block.get("records") or []
+            if not records or not isinstance(records, list):
+                continue
+            first_rec = records[0]
+            if not isinstance(first_rec, dict):
+                continue
+            period = str(first_rec.get("period") or "").strip()
+            if not period:
+                continue
+            # Buscar el primer record con yoy_pct no nulo (siguiente período
+            # comparable: normalmente +1 año cronológicamente).
+            first_yoy_period: Optional[str] = None
+            first_yoy_value: Any = None
+            for rec in records:
+                if not isinstance(rec, dict):
+                    continue
+                yv = rec.get("yoy_pct")
+                if yv is None:
+                    continue
+                first_yoy_period = str(rec.get("period") or "").strip() or None
+                first_yoy_value = yv
+                break
+            # conservar el primer record por frecuencia (la más antigua)
+            cur = result.get(freq_code)
+            if cur is None or period < cur.get("period", "~"):
+                result[freq_code] = {
+                    "period": period,
+                    "value": first_rec.get("value"),
+                    "yoy_pct": first_rec.get("yoy_pct"),
+                    "first_yoy_period": first_yoy_period,
+                    "first_yoy_value": first_yoy_value,
+                    "series_id": str(series.get("series_id") or ""),
+                    "short_title": str(series.get("short_title") or ""),
+                }
+    return result
+
+
+def _build_earliest_data_instruction(
+    entities_ctx: Dict[str, Any],
+    observations: Dict[str, Any],
+) -> Optional[str]:
+    """Inyecta instrucción para consultas que piden el primer dato histórico disponible (BUG-A)."""
+    if str(entities_ctx.get("date_direction") or "").strip().lower() != "earliest":
+        return None
+    indicator = str(entities_ctx.get("indicator_ent") or "").strip().lower()
+
+    # 1) Preferir first_available expuesto a nivel observaciones (si existe).
+    first_available = observations.get("first_available") or {}
+    # 2) Fallback: computarlo desde los records.
+    if not first_available:
+        first_available = _compute_first_available_from_observations(observations)
+
+    if first_available:
+        lines = []
+        for k, v in first_available.items():
+            if not isinstance(v, dict):
+                lines.append(f"- {k}: {v}")
+                continue
+            period = v.get("period") or ""
+            value = v.get("value")
+            yoy = v.get("yoy_pct")
+            first_yoy_period = v.get("first_yoy_period")
+            first_yoy_value = v.get("first_yoy_value")
+            sid = v.get("series_id") or ""
+            extras = []
+            if value is not None:
+                extras.append(f"value={value}")
+            if yoy is not None:
+                extras.append(f"yoy_pct={yoy}")
+            if first_yoy_period and first_yoy_value is not None and yoy is None:
+                try:
+                    rounded_yoy = round(float(first_yoy_value), 1)
+                except (TypeError, ValueError):
+                    rounded_yoy = first_yoy_value
+                extras.append(
+                    f"first_yoy_period={first_yoy_period}, first_yoy_pct={rounded_yoy}"
+                )
+            extras_str = (" (" + ", ".join(extras) + ")") if extras else ""
+            lines.append(f"- frecuencia {k}: primer período = {period}{extras_str} [series_id={sid}]")
+        anchor = "PRIMER PERÍODO DISPONIBLE POR FRECUENCIA:\n" + "\n".join(lines)
+    else:
+        anchor = (
+            "No hay first_available explícito en los metadatos. Llama get_metadata "
+            "y/o get_series_data con frequency='M'|'T'|'A' y toma el PRIMER record "
+            "de la lista (el más antiguo cronológicamente)."
+        )
+
+    return (
+        f"REGLA DE DATO MÁS ANTIGUO ({indicator.upper() or 'SERIE'}) — PRIORIDAD MÁXIMA:\n"
+        "El usuario solicitó explícitamente el PRIMER dato histórico disponible "
+        "(expresiones: 'primer', 'más antiguo', 'más viejo', 'primero disponible').\n"
+        f"{anchor}\n"
+        "ESTRUCTURA OBLIGATORIA DE LA RESPUESTA (DOS PÁRRAFOS — NO OMITAS NINGUNO):\n"
+        " · PÁRRAFO 1 (valor original del PRIMER período): Reporta el campo 'value' "
+        "del PRIMER record, anclado al primer período indicado arriba. Ej.: 'En 1996-01, "
+        "el primer IMACEC disponible fue 42,49.' / 'En 1960, el primer PIB anual fue de "
+        "19.142 miles de millones de pesos encadenados.'\n"
+        " · PÁRRAFO 2 (variación del PERÍODO SIGUIENTE comparable): Si el primer record "
+        "NO trae yoy_pct, USA OBLIGATORIAMENTE los campos 'first_yoy_period' y "
+        "'first_yoy_pct' indicados arriba para describir la variación interanual del "
+        "PERÍODO SIGUIENTE de la serie. Formato literal: 'La primera variación interanual "
+        "disponible corresponde a {first_yoy_period}, cuando el {indicador} registró una "
+        "variación de {first_yoy_pct}% respecto al mismo período del año anterior.'\n"
+        "PROHIBIDO EXPLÍCITAMENTE EN EL PÁRRAFO 2:\n"
+        " · Frases como 'no tiene base de comparación', 'no existe una base comparable "
+        "previa', 'ese primer registro no incluye una variación', 'no hay variación "
+        "disponible'. NO uses esas frases: en su lugar EMITE la variación del período "
+        "siguiente usando first_yoy_period/first_yoy_pct.\n"
+        " · Omitir el párrafo 2 cuando first_yoy_period y first_yoy_pct están presentes "
+        "en el anchor (siempre que existan, DEBES emitirlos).\n"
+        "CASO EXCEPCIÓN: Si el primer record YA trae yoy_pct (no es None), entonces el "
+        "párrafo 2 reporta esa yoy_pct del MISMO período (no del siguiente).\n"
+        "REGLA DE ANULACIÓN: ESTA REGLA ANULA TODAS LAS REGLAS DE 'usar último período "
+        "disponible', 'latest_available', 'req_form_cls=latest'. NO menciones marzo 2026, "
+        "ni 2025, ni el último trimestre disponible.\n"
+        "RECOMENDACIÓN FINAL: Sugerir profundizar en la evolución desde ese primer "
+        "período hacia los siguientes, no en el dato reciente."
+    )
+
+
+def _build_region_alias_note_instruction(
+    entities_ctx: Dict[str, Any],
+) -> Optional[str]:
+    """Inyecta aclaración geográfica cuando el usuario dijo 'antártica' sin 'magallanes' (BUG-B2)."""
+    note = str(entities_ctx.get("region_alias_note") or "").strip().lower()
+    if note != "antartica_standalone":
+        return None
+    return (
+        "NOTA GEOGRÁFICA OBLIGATORIA:\n"
+        "'La Antártica Chilena' no existe como región independiente en el PIB Regional. "
+        "Es parte de la Región XII: 'Magallanes y de la Antártica Chilena'.\n"
+        "Debes aclarar esto al inicio de tu respuesta (primera o segunda oración), "
+        "luego presenta los datos de la Región de Magallanes como corresponde."
+    )
+
+
 def _normalize_freq_code(freq: Any) -> str:
     return _FREQ_CODE_MAP.get(str(freq or "").strip().lower(), "")
 
@@ -2194,16 +2359,15 @@ def _is_level_only_query(question: str, entities_ctx: Dict[str, Any]) -> bool:
          ``indicator_ent='pib_per_capita'``, ``activity_ent='per_capita'``,
          o el texto menciona explícitamente "nominal", "precios corrientes",
          "per cápita", "a cuánto asciende" → True.
-      4. Señal semántica del clasificador CON hint léxico de nivel: si
-         ``intent_cls='value'`` con ``calc_mode`` neutro ({'', 'original'})
-         Y el texto contiene un hint léxico fuerte de nivel monetario
-         ("monto", "valor en pesos/dólares", "cifra en pesos", "miles de
-         millones", "billones", "cuántos pesos", "en pesos") → True. Para
-         paráfrasis genéricas SIN hint ("valor del PIB", "cifra del PIB",
-         "cuánto fue el PIB", "PIB del último trimestre") devolvemos False
-         para que la respuesta sea sólo de variación (yoy_pct), conforme a
-         la convención macroeconómica chilena. IMACEC se excluye en esta
-         capa siempre (siempre es índice → variación interanual).
+      4. Señal semántica del clasificador: ``intent_cls='value'`` con
+         ``calc_mode`` neutro ({'', 'original'}) → True. Esto cubre
+         paráfrasis como "monto del IMACEC", "cuánto fue el PIB", "dame el
+         valor del IMACEC", "cifra del IMACEC", que el regex léxico previo
+         dejaba escapar. ``calc_mode='yoy'`` se excluye porque indica
+         intención variacional explícita del clasificador (e.g. "qué
+         actividad creció más", "cuánto creció el PIB"); en esos casos
+         debemos permitir tool calls (rank_series / get_series_data con
+         yoy_pct) en lugar de inyectar prefetch de nivel.
       5. Fallback léxico (compat): "nivel de/del X" sin tokens variacionales.
     """
     text = str(question or "")
@@ -2241,28 +2405,16 @@ def _is_level_only_query(question: str, entities_ctx: Dict[str, Any]) -> bool:
     )):
         return True
 
-    # 4. Señal semántica del clasificador con HINT léxico explícito de nivel.
-    #    Política: paráfrasis genéricas como "valor del PIB", "cifra del
-    #    PIB", "cuánto fue el PIB" / IMACEC NO deben gatillar prefetch de
-    #    nivel — por convención macroeconómica chilena se reportan como
-    #    variación interanual (yoy_pct). Solo activamos level-only cuando
-    #    el texto contiene un hint léxico fuerte de nivel monetario:
-    #    "monto", "valor en pesos/dólares", "cifra en pesos", "miles de
-    #    millones", "en pesos", "cuántos pesos".
+    # 4. Señal semántica del clasificador (cubre paráfrasis: valor, monto,
+    #    cifra, cuánto fue, dame el ..., etc.).
     if intent_cls == "value" and calc_mode in {"", "original"}:
+        # IMACEC es un índice base 2018=100 sin variante nominal: por
+        # convención macroeconómica chilena, "valor del IMACEC" = variación
+        # interanual (yoy_pct), no el nivel del índice. No cortamos en
+        # False aquí: dejamos caer a la capa 5 (regex léxico) para que
+        # "nivel del imacec" siga retornando True.
         if indicator_ent != "imacec":
-            level_hint_re = re.compile(
-                r"\b(?:monto|montos)\b"
-                r"|\bvalor\s+en\s+(?:peso|pesos|d[oó]lares|dolares|usd|clp)\b"
-                r"|\bcifra\s+en\s+(?:peso|pesos|d[oó]lares|dolares|usd|clp)\b"
-                r"|\bmiles\s+de\s+millones\b"
-                r"|\bbillones\b"
-                r"|\b(?:cu[aá]ntos?)\s+(?:peso|pesos|d[oó]lares|dolares)\b"
-                r"|\ben\s+(?:peso|pesos)\b",
-                re.IGNORECASE,
-            )
-            if level_hint_re.search(text_norm):
-                return True
+            return True
 
     # 5. Fallback léxico estricto.
     if re.search(r"\bnivel(?:es)?\s+de[l]?\s+(?!variaci|crecimient|ca[ií]da|aceleraci|alza|subid|bajad)\w+", text_norm):
@@ -2684,6 +2836,11 @@ def _build_level_prefetch_messages(
       - fetched:       dict con los records (para tracking CSV)
     Retorna None si no corresponde inyectar prefetch.
     """
+    # BUG-A: si la consulta pide el PRIMER dato histórico, NO precargar el
+    # último record (el prefetch sintético anclaría al LLM en el dato reciente).
+    if str(entities_ctx.get("date_direction") or "").strip().lower() == "earliest":
+        logger.info("[DATA_RESPONSE] level_prefetch skipped (date_direction=earliest)")
+        return None
     if not _is_level_only_query(question, entities_ctx):
         return None
     # Skip en consultas de PIB anual histórico/rango amplio: aquí debemos
@@ -3483,6 +3640,9 @@ def _build_no_explicit_period_latest_instruction(
     entities_ctx: Dict[str, Any],
     observations: Dict[str, Any],
 ) -> Optional[str]:
+    # BUG-A: si la pregunta pide el PRIMER dato histórico, no inyectar la regla de "último período".
+    if str(entities_ctx.get("date_direction") or "").strip().lower() == "earliest":
+        return None
     calc_mode = str(
         entities_ctx.get("calc_mode_cls")
         or entities_ctx.get("calc_mode")
@@ -4174,6 +4334,12 @@ def stream_data_response(
     hist_floor = entities_ctx.get("historical_floor_instruction")
     if hist_floor:
         messages.append({"role": "system", "content": hist_floor})
+    earliest_instruction = _build_earliest_data_instruction(entities_ctx, observations)
+    if earliest_instruction:
+        messages.append({"role": "system", "content": earliest_instruction})
+    region_alias_instruction = _build_region_alias_note_instruction(entities_ctx)
+    if region_alias_instruction:
+        messages.append({"role": "system", "content": region_alias_instruction})
     messages.append({"role": "user", "content": question})
 
     fetched_series: List[Dict[str, Any]] = []  # track get_series_data results
