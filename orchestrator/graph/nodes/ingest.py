@@ -545,6 +545,9 @@ def make_router_node():
                 "activity": history_entity.get("activity"),
                 "seasonality": history_entity.get("seasonality"),
                 "region": history_entity.get("region"),
+                "investment": history_entity.get("investment"),
+                "price": history_entity.get("price"),
+                "frequency": history_entity.get("frequency"),
                 "period": history_entity.get("period"),
             }
         _merge_entity_fields(primary_entity, history_payload)

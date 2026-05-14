@@ -4060,6 +4060,7 @@ def _build_filtered_source_url(
         observations=series_data.get("records") or [],
         frequency=frequency_for_url,
         calc_mode=calc_mode_for_url,
+        date_direction=entities_ctx.get("date_direction"),
     )
     return str(filtered or "").strip() or None
 

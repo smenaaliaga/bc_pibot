@@ -810,7 +810,8 @@ class Rule13_Historicos:
         r"|\bm[aá]s\s+viejo\b"
         r"|\bprimer\s+(?:dato|valor|registro|publicacion|imacec|pib)\b"
         r"|\bprimero\s+(?:disponible|publicado|registrado)\b"
-        r"|\bhistor\w+\s+disponible\s+m[aá]s\s+antiguo\b",
+        r"|\bhistor\w+\s+disponible\s+m[aá]s\s+antiguo\b"
+        r"|\bdesde\s+cu[aá]ndo\b",
         re.IGNORECASE,
     )
     # Guard: "primer trimestre" / "primera región" NO activan earliest

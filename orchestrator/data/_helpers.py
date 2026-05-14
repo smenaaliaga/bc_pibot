@@ -205,6 +205,7 @@ def build_target_series_url(
     observations: Optional[List[Dict[str, Any]]] = None,
     frequency: Optional[str] = None,
     calc_mode: Optional[str] = None,
+    date_direction: Optional[str] = None,
 ) -> Optional[str]:
     """Construye la URL de consulta para el explorador de series del Banco Central.
 
@@ -244,6 +245,16 @@ def build_target_series_url(
     observed_end_year = (
         str(observed_end_year_num) if observed_end_year_num is not None else None
     )
+
+    # date_direction='earliest' → la pregunta es por el primer/más antiguo dato.
+    # El enlace al cuadro debe abrir el año más antiguo observado, no años
+    # recientes que es lo que produce la lógica por defecto (que prioriza el
+    # período pedido o el último observado). Se hace antes de los cálculos
+    # subsiguientes para que toda la resolución de start/end use ese ancla.
+    is_earliest_request = str(date_direction or "").strip().lower() == "earliest"
+    if is_earliest_request and observed_start_year:
+        requested_start_year = observed_start_year
+        requested_end_year = observed_start_year
 
     use_observed_end = req == "latest" and not is_contribution_link
 
@@ -332,8 +343,12 @@ def build_target_series_url(
     # Para referencias URL en consultas fuera de rango (o con cálculo no disponible
     # en el año pedido), anclar al último período observable de la serie para evitar
     # enlaces que abran años sin dato útil en el cuadro BDE.
+    # Excepción: cuando la consulta es por el dato más antiguo (date_direction='earliest'),
+    # el ancla ya quedó fijada al observed_start_year y NO debe desplazarse al
+    # último año aunque ese punto no tenga variación interanual.
     if (
         not is_contribution_link
+        and not is_earliest_request
         and observed_start_year_num is not None
         and observed_end_year_num is not None
         and start_year
