@@ -119,9 +119,37 @@ def build_no_series_message(
     *,
     requested_activity: Optional[str] = None,
     indicator_label: Optional[str] = None,
+    seasonality_unavailable: Optional[Dict[str, Any]] = None,
 ) -> str:
-    """Genera un mensaje amigable cuando no se encuentra la serie solicitada."""
-    parts: List[str] = []
+    """Genera un mensaje amigable cuando no se encuentra la serie solicitada.
+
+    Args:
+        seasonality_unavailable: Si se proporciona, indica que la combinación
+            indicador + desestacionalizada no está disponible para el período
+            solicitado (usualmente pre-1996). Espera claves ``{"indicator":
+            str, "year": int, "floor_year": int}``. Genera un mensaje
+            específico explicando la limitación y ofreciendo la alternativa
+            histórica (serie empalmada sin desestacionalizar).
+    """
+    if seasonality_unavailable:
+        ind = str(seasonality_unavailable.get("indicator") or "").strip().upper() or "la serie"
+        year = seasonality_unavailable.get("year")
+        floor = seasonality_unavailable.get("floor_year") or 1996
+        parts: List[str] = []
+        parts.append(
+            f"La serie **{ind} desestacionalizada** solo está disponible desde {floor}. "
+            f"Para el período solicitado{f' ({year})' if year else ''} no existe versión desestacionalizada."
+        )
+        parts.append(
+            f"Puedes consultar la serie histórica de **{ind}** (sin ajuste estacional) "
+            f"que está disponible desde 1960, o reformular tu pregunta a partir de {floor}."
+        )
+        parts.append(
+            f"También puedes buscar y ver series en 🔗 [Catálogo BDE]({_BDE_SERIES_BROWSER_URL})."
+        )
+        return " ".join(parts)
+
+    parts = []
 
     if indicator_label and requested_activity:
         parts.append(
@@ -186,9 +214,35 @@ def handle_no_series(
     if indicator_label in {"", "[]", "NONE", "NULL"}:
         indicator_label = None
 
+    # Caso específico: PIB/IMACEC desestacionalizado solicitado para período
+    # previo a la disponibilidad de la serie SA (pre-1996). Producir mensaje
+    # informativo con la limitación y la alternativa histórica.
+    seasonality_unavailable: Optional[Dict[str, Any]] = None
+    try:
+        seasonality_val = str(getattr(ent, "seasonality_ent", "") or "").strip().lower()
+        indicator_norm = str(getattr(ent, "indicator_ent", "") or "").strip().lower()
+        if seasonality_val == "sa" and indicator_norm in {"pib", "imacec"}:
+            period_list = list(getattr(ent, "period_ent", None) or [])
+            ref_year: Optional[int] = None
+            for p in period_list:
+                m = re.search(r"((?:19|20)\d{2})", str(p or ""))
+                if m:
+                    ref_year = int(m.group(1))
+                    break
+            floor_year = 1996
+            if ref_year is not None and ref_year < floor_year:
+                seasonality_unavailable = {
+                    "indicator": indicator_norm,
+                    "year": ref_year,
+                    "floor_year": floor_year,
+                }
+    except Exception:
+        seasonality_unavailable = None
+
     text = build_no_series_message(
         requested_activity=requested_activity,
         indicator_label=indicator_label,
+        seasonality_unavailable=seasonality_unavailable,
     )
 
     logger.warning("[DATA_NODE] %s", text)
@@ -1370,6 +1424,21 @@ def _compute_first_available_from_observations(
                 first_yoy_period = str(rec.get("period") or "").strip() or None
                 first_yoy_value = yv
                 break
+            # Buscar el primer record con pct (var. c/r período anterior) no nulo.
+            # Útil para cuadros con calc_mode='prev_period' donde el "primer dato"
+            # significativo no es el primer level (que no tiene base previa) sino
+            # la primera variación disponible (ej. IMACEC desestacionalizado Feb-1996).
+            first_pct_period: Optional[str] = None
+            first_pct_value: Any = None
+            for rec in records:
+                if not isinstance(rec, dict):
+                    continue
+                pv = rec.get("pct")
+                if pv is None:
+                    continue
+                first_pct_period = str(rec.get("period") or "").strip() or None
+                first_pct_value = pv
+                break
             # conservar el primer record por frecuencia (la más antigua)
             cur = result.get(freq_code)
             if cur is None or period < cur.get("period", "~"):
@@ -1377,8 +1446,11 @@ def _compute_first_available_from_observations(
                     "period": period,
                     "value": first_rec.get("value"),
                     "yoy_pct": first_rec.get("yoy_pct"),
+                    "pct": first_rec.get("pct"),
                     "first_yoy_period": first_yoy_period,
                     "first_yoy_value": first_yoy_value,
+                    "first_pct_period": first_pct_period,
+                    "first_pct_value": first_pct_value,
                     "series_id": str(series.get("series_id") or ""),
                     "short_title": str(series.get("short_title") or ""),
                 }
@@ -1388,11 +1460,17 @@ def _compute_first_available_from_observations(
 def _build_earliest_data_instruction(
     entities_ctx: Dict[str, Any],
     observations: Dict[str, Any],
+    calc_mode: Optional[str] = None,
 ) -> Optional[str]:
     """Inyecta instrucción para consultas que piden el primer dato histórico disponible (BUG-A)."""
     if str(entities_ctx.get("date_direction") or "").strip().lower() != "earliest":
         return None
     indicator = str(entities_ctx.get("indicator_ent") or "").strip().lower()
+    cm = str(calc_mode or "").strip().lower()
+    # Para cuadros de variación (prev_period / yoy), el "primer dato" relevante
+    # es la primera variación disponible — no el level (que no aplica como
+    # respuesta a la pregunta del usuario que cargó un cuadro de variación).
+    is_variation_cuadro = cm in {"prev_period", "yoy"}
 
     # 1) Preferir first_available expuesto a nivel observaciones (si existe).
     first_available = observations.get("first_available") or {}
@@ -1409,14 +1487,19 @@ def _build_earliest_data_instruction(
             period = v.get("period") or ""
             value = v.get("value")
             yoy = v.get("yoy_pct")
+            pct = v.get("pct")
             first_yoy_period = v.get("first_yoy_period")
             first_yoy_value = v.get("first_yoy_value")
+            first_pct_period = v.get("first_pct_period")
+            first_pct_value = v.get("first_pct_value")
             sid = v.get("series_id") or ""
             extras = []
             if value is not None:
                 extras.append(f"value={value}")
             if yoy is not None:
                 extras.append(f"yoy_pct={yoy}")
+            if pct is not None:
+                extras.append(f"pct={pct}")
             if first_yoy_period and first_yoy_value is not None and yoy is None:
                 try:
                     rounded_yoy = round(float(first_yoy_value), 1)
@@ -1424,6 +1507,14 @@ def _build_earliest_data_instruction(
                     rounded_yoy = first_yoy_value
                 extras.append(
                     f"first_yoy_period={first_yoy_period}, first_yoy_pct={rounded_yoy}"
+                )
+            if first_pct_period and first_pct_value is not None and pct is None:
+                try:
+                    rounded_pct = round(float(first_pct_value), 1)
+                except (TypeError, ValueError):
+                    rounded_pct = first_pct_value
+                extras.append(
+                    f"first_pct_period={first_pct_period}, first_pct_value={rounded_pct}"
                 )
             extras_str = (" (" + ", ".join(extras) + ")") if extras else ""
             lines.append(f"- frecuencia {k}: primer período = {period}{extras_str} [series_id={sid}]")
@@ -1433,6 +1524,29 @@ def _build_earliest_data_instruction(
             "No hay first_available explícito en los metadatos. Llama get_metadata "
             "y/o get_series_data con frequency='M'|'T'|'A' y toma el PRIMER record "
             "de la lista (el más antiguo cronológicamente)."
+        )
+
+    if is_variation_cuadro and cm == "prev_period":
+        return (
+            f"REGLA DE DATO MÁS ANTIGUO ({indicator.upper() or 'SERIE'}) — PRIORIDAD MÁXIMA:\n"
+            "El usuario solicitó el PRIMER dato disponible, y el cuadro cargado "
+            "corresponde a VARIACIÓN RESPECTO AL PERÍODO ANTERIOR (calc_mode='prev_period').\n"
+            f"{anchor}\n"
+            "ESTRUCTURA OBLIGATORIA DE LA RESPUESTA (UN SOLO PÁRRAFO):\n"
+            " · Reporta la PRIMERA VARIACIÓN disponible respecto al período anterior "
+            "usando los campos 'first_pct_period' y 'first_pct_value' del anchor. "
+            "Formato: 'En {first_pct_period}, el {indicador} varió **X,X%** respecto "
+            "al período anterior.' (redondea a 1 decimal, usa coma decimal española).\n"
+            " · PROHIBIDO reportar el campo 'value' (level/nivel del índice) como "
+            "respuesta principal. PROHIBIDO mencionar variación interanual (yoy_pct) "
+            "o 'respecto al mismo período del año anterior'. Reporta SOLO la variación "
+            "respecto al período anterior (pct).\n"
+            " · Si la serie es desestacionalizada (seasonality='sa'), menciónalo "
+            "explícitamente ('el IMACEC desestacionalizado varió...').\n"
+            "REGLA DE ANULACIÓN: ESTA REGLA ANULA TODAS LAS REGLAS DE 'usar último "
+            "período disponible' o 'latest_available'.\n"
+            "RECOMENDACIÓN FINAL: Sugerir profundizar en la evolución reciente o "
+            "comportamiento de los meses siguientes."
         )
 
     return (
@@ -2821,6 +2935,81 @@ def _build_historical_pib_yoy_instruction(
     )
 
 
+def _is_historical_imacec_range(question: str, entities_ctx: Dict[str, Any]) -> bool:
+    """True para IMACEC mensual con rango histórico amplio.
+
+    Casos cubiertos:
+      - ``req_form_cls == 'range'`` con texto del tipo ``desde X``,
+        ``en adelante``, ``a partir de``, ``histórico`` o ``evolución``, o
+      - ``period_ent`` cubre 2+ años distintos.
+
+    En estos casos el LLM debe reportar la trayectoria mensual con foco en
+    extremos (min/max yoy), cobertura real (la serie empalmada parte en
+    enero de 1996) y los últimos datos disponibles — análogo al manejo del
+    PIB anual histórico.
+    """
+    indicator = str(entities_ctx.get("indicator_ent") or "").strip().lower()
+    if indicator != "imacec":
+        return False
+    frequency = str(entities_ctx.get("frequency_ent") or "").strip().lower()
+    if frequency != "m":
+        return False
+    req_form = str(entities_ctx.get("req_form_cls") or "").strip().lower()
+    if req_form != "range":
+        return False
+    text_norm = unicodedata.normalize("NFKD", str(question or "").lower())
+    text_norm = "".join(c for c in text_norm if not unicodedata.combining(c))
+    if re.search(
+        r"\b(desde|en\s+adelante|a\s+partir\s+de|hist[o\u00f3]ric|evoluci[o\u00f3]n)\b",
+        text_norm,
+    ):
+        return True
+    period = entities_ctx.get("period_ent") or []
+    years: List[int] = []
+    for value in period:
+        match = re.search(r"(\d{4})", str(value or ""))
+        if match:
+            years.append(int(match.group(1)))
+    return len(years) >= 2 and (max(years) - min(years)) >= 2
+
+
+def _build_historical_imacec_instruction(
+    question: str,
+    entities_ctx: Dict[str, Any],
+) -> Optional[str]:
+    """Instrucción específica para IMACEC mensual con rango amplio.
+
+    Análoga a ``_build_historical_pib_yoy_instruction`` para PIB anual:
+    obliga al LLM a llamar get_series_data y reportar la trayectoria con
+    foco en cobertura real, extremos (min/max yoy_pct) y los datos más
+    recientes; prohíbe responder ``n.d.`` o afirmar indisponibilidad.
+    """
+    if not _is_historical_imacec_range(question, entities_ctx):
+        return None
+    return (
+        "REGLA HISTÓRICA IMACEC MENSUAL (RANGO): esta consulta cubre un "
+        "rango amplio del IMACEC mensual. OBLIGATORIO:\n"
+        "1. Llama get_series_data con frequency='M' para obtener TODOS los "
+        "registros del rango solicitado.\n"
+        "2. Estructura la respuesta como resumen, no enumeración mes a mes:\n"
+        "   - PÁRRAFO 1: cobertura real (la serie empalmada del IMACEC parte "
+        "en enero de 1996) y último mes disponible.\n"
+        "   - PÁRRAFO 2: extremos del período en yoy_pct (mínimo y máximo con "
+        "su mes), y la variación más reciente vs la del mismo mes del año "
+        "previo.\n"
+        "3. Reporta variaciones INTERANUALES (yoy_pct) redondeadas a 1 decimal. "
+        "Si yoy_pct no existe para el primer mes (enero de 1996 no tiene "
+        "base de comparación), NO escribas 'n.d.': simplemente omite esa "
+        "mención y empieza desde el primer mes con yoy_pct disponible.\n"
+        "4. ESTÁ PROHIBIDO afirmar 'no dispongo de los valores', 'no tengo "
+        "cargados los datos' o frases similares: la serie histórica del "
+        "IMACEC está completa en get_series_data desde 1996-01.\n"
+        "5. ESTÁ PROHIBIDO escribir 'n.d.', 'no disponible' o similares "
+        "para una variación que sí existe en la serie."
+    )
+
+
+
 def _build_level_prefetch_messages(
     question: str,
     entities_ctx: Dict[str, Any],
@@ -2849,6 +3038,11 @@ def _build_level_prefetch_messages(
     if _is_historical_pib_range(question, entities_ctx):
         logger.info(
             "[DATA_RESPONSE] level_prefetch skipped (historical pib annual range)"
+        )
+        return None
+    if _is_historical_imacec_range(question, entities_ctx):
+        logger.info(
+            "[DATA_RESPONSE] level_prefetch skipped (historical imacec monthly range)"
         )
         return None
     # Skip en cuadros de participación/share: sus series son porcentajes sobre
@@ -4332,10 +4526,18 @@ def stream_data_response(
     )
     if historical_pib_yoy_instruction:
         messages.append({"role": "system", "content": historical_pib_yoy_instruction})
+    historical_imacec_instruction = _build_historical_imacec_instruction(
+        question=question,
+        entities_ctx=entities_ctx,
+    )
+    if historical_imacec_instruction:
+        messages.append({"role": "system", "content": historical_imacec_instruction})
     hist_floor = entities_ctx.get("historical_floor_instruction")
     if hist_floor:
         messages.append({"role": "system", "content": hist_floor})
-    earliest_instruction = _build_earliest_data_instruction(entities_ctx, observations)
+    earliest_instruction = _build_earliest_data_instruction(
+        entities_ctx, observations, calc_mode=effective_calc_mode or calc_mode_ctx
+    )
     if earliest_instruction:
         messages.append({"role": "system", "content": earliest_instruction})
     region_alias_instruction = _build_region_alias_note_instruction(entities_ctx)

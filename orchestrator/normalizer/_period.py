@@ -722,6 +722,27 @@ def resolve_period(
     has_year_only = False
     is_quarterly = (frequency == "q") or any(has_quarter_ref(r) for r in raw_values if r)
 
+    # Detección de rango abierto hacia adelante: "desde X en adelante",
+    # "a partir de X", "desde X" (sin ``hasta``/segundo año explícito).
+    # En estos casos el límite superior se extiende a la fecha actual.
+    def _is_open_ended_forward(values: List[str]) -> bool:
+        for raw in values:
+            if not raw:
+                continue
+            n = normalize_text(str(raw))
+            if re.search(r"\ben\s+adelante\b", n) or re.search(r"\ba\s+partir\s+de(?:l)?\b", n):
+                return True
+            if "desde" in n:
+                # "desde X" sin "hasta Y" y sin un segundo año explícito → abierto.
+                if "hasta" in n:
+                    continue
+                years = re.findall(r"\b(?:19|20)\d{2}\b", n)
+                if len(years) <= 1:
+                    return True
+        return False
+
+    open_ended_forward = _is_open_ended_forward(raw_values)
+
     # 1. Intentar resolución de referencias relativas.
     for raw in raw_values:
         if not raw:
@@ -843,6 +864,15 @@ def resolve_period(
     if req == "range":
         s = sorted(parsed)
         first = fmt_month_start(s[0])
+        # Rango abierto hacia adelante: extender el límite superior a hoy.
+        if open_ended_forward:
+            if has_year_only and frequency != "m" and not is_quarterly:
+                last = f"{now.year:04d}-12-31"
+            elif is_quarterly:
+                last = fmt_quarter_end(now)
+            else:
+                last = fmt_month_end(now)
+            return [first, last]
         if has_year_only and all(d.month == 1 and d.day == 1 for d in s):
             last = f"{s[-1].year:04d}-12-31"
         elif is_quarterly:

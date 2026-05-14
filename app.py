@@ -1150,7 +1150,7 @@ def run_app(
         if final or not stream_cursor_enabled:
             placeholder.markdown(_decorate_links(content) or "\u200B", unsafe_allow_html=True)
         else:
-            placeholder.markdown((content or "\u200B") + "▌")
+            placeholder.markdown((_decorate_links(content) or "\u200B") + "▌")
 
     def handle_chunk(chunk: str) -> None:
         nonlocal collecting_csv, collecting_chart, collecting_followup, buffer_csv, buffer_chart, buffer_followup, raw_text_accum, text_accum, _debug_chunk_idx, first_stream_piece_rendered, thinking_frame
