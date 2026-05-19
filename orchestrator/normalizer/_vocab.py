@@ -82,10 +82,58 @@ ACTIVITY_TERMS_PIB: Dict[str, List[str]] = {
     "agropecuario": ["agro", "agropecuario", "agropecuaria"],
     "pesca": ["pesca", "pesquero"],
     "mineria": ["mineria", "minería", "minero", "minera"],
+    "mineria_cobre": [
+        "mineria del cobre", "minería del cobre", "cobre", "del cobre",
+    ],
+    "otras_actividades_mineras": [
+        "otras actividades mineras", "otras mineras", "otra mineria",
+        "otras minerías",
+    ],
     "no_mineria": ["no minero", "no minería", "no mineria"],
     "industria": [
         "industria", "industrial", "manufacturera", "industria manufacturera",
         "manufactura",
+    ],
+    # Sub-actividades de Industria Manufacturera (publicadas en los cuadros
+    # "PIB por clase de actividad económica"). Añadirlas aquí permite que el
+    # normalizer reconozca consultas como "PIB de celulosa" o "alimentos y
+    # bebidas" y resuelva activity_ent (evita que se dispare la instrucción
+    # 'actividad no disponible' cuando la serie sí existe en el data_store).
+    "alimentos_bebidas_tabaco": [
+        "alimentos bebidas y tabaco", "alimentos, bebidas y tabaco",
+        "alimentos y bebidas", "alimentos", "bebidas y tabaco", "tabaco",
+        "bebidas",
+    ],
+    "textil_vestir_cuero_calzado": [
+        "textil prendas de vestir cuero y calzado",
+        "textil, prendas de vestir, cuero y calzado",
+        "textil", "textiles", "prendas de vestir", "cuero y calzado",
+        "calzado", "cuero",
+    ],
+    "maderas_muebles": [
+        "maderas y muebles", "maderas", "muebles", "madera",
+    ],
+    "celulosa_papel_imprentas": [
+        "celulosa papel e imprentas", "celulosa, papel e imprentas",
+        "celulosa", "papel e imprentas", "papel", "imprentas",
+    ],
+    "quimica_petroleo_caucho_plastico": [
+        "quimica petroleo caucho y plastico",
+        "química, petróleo, caucho y plástico",
+        "quimica", "química", "petroquimica", "petróleo", "petroleo",
+        "caucho", "plastico", "plástico",
+    ],
+    "minerales_no_metalicos_metalica_basica": [
+        "minerales no metalicos y metalica basica",
+        "minerales no metálicos y metálica básica",
+        "minerales no metalicos", "minerales no metálicos",
+        "metalica basica", "metálica básica",
+    ],
+    "productos_metalicos_maquinaria": [
+        "productos metalicos maquinaria equipos y otros",
+        "productos metálicos, maquinaria, equipos y otros",
+        "productos metalicos", "productos metálicos",
+        "maquinaria y equipos", "maquinaria", "equipos",
     ],
     "electricidad": [
         "electricidad", "energía", "energético", "electricidad gas y agua",

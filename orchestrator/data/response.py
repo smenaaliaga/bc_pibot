@@ -28,6 +28,8 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from langgraph.types import StreamWriter
 from orchestrator.data._helpers import build_target_series_url
+from orchestrator.normalizer._text import best_vocab_key
+from orchestrator.normalizer._vocab import ACTIVITY_TERMS_PIB
 
 logger = logging.getLogger(__name__)
 
@@ -1752,6 +1754,7 @@ def _build_missing_activity_instruction(
         return None
 
     available_activities: List[Tuple[str, str]] = []
+    available_vocab_keys: set = set()
     for series in observations.get("series", []) or []:
         cls = series.get("classification_series", {})
         if not isinstance(cls, dict):
@@ -1760,12 +1763,22 @@ def _build_missing_activity_instruction(
         activity = _normalize_token(raw_label)
         if activity and raw_label:
             available_activities.append((activity, raw_label))
+        else:
+            # Sub-actividades sin classification_series.activity — usar short_title
+            short_title = str(series.get("short_title") or "").strip()
+            if short_title:
+                vocab_key = best_vocab_key(short_title.lower(), ACTIVITY_TERMS_PIB, threshold=0.6)
+                if vocab_key:
+                    available_vocab_keys.add(vocab_key)
 
-    if not available_activities:
+    if not available_activities and not available_vocab_keys:
         return None
 
     available_set = {token for token, _ in available_activities}
     if requested_activity in available_set:
+        return None
+    # Sub-actividades identificadas por short_title también se consideran disponibles
+    if requested_activity in available_vocab_keys:
         return None
 
     labels_by_token: Dict[str, str] = {}
@@ -1801,6 +1814,10 @@ def _build_missing_activity_instruction(
         f"Usa literalmente esta lista (en el mismo idioma y sin reinterpretar), separada por comas: {options}. "
         "PROHIBIDO usar expresiones como 'actividad similar', 'más cercana', 'proxy' o "
         "'como referencia usar ...'. "
+        "PROHIBIDO ABSOLUTO mencionar cualquier valor numérico, porcentaje, variación (yoy/qoq/anual), "
+        "frase 'el último dato disponible', 'dato más reciente', 'para la actividad consultada "
+        "el último dato', 'la actividad consultada muestra', ni atribuir cifras de OTRA actividad a la "
+        "actividad solicitada. Si el contexto contiene números, IGNÓRALOS por completo. "
         "Usa nombres naturales de actividades (sin guiones bajos, sin códigos técnicos). "
         "NO reemplaces por la serie agregada (PIB total) ni por otra actividad, y NO inventes valores."
     )
@@ -1866,6 +1883,10 @@ def _build_prevalidated_missing_specific_activity_instruction(
         f"Usa literalmente esta lista (en el mismo idioma y sin reinterpretar), separada por comas: {options}. "
         "PROHIBIDO usar expresiones como 'actividad similar', 'más cercana', 'proxy' o "
         "'como referencia usar ...'. "
+        "PROHIBIDO ABSOLUTO mencionar cualquier valor numérico, porcentaje, variación (yoy/qoq/anual), "
+        "frase 'el último dato disponible', 'dato más reciente', 'para la actividad consultada "
+        "el último dato', 'la actividad consultada muestra', ni atribuir cifras de OTRA actividad a la "
+        "actividad solicitada. Si el contexto contiene números, IGNÓRALOS por completo. "
         "Usa nombres naturales de actividades (sin guiones bajos, sin códigos técnicos). "
         "NO reemplaces por PIB total, NO uses actividades proxy y NO inventes cifras. "
         "Esta regla alternativa reemplaza el flujo de contribución específica para este turno."
@@ -4469,6 +4490,15 @@ def stream_data_response(
     )
     if missing_activity_instruction:
         messages.append({"role": "system", "content": missing_activity_instruction})
+    # Modo "actividad no disponible": cuando alguna de las dos instrucciones
+    # anteriores está activa, NO debemos inyectar prefetch de series ni permitir
+    # tool_calls al LLM, porque cualquier número que llegue al contexto puede
+    # contaminar la respuesta (LLM mezclaba "no disponible" + cifra de otra
+    # serie produciendo respuestas contradictorias).
+    activity_unavailable_mode = bool(
+        prevalidated_missing_specific_activity_instruction
+        or missing_activity_instruction
+    )
     contribution_activity_focus_instruction = _build_contribution_activity_focus_instruction(
         question=question,
         entities_ctx=entities_ctx,
@@ -4560,6 +4590,11 @@ def stream_data_response(
         or _build_level_prefetch_messages(question, entities_ctx, observations)
     )
     first_call_tool_choice: Any = None
+    # En modo "actividad no disponible" descartamos cualquier prefetch para que
+    # el LLM no reciba valores numéricos que pueda mezclar con la negativa.
+    if activity_unavailable_mode:
+        level_prefetch = None
+        first_call_tool_choice = "none"
     if level_prefetch is not None:
         messages.append(level_prefetch["assistant_msg"])
         messages.append(level_prefetch["tool_msg"])
@@ -4580,6 +4615,10 @@ def stream_data_response(
             }
             if iteration_idx == 0 and first_call_tool_choice is not None:
                 call_kwargs["tool_choice"] = first_call_tool_choice
+            elif activity_unavailable_mode:
+                # Mantener bloqueo de tool calls durante todas las iteraciones
+                # del modo "actividad no disponible".
+                call_kwargs["tool_choice"] = "none"
             stream = client.chat.completions.create(**call_kwargs)
 
             # Acumular respuesta streameada
