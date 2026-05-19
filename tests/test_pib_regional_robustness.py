@@ -161,7 +161,8 @@ def test_imacec_point_keeps_original():
 
 
 def test_pib_sectorial_point_keeps_original():
-    """PIB sectorial sin región: la regla NO aplica."""
+    """PIB sectorial sin región: Rule14 NO aplica (es regional).
+    Rule18_PibActivityDefaultYoY SÍ aplica → calc_mode=yoy."""
     ent = ResolvedEntities(
         question="pib de la minería el último trimestre",
         indicator_ent="pib",
@@ -174,7 +175,7 @@ def test_pib_sectorial_point_keeps_original():
         req_form_cls="point",
     )
     apply_business_rules(ent)
-    assert ent.calc_mode_cls == "original"
+    assert ent.calc_mode_cls == "yoy"
 
 
 def test_pib_regional_general_keeps_original():

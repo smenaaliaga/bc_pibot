@@ -653,3 +653,48 @@ def test_sanitize_contribution_tool_result_no_change_for_non_contribution_modes(
     parsed = response_module.json.loads(out)
     assert parsed["records"][0]["value"] == -0.1
     assert "contribution_direction" not in parsed["records"][0]
+
+
+# ---------------------------------------------------------------------------
+# Bug fix: actividad solicitada specific con activity_ent vacío (ej. "Celulosa,
+# papel e imprentas"). El sistema debía evitar respuestas contradictorias
+# donde el LLM negaba la disponibilidad y a la vez mencionaba un valor de otra
+# serie. Tests deterministas sobre los prompts y sobre el flag de inhibición
+# de tool calls.
+# ---------------------------------------------------------------------------
+
+
+def test_prevalidated_missing_specific_forbids_numeric_phrasing():
+    text = response_module._build_prevalidated_missing_specific_activity_instruction(
+        entities_ctx={
+            "activity_cls": "specific",
+            "indicator_ent": "pib",
+            "activity_ent": "",
+        },
+        observations={
+            "series": [
+                {"classification_series": {"activity": "Producción de bienes"}},
+            ]
+        },
+    )
+    assert text is not None
+    assert "PROHIBIDO ABSOLUTO mencionar cualquier valor numérico" in text
+    assert "último dato disponible" in text
+    assert "la actividad consultada muestra" in text
+    assert "IGNÓRALOS" in text
+
+
+def test_missing_activity_instruction_forbids_numeric_phrasing():
+    text = response_module._build_missing_activity_instruction(
+        entities_ctx={"activity_ent": "mineria", "activity_cls": "specific"},
+        observations={
+            "series": [
+                {"classification_series": {"activity": "industria"}},
+                {"classification_series": {"activity": "servicios"}},
+                {"classification_series": {"indicator": "pib"}},
+            ]
+        },
+    )
+    assert text is not None
+    assert "PROHIBIDO ABSOLUTO mencionar cualquier valor numérico" in text
+    assert "último dato disponible" in text

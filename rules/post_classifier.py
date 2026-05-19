@@ -152,6 +152,17 @@ _IMACEC_ACTIVITY_HINTS = {
 _PREVIOUS_ACTIVITY_HINTS = {"comercio", "impuesto"}
 
 
+# Hints léxicos compartidos: el usuario pide explícitamente el NIVEL/MONTO
+# de una serie (no su variación). Usado por Rule14 (PIB regional) y Rule18
+# (PIB por actividad) para NO forzar a yoy cuando hay intención de nivel.
+_LEVEL_HINTS_RE = re.compile(
+    r"\b(monto|nivel(?:es)?|valor(?:es)?\s+en\s+pesos?|"
+    r"miles\s+de\s+millones|cu[aá]nt[oa]s?\s+pesos?|en\s+pesos?\b|"
+    r"a\s+cu[aá]nto\s+ascien)",
+    re.IGNORECASE,
+)
+
+
 # ============================================================================
 # TIPO DE CONSULTA: 01 — CONTRIBUCIÓN GRUPAL
 # ============================================================================
@@ -952,12 +963,8 @@ class Rule14_PibRegionalDefaultYoY:
 
     CAT = "CAT14"
 
-    LEVEL_HINTS_RE = re.compile(
-        r"\b(monto|nivel(?:es)?|valor(?:es)?\s+en\s+pesos?|"
-        r"miles\s+de\s+millones|cu[aá]nt[oa]s?\s+pesos?|en\s+pesos?\b|"
-        r"a\s+cu[aá]nto\s+ascien)",
-        re.IGNORECASE,
-    )
+    # Alias para compatibilidad: la fuente de verdad es ``_LEVEL_HINTS_RE``.
+    LEVEL_HINTS_RE = _LEVEL_HINTS_RE
 
     @classmethod
     def force_yoy(cls, ent: ResolvedEntities) -> None:
@@ -1218,6 +1225,73 @@ class Rule17_PibRegionalRanking:
         )
 
 
+# ============================================================================
+# TIPO DE CONSULTA: 18 — PIB POR ACTIVIDAD · default YoY (no regional)
+# ============================================================================
+#
+# EXPLICACIÓN DEL PROCESO
+#   Análogo a Rule14 pero para PIB por ACTIVIDAD (sin región). Cuando el
+#   usuario pregunta "cuál es el pib minero", "cuál es el valor del pib de
+#   transporte", etc., el clasificador deja calc_mode=original, lo que hace
+#   que el data node retorne el NIVEL en miles de millones de pesos y, peor
+#   aún, que la búsqueda en la familia de niveles seleccione una serie
+#   distinta a la solicitada (ej. "pib minero" → "pib no minero") porque la
+#   organización de series por nivel difiere de la organización YoY.
+#
+#   La interpretación natural de "cuál es el PIB de <actividad>" es la
+#   variación interanual (yoy), salvo que el usuario indique nivel/monto
+#   explícitamente (LEVEL_HINTS_RE).
+#
+# Trigger : indicator_ent=pib, activity_cls=specific, region_cls!=specific,
+#           calc_mode_cls=original, req_form_cls in {point, latest},
+#           sin hints léxicos de nivel.
+# Output  : calc_mode_cls=yoy
+# ============================================================================
+
+
+class Rule18_PibActivityDefaultYoY:
+    """REGLA_18_PIB_ACTIVITY_DEFAULT_YOY."""
+
+    CAT = "CAT18"
+
+    # Alias para compatibilidad: la fuente de verdad es ``_LEVEL_HINTS_RE``.
+    LEVEL_HINTS_RE = _LEVEL_HINTS_RE
+
+    # req_form aceptados:
+    #   - 'point'  → período explícito ("pib minero del 2024")
+    #   - 'latest' → consulta genérica ("cuál es el pib minero")
+    #   - 'range'  → rango temporal ("pib minero últimos 4 trimestres")
+    _REQ_FORMS = ("point", "latest", "range")
+
+    @classmethod
+    def force_yoy(cls, ent: ResolvedEntities) -> None:
+        if (str(ent.indicator_ent or "").strip().lower()) != "pib":
+            return
+        # Debe ser actividad específica resuelta
+        if (str(ent.activity_cls or "").strip().lower()) != "specific":
+            return
+        if not (str(ent.activity_ent or "").strip()):
+            return
+        # NO aplicar si es regional (Rule14 maneja regional)
+        if (str(ent.region_cls or "").strip().lower()) == "specific":
+            return
+        if (str(ent.calc_mode_cls or "").strip().lower()) != "original":
+            return
+        if (str(ent.req_form_cls or "").strip().lower()) not in cls._REQ_FORMS:
+            return
+        q = _ensure_text(ent.question)
+        if cls.LEVEL_HINTS_RE.search(q):
+            return
+        ent.calc_mode_cls = "yoy"
+        _trace(
+            ent,
+            cls.CAT,
+            "pib_activity_default_yoy",
+            f"activity_ent={ent.activity_ent} → calc_mode=yoy",
+        )
+
+    # Methods / Functions / Exceptions: (none)
+
 
 # ============================================================================
 #
@@ -1286,6 +1360,7 @@ _RULES_PIPELINE = [
     Rule16_PibLargoPlazoAnual.force_annual_frequency,              # después de Rule04
     Rule17_PibRegionalRanking.force_regional_ranking,     # antes de Rule14
     Rule14_PibRegionalDefaultYoY.force_yoy,
+    Rule18_PibActivityDefaultYoY.force_yoy,         # PIB por actividad (no regional)
     Rule12_PibRegional.flag_antartica_standalone,   # BUG-B2: alias geográfico
 ]
 
@@ -1406,6 +1481,7 @@ __all__ = [
     "Rule15_CrecimientoChileToPIB",
     "Rule16_PibLargoPlazoAnual",
     "Rule17_PibRegionalRanking",
+    "Rule18_PibActivityDefaultYoY",
     "RuleGreeting",
     # Predicates de ruteo
     "_is_calendar_intent",

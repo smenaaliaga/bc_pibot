@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import re
 import logging
+from datetime import date as _date
 from typing import Optional, List, Dict, Any, Iterable
 
 logger = logging.getLogger(__name__)
@@ -79,41 +80,60 @@ CALENDAR_URL = (
 CALENDAR_LINK_LABEL = "Calendario de Publicaciones 2026"
 CALENDAR_LINK_MD = f"[{CALENDAR_LINK_LABEL}]({CALENDAR_URL})"
 
-CALENDAR_2026_TEXT = (
-    "\n\nCALENDARIO DE PUBLICACIONES ESTADÍSTICAS 2026 (Cuentas Nacionales):\n"
-    "Fuente oficial: " + CALENDAR_LINK_MD + "\n"
-    "\n"
-    "IMACEC:\n"
-    "- 04-05-2026: IMACEC - marzo 2026\n"
-    "- 01-06-2026: IMACEC - abril 2026\n"
-    "- 01-07-2026: IMACEC - mayo 2026\n"
-    "- 03-08-2026: IMACEC - junio 2026\n"
-    "- 01-09-2026: IMACEC - julio 2026\n"
-    "- 01-10-2026: IMACEC - agosto 2026\n"
-    "- 02-11-2026: IMACEC - septiembre 2026\n"
-    "- 01-12-2026: IMACEC - octubre 2026\n"
-    "\n"
-    "PIB (Cuentas Nacionales Trimestrales):\n"
-    "- 18-05-2026: Cuentas Nacionales Trimestrales - 1er trim 2026\n"
-    "- 18-08-2026: Cuentas Nacionales Trimestrales - 2do trim 2026\n"
-    "- 18-11-2026: Cuentas Nacionales Trimestrales - 3er trim 2026\n"
-    "\n"
-    "PIB REGIONAL:\n"
-    "- 23-04-2026: PIB Regional trimestral - 4° trim 2025\n"
-    "- 23-06-2026: PIB Regional trimestral - 1er trim 2026\n"
-    "- 23-09-2026: PIB Regional trimestral - 2do trim 2026\n"
-    "- 23-12-2026: PIB Regional trimestral - 3er trim 2026\n"
-    "\n"
-    "Usa EXCLUSIVAMENTE estas fechas para responder cuándo se publica el próximo indicador.\n"
-    "Escribe una respuesta natural y conversacional: comienza con una frase introductoria "
-    "(por ejemplo: \"El calendario de publicaciones del IMACEC para 2026 es:\") y a continuación lista las fechas.\n"
-    "IMPORTANTE: NO incluyas ningún enlace markdown [Calendario...](...) ni URLs en el cuerpo de la respuesta.\n"
-    "NO escribas frases como 'puedes revisar el calendario aquí', 'ver el calendario completo', "
-    "'más información en el enlace' o similares. El enlace oficial al calendario se agrega automáticamente "
-    "en la sección de referencias al final.\n"
-    "NUNCA muestres URLs en texto plano.\n"
-    "NUNCA uses la URL https://www.bcentral.cl/web/banco-central/areas/estadisticas/calendario-de-publicaciones"
-)
+# Datos estructurados del calendario; se filtran dinámicamente por fecha.
+_CALENDAR_2026_ENTRIES: Dict[str, List[tuple]] = {
+    "IMACEC": [
+        ("04-05-2026", "IMACEC - marzo 2026"),
+        ("01-06-2026", "IMACEC - abril 2026"),
+        ("01-07-2026", "IMACEC - mayo 2026"),
+        ("03-08-2026", "IMACEC - junio 2026"),
+        ("01-09-2026", "IMACEC - julio 2026"),
+        ("01-10-2026", "IMACEC - agosto 2026"),
+        ("02-11-2026", "IMACEC - septiembre 2026"),
+        ("01-12-2026", "IMACEC - octubre 2026"),
+    ],
+    "PIB (Cuentas Nacionales Trimestrales)": [
+        ("18-05-2026", "Cuentas Nacionales Trimestrales - 1er trim 2026"),
+        ("18-08-2026", "Cuentas Nacionales Trimestrales - 2do trim 2026"),
+        ("18-11-2026", "Cuentas Nacionales Trimestrales - 3er trim 2026"),
+    ],
+    "PIB REGIONAL": [
+        ("23-04-2026", "PIB Regional trimestral - 4° trim 2025"),
+        ("23-06-2026", "PIB Regional trimestral - 1er trim 2026"),
+        ("23-09-2026", "PIB Regional trimestral - 2do trim 2026"),
+        ("23-12-2026", "PIB Regional trimestral - 3er trim 2026"),
+    ],
+}
+
+
+def _build_calendar_text() -> str:
+    """Construye el texto del calendario incluyendo solo fechas estrictamente futuras."""
+    today = _date.today()
+    lines: List[str] = [
+        "\n\nCALENDARIO DE PUBLICACIONES ESTADÍSTICAS 2026 (Cuentas Nacionales):\n",
+        f"Fuente oficial: {CALENDAR_LINK_MD}\n",
+    ]
+    for section, entries in _CALENDAR_2026_ENTRIES.items():
+        future = [
+            (d, label) for d, label in entries
+            if _date(int(d[6:]), int(d[3:5]), int(d[:2])) > today
+        ]
+        if future:
+            lines.append(f"\n{section}:\n")
+            for d, label in future:
+                lines.append(f"- {d}: {label}\n")
+    lines += [
+        "\nUsa EXCLUSIVAMENTE estas fechas para responder cuándo se publica el próximo indicador.\n",
+        "Escribe una respuesta natural y conversacional: comienza con una frase introductoria "
+        "(por ejemplo: \"El calendario de publicaciones del IMACEC para 2026 es:\") y a continuación lista las fechas.\n",
+        "IMPORTANTE: NO incluyas ningún enlace markdown [Calendario...](...) ni URLs en el cuerpo de la respuesta.\n",
+        "NO escribas frases como 'puedes revisar el calendario aquí', 'ver el calendario completo', "
+        "'más información en el enlace' o similares. El enlace oficial al calendario se agrega automáticamente "
+        "en la sección de referencias al final.\n",
+        "NUNCA muestres URLs en texto plano.\n",
+        "NUNCA uses la URL https://www.bcentral.cl/web/banco-central/areas/estadisticas/calendario-de-publicaciones",
+    ]
+    return "".join(lines)
 
 
 def _is_calendar_question(question: str) -> bool:
@@ -283,7 +303,7 @@ class LLMAdapter:
                 pass
         # Inject publication calendar when the question is about dates
         if _is_calendar_question(question):
-            system_content += CALENDAR_2026_TEXT
+            system_content += _build_calendar_text()
         # Knowledge base (RAG) context
         if self._retriever:
             try:
